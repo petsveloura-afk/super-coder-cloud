@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
 
 export const SHOTS = process.env.E2E_SCREENSHOTS_DIR;
@@ -6,7 +7,11 @@ export function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.floor(Math.random() * 1e5)}@e2e.test`;
 }
 
-export const PASSWORD = "E2eStrongPass2026";
+/**
+ * Password for throwaway E2E users. Generated per test run (never committed),
+ * or supplied via E2E_PASSWORD. Always ≥10 chars with letters and digits.
+ */
+export const PASSWORD = process.env.E2E_PASSWORD ?? `E2e${randomBytes(12).toString("hex")}7x`;
 
 export async function signUp(page: Page, opts: { name: string; email: string; locale?: string }) {
   const locale = opts.locale ?? "he";
