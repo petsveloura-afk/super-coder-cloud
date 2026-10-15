@@ -1,0 +1,25 @@
+{
+  "name": "super-coder-cloud",
+  "private": true,
+  "version": "1.0.0-phase1",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @scc/web dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:db": "node scripts/validation/run-db-tests.mjs",
+    "test:e2e": "pnpm --filter @scc/web test:e2e",
+    "check:env": "node scripts/validation/check-env.mjs",
+    "gen:permissions": "node scripts/setup/generate-permissions-sql.mjs",
+    "worker": "pnpm --filter @scc/worker start"
+  },
+  "devDependencies": {
+    "turbo": "2.11.8",
+    "typescript": "5.9.3"
+  }
+}

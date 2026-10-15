@@ -1,0 +1,34 @@
+name: Deploy database migrations
+
+# The Next.js app deploys through Vercel's Git integration (push → build).
+# This workflow applies Supabase migrations to production on main, AFTER CI.
+# Required repository secrets:
+#   SUPABASE_ACCESS_TOKEN   (supabase.com → Account → Access Tokens)
+#   SUPABASE_PROJECT_REF    (project settings → General → Reference ID)
+#   SUPABASE_DB_PASSWORD    (project database password)
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+      - name: Show pending migrations
+        run: supabase migration list
+      - name: Apply migrations
+        run: supabase db push

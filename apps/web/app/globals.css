@@ -1,0 +1,180 @@
+@import "tailwindcss";
+@import "@fontsource-variable/heebo";
+@import "@fontsource-variable/noto-sans-arabic";
+
+/* Theme switch is driven by [data-theme] on <html> (set server-side from a cookie). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------------------------------------------------------------------------
+   Design tokens — SUPER CODER CLOUD
+   Dark is the signature theme; light is a fully supported counterpart.
+--------------------------------------------------------------------------- */
+:root,
+[data-theme="dark"] {
+  --bg: #080d19;
+  --bg-elevated: #111a2b;
+  --surface: #172238;
+  --surface-hover: #1d2a44;
+  --border: #24324d;
+  --border-strong: #33456a;
+  --text: #f8fafc;
+  --text-muted: #9cafc7;
+  --text-subtle: #8296b4;
+  --brand: #477bff;
+  --accent: #6b95ff;
+  --accent-hover: #7aa0ff;
+  --accent-solid: #3366e6;
+  --accent-solid-hover: #2e5fdb;
+  --accent-fg: #ffffff;
+  --accent-soft: rgb(71 123 255 / 0.14);
+  --teal: #00d9c5;
+  --teal-soft: rgb(0 217 197 / 0.12);
+  --gold: #c9a66b;
+  --gold-soft: rgb(201 166 107 / 0.14);
+  --danger: #f2556b;
+  --danger-soft: rgb(242 85 107 / 0.12);
+  --warning: #f5b544;
+  --warning-soft: rgb(245 181 68 / 0.12);
+  --success: #2fcf8f;
+  --success-soft: rgb(47 207 143 / 0.12);
+  --ring: rgb(71 123 255 / 0.55);
+  --shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 12px 32px -12px rgb(0 0 0 / 0.6);
+  --glass: rgb(17 26 43 / 0.72);
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: #f4f6fb;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-hover: #f0f3f9;
+  --border: #dfe5ef;
+  --border-strong: #c8d2e2;
+  --text: #0b1220;
+  --text-muted: #4b5b75;
+  --text-subtle: #5b6b83;
+  --brand: #2f63e8;
+  --accent: #2756d6;
+  --accent-hover: #1f47b8;
+  --accent-solid: #2f63e8;
+  --accent-solid-hover: #2453cc;
+  --accent-fg: #ffffff;
+  --accent-soft: rgb(47 99 232 / 0.1);
+  --teal: #006e65;
+  --teal-soft: rgb(0 165 150 / 0.1);
+  --gold: #7a5e2b;
+  --gold-soft: rgb(156 122 62 / 0.12);
+  --danger: #c42840;
+  --danger-soft: rgb(214 48 74 / 0.09);
+  --warning: #8a5807;
+  --warning-soft: rgb(184 119 11 / 0.1);
+  --success: #0d6f47;
+  --success-soft: rgb(21 147 95 / 0.1);
+  --ring: rgb(47 99 232 / 0.45);
+  --shadow: 0 1px 2px rgb(16 24 40 / 0.04), 0 8px 24px -12px rgb(16 24 40 / 0.12);
+  --glass: rgb(255 255 255 / 0.78);
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-fg: var(--text);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-solid: var(--accent-solid);
+  --color-accent-solid-hover: var(--accent-solid-hover);
+  --color-brand: var(--brand);
+  --color-accent-soft: var(--accent-soft);
+  --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-ring: var(--ring);
+  --font-sans: "Heebo Variable", "Heebo", "Noto Sans Arabic Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius-card: 1rem;
+  --shadow-card: var(--shadow);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html[lang="ar"] body {
+  font-family: "Noto Sans Arabic Variable", "Heebo Variable", system-ui, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100dvh;
+}
+
+/* Subtle signature backdrop: a single low-contrast aurora, no neon. */
+.app-backdrop {
+  background:
+    radial-gradient(900px 480px at 85% -10%, rgb(71 123 255 / 0.10), transparent 60%),
+    radial-gradient(700px 420px at -10% 110%, rgb(0 217 197 / 0.06), transparent 60%),
+    var(--bg);
+}
+[data-theme="light"] .app-backdrop {
+  background:
+    radial-gradient(900px 480px at 85% -10%, rgb(47 99 232 / 0.07), transparent 60%),
+    var(--bg);
+}
+
+.glass {
+  background: var(--glass);
+  backdrop-filter: saturate(140%) blur(14px);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* iPhone safe areas */
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.mb-bottomnav { margin-bottom: calc(4.25rem + env(safe-area-inset-bottom)); }
+
+/* Numbers, phones and emails keep LTR order inside RTL text */
+.ltr-iso { unicode-bidi: isolate; direction: ltr; }
+
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 0%, var(--surface-hover) 50%, var(--surface) 100%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

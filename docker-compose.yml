@@ -1,0 +1,14 @@
+# Runs the background worker in a container against your database.
+# The database itself is provided by Supabase (local: `supabase start`).
+#   DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:54322/postgres docker compose up --build worker
+services:
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      WORKER_INTERVAL_MS: ${WORKER_INTERVAL_MS:-3600000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
