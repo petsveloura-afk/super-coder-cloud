@@ -32,8 +32,13 @@ git branch -M main
 git remote add origin git@github.com:<you>/super-coder-cloud.git
 git push -u origin main
 ```
-Repository secrets for `.github/workflows/deploy.yml`: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`,
-`SUPABASE_DB_PASSWORD`. Create a GitHub Environment named `production` (add required reviewers if desired).
+Repository secret for `.github/workflows/deploy.yml`: `SUPABASE_DB_URL` — Supabase → **Connect** →
+**Direct** → **Session pooler** connection string with your database password filled in
+(`postgresql://postgres.<ref>:<PASSWORD>@aws-…pooler.supabase.com:5432/postgres`). Use the pooler, not the
+direct `db.<ref>.supabase.co` host (IPv6-only; GitHub runners are IPv4). URL-encode special characters in the
+password, or reset it to letters/digits only. No access token is required. Without the secret the workflow
+skips with a warning. A GitHub Environment named `production` is created automatically on first run (add
+required reviewers if desired).
 
 ## 4. Vercel
 1. https://vercel.com/new → import the repository.
