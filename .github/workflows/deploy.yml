@@ -2,10 +2,14 @@ name: Deploy database migrations
 
 # The Next.js app deploys through Vercel's Git integration (push → build).
 # This workflow applies Supabase migrations to production on main, AFTER CI.
-# Required repository secrets:
-#   SUPABASE_ACCESS_TOKEN   (supabase.com → Account → Access Tokens)
-#   SUPABASE_PROJECT_REF    (project settings → General → Reference ID)
-#   SUPABASE_DB_PASSWORD    (project database password)
+#
+# Required repository secret (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL   Session pooler connection string, from Supabase →
+#                     Connect → "Direct" → Session pooler, with the password filled in:
+#                     postgresql://postgres.<project-ref>:<PASSWORD>@aws-…pooler.supabase.com:5432/postgres
+#
+# No Supabase access token is needed: the CLI connects straight to the database.
+# If the secret is missing, the job exits with a warning instead of failing.
 
 on:
   workflow_run:
@@ -20,15 +24,26 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
+      - name: Check configuration
+        id: cfg
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::SUPABASE_DB_URL secret is not set — skipping migrations."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: steps.cfg.outputs.skip == 'false'
       - uses: supabase/setup-cli@v1
+        if: steps.cfg.outputs.skip == 'false'
         with:
           version: latest
-      - run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
-      - name: Show pending migrations
-        run: supabase migration list
+      - name: Show migration status
+        if: steps.cfg.outputs.skip == 'false'
+        run: supabase migration list --db-url "$SUPABASE_DB_URL"
       - name: Apply migrations
-        run: supabase db push
+        if: steps.cfg.outputs.skip == 'false'
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all
