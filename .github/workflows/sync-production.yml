@@ -1,0 +1,83 @@
+name: Sync production (Vercel)
+
+# Full automatic sync on every push to main — without connecting Vercel to GitHub:
+#
+#   git push  →  CI (tests/build)  →  Deploy database migrations (Supabase)  →  THIS: deploy site to Vercel
+#
+# The site is deployed only after CI passed and migrations finished, so the
+# database schema is always updated BEFORE the new code goes live.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN        vercel.com → Account Settings → Tokens → Create (scope: the team that owns the project)
+#   VERCEL_ORG_ID       "orgId"     from .vercel/project.json (created by `npx vercel link`)
+#   VERCEL_PROJECT_ID   "projectId" from .vercel/project.json
+# If any secret is missing, the job exits with a warning instead of failing.
+
+on:
+  workflow_run:
+    workflows: ["Deploy database migrations"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: sync-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Check configuration
+        id: cfg
+        run: |
+          missing=""
+          [ -z "$VERCEL_TOKEN" ] && missing="$missing VERCEL_TOKEN"
+          [ -z "$VERCEL_ORG_ID" ] && missing="$missing VERCEL_ORG_ID"
+          [ -z "$VERCEL_PROJECT_ID" ] && missing="$missing VERCEL_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "::warning::Missing secrets:$missing — skipping Vercel deploy."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.skip == 'false'
+        with:
+          # Deploy exactly the commit that passed CI and migrations.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        if: steps.cfg.outputs.skip == 'false'
+        with:
+          node-version: 22
+
+      - name: Deploy to Vercel (production)
+        if: steps.cfg.outputs.skip == 'false'
+        run: |
+          url=$(npx --yes vercel@64.2.0 deploy --prod --yes --token "$VERCEL_TOKEN")
+          echo "Deployed: $url"
+          echo "### ✅ Deployed to production" >> "$GITHUB_STEP_SUMMARY"
+          echo "$url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Health check
+        if: steps.cfg.outputs.skip == 'false'
+        run: |
+          for i in 1 2 3 4 5; do
+            body=$(curl -fsS https://super-coder-cloud.vercel.app/api/health || true)
+            echo "$body"
+            if echo "$body" | grep -q '"supabaseConfigured":true'; then
+              echo "Health OK"; exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Health check failed — site is not responding correctly"
+          exit 1

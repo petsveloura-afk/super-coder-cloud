@@ -10,7 +10,9 @@
     "./permissions": "./src/permissions.ts",
     "./validators": "./src/validators.ts",
     "./env": "./src/env.ts",
-    "./crypto": "./src/crypto.ts"
+    "./crypto": "./src/crypto.ts",
+    "./billing": "./src/billing.ts",
+    "./stripe": "./src/stripe.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

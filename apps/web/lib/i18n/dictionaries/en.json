@@ -30,7 +30,8 @@
     "newWorkspace": "New workspace",
     "sectionCore": "Core",
     "sectionGrowth": "Growth",
-    "sectionOps": "Operations"
+    "sectionOps": "Operations",
+    "billing": "Billing & plans"
   },
   "common": {
     "save": "Save",
@@ -280,6 +281,132 @@
     "member_joined": "Member joined",
     "invitation_created": "Invitation created",
     "invitation_revoked": "Invitation revoked",
-    "settings_updated": "Settings updated"
+    "settings_updated": "Settings updated",
+    "billing_plan_changed": "Plan changed",
+    "ai_agents_insert": "AI agent created"
+  },
+  "billing": {
+    "title": "Billing & plans",
+    "subtitle": "Your workspace plan, usage and payments",
+    "currentPlan": "Current plan",
+    "usage": "Usage",
+    "contacts": "Contacts",
+    "members": "Team members (incl. invites)",
+    "aiCredits": "AI credits this month",
+    "aiAgents": "AI agents",
+    "unlimited": "Unlimited",
+    "renews": "Renews on {date}",
+    "cancelsAt": "Cancels on {date}",
+    "manage": "Manage subscription & payment methods",
+    "choosePlan": "Choose a plan",
+    "interval": "Billing period",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "save": "2 months free",
+    "perMonth": "/ month",
+    "perYear": "/ year",
+    "custom": "Custom pricing",
+    "popular": "Most popular",
+    "current": "Your plan",
+    "upgrade": "Upgrade",
+    "contactSales": "Talk to us",
+    "contactAdmin": "Contact your administrator to upgrade",
+    "readOnly": "Only organization owners can change the plan",
+    "notConfigured": "Online payments are not enabled yet. Upgrades can be applied manually by the administrator (bank transfer / invoice).",
+    "providerError": "The payment provider is unavailable right now. Please try again in a few minutes.",
+    "noCustomer": "No active subscription was found at the payment provider",
+    "demoBlocked": "Payments are disabled in demo workspaces",
+    "limitReached": "You've reached your plan's limit. Upgrade to continue.",
+    "success": "Payment received. Your plan will update within a minute.",
+    "canceled": "Payment canceled — you were not charged.",
+    "comingSoon": "coming soon",
+    "vat": "Prices in ILS, excluding VAT. Cancel anytime.",
+    "plans": {
+      "free": {
+        "name": "Free",
+        "desc": "To get started and for small businesses"
+      },
+      "pro": {
+        "name": "Pro",
+        "desc": "For growing businesses with AI"
+      },
+      "business": {
+        "name": "Business",
+        "desc": "For larger teams and agencies"
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "desc": "A tailored solution for organizations"
+      }
+    },
+    "limitLabels": {
+      "contacts": "contacts",
+      "members": "team members",
+      "ai_credits_monthly": "AI credits / month",
+      "ai_agents": "AI agents"
+    },
+    "features": {
+      "crm": "Full CRM",
+      "team": "Team & permissions",
+      "demo": "Demo data",
+      "csv_export": "CSV export",
+      "ai_basic": "AI contact assistant",
+      "ai_agents": "AI agent studio",
+      "audit_log": "Audit log",
+      "priority_support": "Priority support",
+      "white_label": "White-label branding",
+      "api_access": "API access",
+      "sso": "SSO login",
+      "dedicated_support": "Dedicated account manager"
+    },
+    "statuses": {
+      "trialing": "Trial",
+      "active": "Active",
+      "past_due": "Past due",
+      "canceled": "Canceled",
+      "incomplete": "Incomplete",
+      "unpaid": "Unpaid"
+    },
+    "freeForever": "Free forever"
+  },
+  "ai": {
+    "title": "AI Agents",
+    "subtitle": "Smart agents that work on your CRM data — safely and under your control",
+    "assistant": "AI assistant",
+    "assistantHint": "Summaries and drafts based on this contact's data and notes",
+    "summarize": "AI summary",
+    "followup": "Draft follow-up",
+    "aiNotice": "AI-generated — review before use",
+    "saveAsNote": "Save as note",
+    "notConfigured": "AI is not configured on the server yet. Add ANTHROPIC_API_KEY or OPENAI_API_KEY to the Vercel environment variables.",
+    "demoBlocked": "No real AI requests are sent in demo workspaces",
+    "rateLimited": "Too many requests. Try again in a minute.",
+    "limitReached": "You've used this month's AI credits. Upgrade to continue.",
+    "failed": "The AI request failed. Please try again.",
+    "agentDisabled": "This agent is disabled",
+    "agents": "Your agents",
+    "newAgent": "New agent",
+    "editAgent": "Edit agent",
+    "name": "Agent name",
+    "instructions": "Instructions",
+    "instructionsHint": "What the agent does, how it speaks, and what it must never do",
+    "provider": "Provider",
+    "model": "Model",
+    "temperature": "Creativity (0–1)",
+    "language": "Reply language",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "toolCrm": "May search this organization's contacts (CRM)",
+    "testChat": "Test chat",
+    "testChatHint": "Try the agent before connecting it to channels",
+    "chatEmpty": "Send a message to start",
+    "noEnabledAgents": "No enabled agent to test",
+    "messagePlaceholder": "Write a message to the agent…",
+    "send": "Send",
+    "clear": "Clear chat",
+    "agent": "Agent",
+    "empty": "No agents yet",
+    "emptyBody": "Create your first agent — e.g. a sales rep that answers questions and qualifies leads",
+    "saved": "Agent saved"
   }
 }

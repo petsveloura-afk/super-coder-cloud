@@ -98,3 +98,22 @@ pnpm check:env --prod        # with production values exported in your shell
 ## 10. Monitoring
 Vercel → Observability (function errors, latency). Supabase → Logs (Auth, Postgres, API) and Reports.
 Recommended next step: add Sentry (`@sentry/nextjs`) — not included in Phase 1.
+
+## 11. Full automatic sync without connecting Vercel to GitHub
+`.github/workflows/sync-production.yml` chains the pipeline on every push to `main`:
+
+```
+git push → CI → Deploy database migrations (Supabase) → Sync production (Vercel) → health check
+```
+
+One-time setup — repository secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Where |
+|---|---|
+| `SUPABASE_DB_URL` | Supabase → Connect → Direct → Session pooler (password filled in, URL-encoded) |
+| `VERCEL_TOKEN` | vercel.com (project owner's account) → Account Settings → Tokens → Create |
+| `VERCEL_ORG_ID` | `"orgId"` in `.vercel/project.json` (Windows: `type .vercel\project.json`) |
+| `VERCEL_PROJECT_ID` | `"projectId"` in `.vercel/project.json` |
+
+Run it manually any time: Actions → **Sync production (Vercel)** → Run workflow.
+Missing secrets make the job skip with a warning rather than fail.

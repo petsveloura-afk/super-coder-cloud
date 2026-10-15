@@ -2,6 +2,7 @@ import {
   BarChart3,
   Bot,
   CalendarClock,
+  CreditCard,
   FileInput,
   Globe,
   Inbox,
@@ -34,5 +35,6 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   finance: Wallet,
   integrations: Plug,
   team: UsersRound,
+  billing: CreditCard,
   settings: Settings,
 };

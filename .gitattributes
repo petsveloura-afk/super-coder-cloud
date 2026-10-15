@@ -1,0 +1,4 @@
+# Windows scripts need CRLF; everything else LF
+*.cmd text eol=crlf
+*.sh text eol=lf
+* text=auto

@@ -26,6 +26,11 @@ export function formValues(fd: FormData, keys: string[]): Record<string, string>
 
 /** Map Postgres/PostgREST error codes to i18n keys without leaking internals. */
 export function dbErrorKey(error: { code?: string; message?: string } | null | undefined): string {
+  // Plan limits / demo / rate limits raised by the database (migration 0010).
+  if (error?.message?.includes("plan_limit:ai_credits")) return "ai.limitReached";
+  if (error?.message?.includes("plan_limit:")) return "billing.limitReached";
+  if (error?.message?.includes("demo_mode")) return "ai.demoBlocked";
+  if (error?.message?.includes("rate_limited")) return "ai.rateLimited";
   switch (error?.code) {
     case "42501":
       return "errors.forbidden";

@@ -33,6 +33,8 @@ d("tenant isolation & RLS (real Postgres)", () => {
     orgA = await db.as(alice, async (q) => (await q<{ id: string }>(`select public.create_organization('Org A', 'org-a') as id`))[0]!.id, true);
     orgB = await db.as(bob, async (q) => (await q<{ id: string }>(`select public.create_organization('Org B', 'org-b') as id`))[0]!.id, true);
 
+    // Org A is on the Business plan so the member fixtures fit its limits (plan limits are tested separately).
+    await db.q(`update organizations set plan = 'business' where id = $1`, [orgA]);
     await db.q(`insert into organization_members (organization_id, user_id, role) values ($1, $2, 'read_only'), ($1, $3, 'manager')`, [orgA, rita, mark]);
 
     contactA = await db.as(alice, async (q) =>

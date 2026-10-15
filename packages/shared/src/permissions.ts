@@ -51,6 +51,10 @@ export const PERMISSIONS = [
   "settings.manage",
   "integrations.manage",
   "billing.manage",
+  // v2 (migration 0011): commercial layer
+  "billing.read",
+  "ai.use",
+  "ai.manage",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -87,10 +91,12 @@ export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     "deals.delete",
     "members.invite",
     "audit.read",
+    "billing.read",
+    "ai.use",
   ],
-  marketing: [...READ_ALL, "contacts.write", "companies.write", "contacts.export", "tasks.write"],
-  sales: [...READ_ALL, ...CRM_WRITE],
-  support: [...READ_ALL, "contacts.write", "tasks.write"],
+  marketing: [...READ_ALL, "contacts.write", "companies.write", "contacts.export", "tasks.write", "ai.use"],
+  sales: [...READ_ALL, ...CRM_WRITE, "ai.use"],
+  support: [...READ_ALL, "contacts.write", "tasks.write", "ai.use"],
   analyst: [...READ_ALL, "contacts.export", "audit.read"],
   client: ["org.read", "contacts.read", "companies.read", "deals.read", "tasks.read"],
   read_only: READ_ALL,

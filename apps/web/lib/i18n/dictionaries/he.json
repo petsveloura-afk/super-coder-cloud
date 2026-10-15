@@ -30,7 +30,8 @@
     "newWorkspace": "סביבת עבודה חדשה",
     "sectionCore": "ליבה",
     "sectionGrowth": "צמיחה",
-    "sectionOps": "תפעול"
+    "sectionOps": "תפעול",
+    "billing": "מנוי וחיוב"
   },
   "common": {
     "save": "שמירה",
@@ -280,6 +281,132 @@
     "member_joined": "חבר צוות הצטרף",
     "invitation_created": "הזמנה נוצרה",
     "invitation_revoked": "הזמנה בוטלה",
-    "settings_updated": "ההגדרות עודכנו"
+    "settings_updated": "ההגדרות עודכנו",
+    "billing_plan_changed": "החבילה עודכנה",
+    "ai_agents_insert": "סוכן AI נוצר"
+  },
+  "billing": {
+    "title": "מנוי וחיוב",
+    "subtitle": "החבילה, השימוש והתשלומים של סביבת העבודה",
+    "currentPlan": "החבילה הנוכחית",
+    "usage": "שימוש",
+    "contacts": "אנשי קשר",
+    "members": "חברי צוות (כולל הזמנות)",
+    "aiCredits": "קרדיטי AI החודש",
+    "aiAgents": "סוכני AI",
+    "unlimited": "ללא הגבלה",
+    "renews": "מתחדש ב-{date}",
+    "cancelsAt": "יבוטל ב-{date}",
+    "manage": "ניהול מנוי ואמצעי תשלום",
+    "choosePlan": "בחירת חבילה",
+    "interval": "תקופת חיוב",
+    "monthly": "חודשי",
+    "yearly": "שנתי",
+    "save": "חודשיים חינם",
+    "perMonth": "לחודש",
+    "perYear": "לשנה",
+    "custom": "מחיר מותאם",
+    "popular": "הכי פופולרי",
+    "current": "החבילה שלך",
+    "upgrade": "שדרוג",
+    "contactSales": "דברו איתנו",
+    "contactAdmin": "לשדרוג פנו למנהל המערכת",
+    "readOnly": "רק בעלי הארגון יכולים לשנות חבילה",
+    "notConfigured": "תשלום מקוון עדיין לא הופעל. ניתן לשדרג ידנית דרך מנהל המערכת (העברה בנקאית / חשבונית).",
+    "providerError": "ספק התשלומים לא זמין כרגע. נסו שוב בעוד מספר דקות.",
+    "noCustomer": "לא נמצא מנוי פעיל אצל ספק התשלומים",
+    "demoBlocked": "בסביבת דמו לא ניתן לבצע תשלום",
+    "limitReached": "הגעתם למגבלת החבילה הנוכחית. שדרגו חבילה כדי להמשיך.",
+    "success": "התשלום התקבל. החבילה תתעדכן בתוך דקה.",
+    "canceled": "התשלום בוטל, לא חויבתם.",
+    "comingSoon": "בקרוב",
+    "vat": "המחירים בש״ח ואינם כוללים מע״מ. ניתן לבטל בכל עת.",
+    "plans": {
+      "free": {
+        "name": "חינם",
+        "desc": "להתחלה ולעסקים קטנים"
+      },
+      "pro": {
+        "name": "Pro",
+        "desc": "לעסקים בצמיחה עם AI"
+      },
+      "business": {
+        "name": "Business",
+        "desc": "לצוותים גדולים וסוכנויות"
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "desc": "פתרון מותאם לארגונים"
+      }
+    },
+    "limitLabels": {
+      "contacts": "אנשי קשר",
+      "members": "חברי צוות",
+      "ai_credits_monthly": "קרדיטי AI בחודש",
+      "ai_agents": "סוכני AI"
+    },
+    "features": {
+      "crm": "CRM מלא",
+      "team": "צוות והרשאות",
+      "demo": "נתוני דמו",
+      "csv_export": "ייצוא CSV",
+      "ai_basic": "עוזר AI באנשי קשר",
+      "ai_agents": "סטודיו סוכני AI",
+      "audit_log": "יומן ביקורת",
+      "priority_support": "תמיכה מועדפת",
+      "white_label": "מיתוג White-label",
+      "api_access": "גישת API",
+      "sso": "התחברות SSO",
+      "dedicated_support": "מנהל לקוח ייעודי"
+    },
+    "statuses": {
+      "trialing": "תקופת ניסיון",
+      "active": "פעיל",
+      "past_due": "תשלום באיחור",
+      "canceled": "בוטל",
+      "incomplete": "לא הושלם",
+      "unpaid": "לא שולם"
+    },
+    "freeForever": "חינם לתמיד"
+  },
+  "ai": {
+    "title": "סוכני AI",
+    "subtitle": "סוכנים חכמים שעובדים על נתוני ה-CRM שלכם — בבטחה ובשליטה",
+    "assistant": "עוזר AI",
+    "assistantHint": "סיכום וטיוטות על בסיס הנתונים וההערות של איש הקשר",
+    "summarize": "סיכום AI",
+    "followup": "טיוטת הודעת המשך",
+    "aiNotice": "נוצר ע״י AI — בדקו לפני שימוש",
+    "saveAsNote": "שמירה כהערה",
+    "notConfigured": "AI עדיין לא הוגדר בשרת. הוסיפו ANTHROPIC_API_KEY או OPENAI_API_KEY במשתני הסביבה של Vercel.",
+    "demoBlocked": "בסביבת דמו לא נשלחות בקשות AI אמיתיות",
+    "rateLimited": "יותר מדי בקשות. נסו שוב בעוד דקה.",
+    "limitReached": "נגמרו קרדיטי ה-AI לחודש זה. שדרגו חבילה כדי להמשיך.",
+    "failed": "בקשת ה-AI נכשלה. נסו שוב.",
+    "agentDisabled": "הסוכן מושבת",
+    "agents": "הסוכנים שלכם",
+    "newAgent": "סוכן חדש",
+    "editAgent": "עריכת סוכן",
+    "name": "שם הסוכן",
+    "instructions": "הוראות",
+    "instructionsHint": "מה הסוכן עושה, איך הוא מדבר, ומה אסור לו. למשל: ״אתה נציג שירות של מספרה…״",
+    "provider": "ספק",
+    "model": "מודל",
+    "temperature": "יצירתיות (0–1)",
+    "language": "שפת תשובה",
+    "enabled": "פעיל",
+    "disabled": "מושבת",
+    "toolCrm": "מותר לחפש באנשי הקשר של הארגון (CRM)",
+    "testChat": "בדיקת שיחה",
+    "testChatHint": "נסו את הסוכן לפני שמחברים אותו לערוצים",
+    "chatEmpty": "שלחו הודעה כדי להתחיל",
+    "noEnabledAgents": "אין סוכן פעיל לבדיקה",
+    "messagePlaceholder": "כתבו הודעה לסוכן…",
+    "send": "שליחה",
+    "clear": "ניקוי שיחה",
+    "agent": "סוכן",
+    "empty": "עדיין אין סוכנים",
+    "emptyBody": "צרו סוכן ראשון — למשל נציג מכירות שעונה על שאלות ומסווג לידים",
+    "saved": "הסוכן נשמר"
   }
 }

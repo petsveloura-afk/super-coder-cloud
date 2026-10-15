@@ -1,0 +1,55 @@
+name: Database backup
+
+# Weekly encrypted backup of the production database (schema + data), stored as
+# a private GitHub artifact for 30 days. The Supabase Free plan has no backups.
+#
+# Required secrets:
+#   SUPABASE_DB_URL     Session pooler connection string (same as the migrations workflow)
+#   BACKUP_PASSPHRASE   long random passphrase; the dump is AES-256 encrypted with it.
+#                       Without it the job refuses to upload (no unencrypted personal data).
+#
+# Restore (on your computer):
+#   openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in backup.tar.gz.enc -out backup.tar.gz -pass pass:"$BACKUP_PASSPHRASE"
+#   tar xzf backup.tar.gz   →  schema.sql, data.sql   (apply with psql to a new database)
+
+on:
+  schedule:
+    - cron: "41 2 * * 0"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check configuration
+        id: cfg
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::warning::SUPABASE_DB_URL or BACKUP_PASSPHRASE not set — skipping backup."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: supabase/setup-cli@v1
+        if: steps.cfg.outputs.skip == 'false'
+        with:
+          version: latest
+      - name: Dump schema and data
+        if: steps.cfg.outputs.skip == 'false'
+        run: |
+          mkdir backup
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" --data-only -f backup/data.sql
+          tar czf backup.tar.gz -C backup .
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in backup.tar.gz -out backup.tar.gz.enc -pass env:BACKUP_PASSPHRASE
+          rm -rf backup backup.tar.gz
+          ls -la backup.tar.gz.enc
+      - uses: actions/upload-artifact@v4
+        if: steps.cfg.outputs.skip == 'false'
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backup.tar.gz.enc
+          retention-days: 30

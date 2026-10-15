@@ -31,3 +31,17 @@ never prints values. Any variable starting with `NEXT_PUBLIC_` is embedded in br
 
 Missing optional credentials disable the integration: `integrationAvailability()` in
 `packages/shared/src/env.ts`, reported as booleans at `/api/health`.
+
+## v2 — commercial layer
+
+| Variable | Required | Scope | Used by | Where to get it |
+|---|---|---|---|---|
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | for AI | **server** | AI assistant + agents | console.anthropic.com / platform.openai.com — at least one enables AI |
+| `AI_ANTHROPIC_MODEL`, `AI_OPENAI_MODEL` | no | server | default model per provider | model id from the provider |
+| `PAYMENT_PROVIDER_SECRET_KEY` | for payments | **server** | Stripe Checkout / Portal | Stripe → Developers → API keys (`sk_live_…`) |
+| `PAYMENT_WEBHOOK_SECRET` | for payments | **server** | `/api/webhooks/stripe` signature check | Stripe → Developers → Webhooks → endpoint → Signing secret (`whsec_…`) |
+| `STRIPE_PRICE_{PRO,BUSINESS}_{MONTH,YEAR}` | for payments | server | maps plans ↔ Stripe prices | Stripe → Products → price id |
+| `NEXT_PUBLIC_SALES_EMAIL` | no | public | Enterprise "Talk to us" button | your sales address |
+| `CRON_SECRET` | recommended | **server** | protects `/api/keepalive` (Vercel Cron sends it automatically) | `openssl rand -hex 24` |
+
+Without payment variables the billing page still works (plans, usage, limits) and shows "online payments not enabled"; a platform admin can assign plans manually with `select public.admin_set_plan('<org-id>', 'pro');` in the Supabase SQL editor.

@@ -18,7 +18,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "pipelines", label: "nav.pipelines", section: "core", phase: 2, permission: "deals.read" },
   { key: "inbox", label: "nav.inbox", section: "core", phase: 5 },
   { key: "automations", label: "nav.automations", section: "growth", phase: 3 },
-  { key: "ai-agents", label: "nav.aiAgents", section: "growth", phase: 4 },
+  { key: "ai-agents", label: "nav.aiAgents", section: "growth", phase: null, permission: "ai.use" },
   { key: "campaigns", label: "nav.campaigns", section: "growth", phase: 5 },
   { key: "websites", label: "nav.websites", section: "growth", phase: 6 },
   { key: "forms", label: "nav.forms", section: "growth", phase: 5 },
@@ -28,6 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "finance", label: "nav.finance", section: "ops", phase: 6 },
   { key: "integrations", label: "nav.integrations", section: "ops", phase: 3 },
   { key: "team", label: "nav.team", section: "ops", phase: null, permission: "members.read" },
+  { key: "billing", label: "nav.billing", section: "ops", phase: null, permission: "billing.read" },
   { key: "settings", label: "nav.settings", section: "ops", phase: null },
 ];
 

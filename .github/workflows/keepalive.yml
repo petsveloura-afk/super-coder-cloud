@@ -1,0 +1,31 @@
+name: Keep alive
+
+# Daily heartbeat so the Supabase Free project is never paused for inactivity
+# (Vercel Cron in apps/web/vercel.json does the same — two independent sources).
+# Optional secrets: APP_URL (default https://super-coder-cloud.vercel.app), CRON_SECRET.
+
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    env:
+      APP_URL: ${{ secrets.APP_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Ping /api/keepalive (runs a real DB round-trip)
+        run: |
+          URL="${APP_URL:-https://super-coder-cloud.vercel.app}"
+          AUTH=()
+          if [ -n "$CRON_SECRET" ]; then AUTH=(-H "Authorization: Bearer $CRON_SECRET"); fi
+          for i in 1 2 3; do
+            code=$(curl -s -o out.json -w "%{http_code}" "${AUTH[@]}" "$URL/api/keepalive" || true)
+            cat out.json || true; echo
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 20
+          done
+          echo "::error::Keep-alive failed (HTTP $code). Check that the site and Supabase are up."
+          exit 1

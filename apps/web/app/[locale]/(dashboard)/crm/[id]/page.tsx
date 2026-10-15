@@ -8,6 +8,7 @@ import { Badge, Card, CardHeader, Ltr } from "@/components/ui/primitives";
 import { ContactDialog } from "@/components/crm/contact-form";
 import { StatusBadge } from "@/components/crm/status-badge";
 import { AddNoteForm, DeleteContactButton } from "@/components/crm/contact-detail-client";
+import { ContactAIAssistant } from "@/components/crm/ai-assistant";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { auditLabel } from "@/lib/i18n/translate";
@@ -130,6 +131,15 @@ export default async function ContactDetailPage({ params }: { params: Params }) 
           </dl>
         </Card>
 
+        <div className="space-y-4">
+        {ctx.can("ai.use") ? (
+          <Card>
+            <CardHeader title={t("ai.assistant")} description={t("ai.assistantHint")} />
+            <div className="p-5">
+              <ContactAIAssistant contactId={contact.id} canWriteNotes={ctx.can("contacts.write")} />
+            </div>
+          </Card>
+        ) : null}
         <Card>
           <CardHeader title={t("crm.timeline")} />
           <div className="space-y-4 p-5">
@@ -158,6 +168,7 @@ export default async function ContactDetailPage({ params }: { params: Params }) 
             )}
           </div>
         </Card>
+        </div>
       </div>
     </>
   );
