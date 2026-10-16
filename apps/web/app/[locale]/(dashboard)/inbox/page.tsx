@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowLeft, ArrowRight, Bot, Globe, Inbox, Mail, MessageCircle, Plug, QrCode, Send, Smartphone, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Globe, Inbox, Mail, MessageCircle, Plug, QrCode, Send, Smartphone, User, UserRound } from "lucide-react";
 import { uuidSchema } from "@scc/shared/validators";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { AiModeToggle, ConversationControls, LiveRefresh, MarkRead, ReplyBox } from "@/components/inbox/inbox-client";
 
 // icons resolved on the server (objects exported from client modules are only references here)
-const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone, whatsapp_qr: QrCode, email: Mail, web: Globe } as const;
+const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone, whatsapp_qr: QrCode, email: Mail, web: Globe, telegram_user: UserRound } as const;
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -24,7 +24,7 @@ const FILTERS = ["open", "mine", "unassigned", "closed"] as const;
 
 interface ConvRow {
   id: string;
-  channel: "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email" | "web";
+  channel: "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email" | "web" | "telegram_user";
   title: string | null;
   ai_mode?: "auto" | "human";
   subject?: string | null;
@@ -86,7 +86,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
     selected = (data as ConvRow | null) ?? null;
   }
   const { data: msgs } = selected
-    ? await supabase.from("messages").select("id, direction, body, status, error, created_at, sent_by, media, ai_agent_id").eq("organization_id", ctx.org.id).eq("conversation_id", selected.id).order("created_at").limit(300)
+    ? await supabase.from("messages").select("id, direction, body, status, error, created_at, sent_by, media, ai_agent_id, meta").eq("organization_id", ctx.org.id).eq("conversation_id", selected.id).order("created_at").limit(300)
     : { data: [] };
   const Back = locale === "en" ? ArrowLeft : ArrowRight;
   const href = (over: Record<string, string | undefined>) => {
@@ -192,6 +192,12 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                         <p className="mb-1 inline-flex items-center gap-1 text-[11px] font-semibold text-gold">
                           <Bot className="h-3.5 w-3.5" /> {t("inbox.aiReply")}
                         </p>
+                      ) : null}
+                      {(m.meta as { media?: { url?: string; title?: string } } | null)?.media?.url ? (
+                        <a href={(m.meta as { media: { url: string } }).media.url} target="_blank" rel="noopener noreferrer" className="mb-1.5 block overflow-hidden rounded-xl" data-testid="inbox-image">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- the business's own gallery image */}
+                          <img src={(m.meta as { media: { url: string } }).media.url} alt={(m.meta as { media: { title?: string } }).media.title ?? ""} className="max-h-56 w-full object-cover" loading="lazy" />
+                        </a>
                       ) : null}
                       <p className="whitespace-pre-wrap break-words" dir="auto">
                         {(m.body as string) || (m.media ? "📎" : "")}

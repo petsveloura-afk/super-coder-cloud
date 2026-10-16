@@ -5,7 +5,7 @@
  * filter automatic e-mails that must never get an automatic answer.
  */
 
-export const AUTOPILOT_CHANNELS = ["web", "telegram", "whatsapp", "whatsapp_qr", "sms", "email"] as const;
+export const AUTOPILOT_CHANNELS = ["web", "telegram", "whatsapp", "whatsapp_qr", "sms", "email", "telegram_user"] as const;
 export type AutopilotChannel = (typeof AUTOPILOT_CHANNELS)[number];
 
 export function isAutopilotChannel(v: unknown): v is AutopilotChannel {
@@ -134,6 +134,7 @@ const CHANNEL_NAMES: Record<AutopilotChannel, string> = {
   whatsapp_qr: "WhatsApp",
   sms: "SMS",
   email: "e-mail",
+  telegram_user: "Telegram",
 };
 
 export function autopilotInstructions(input: {
@@ -227,7 +228,7 @@ export interface AgentTools {
 const LEAD_RE = /\[\[\s*lead\s*:([^\]]{0,2000})\]\]/i;
 const BUTTONS_RE = /\[\[\s*buttons\s*:([^\]]{0,400})\]\]/i;
 const ASK_PHONE_RE = /\[\[\s*ask_phone\s*\]\]/i;
-const ANY_MARKER_RE = /\[\[\s*(?:lead|buttons|ask_phone|handoff|build_site)\b[^\]]*\]\]/gi;
+const ANY_MARKER_RE = /\[\[\s*(?:lead|buttons|ask_phone|handoff|build_site|send_media)\b[^\]]*\]\]/gi;
 const LEAD_KEYS = new Set(["name", "phone", "email", "need", "budget", "score", "summary"]);
 
 export function parseLeadFields(raw: string): LeadData | null {
@@ -272,6 +273,12 @@ export function parseAgentTools(raw: string): AgentTools {
   };
 }
 
+export interface AgentMedia {
+  title: string;
+  url: string;
+  caption?: string;
+}
+
 export interface AgentProfile {
   business?: string;
   services?: string;
@@ -281,6 +288,18 @@ export interface AgentProfile {
   website?: string;
   faq?: string;
   tone?: "friendly" | "professional" | "luxury" | "casual";
+  /** wave 8 — the conversation script (ordered steps), set by the business */
+  flow?: string[];
+  /** details the agent must find out before closing (e.g. dog size, preferred date) */
+  fields?: string[];
+  /** prices, discounts and how far the agent may negotiate */
+  pricing?: string;
+  /** links the agent may send: "title | https://…" */
+  links?: string[];
+  /** Telegram / chat menu buttons shown on Start */
+  menu?: string[];
+  /** examples / portfolio images the agent can send */
+  media?: AgentMedia[];
 }
 
 const TONES: Record<string, string> = {
@@ -296,6 +315,24 @@ const GOALS: Record<string, string> = {
   sale: "Sell: recommend the right product/service, explain the value, handle objections with empathy and close — collect the details needed for the order.",
   support: "Resolve the customer's issue quickly and kindly; collect the details the team needs when something must be checked.",
 };
+
+/**
+ * wave 8 — a real conversation, not a form: these rules take priority over the
+ * shorter generic rules above (length, handoff on orders) and over the script.
+ */
+export const CONVERSATION_INTELLIGENCE = [
+  "HOW TO TALK (most important — these rules take priority over any rule above):",
+  "- Hold a real, natural conversation like an experienced, friendly salesperson of this business — never a form, never a bot menu.",
+  "- First understand what the customer really asked or meant (also short, vague or misspelled messages, slang, voice-like typing) and ANSWER IT DIRECTLY in your own words, then continue the conversation.",
+  "- Prices: when asked (\"how much\", \"מה המחיר\", \"כמה עולה\"), give the actual price from the business facts, explain what it includes and the value, and if it depends on something (size, quantity, date, type) say the range and ask the ONE detail you need to give the exact price. Compare options when there are several, and recommend the one that fits this customer.",
+  "- Negotiation: if the customer says it is expensive or asks for a discount, acknowledge, explain the value, and offer only what the pricing policy allows (or a cheaper option / package). Never invent a discount; if there is no policy, do not discount — offer value instead.",
+  "- Remember everything said earlier in this conversation; never ask again for something the customer already told you, never repeat the greeting, vary your wording.",
+  "- The business script (if any) is your guide for WHAT to cover and in which order — follow it naturally, adapt to what the customer says, answer side questions first and then return to the next step.",
+  "- Ask at most one question per message, and end most messages with a clear, easy next step.",
+  "- Length: short and chat-friendly, but when explaining prices, options or how something works you may use up to ~150 words (short lines, no tables).",
+  "- When the customer wants to buy / book / order — close it YOURSELF: confirm what they chose and the price, collect the missing details (name, phone and what the business needs), and record it with the LEAD tool. Hand off to a person only when the customer asks for one, is upset, wants a refund/cancellation, or you truly lack the information.",
+  "- If a fact is not in the business information, say honestly that you will check with the team and capture the lead — never make it up.",
+].join("\n");
 
 /** Extra system-prompt sections for the sales agent (profile, goal, sales method, tools). */
 export function salesAgentInstructions(input: {
@@ -315,7 +352,26 @@ export function salesAgentInstructions(input: {
     p.faq ? `- Frequently asked questions:\n${p.faq}` : "",
   ].filter(Boolean);
   const buttonsOk = input.channel !== "email" && input.channel !== "sms";
+  const flow = (p.flow ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 15);
+  const fields = (p.fields ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 15);
+  const links = (p.links ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 20);
+  const media = (p.media ?? []).filter((m) => m?.title && m?.url).slice(0, 20);
+  const extra = [
+    flow.length
+      ? `Conversation script set by the business — follow these steps IN ORDER (adapt naturally, skip a step the customer already answered, one step per message):\n${flow.map((f, i) => `${i + 1}. ${f}`).join("\n")}`
+      : "",
+    fields.length ? `Before closing, make sure you found out: ${fields.join(" · ")} (ask naturally, one at a time) and include them in the LEAD summary.` : "",
+    p.pricing
+      ? `Pricing & negotiation policy (follow strictly — never go below it, never invent other discounts):\n${p.pricing}\nWhen the customer haggles: first show the value, then offer only what this policy allows, and close.`
+      : "",
+    links.length ? `Links you may send when relevant (copy the URL exactly):\n${links.map((l) => `- ${l}`).join("\n")}` : "",
+    media.length
+      ? `Examples / images you can send when the customer asks for examples, photos or a portfolio — add [[SEND_MEDIA: exact title]] (max 3):\n${media.map((m) => `- ${m.title}${m.caption ? ` — ${m.caption}` : ""}`).join("\n")}`
+      : "",
+  ].filter(Boolean);
   return [
+    CONVERSATION_INTELLIGENCE,
+    ...extra,
     facts.length ? `Business profile (facts you may use):\n${facts.join("\n")}` : "",
     `Your goal: ${GOALS[input.goal ?? "lead"] ?? GOALS.lead}`,
     `Tone: ${TONES[p.tone ?? "friendly"] ?? TONES.friendly}.`,
@@ -365,4 +421,39 @@ export function telegramHtml(text: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+}
+
+/** [[SEND_MEDIA: title]] requests → matching items of the agent's gallery (max 3). */
+export function pickMedia(raw: string, media: AgentMedia[] | null | undefined): AgentMedia[] {
+  const list = (media ?? []).filter((m) => m?.title && /^https?:\/\//.test(m.url));
+  if (!list.length) return [];
+  const wanted = [...raw.matchAll(/\[\[\s*send_media\s*:\s*([^\]]{1,120})\]\]/gi)].map((m) => m[1]!.trim().toLowerCase());
+  const out: AgentMedia[] = [];
+  for (const w of wanted) {
+    const hit = list.find((m) => m.title.toLowerCase() === w) ?? list.find((m) => m.title.toLowerCase().includes(w) || w.includes(m.title.toLowerCase()));
+    if (hit && !out.includes(hit)) out.push(hit);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+/** Telegram commands → what the agent should understand. */
+export function commandIntent(text: string, locale: string): { kind: "start" | "menu" | "human" | "text"; text: string } {
+  const t = text.trim();
+  const cmd = /^\/(\w{1,32})(?:@\w+)?\b/.exec(t)?.[1]?.toLowerCase();
+  if (!cmd) return { kind: "text", text: t };
+  if (cmd === "start") return { kind: "start", text: t };
+  if (cmd === "menu") return { kind: "menu", text: t };
+  if (cmd === "human" || cmd === "agent") return { kind: "human", text: t };
+  const he: Record<string, string> = { prices: "מה המחירים?", price: "מה המחירים?", services: "אילו שירותים יש לכם?", book: "אני רוצה לקבוע תור", hours: "מה שעות הפעילות?", contact: "איך יוצרים קשר?" };
+  const en: Record<string, string> = { prices: "What are your prices?", price: "What are your prices?", services: "Which services do you offer?", book: "I'd like to book an appointment", hours: "What are your opening hours?", contact: "How can I contact you?" };
+  const map = locale === "en" ? en : he;
+  return { kind: "text", text: map[cmd] ?? (t.replace(/^\/\w+(?:@\w+)?/, "").trim() || t) };
+}
+
+/** Polite "I'm on it" when the AI is busy — the safety net answers properly within minutes. */
+export function busyMessage(locale: string): string {
+  if (locale === "en") return "Got it! 🙏 I'm checking this for you and will answer here in a moment.";
+  if (locale === "ar") return "تم الاستلام! 🙏 أتحقق من ذلك وسأرد عليك هنا خلال لحظات.";
+  return "קיבלתי! 🙏 אני בודק את זה ואחזור אליך כאן תוך רגע.";
 }

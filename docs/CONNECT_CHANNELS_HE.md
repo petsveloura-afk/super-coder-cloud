@@ -73,3 +73,62 @@
 
 ## שפה
 מעכשיו, ביקור ראשון נפתח בעברית גם בטלפון שהשפה שלו אנגלית (מי שהדפדפן שלו בערבית מקבל ערבית). זה מונע את "התרגום האוטומטי" המשובש של iPhone ו-Chrome. אנגלית עדיין זמינה בבורר השפה. כדי לחזור לבחירה לפי הדפדפן: `NEXT_PUBLIC_LOCALE_NEGOTIATION=browser`.
+
+---
+
+## עדכון v8
+
+### 5) טלגרם בחשבון האישי (לא רק בוט)
+הלקוח שלך יכול לבחור: **בוט** (טוקן מ-@BotFather) או **החשבון האישי שלו** (הסוכן עונה מהמספר הפרטי, כמו "משתמש שעונה").
+החיבור האישי עובר דרך אותו שירות גשר מסעיף 1 (Railway). פעם אחת אצלך:
+1. נכנסים ל-my.telegram.org ← API development tools ← יוצרים אפליקציה (שם כלשהו).
+2. מעתיקים `api_id` ו-`api_hash`.
+3. ב-Railway, בשירות הגשר ← Variables מוסיפים:
+   - `TELEGRAM_API_ID` = המספר
+   - `TELEGRAM_API_HASH` = המחרוזת
+4. Redeploy לשירות. בדף האינטגרציות יופיע כרטיס "טלגרם – החשבון האישי".
+
+אצל הלקוח: לוחצים "חיבור" ← בטלפון: טלגרם ← הגדרות ← מכשירים ← **קישור מכשיר** ← סורקים את ה-QR. אם יש אימות דו-שלבי, מופיע שדה סיסמה.
+הסוכן עונה רק בצ׳אטים פרטיים, לעולם לא בקבוצות או בערוצים.
+⚠️ זה חשבון אמיתי. טלגרם עלולה להגביל חשבון ששולח הרבה הודעות ללא היכרות, ולכן לשיווק המוני עדיף בוט.
+
+### 6) תשלום על החבילות: הכסף נכנס אליך
+אפשר להפעיל כל שילוב. כל שיטה מופיעה בדף החיוב רק כשהמפתחות שלה מוגדרים ב-Vercel.
+
+**PayPal: הכסף נכנס לארנק ה-PayPal שלך.** הלקוח משלם עם PayPal, או עם כרטיס אשראי בלי חשבון PayPal, היכן ש-PayPal מאפשרת את זה.
+1. developer.paypal.com ← Apps & Credentials ← **Live** ← Create App ← מעתיקים Client ID ו-Secret.
+2. באותה אפליקציה ← Webhooks ← Add Webhook:
+   - URL: `https://super-coder-cloud.vercel.app/api/webhooks/paypal`
+   - אירועים: `BILLING.SUBSCRIPTION.*` ו-`PAYMENT.SALE.COMPLETED`
+   - מעתיקים את ה-Webhook ID.
+3. ב-Vercel: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, ואז Redeploy. החבילות ב-PayPal נוצרות לבד בתשלום הראשון.
+
+**Lemon Squeezy: כרטיס אשראי, Apple Pay ו-Google Pay, כולל מע״מ וחשבוניות מהם.** הם המוכר הרשמי (Merchant of Record), והתשלום אליך מגיע ל-PayPal או לבנק.
+1. app.lemonsqueezy.com ← Store ← יוצרים מוצר "Pro" ו-"Business", עם Variant חודשי ושנתי כמנוי.
+2. Settings ← API ← מפתח חדש. מעתיקים גם את ה-Store ID.
+3. Settings ← Webhooks ← `https://super-coder-cloud.vercel.app/api/webhooks/lemonsqueezy`, עם Signing secret לבחירתך. מסמנים את אירועי `subscription_*` ואת `order_created`.
+4. ב-Vercel:
+   - `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_STORE_ID`, `LEMONSQUEEZY_WEBHOOK_SECRET`
+   - `LEMONSQUEEZY_VARIANT_PRO_MONTH`, `LEMONSQUEEZY_VARIANT_PRO_YEAR`, `LEMONSQUEEZY_VARIANT_BUSINESS_MONTH`, `LEMONSQUEEZY_VARIANT_BUSINESS_YEAR` (המספר של כל Variant)
+5. Payouts ← מחברים PayPal או בנק.
+
+**קריפטו (NOWPayments): הכסף נכנס לארנק הקריפטו שלך.**
+1. nowpayments.io ← הרשמה ← Wallet settings ← מגדירים את כתובת הארנק שלך (למשל USDT).
+2. Settings ← API keys ← מפתח חדש. Payment settings ← IPN secret.
+3. ב-Vercel: `NOWPAYMENTS_API_KEY`, `NOWPAYMENTS_IPN_SECRET`. כתובת ה-IPN נשלחת אוטומטית עם כל חשבונית: `/api/webhooks/nowpayments`.
+4. תשלום בקריפטו משלם על תקופה מראש (חודש או שנה). 3 ימים לפני הסוף הלקוח מקבל תזכורת, ו-3 ימים אחרי הסוף החבילה חוזרת לחינם. זה רץ לבד ב-GitHub Actions.
+
+**קבלות:** כל תשלום, מכל ספק, נרשם עם מספר קבלה רץ (מ-1001). הלקוח מקבל מייל עם קישור לקבלה להדפסה או לשמירה כ-PDF, וכל התשלומים מופיעים בדף החיוב וגם בממשק המנהל שלך. פרטי העסק שעל הקבלה: `BILLING_BUSINESS_NAME`, `BILLING_BUSINESS_ID`, `BILLING_BUSINESS_ADDRESS`, `BILLING_BUSINESS_EMAIL`.
+ℹ️ זו קבלה על תשלום ולא חשבונית מס. לחשבונית מס (למשל בישראל) צריך מערכת חשבוניות מאושרת, או Lemon Squeezy שמנפיקה חשבוניות בעצמה. כדאי לבדוק עם רואה החשבון.
+
+### 7) ניהול השיחה של הסוכן: הכול מהממשק
+בדף הסוכנים, ליד כל סוכן, יש כפתור **"ניהול שיחה"**. שם בעל העסק קובע:
+- **תסריט השיחה:** השלבים לפי הסדר. אפשר לטעון תסריט מוצע לפי המטרה, לשנות, למחוק ולהזיז עם חצים.
+- **מה חייבים לברר** לפני סגירת הליד (למשל גודל הכלב או תאריך).
+- **מחירים ומיקוח:** הסוכן מתמקח רק במסגרת הזו ולעולם לא יורד ממנה.
+- **קישורים** שהסוכן שולח (אתר, קטלוג, תשלום).
+- **כפתורי תפריט:** מופיעים בטלגרם ב-Start וב-/menu, ובצ׳אט באתר. בטלגרם נוספים גם תפריט פקודות (/prices, /book, /human) ותיאור הבוט, אוטומטית לכל מי שמחבר טוקן.
+- **גלריית דוגמאות:** מעלים תמונות. כשלקוח מבקש דוגמאות, הסוכן שולח את המתאימות.
+
+**כשה-AI עמוס:** הסוכן מחכה עד 45 שניות ומנסה שוב, ומנסה גם ספק AI אחר אם הוגדר. אם עדיין אין תשובה, הלקוח מקבל "קיבלתי, אחזור אליך תוך רגע", השיחה **נשארת אצל הסוכן**, ותוך 1–5 דקות הסוכן עונה לבד. אין יותר "נציג יחזור אליך" שעוצר את השיחה.
+כדי למנוע עומס בחינם: אפשר להוסיף כמה מפתחות Gemini ב-Vercel (`GEMINI_API_KEY_2` עד `GEMINI_API_KEY_10`, כל אחד מחשבון Google אחר), או `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` כגיבוי.

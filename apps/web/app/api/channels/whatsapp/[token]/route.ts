@@ -5,6 +5,8 @@ import { ingest } from "@/lib/channels/ingest";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
+// the AI agent answers in the background (after the response) and may wait for a busy provider
+export const maxDuration = 120;
 
 /** GET — Meta webhook verification: echo hub.challenge when hub.verify_token matches. */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {

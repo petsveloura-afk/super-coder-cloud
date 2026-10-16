@@ -5,6 +5,8 @@ import { verifyBridgeSignature } from "@/lib/channels/wa-bridge";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
+// the AI agent answers in the background (after the response) and may wait for a busy provider
+export const maxDuration = 120;
 
 interface BridgeEvent {
   type: "message" | "status";

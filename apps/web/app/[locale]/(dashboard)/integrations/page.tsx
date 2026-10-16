@@ -63,6 +63,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
   const qr = ch("whatsapp_qr");
   const tg = ch("telegram");
   const mail = ch("email");
+  const tgu = ch("telegram_user");
   const hub: HubProps = {
     orgSlug: ctx.org.slug,
     appUrl: baseUrl,
@@ -73,6 +74,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
       whatsapp_qr: { connected: qr?.config.state === "connected", label: qr?.config.phone ? `+${qr.config.phone}` : null, error: qr?.status === "error" ? qr.last_error : null },
       telegram: { connected: Boolean(tg && tg.status !== "disabled"), label: tg?.config.username ? `@${tg.config.username}` : null, error: tg?.status === "error" ? tg.last_error : null },
       email: { connected: Boolean(mail && mail.status !== "disabled"), address: mail?.config.address ?? null, auth: mail?.config.auth ?? null, error: mail?.status === "error" ? mail.last_error : null },
+      telegram_user: { connected: tgu?.config.state === "connected", label: tgu?.config.username ? `@${tgu.config.username}` : tgu?.config.phone ? `+${tgu.config.phone}` : null, error: tgu?.status === "error" ? tgu.last_error : null },
     },
     meta: metaPublicConfig(),
     bridge: bridgeConfigured(),

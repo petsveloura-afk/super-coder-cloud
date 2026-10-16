@@ -386,7 +386,42 @@
       "incomplete": "Incomplete",
       "unpaid": "Unpaid"
     },
-    "freeForever": "Free forever"
+    "freeForever": "Free forever",
+    "pay": {
+      "pending": "Your payment is being confirmed. The plan activates automatically within minutes. ⏳",
+      "cancelPaypal": "Cancel the PayPal subscription",
+      "paypal": "PayPal or credit card",
+      "paypalSub": "No PayPal account needed",
+      "card": "Credit card",
+      "cardSub": "Visa · Mastercard · Apple Pay · Google Pay",
+      "crypto": "Crypto",
+      "cryptoSub": "BTC · USDT · ETH and more",
+      "or": "or choose a payment method",
+      "history": "Payments & receipts",
+      "noPayments": "No payments yet.",
+      "receipt": "Receipt",
+      "providers": {
+        "paypal": "PayPal / card",
+        "lemonsqueezy": "Credit card",
+        "nowpayments": "Crypto",
+        "stripe": "Stripe",
+        "manual": "Manual"
+      },
+      "receiptTitle": "Receipt",
+      "receiptNo": "Receipt no.",
+      "date": "Date",
+      "customer": "Customer",
+      "item": "For",
+      "method": "Payment method",
+      "validUntil": "Valid until",
+      "total": "Total paid",
+      "paidNote": "Paid in full. Thank you!",
+      "refunded": "This payment was refunded.",
+      "legalNote": "This document is generated automatically as a payment confirmation. A tax invoice, when required, is issued separately.",
+      "providerReceipt": "Payment provider's receipt",
+      "backToBilling": "← Back to billing",
+      "print": "Print / save as PDF"
+    }
   },
   "ai": {
     "title": "AI Agents",
@@ -464,7 +499,8 @@
         "whatsapp_qr": "WhatsApp (QR)",
         "telegram": "Telegram",
         "email": "E-mail",
-        "sms": "SMS"
+        "sms": "SMS",
+        "telegram_user": "Telegram (personal account)"
       }
     },
     "templates": {
@@ -570,6 +606,48 @@
       "hot": "Hot leads 🔥",
       "deals": "Deals opened",
       "handoffs": "Handed to the team"
+    },
+    "setup": {
+      "open": "Conversation",
+      "title": "Agent conversation setup",
+      "titleFor": "Conversation setup: {name}",
+      "subtitle": "Tell the agent how to run the conversation up to the lead: steps, details to collect, pricing & negotiation, links, buttons and examples.",
+      "test": "Test chat",
+      "save": "Save settings",
+      "flowTitle": "Conversation script (step order)",
+      "flowHint": "The agent follows the steps in order, one step per message, skipping what the customer already answered. Reorder with the arrows.",
+      "flowPlaceholder": "E.g. ask which service the customer needs",
+      "loadTemplate": "Load a suggested script",
+      "flowTemplates": {
+        "lead": "Greet and ask how you can help\nUnderstand exactly what the customer needs\nAsk about timing and urgency\nGently ask about the budget\nRecommend the right solution and its benefit\nAnswer questions and objections\nAsk for name and phone so the team can follow up\nConfirm and summarise the next step",
+        "booking": "Greet and ask which service\nAsk which day and time suit them\nOffer times or send the booking link\nAsk for name and phone\nConfirm the appointment and summarise",
+        "sale": "Greet and ask what they are looking for\nFind out need, quantity and budget\nRecommend one or two products with their benefits\nSend examples or photos when asked\nHandle objections and haggling within the pricing policy\nClose: order details (name, phone, address)\nConfirm and thank",
+        "support": "Greet and ask what happened\nAsk for details (order number, product)\nGive a step-by-step solution\nCheck the issue is solved\nIf not, hand off to a person with a summary"
+      },
+      "fieldsTitle": "Details the agent must find out",
+      "fieldsHint": "Asked before the lead is closed and included in the team's summary.",
+      "fieldsPlaceholder": "E.g. dog size, preferred date, city",
+      "pricingTitle": "Prices, discounts & negotiation",
+      "pricingHint": "The agent quotes and negotiates only within what you write here — never below it.",
+      "pricingPlaceholder": "Small dog grooming $45, large $65.\nUp to 10% off when booking two treatments.\nNo discounts on weekends.",
+      "linksTitle": "Links the agent may send",
+      "linksHint": "Format: name | link. E.g. Website | https://… or Catalog | https://…",
+      "linksPlaceholder": "Website | https://example.com",
+      "menuTitle": "Menu buttons (Telegram & website chat)",
+      "menuHint": "Shown when the customer presses Start and in /menu. A tap sends the text to the agent, which continues the conversation.",
+      "menuPlaceholder": "E.g. 💰 Prices",
+      "menuPreview": "How it looks in Telegram",
+      "mediaTitle": "Examples & photo gallery",
+      "mediaHint": "Photos of work, products and results. When a customer asks for examples, the agent sends the right ones.",
+      "mediaUpload": "Upload image",
+      "mediaName": "Name (e.g. before & after)",
+      "mediaCaption": "Short caption (optional)",
+      "add": "Add",
+      "up": "Up",
+      "down": "Down",
+      "badImage": "Only PNG, JPG, WEBP or GIF images",
+      "tooBig": "The image is larger than 5MB",
+      "uploadFailed": "Upload failed, try again"
     }
   },
   "deals": {
@@ -1187,6 +1265,22 @@
       "cancelled": "Sign-in cancelled",
       "oauthNotConfigured": "Account sign-in isn't enabled on the platform yet. Use an app password.",
       "oauthFailed": "E-mail connection failed {detail}"
+    },
+    "tgUser": {
+      "title": "Telegram: personal account",
+      "body": "The agent answers from your own Telegram account (not a bot), connected with a QR code. You can connect both a bot and a personal account.",
+      "warning": "Personal account via the API: a dedicated business account is recommended. Telegram may limit accounts used for bulk messages.",
+      "dialogTitle": "Connect a personal Telegram account",
+      "scan": "Scan QR",
+      "step1": "Open Telegram on your phone",
+      "step2": "Settings → Devices → Link Desktop Device",
+      "step3": "Scan the code here",
+      "password": "Two-step verification password",
+      "hint": "Hint: {hint}",
+      "continue": "Continue",
+      "passwordFailed": "Password not accepted, try again",
+      "connected": "Telegram account connected!",
+      "notConfigured": "Personal-account connection isn't enabled on the platform yet."
     }
   },
   "public": {
@@ -1363,7 +1457,8 @@
       "sms": "SMS",
       "telegram": "Telegram",
       "web": "Website chat",
-      "whatsapp_qr": "WhatsApp (QR)"
+      "whatsapp_qr": "WhatsApp (QR)",
+      "telegram_user": "Telegram (personal account)"
     },
     "notConnected": "Not connected",
     "message": "Message",
@@ -1826,7 +1921,15 @@
     "off": "Off",
     "noFlags": "No flags defined",
     "flagSaved": "Flag saved",
-    "badFlagKey": "Invalid key (a-z, 0-9, _ . -)"
+    "badFlagKey": "Invalid key (a-z, 0-9, _ . -)",
+    "payments": {
+      "title": "Payments & revenue",
+      "subtitle": "Payment providers, revenue in the last 30 days and the latest payments",
+      "on": "Active",
+      "off": "Not set",
+      "revenue30": "Revenue · 30 days",
+      "none": "No payments in the last 30 days yet."
+    }
   },
   "chat": {
     "title": "Chat",

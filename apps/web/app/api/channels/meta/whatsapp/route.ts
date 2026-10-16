@@ -5,6 +5,8 @@ import { ingest } from "@/lib/channels/ingest";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
+// the AI agent answers in the background (after the response) and may wait for a busy provider
+export const maxDuration = 120;
 
 /**
  * App-level WhatsApp webhook for numbers connected with Embedded Signup

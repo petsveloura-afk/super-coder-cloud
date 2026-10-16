@@ -3,6 +3,8 @@ import { timingSafeEqual } from "node:crypto";
 import { ingest } from "@/lib/channels/ingest";
 
 export const dynamic = "force-dynamic";
+// the AI agent answers in the background (after the response) and may wait for a busy provider
+export const maxDuration = 120;
 
 interface TgUser {
   id: number;

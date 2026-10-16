@@ -6,7 +6,7 @@ import { extractContactInfo } from "@/lib/ai/autopilot-core";
 import { handleInboundWithAI } from "@/lib/ai/autopilot";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 /**
  * Website chat (no setup needed): visitors of the business's sites — or of any
@@ -27,6 +27,7 @@ interface ChatMsg {
   at: string;
   buttons?: string[];
   askPhone?: boolean;
+  image?: string;
 }
 
 async function state(org: string, visitor: string | null) {
@@ -47,7 +48,7 @@ async function state(org: string, visitor: string | null) {
           .eq("conversation_id", conv.id)
           .order("created_at", { ascending: false })
           .limit(60);
-        messages = ((rows ?? []) as { id: string; direction: string; body: string; created_at: string; ai_agent_id: string | null; sent_by: string | null; meta: { buttons?: string[]; ask_phone?: boolean } | null }[])
+        messages = ((rows ?? []) as { id: string; direction: string; body: string; created_at: string; ai_agent_id: string | null; sent_by: string | null; meta: { buttons?: string[]; ask_phone?: boolean; media?: { url?: string } } | null }[])
           .reverse()
           .map((m) => ({
             id: m.id,
@@ -56,11 +57,21 @@ async function state(org: string, visitor: string | null) {
             at: m.created_at,
             ...(m.direction === "out" && m.meta?.buttons?.length ? { buttons: m.meta.buttons.slice(0, 3) } : {}),
             ...(m.direction === "out" && m.meta?.ask_phone ? { askPhone: true } : {}),
+            ...(m.direction === "out" && m.meta?.media?.url && (/^https:\/\//.test(m.meta.media.url) || m.meta.media.url.startsWith(`${(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "")}/storage/v1/object/public/`)) ? { image: m.meta.media.url } : {}),
           }));
       }
     }
   }
-  return { ...(cfg as Record<string, unknown>), mode, messages };
+  // wave 8: the agent's menu buttons (shown under the greeting)
+  let menu: string[] = [];
+  if ((cfg as { enabled?: boolean }).enabled) {
+    const { data: o } = await admin.from("organizations").select("id").eq("slug", org).maybeSingle();
+    if (o) {
+      const { data: a } = await admin.from("ai_agents").select("profile").eq("organization_id", o.id).eq("enabled", true).contains("autopilot_channels", ["web"]).order("created_at").limit(1).maybeSingle();
+      menu = (((a?.profile as { menu?: string[] } | null)?.menu ?? []) as string[]).filter((x) => typeof x === "string" && x.trim()).slice(0, 8);
+    }
+  }
+  return { ...(cfg as Record<string, unknown>), mode, messages, menu };
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ org: string }> }) {

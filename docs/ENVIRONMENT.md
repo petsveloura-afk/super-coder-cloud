@@ -98,3 +98,22 @@ Add extra keys in Vercel → Environment Variables as `GEMINI_API_KEY_2`, `GEMIN
 
 ## v7 — sales agent
 No new variables. `/api/ai/followups` (Bearer `CRON_SECRET`) sends the agent's automatic follow-ups; the GitHub "jobs" workflow calls it every 5 minutes (the QR bridge every minute when it runs with `CRON_SECRET`). New-lead e-mails to the owners use the existing e-mail settings (`EMAIL_PROVIDER_API_KEY`, `EMAIL_FROM_ADDRESS`).
+
+## v8 — plan payments, receipts, Telegram personal account, conversation setup
+All optional; each payment method appears on the billing page only when its keys are set.
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Vercel | PayPal REST app (Live). Plans/products are created automatically on the first checkout |
+| `PAYPAL_MODE` | Vercel | `live` (default) or `sandbox` |
+| `PAYPAL_WEBHOOK_ID` | Vercel | ID of the webhook pointing at `/api/webhooks/paypal` (signature verification) |
+| `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_STORE_ID`, `LEMONSQUEEZY_WEBHOOK_SECRET` | Vercel | Lemon Squeezy checkout + webhook `/api/webhooks/lemonsqueezy` (X-Signature) |
+| `LEMONSQUEEZY_VARIANT_{PRO,BUSINESS}_{MONTH,YEAR}` | Vercel | variant id of each plan / interval |
+| `NOWPAYMENTS_API_KEY`, `NOWPAYMENTS_IPN_SECRET` | Vercel | crypto invoices + IPN `/api/webhooks/nowpayments` (HMAC-SHA512) |
+| `BILLING_BUSINESS_NAME`, `_ID`, `_ADDRESS`, `_EMAIL` | Vercel | seller details printed on receipts |
+| `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` | bridge (Railway) | enables "Telegram personal account" (QR login) on `services/wa-bridge` |
+| `AI_AUTOPILOT_PATIENCE_MS` | Vercel | how long an automatic reply waits for a busy AI provider (default 45000) |
+
+Endpoints: `/api/billing/paypal/return` (PayPal approval return), `/api/billing/sweep` (Bearer `CRON_SECRET`, prepaid crypto periods — called by the jobs workflow), `/api/channels/telegram_user/{token}` (signed bridge callbacks).
+`/api/ai/followups` now first answers any customer message that got no reply (provider busy / timeout), then sends follow-ups.
+Migration: `20261015000025_payments_telegram_user.sql`.

@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { kickJobs } from "@/lib/jobs/kick";
 
 export interface InboundMessage {
-  kind: "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email";
+  kind: "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email" | "telegram_user";
   token: string;
   chatId: string;
   senderName?: string | null;
@@ -24,7 +24,7 @@ export interface InboundMessage {
 /** Stores an inbound message via the SECURITY DEFINER RPC (matches/creates contact + conversation). */
 export async function ingest(m: InboundMessage) {
   const admin = createAdminClient();
-  const useV2 = m.kind === "whatsapp_qr" || m.kind === "email";
+  const useV2 = m.kind === "whatsapp_qr" || m.kind === "email" || m.kind === "telegram_user";
   const { data, error } = useV2
     ? await admin.rpc("ingest_channel_message_v2", {
         p_token: m.token,

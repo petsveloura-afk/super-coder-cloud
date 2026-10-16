@@ -155,3 +155,20 @@ export async function whatsappSendButtons(token: string, phoneNumberId: string, 
     return { ok: false, error: (e as Error).message };
   }
 }
+
+/** WhatsApp Cloud API: image by public URL with an optional caption. */
+export async function whatsappSendImage(token: string, phoneNumberId: string, toE164: string, url: string, caption?: string): Promise<ProviderResult> {
+  try {
+    const res = await fetch(`${waBase()}/${encodeURIComponent(phoneNumberId)}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: toE164.replace(/^\+/, ""), type: "image", image: { link: url, ...(caption ? { caption: caption.slice(0, 1024) } : {}) } }),
+      signal: AbortSignal.timeout(TIMEOUT),
+      cache: "no-store",
+    });
+    const j = (await res.json().catch(() => ({}))) as { messages?: { id: string }[]; error?: { message?: string } };
+    return res.ok ? { ok: true, status: res.status, externalId: j.messages?.[0]?.id } : { ok: false, status: res.status, error: j.error?.message ?? `HTTP ${res.status}`, permanent: permanent(res.status) };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}

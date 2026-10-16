@@ -10,7 +10,11 @@ import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 import { stripeConfigured, priceIdFor } from "@/lib/billing/stripe";
 import { cn } from "@/lib/utils";
-import { openPortalAction, startCheckoutAction } from "./actions";
+import { cancelPayPalAction, openPortalAction, startCheckoutAction } from "./actions";
+import { PaymentMethods, PaymentHistory, type PaymentRow } from "@/components/billing/payment-methods";
+import { paypalConfigured } from "@/lib/billing/paypal";
+import { lemonConfigured, lemonVariant } from "@/lib/billing/lemonsqueezy";
+import { cryptoConfigured } from "@/lib/billing/nowpayments";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -66,8 +70,18 @@ export default async function BillingPage({
   const [{ data: entRows }, { data: plansData }, { data: sub }] = await Promise.all([
     supabase.rpc("org_entitlements", { org: ctx.org.id }),
     supabase.from("plans").select("key, price_monthly, price_yearly, currency, limits, features, contact_sales").order("sort"),
-    supabase.from("subscriptions").select("provider, provider_customer_id").eq("organization_id", ctx.org.id).maybeSingle(),
+    supabase.from("subscriptions").select("provider, provider_customer_id, provider_subscription_id").eq("organization_id", ctx.org.id).maybeSingle(),
   ]);
+  // wave 8 — more ways to pay + payment history with receipts
+  const { data: payRows } = ctx.can("billing.manage")
+    ? await supabase.from("billing_payments").select("id, provider, plan_key, billing_interval, amount, currency, status, receipt_number, paid_at").eq("organization_id", ctx.org.id).order("paid_at", { ascending: false }).limit(50)
+    : { data: [] };
+  const methodFor = (plan: string) => [
+    ...(paypalConfigured() ? (["paypal"] as const) : []),
+    ...(lemonConfigured() && lemonVariant(plan, interval) ? (["lemonsqueezy"] as const) : []),
+    ...(cryptoConfigured() ? (["crypto"] as const) : []),
+  ];
+  const anyExtra = paypalConfigured() || lemonConfigured() || cryptoConfigured();
   const ent = ((entRows ?? []) as Entitlements[])[0];
   const plans = (plansData ?? []) as PlanRow[];
   const current = ent?.plan_key ?? "free";
@@ -93,6 +107,9 @@ export default async function BillingPage({
 
       {sp.checkout === "success" ? (
         <div role="status" className="mb-4 rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm text-success">{t("billing.success")}</div>
+      ) : null}
+      {sp.checkout === "pending" ? (
+        <div role="status" className="mb-4 rounded-xl border border-accent/30 bg-accent-soft px-4 py-3 text-sm text-accent">{t("billing.pay.pending")}</div>
       ) : null}
       {sp.checkout === "canceled" ? (
         <div role="status" className="mb-4 rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">{t("billing.canceled")}</div>
@@ -126,6 +143,19 @@ export default async function BillingPage({
                 ) : null}
               </div>
             ) : null}
+            {canManage && sub?.provider === "paypal" && sub.provider_subscription_id && ent?.subscription_status === "active" ? (
+              <form action={cancelPayPalAction}>
+                <input type="hidden" name="locale" value={locale} />
+                <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-surface px-4 text-sm font-medium hover:bg-surface-hover">
+                  <CreditCard className="h-4 w-4" /> {t("billing.pay.cancelPaypal")}
+                </button>
+              </form>
+            ) : null}
+            {canManage && sub?.provider === "lemonsqueezy" ? (
+              <a href="https://app.lemonsqueezy.com/my-orders" target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-surface px-4 text-sm font-medium hover:bg-surface-hover">
+                <CreditCard className="h-4 w-4" /> {t("billing.manage")}
+              </a>
+            ) : null}
             {canManage && payments && sub?.provider === "stripe" && sub.provider_customer_id ? (
               <form action={openPortalAction}>
                 <input type="hidden" name="locale" value={locale} />
@@ -157,7 +187,7 @@ export default async function BillingPage({
         </Card>
       </div>
 
-      {!payments ? (
+      {!payments && !anyExtra ? (
         <div className="mt-4 flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning">
           <Clock className="mt-0.5 h-4 w-4 shrink-0" /> {t("billing.notConfigured")}
         </div>
@@ -253,8 +283,11 @@ export default async function BillingPage({
                       {t("billing.upgrade")}
                     </button>
                   </form>
-                ) : p.key !== "free" ? (
+                ) : p.key !== "free" && !(canManage && !ctx.org.is_demo && methodFor(p.key).length) ? (
                   <p className="text-center text-[13px] text-subtle">{!canManage ? t("billing.readOnly") : t("billing.contactAdmin")}</p>
+                ) : null}
+                {!isCurrent && (p.key === "pro" || p.key === "business") && canManage && !ctx.org.is_demo && methodFor(p.key).length ? (
+                  <PaymentMethods locale={locale} plan={p.key} interval={interval} methods={methodFor(p.key)} withDivider={purchasable} />
                 ) : null}
               </div>
             </Card>
@@ -262,6 +295,7 @@ export default async function BillingPage({
         })}
       </div>
       <p className="mt-4 text-center text-[12px] text-subtle">{t("billing.vat")}</p>
+      {canManage ? <PaymentHistory locale={locale} rows={(payRows ?? []) as PaymentRow[]} /> : null}
     </>
   );
 }

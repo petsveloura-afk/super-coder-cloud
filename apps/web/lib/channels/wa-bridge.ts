@@ -43,6 +43,11 @@ async function call(path: string, init: { method: "GET" | "POST"; body?: unknown
   }
 }
 
+/** Shared signed call to the bridge service (also used by the personal-Telegram channel). */
+export async function bridgeCall(path: string, init: { method: "GET" | "POST"; body?: unknown }) {
+  return call(path, init);
+}
+
 export function bridgeCallbackUrl(token: string) {
   return `${publicEnv.appUrl.replace(/\/$/, "")}/api/channels/whatsapp_qr/${token}`;
 }

@@ -211,6 +211,13 @@ export async function connectChannelAction(_prev: ActionState, fd: FormData): Pr
       revalidatePath(`/${locale}/integrations`);
       return { error: "integrations.channels.webhookFailed", messageParams: { detail: hook.error ?? "" } };
     }
+    // wave 8: bot menu (commands), description and short description from the AI agent
+    try {
+      const { configureTelegramBot } = await import("@/lib/channels/telegram-setup");
+      await configureTelegramBot(ctx.org.id);
+    } catch {
+      // cosmetic — the bot works without it
+    }
   }
   revalidatePath(`/${locale}/integrations`);
   revalidatePath(`/${locale}/inbox`);
@@ -293,12 +300,16 @@ export async function disconnectChannelV2Action(fd: FormData): Promise<ActionSta
   const ctx = await getOrgContext(locale);
   if (!ctx.can("integrations.manage")) return { error: "errors.forbidden" };
   const kind = str(fd, "kind");
-  if (!["email", "whatsapp_qr"].includes(kind)) return { error: "validation.invalidId" };
+  if (!["email", "whatsapp_qr", "telegram_user"].includes(kind)) return { error: "validation.invalidId" };
   const supabase = await createClient();
   const { data: acc } = await supabase.from("channel_accounts").select("id").eq("organization_id", ctx.org.id).eq("kind", kind).maybeSingle();
   if (kind === "whatsapp_qr" && acc) {
     const { bridgeLogout } = await import("@/lib/channels/wa-bridge");
     await bridgeLogout(acc.id as string).catch(() => {});
+  }
+  if (kind === "telegram_user" && acc) {
+    const { tgUserLogout } = await import("@/lib/channels/tg-user");
+    await tgUserLogout(acc.id as string).catch(() => {});
   }
   const { error } = await supabase.from("channel_accounts").delete().eq("organization_id", ctx.org.id).eq("kind", kind);
   if (error) return { error: dbErrorKey(error) };
@@ -384,4 +395,66 @@ export async function whatsAppQrStatusAction(input: { locale: string }): Promise
   const st = await bridgeStatus(acc.id as string);
   if (st.status === "connected") revalidatePath(`/${locale}/integrations`);
   return { status: st.status, qr: st.qr ?? null, phone: st.phone ?? null, error: st.error ?? null };
+}
+
+/* ------------------------------------- wave 8: Telegram personal account ---- */
+
+export interface TgUserState {
+  status: "starting" | "qr" | "password" | "connected" | "error" | "unknown" | "not_configured";
+  qr?: string | null;
+  hint?: string | null;
+  phone?: string | null;
+  error?: string | null;
+}
+
+async function tgUserAccount(orgId: string, userId: string, create: boolean) {
+  const supabase = await createClient();
+  const { data: acc } = await supabase.from("channel_accounts").select("id, webhook_token").eq("organization_id", orgId).eq("kind", "telegram_user").maybeSingle();
+  if (acc || !create) return acc as { id: string; webhook_token: string } | null;
+  const { data } = await supabase
+    .from("channel_accounts")
+    .insert({ organization_id: orgId, kind: "telegram_user", name: "Telegram", status: "active", config: { state: "starting" }, created_by: userId })
+    .select("id, webhook_token")
+    .single();
+  return (data as { id: string; webhook_token: string } | null) ?? null;
+}
+
+/** Telegram personal account — opens a login session on the bridge and returns the QR to scan. */
+export async function startTelegramUserAction(input: { locale: string }): Promise<TgUserState> {
+  const locale = input.locale === "ar" || input.locale === "en" ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("integrations.manage")) return { status: "error", error: "errors.forbidden" };
+  const { tgUserConfigured, tgUserStart } = await import("@/lib/channels/tg-user");
+  if (!tgUserConfigured()) return { status: "not_configured" };
+  const acc = await tgUserAccount(ctx.org.id, ctx.userId, true);
+  if (!acc) return { status: "error", error: "errors.generic" };
+  const st = await tgUserStart(acc.id, acc.webhook_token);
+  return { status: st.status, qr: st.qr ?? null, hint: st.hint ?? null, phone: st.phone ?? null, error: st.error ?? null };
+}
+
+export async function telegramUserStatusAction(input: { locale: string }): Promise<TgUserState> {
+  const locale = input.locale === "ar" || input.locale === "en" ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("integrations.manage")) return { status: "error", error: "errors.forbidden" };
+  const { tgUserConfigured, tgUserStatus } = await import("@/lib/channels/tg-user");
+  if (!tgUserConfigured()) return { status: "not_configured" };
+  const acc = await tgUserAccount(ctx.org.id, ctx.userId, false);
+  if (!acc) return { status: "unknown" };
+  const st = await tgUserStatus(acc.id);
+  if (st.status === "connected") revalidatePath(`/${locale}/integrations`);
+  return { status: st.status, qr: st.qr ?? null, hint: st.hint ?? null, phone: st.phone ?? null, error: st.error ?? null };
+}
+
+/** The account has two-step verification: forward the password to the login session (never stored). */
+export async function telegramUserPasswordAction(input: { locale: string; password: string }): Promise<TgUserState> {
+  const locale = input.locale === "ar" || input.locale === "en" ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("integrations.manage")) return { status: "error", error: "errors.forbidden" };
+  const pw = String(input.password ?? "").slice(0, 256);
+  if (!pw) return { status: "password" };
+  const { tgUserPassword } = await import("@/lib/channels/tg-user");
+  const acc = await tgUserAccount(ctx.org.id, ctx.userId, false);
+  if (!acc) return { status: "unknown" };
+  const st = await tgUserPassword(acc.id, pw);
+  return { status: st.status, error: st.error ?? null };
 }

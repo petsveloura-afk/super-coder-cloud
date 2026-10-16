@@ -8,7 +8,7 @@ export function validSessionId(id) {
 
 /** Only the web app's own callback URL is accepted. */
 export function validCallback(url, appUrl) {
-  if (typeof url !== "string" || !/^https?:\/\/\S+\/api\/channels\/whatsapp_qr\/[a-f0-9]{48}$/.test(url)) return false;
+  if (typeof url !== "string" || !/^https?:\/\/\S+\/api\/channels\/(?:whatsapp_qr|telegram_user)\/[a-f0-9]{48}$/.test(url)) return false;
   if (!appUrl) return true;
   try {
     return new URL(url).origin === new URL(appUrl).origin;

@@ -29,7 +29,7 @@ const agentSchema = z.object({
   siteBuilder: z.boolean().default(false),
   imageGen: z.boolean().default(false),
   // wave 6 — the agent answers customers automatically on these channels
-  autopilot: z.array(z.enum(["web", "telegram", "whatsapp", "whatsapp_qr", "sms", "email"])).max(6).default([]),
+  autopilot: z.array(z.enum(["web", "telegram", "whatsapp", "whatsapp_qr", "sms", "email", "telegram_user"])).max(7).default([]),
   greeting: z.string().trim().max(500, "validation.tooLong").default(""),
   handoffRules: z.string().trim().max(2000, "validation.tooLong").default(""),
 });
@@ -82,6 +82,15 @@ export async function saveAgentAction(_prev: ActionState, fd: FormData): Promise
     : await supabase.from("ai_agents").insert({ ...row, organization_id: ctx.org.id, created_by: ctx.userId });
   if (error) return { error: limitErrorKey(error.message) ?? dbErrorKey(error), values };
   revalidatePath(`/${locale}/ai-agents`);
+  // keep the Telegram bot's menu / description in sync with the agent
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const { configureTelegramBot } = await import("@/lib/channels/telegram-setup");
+      await configureTelegramBot(ctx.org.id);
+    } catch {
+      /* cosmetic */
+    }
+  }
   return { ok: true, message: "ai.saved" };
 }
 
@@ -200,7 +209,7 @@ export async function createQuickAgentAction(input: {
     language: locale,
     enabled: true,
     allowed_tools: ["crm_lookup", "draft_message", "site_builder", "image_gen"],
-    autopilot_channels: ["web", "whatsapp", "whatsapp_qr", "telegram", "email"],
+    autopilot_channels: ["web", "whatsapp", "whatsapp_qr", "telegram", "telegram_user", "email"],
     lead_goal: "lead",
     followup_hours: 3,
   });
@@ -227,4 +236,94 @@ function salesFields(fd: FormData) {
     lead_goal: ["lead", "booking", "sale", "support"].includes(goal) ? goal : "lead",
     followup_hours: Number.isFinite(hours) ? Math.max(0, Math.min(168, Math.round(hours))) : 0,
   };
+}
+
+/* ------------------------------------------ wave 8: conversation setup (script, knowledge, media) ---- */
+
+/** gallery images: any https URL, or this project's own Storage (local / self-hosted Supabase over http) */
+function isMediaUrl(u: string) {
+  if (/^https:\/\/\S{8,1000}$/.test(u)) return true;
+  const own = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
+  return Boolean(own) && u.startsWith(`${own}/storage/v1/object/public/`) && !/\s/.test(u);
+}
+
+const setupSchema = z.object({
+  id: uuidSchema,
+  flow: z.array(z.string().trim().min(1).max(300)).max(15),
+  fields: z.array(z.string().trim().min(1).max(120)).max(15),
+  pricing: z.string().trim().max(3000),
+  links: z.array(z.string().trim().min(3).max(400)).max(20),
+  menu: z.array(z.string().trim().min(1).max(30)).max(8),
+  media: z
+    .array(z.object({ title: z.string().trim().min(1).max(80), url: z.string().trim().max(1000).refine(isMediaUrl), caption: z.string().trim().max(300).optional().default("") }))
+    .max(20),
+});
+
+/** Saves the agent's conversation script, required details, pricing policy, links, menu and gallery. */
+export async function saveAgentSetupAction(input: {
+  locale: string;
+  id: string;
+  flow: string[];
+  fields: string[];
+  pricing: string;
+  links: string[];
+  menu: string[];
+  media: { title: string; url: string; caption?: string }[];
+}): Promise<ActionState> {
+  const locale: Locale = isLocale(input.locale) ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("ai.manage")) return { error: "errors.forbidden" };
+  const parsed = setupSchema.safeParse(input);
+  if (!parsed.success) return { error: "validation.required" };
+  const supabase = await createClient();
+  const { data: agent } = await supabase.from("ai_agents").select("profile").eq("id", parsed.data.id).eq("organization_id", ctx.org.id).maybeSingle();
+  if (!agent) return { error: "errors.notFound" };
+  const profile = {
+    ...((agent.profile as Record<string, unknown> | null) ?? {}),
+    flow: parsed.data.flow,
+    fields: parsed.data.fields,
+    pricing: parsed.data.pricing,
+    links: parsed.data.links,
+    menu: parsed.data.menu,
+    media: parsed.data.media,
+  };
+  const { error } = await supabase.from("ai_agents").update({ profile }).eq("id", parsed.data.id).eq("organization_id", ctx.org.id);
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}/ai-agents`);
+  revalidatePath(`/${locale}/ai-agents/${parsed.data.id}/setup`);
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const { configureTelegramBot } = await import("@/lib/channels/telegram-setup");
+      await configureTelegramBot(ctx.org.id);
+    } catch {
+      /* cosmetic */
+    }
+  }
+  return { ok: true, message: "ai.saved" };
+}
+
+const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
+
+/** Uploads an example / portfolio image for the agent (public URL the agent can send to customers). */
+export async function uploadAgentMediaAction(fd: FormData): Promise<ActionState<{ url: string }>> {
+  const locale = loc(fd);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("ai.manage")) return { error: "errors.forbidden" };
+  const id = uuidSchema.safeParse(fd.get("id"));
+  const file = fd.get("file");
+  if (!id.success || !(file instanceof File)) return { error: "validation.required" };
+  const ext = IMAGE_TYPES[file.type];
+  if (!ext) return { error: "ai.setup.badImage" };
+  if (file.size > 5 * 1024 * 1024) return { error: "ai.setup.tooBig" };
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "inbox.serverKeyMissing" };
+  const supabase = await createClient();
+  const { data: agent } = await supabase.from("ai_agents").select("id").eq("id", id.data).eq("organization_id", ctx.org.id).maybeSingle();
+  if (!agent) return { error: "errors.notFound" };
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+  const path = `${ctx.org.id}/agents/${id.data}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await admin.storage.from("site-assets").upload(path, Buffer.from(await file.arrayBuffer()), { contentType: file.type, upsert: false });
+  if (error) return { error: "ai.setup.uploadFailed" };
+  const { data } = admin.storage.from("site-assets").getPublicUrl(path);
+  return { ok: true, data: { url: data.publicUrl } };
 }

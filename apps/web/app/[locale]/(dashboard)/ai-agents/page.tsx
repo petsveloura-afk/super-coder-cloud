@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Bot, KeyRound } from "lucide-react";
+import { Bot, KeyRound, MessagesSquare } from "lucide-react";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { AgentDialog, AgentStatus, DeleteAgentButton, QuickAgentButton, type AgentRow } from "@/components/ai/agents-client";
 import { AutopilotExplainer } from "@/components/ai/autopilot-explainer";
@@ -87,31 +87,42 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
             ) : (
               <ul className="divide-y divide-line">
                 {agents.map((a) => (
-                  <li key={a.id} className="flex items-center gap-3 px-5 py-3.5">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gold-soft text-gold">
-                      <Bot className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{a.name}</div>
-                      <div className="truncate text-[12px] text-subtle" dir="ltr">
-                        {a.provider} · {a.model}
-                      </div>
-                      {a.enabled && (a.autopilot_channels ?? []).length ? (
-                        <div className="mt-1 flex flex-wrap gap-1" data-testid="autopilot-badges">
-                          {(a.autopilot_channels ?? []).map((c) => (
-                            <span key={c} className="rounded-md bg-success-soft px-1.5 py-0.5 text-[10.5px] font-medium text-success">
-                              {t(`ai.autopilot.channels.${c}`)}
-                            </span>
-                          ))}
+                  <li key={a.id} className="space-y-2.5 px-4 py-3.5 sm:px-5">
+                    <div className="flex items-start gap-3">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gold-soft text-gold">
+                        <Bot className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{a.name}</div>
+                        <div className="truncate text-[12px] text-subtle" dir="ltr">
+                          {a.provider} · {a.model}
                         </div>
-                      ) : null}
+                      </div>
+                      <div className="shrink-0">
+                        <AgentStatus enabled={a.enabled} />
+                      </div>
                     </div>
-                    <AgentStatus enabled={a.enabled} />
+                    {a.enabled && (a.autopilot_channels ?? []).length ? (
+                      <div className="flex flex-wrap gap-1" data-testid="autopilot-badges">
+                        {(a.autopilot_channels ?? []).map((c) => (
+                          <span key={c} className="whitespace-nowrap rounded-md bg-success-soft px-1.5 py-0.5 text-[11px] font-medium text-success">
+                            {t(`ai.autopilot.channels.${c}`)}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                     {canManage ? (
-                      <>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/${locale}/ai-agents/${a.id}/setup`}
+                          className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent-soft px-3 text-[13px] font-semibold text-accent transition hover:brightness-110"
+                          data-testid="agent-setup-link"
+                        >
+                          <MessagesSquare className="h-4 w-4" /> {t("ai.setup.open")}
+                        </Link>
                         <AgentDialog agent={a} defaults={defaults} />
                         <DeleteAgentButton id={a.id} />
-                      </>
+                      </div>
                     ) : null}
                   </li>
                 ))}

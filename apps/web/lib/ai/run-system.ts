@@ -20,6 +20,8 @@ export async function runAISystem(input: {
   messages: AIMessage[];
   temperature?: number;
   maxTokens?: number;
+  /** wait for a busy provider (background replies) — default 45s */
+  patienceMs?: number;
 }): Promise<AIOutcome> {
   const provider = pickProvider(input.provider);
   if (!provider) return { ok: false, error: "ai.notConfigured" };
@@ -40,6 +42,7 @@ export async function runAISystem(input: {
       messages: input.messages,
       temperature: input.temperature ?? 0.4,
       maxTokens: input.maxTokens ?? 600,
+      patienceMs: input.patienceMs ?? (Number(process.env.AI_AUTOPILOT_PATIENCE_MS) > 0 ? Number(process.env.AI_AUTOPILOT_PATIENCE_MS) : 45_000),
     });
     await admin.rpc("finalize_ai_usage_system", {
       p_usage_id: usageId,
@@ -53,6 +56,18 @@ export async function runAISystem(input: {
     return { ok: true, text: result.text, provider: result.provider, model: result.model, credits: Math.max(1, Math.ceil((result.inputTokens + result.outputTokens) / 1000)) };
   } catch (err) {
     console.error("autopilot ai call failed", (err as Error).message);
+    // another configured provider (e.g. Anthropic / OpenAI next to Gemini) can still answer
+    for (const other of (["gemini", "anthropic", "openai"] as const).filter((p) => p !== provider && pickProvider(p) === p)) {
+      try {
+        const alt = await generate(other, { model: DEFAULT_MODELS[other], system: input.system, messages: input.messages, temperature: input.temperature ?? 0.4, maxTokens: input.maxTokens ?? 600 });
+        if (alt.text) {
+          await admin.rpc("finalize_ai_usage_system", { p_usage_id: usageId, p_provider: alt.provider, p_model: alt.model, p_input: alt.inputTokens, p_output: alt.outputTokens, p_ok: true });
+          return { ok: true, text: alt.text, provider: alt.provider, model: alt.model, credits: Math.max(1, Math.ceil((alt.inputTokens + alt.outputTokens) / 1000)) };
+        }
+      } catch {
+        /* next */
+      }
+    }
     await admin.rpc("finalize_ai_usage_system", { p_usage_id: usageId, p_provider: provider, p_model: model, p_input: 0, p_output: 0, p_ok: false });
     if (/_(429|500|502|503|504)\b/.test((err as Error).message ?? "")) return { ok: false, error: "ai.busy" };
     return { ok: false, error: "ai.failed" };

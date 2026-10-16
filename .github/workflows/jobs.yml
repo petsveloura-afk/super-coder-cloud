@@ -51,3 +51,9 @@ jobs:
           if [ "$code" != "200" ] && [ "$code" != "503" ] && [ "$code" != "404" ]; then
             echo "::warning::AI follow-ups returned HTTP $code"
           fi
+      - name: Prepaid plans (expiry + renewal reminders)
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "CRON_SECRET secret not set — skipping"; exit 0; fi
+          URL="${APP_URL:-https://super-coder-cloud.vercel.app}"
+          curl -s -o sweep.json -X POST -H "Authorization: Bearer $CRON_SECRET" "$URL/api/billing/sweep" || true
+          cat sweep.json || true; echo

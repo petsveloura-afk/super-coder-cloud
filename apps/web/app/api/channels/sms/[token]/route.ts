@@ -5,6 +5,8 @@ import { ingest } from "@/lib/channels/ingest";
 import { publicEnv } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
+// the AI agent answers in the background (after the response) and may wait for a busy provider
+export const maxDuration = 120;
 
 /** POST /api/channels/sms/{token} — Twilio inbound SMS webhook (form-encoded, signed). */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {

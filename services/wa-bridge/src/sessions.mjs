@@ -130,15 +130,16 @@ export class SessionManager {
     }
   }
 
-  async send(id, to, text) {
+  async send(id, to, text, image = null) {
     const s = this.sessions.get(id);
     if (!s || s.stopped) throw Object.assign(new Error("not_found"), { code: 404 });
     if (s.status !== "connected") throw Object.assign(new Error("not_connected"), { code: 409 });
     const jid = jidFromPhone(to);
     if (!jid) throw Object.assign(new Error("invalid_recipient"), { code: 400 });
     const body = String(text ?? "").slice(0, 4000);
-    if (!body.trim()) throw Object.assign(new Error("empty"), { code: 400 });
-    const r = await s.sock.sendMessage(jid, { text: body });
+    const img = typeof image === "string" && /^https:\/\/\S+$/.test(image) ? image : null;
+    if (!body.trim() && !img) throw Object.assign(new Error("empty"), { code: 400 });
+    const r = await s.sock.sendMessage(jid, img ? { image: { url: img }, caption: body.slice(0, 1000) } : { text: body });
     return r?.key?.id ?? null;
   }
 

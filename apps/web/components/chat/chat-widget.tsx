@@ -19,6 +19,7 @@ interface ChatMsg {
   pending?: boolean;
   buttons?: string[];
   askPhone?: boolean;
+  image?: string;
 }
 
 interface ChatState {
@@ -28,6 +29,7 @@ interface ChatState {
   greeting: string;
   mode: string | null;
   messages: ChatMsg[];
+  menu?: string[];
 }
 
 function visitorId(org: string): string {
@@ -188,9 +190,24 @@ export function ChatWidget({ orgSlug, accent, embedded = false, defaultOpen = fa
         <Bubble from="agent" color={color}>
           <Linkified text={greeting} />
         </Bubble>
+        {!state.messages.length && state.menu?.length ? (
+          <div className="flex flex-wrap justify-start gap-2" data-testid="chat-menu">
+            {state.menu.map((b) => (
+              <button key={b} type="button" onClick={() => void send(undefined, b)} className="rounded-full border px-3.5 py-1.5 text-[13px] font-medium" style={{ borderColor: color, color }}>
+                {b}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {state.messages.map((m) => (
           <Bubble key={m.id} from={m.from} color={color} pending={m.pending} label={m.from === "team" ? t("chat.team") : undefined}>
-            <Linkified text={m.text} />
+            {m.image ? (
+              <a href={m.image} target="_blank" rel="noopener noreferrer" className="mb-1.5 block overflow-hidden rounded-xl" data-testid="chat-image">
+                {/* eslint-disable-next-line @next/next/no-img-element -- remote gallery image of the business */}
+                <img src={m.image} alt="" className="max-h-64 w-full object-cover" loading="lazy" />
+              </a>
+            ) : null}
+            <Linkified text={m.image ? m.text.replace(m.image, "").trim() : m.text} />
           </Bubble>
         ))}
         {!busy && last?.from === "agent" && last.buttons?.length ? (

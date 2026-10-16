@@ -21,6 +21,8 @@ export interface AIRequest {
   maxTokens: number;
   /** ask the model for a single JSON object (site builder) */
   json?: boolean;
+  /** background callers (AI agent replies) may wait this long for a busy provider before giving up */
+  patienceMs?: number;
 }
 
 export interface AIResult {
@@ -224,6 +226,23 @@ async function gemini(req: AIRequest): Promise<AIResult> {
 }
 
 export async function generate(provider: AIProviderName, req: AIRequest): Promise<AIResult> {
-  if (provider === "gemini") return gemini(req);
-  return provider === "openai" ? openai(req) : anthropic(req);
+  const once = () => (provider === "gemini" ? gemini(req) : provider === "openai" ? openai(req) : anthropic(req));
+  if (!req.patienceMs || req.patienceMs <= 0) return once();
+  // patience: a busy / rate-limited provider usually answers after a short wait
+  const until = Date.now() + Math.min(req.patienceMs, 90_000);
+  let wait = 2000;
+  for (;;) {
+    try {
+      return await once();
+    } catch (e) {
+      const msg = (e as Error).message ?? "";
+      if (!/_(429|500|502|503|504)\b/.test(msg) || /per ?day|daily|PerDay/i.test(msg)) throw e;
+      const asked = Number(/retry in ([\d.]+)\s*s/i.exec(msg)?.[1] ?? 0) * 1000;
+      const delay = Math.min(Math.max(wait, asked), until - Date.now());
+      if (delay <= 300) throw e;
+      console.error("ai provider busy — waiting before retry", provider, Math.round(delay), "ms");
+      await sleep(delay);
+      wait = Math.min(wait * 2, 15_000);
+    }
+  }
 }

@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadAccount, markAccountError, type Kind } from "./accounts";
-import { telegramCall, twilioSendSms, whatsappSendButtons, whatsappSendText, type ProviderResult } from "./providers";
+import { telegramCall, twilioSendSms, whatsappSendButtons, whatsappSendImage, whatsappSendText, type ProviderResult } from "./providers";
 import { toE164 } from "./secrets";
 
 export interface SendOutcome {
@@ -18,6 +18,8 @@ export interface RichMessage {
   askPhone?: boolean;
   askPhoneLabel?: string;
   html?: boolean;
+  /** persistent menu keyboard (Telegram), 2 buttons per row */
+  menu?: string[];
 }
 
 async function providerSend(kind: Kind | "web", orgId: string, externalId: string, text: string, conversationId?: string, rich?: RichMessage): Promise<ProviderResult & { accountId?: string }> {
@@ -29,6 +31,10 @@ async function providerSend(kind: Kind | "web", orgId: string, externalId: strin
   if (kind === "email") {
     const { sendEmailReply } = await import("./email");
     r = await sendEmailReply(acc, externalId, text, conversationId);
+  } else if (kind === "telegram_user") {
+    const { tgUserSend } = await import("./tg-user");
+    const { buttonsAsText } = await import("@/lib/ai/autopilot-core");
+    r = await tgUserSend(acc, externalId, rich?.buttons?.length ? buttonsAsText(text, rich.buttons) : text);
   } else if (kind === "whatsapp_qr") {
     const { bridgeSend } = await import("./wa-bridge");
     const { buttonsAsText } = await import("@/lib/ai/autopilot-core");
@@ -36,9 +42,16 @@ async function providerSend(kind: Kind | "web", orgId: string, externalId: strin
   } else if (kind === "telegram") {
     if (rich) {
       const { telegramHtml } = await import("@/lib/ai/autopilot-core");
+      const menuRows = (rich.menu ?? []).reduce<{ text: string }[][]>((rows, b, i) => {
+        if (i % 2 === 0) rows.push([{ text: b }]);
+        else rows[rows.length - 1]!.push({ text: b });
+        return rows;
+      }, []);
       const reply_markup = rich.askPhone
         ? { keyboard: [[{ text: rich.askPhoneLabel || "📱", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true }
-        : rich.buttons?.length
+        : menuRows.length
+          ? { keyboard: menuRows, resize_keyboard: true, is_persistent: true }
+          : rich.buttons?.length
           ? { keyboard: rich.buttons.map((b) => [{ text: b }]), resize_keyboard: true, one_time_keyboard: true }
           : { remove_keyboard: true };
       r = await telegramCall(acc.secrets.bot_token ?? "", "sendMessage", { chat_id: externalId, text: rich.html ? telegramHtml(text) : text, ...(rich.html ? { parse_mode: "HTML" } : {}), reply_markup, link_preview_options: { is_disabled: false } });
@@ -129,4 +142,34 @@ export async function sendToContact(kind: Kind, orgId: string, contactId: string
     .single();
   if (error || !conv) return { ok: false, error: "conversation_failed" };
   return sendToConversation(orgId, conv.id as string, text);
+}
+
+/** Sends an image (agent gallery) into a conversation on any channel; text link where images aren't supported. */
+export async function sendMediaToConversation(orgId: string, conversationId: string, item: { title: string; url: string; caption?: string }, opts?: { aiAgentId?: string | null }): Promise<SendOutcome> {
+  const admin = createAdminClient();
+  const { data: conv } = await admin.from("conversations").select("id, channel, external_id").eq("id", conversationId).eq("organization_id", orgId).maybeSingle();
+  if (!conv) return { ok: false, error: "not_found", permanent: true };
+  const caption = [item.caption || item.title].filter(Boolean).join("").slice(0, 900);
+  const body = `${caption}\n${item.url}`.trim();
+  const { data: msg } = await admin
+    .from("messages")
+    .insert({ organization_id: orgId, conversation_id: conv.id, direction: "out", body, status: "queued", ai_agent_id: opts?.aiAgentId ?? null, meta: { media: { type: "image", url: item.url, title: item.title } } })
+    .select("id")
+    .single();
+  let r: ProviderResult = { ok: true };
+  const channel = conv.channel as string;
+  if (channel !== "web") {
+    const acc = await loadAccount(orgId, channel as Kind);
+    if (!acc) r = { ok: false, error: "channel_not_connected", permanent: true };
+    else if (channel === "telegram") r = await telegramCall(acc.secrets.bot_token ?? "", "sendPhoto", { chat_id: conv.external_id, photo: item.url, caption });
+    else if (channel === "whatsapp") r = await whatsappSendImage(acc.secrets.access_token ?? "", acc.config.phone_number_id ?? "", `+${String(conv.external_id).replace(/^\+/, "")}`, item.url, caption);
+    else if (channel === "whatsapp_qr") {
+      const { bridgeCall } = await import("./wa-bridge");
+      const x = await bridgeCall(`/sessions/${acc.id}/send`, { method: "POST", body: { to: String(conv.external_id).replace(/[^\d]/g, ""), text: caption, image: item.url } });
+      r = x.ok ? { ok: true } : { ok: false, error: String(x.data.error ?? "bridge") };
+    } else r = await providerSend(channel as Kind, orgId, conv.external_id as string, body, conv.id as string);
+  }
+  if (msg) await admin.from("messages").update({ status: r.ok ? "sent" : "failed", error: r.ok ? null : (r.error ?? "send_failed").slice(0, 500), external_id: r.externalId ?? null }).eq("id", msg.id);
+  await admin.from("conversations").update({ last_message_at: new Date().toISOString(), last_message_preview: `🖼️ ${item.title}`.slice(0, 200) }).eq("id", conv.id);
+  return { ok: r.ok, messageId: msg?.id as string | undefined, error: r.error };
 }

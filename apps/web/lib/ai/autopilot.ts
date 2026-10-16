@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { publicEnv } from "@/lib/env";
-import { sendToConversation } from "@/lib/channels/send-message";
+import { sendMediaToConversation, sendToConversation } from "@/lib/channels/send-message";
 import { runAISystem } from "./run-system";
 import {
   autopilotInstructions,
@@ -16,6 +16,9 @@ import {
   fallbackMessage,
   wantsHuman,
   welcomeMessage,
+  busyMessage,
+  commandIntent,
+  pickMedia,
   type AgentProfile,
   type AutopilotChannel,
   type LeadData,
@@ -130,7 +133,7 @@ export function autopilotLocale(lang: unknown): "he" | "ar" | "en" {
   return lang === "ar" || lang === "en" ? lang : "he";
 }
 
-export async function handleInboundWithAI(input: { conversationId: string; messageId?: string | null; debounceMs?: number }): Promise<AutopilotResult> {
+export async function handleInboundWithAI(input: { conversationId: string; messageId?: string | null; debounceMs?: number; retry?: boolean }): Promise<AutopilotResult> {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { replied: false, handoff: false, reason: "no_service_key" };
   const admin = createAdminClient();
   const { data: conv } = await admin
@@ -177,26 +180,45 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
 
   const { data: rows } = await admin
     .from("messages")
-    .select("direction, body, created_at")
+    .select("direction, body, created_at, meta")
     .eq("conversation_id", conv.id)
     .order("created_at", { ascending: false })
     .limit(30);
-  const history = buildHistory(((rows ?? []) as StoredMessage[]).reverse());
+  // "I'm checking…" holding replies are not part of the real conversation
+  const history = buildHistory(((rows ?? []) as (StoredMessage & { meta?: { fallback?: boolean } | null })[]).reverse().filter((m) => !(m.direction === "out" && m.meta?.fallback)));
   const lastIn = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
   if (!lastIn) return { replied: false, handoff: false, reason: "empty" };
   const locale = autopilotLocale(agent.language);
   const ch = channel as AutopilotChannel;
+  const profile = (agent.profile as AgentProfile | null) ?? {};
+  const menu = (profile.menu ?? []).map((b) => b.trim()).filter(Boolean).slice(0, 8);
+  // Telegram / chat commands (/start, /menu, /human, /prices …)
+  const lastLine = lastIn.split("\n").pop() ?? lastIn;
+  const intent = commandIntent(lastLine, locale);
+  if (intent.kind === "menu" && menu.length) {
+    const text = formatForChannel(locale === "en" ? "Choose an option 👇" : locale === "ar" ? "اختر من القائمة 👇" : "בחרו מהתפריט 👇", ch);
+    await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string, meta: { buttons: menu.slice(0, 3) }, rich: { menu, html: true } });
+    return { replied: true, handoff: false, text };
+  }
+  if (intent.kind === "text" && intent.text !== lastLine) {
+    const lastUser = [...history].reverse().find((m) => m.role === "user");
+    if (lastUser) lastUser.content = lastUser.content.replace(lastLine, intent.text);
+  }
 
   // Telegram "Start" button / a bare greeting command → the welcome message (no AI call needed)
   if (/^\/start\b/i.test(lastIn.trim())) {
     const { data: o } = await admin.from("organizations").select("name").eq("id", orgId).maybeSingle();
     const text = formatForChannel(((agent.greeting as string) ?? "").trim() || welcomeMessage(locale, (o?.name as string | undefined) ?? ""), ch);
-    await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string });
+    // wave 8: the business's menu buttons under the welcome message
+    await sendToConversation(orgId, conv.id as string, text, undefined, {
+      aiAgentId: agent.id as string,
+      ...(menu.length ? { meta: { buttons: menu.slice(0, 3) }, rich: { menu, buttons: menu.slice(0, 3), html: true } } : {}),
+    });
     return { replied: true, handoff: false, text };
   }
 
   // the customer explicitly asks for a person → hand off right away (no AI call needed)
-  if (wantsHuman(lastIn)) {
+  if (intent.kind === "human" || wantsHuman(lastLine)) {
     const text = handoffMessage(locale);
     await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string });
     await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "customer_asked" });
@@ -261,11 +283,19 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     maxTokens: ch === "email" ? 1200 : 600,
   });
   if (!out.ok) {
-    // never leave the customer hanging: a polite answer, then the team takes over
-    const sorry = formatForChannel(fallbackMessage(locale), ch);
-    await sendToConversation(orgId, conv.id as string, sorry, undefined, { aiAgentId: agent.id as string });
-    await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: out.error });
-    return { replied: true, handoff: true, reason: out.error, text: sorry };
+    // no AI credits left → the team takes over (with a polite answer)
+    if (/plan_limit|limit|demo/i.test(out.error)) {
+      const sorry = formatForChannel(fallbackMessage(locale), ch);
+      await sendToConversation(orgId, conv.id as string, sorry, undefined, { aiAgentId: agent.id as string });
+      await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: out.error });
+      return { replied: true, handoff: true, reason: out.error, text: sorry };
+    }
+    // provider busy: a short "on it" — the conversation stays with the agent and the
+    // safety net (cron, every 1–5 min) answers properly; never a second holding message
+    if (input.retry) return { replied: false, handoff: false, reason: out.error };
+    const hold = formatForChannel(busyMessage(locale), ch);
+    await sendToConversation(orgId, conv.id as string, hold, undefined, { aiAgentId: agent.id as string, meta: { fallback: true } });
+    return { replied: true, handoff: false, reason: out.error, text: hold };
   }
   const tools = parseAgentTools(out.text);
   void parseAutopilotReply; // (wave 6 parser kept for compatibility; the tools parser is a superset)
@@ -276,6 +306,10 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     rich: { buttons: tools.buttons, askPhone: tools.askPhone, askPhoneLabel: sharePhoneLabel(locale), html: true },
   });
   await admin.from("conversations").update({ last_ai_at: new Date().toISOString() }).eq("id", conv.id);
+  // examples / portfolio images the agent chose to show
+  for (const item of pickMedia(out.text, profile.media)) {
+    await sendMediaToConversation(orgId, conv.id as string, item, { aiAgentId: agent.id as string });
+  }
   let lead: LeadCaptureResult | null = null;
   if (tools.lead) lead = await captureLead({ orgId, conversationId: conv.id as string, lead: tools.lead, channel: ch, title: (conv.title as string | null) ?? null });
   if (tools.handoff) await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: tools.reason ?? "agent" });
@@ -297,4 +331,23 @@ export async function scheduleAutopilot(input: { conversationId: string; message
     // outside a request scope (tests / scripts): run inline
     await handleInboundWithAI(input).catch((e) => console.error("autopilot failed", (e as Error).message));
   }
+}
+
+/** Safety net (cron): answers customer messages that got no AI reply yet (provider was busy). */
+export async function runPendingReplies(budgetMs = 40_000): Promise<{ checked: number; replied: number }> {
+  const admin = createAdminClient();
+  const started = Date.now();
+  const { data } = await admin.rpc("ai_pending_replies", { p_limit: 20 });
+  const rows = (data ?? []) as { conversation_id: string }[];
+  let replied = 0;
+  for (const r of rows) {
+    if (Date.now() - started > budgetMs) break;
+    try {
+      const out = await handleInboundWithAI({ conversationId: r.conversation_id, retry: true });
+      if (out.replied) replied++;
+    } catch (e) {
+      console.error("pending reply failed", (e as Error).message);
+    }
+  }
+  return { checked: rows.length, replied };
 }

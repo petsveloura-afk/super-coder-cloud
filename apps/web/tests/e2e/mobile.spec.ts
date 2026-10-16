@@ -21,3 +21,50 @@ test("mobile (iPhone viewport): bottom navigation, cards and bottom-sheet dialog
   await expect(page.getByRole("dialog")).toBeVisible();
   await shot(page, "m3-menu-sheet");
 });
+
+test("mobile (iPhone viewport): wave 8 screens fit the phone — billing & payment methods, integrations, agent setup, website chat", async ({ page, browser }) => {
+  test.setTimeout(180_000);
+  const slug = `mob8-${Date.now()}`;
+  await signUp(page, { name: "מובייל 8", email: uniqueEmail("mob8") });
+  await createOrg(page, "נייד שמונה", slug);
+  const noSideScroll = async (name: string) => {
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(over, `${name} scrolls sideways by ${over}px`).toBeLessThanOrEqual(1);
+    await shot(page, name);
+  };
+
+  await page.goto("/he/billing");
+  await expect(page.locator("main")).toBeVisible();
+  await noSideScroll("m4-billing-mobile");
+
+  await page.goto("/he/integrations");
+  await expect(page.locator('[data-hub="web"]')).toBeVisible();
+  await noSideScroll("m5-integrations-mobile");
+
+  await page.goto("/he/ai-agents");
+  await page.getByTestId("quick-agent").click();
+  await expect(page.getByText("הסוכן פעיל ועונה ללקוחות")).toBeVisible();
+  await noSideScroll("m6-agents-mobile");
+  await page.waitForLoadState("networkidle");
+  await page.getByTestId("agent-setup-link").first().click();
+  await expect(page).toHaveURL(/\/setup$/, { timeout: 20_000 });
+  await expect(page.getByTestId("agent-setup")).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId("flow-template").click();
+  const menu = page.getByTestId("menu-editor");
+  await menu.getByRole("textbox").last().fill("💰 מחירים");
+  await menu.getByRole("textbox").last().press("Enter");
+  await expect(page.getByTestId("setup-save")).toBeInViewport();
+  await noSideScroll("m7-agent-setup-mobile");
+  await page.getByTestId("setup-save").click();
+  await expect(page.getByText("הסוכן נשמר").first()).toBeVisible();
+
+  const ctx = await browser.newContext({ ...(test.info().project.use as object) });
+  const v = await ctx.newPage();
+  await v.goto(`/he/chat/${slug}`);
+  await expect(v.getByTestId("chat-panel")).toBeVisible();
+  await expect(v.getByTestId("chat-menu")).toContainText("💰 מחירים");
+  const over = await v.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(over).toBeLessThanOrEqual(1);
+  await shot(v, "m8-chat-mobile");
+  await ctx.close();
+});

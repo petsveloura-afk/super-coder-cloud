@@ -57,6 +57,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // node-only mail libraries (IMAP / SMTP / MIME) stay external to the server bundle
   serverExternalPackages: ["imapflow", "nodemailer", "mailparser"],
+  // agent gallery uploads (images are also resized in the browser first)
+  experimental: { serverActions: { bodySizeLimit: "6mb" } },
   poweredByHeader: false,
   transpilePackages: ["@scc/shared", "@scc/database"],
   async headers() {
