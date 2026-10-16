@@ -117,3 +117,19 @@ All optional; each payment method appears on the billing page only when its keys
 Endpoints: `/api/billing/paypal/return` (PayPal approval return), `/api/billing/sweep` (Bearer `CRON_SECRET`, prepaid crypto periods — called by the jobs workflow), `/api/channels/telegram_user/{token}` (signed bridge callbacks).
 `/api/ai/followups` now first answers any customer message that got no reply (provider busy / timeout), then sends follow-ups.
 Migration: `20261015000025_payments_telegram_user.sql`.
+
+## v9 — AI router (fast failover between AI providers)
+Every AI call (agent replies, studio chat, site builder) goes through `lib/ai/router.ts`: the agent's provider first, then `AI_PROVIDER_ORDER` (default `groq,cerebras,gemini,openrouter,mistral,anthropic,openai`). Each key/model is tried once; limited ones rest (shared through table `ai_provider_rests`, migration `20261015000026_ai_router.sql`).
+
+| Variable | Purpose |
+|---|---|
+| `GROQ_API_KEY` (+`_2`…`_10`, `GROQ_API_KEYS`) | Groq (OpenAI-compatible, free tier) |
+| `CEREBRAS_API_KEY` (+…) | Cerebras (free tier) |
+| `OPENROUTER_API_KEY` (+…) | OpenRouter (`openrouter/free` model) |
+| `MISTRAL_API_KEY` (+…) | Mistral (free Experiment plan) |
+| `AI_PROVIDER_ORDER` | comma list, e.g. `groq,gemini,cerebras` |
+| `AI_GEMINI_MODELS`, `AI_GROQ_MODELS`, `AI_CEREBRAS_MODELS`, `AI_OPENROUTER_MODELS`, `AI_MISTRAL_MODELS` | model lists per provider (first = preferred) |
+| `AI_GROQ_BASE_URL`, `AI_CEREBRAS_BASE_URL`, `AI_OPENROUTER_BASE_URL`, `AI_MISTRAL_BASE_URL` | endpoint overrides (gateways / tests) |
+
+Defaults: Gemini `gemini-3.8-flash, gemini-3.5-flash-lite, gemini-3.6-flash, gemini-2.5-flash`; Groq `openai/gpt-oss-120b, llama-3.3-70b-versatile`; Cerebras `gpt-oss-120b, qwen-3.8-27b`; OpenRouter `openrouter/free`; Mistral `mistral-small-latest`.
+Platform admin → "AI engines check" probes every key and can clear the rests.

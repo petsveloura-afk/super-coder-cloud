@@ -1,13 +1,14 @@
 import "server-only";
 import { limitErrorKey } from "@scc/shared/billing";
 import { createClient } from "@/lib/supabase/server";
-import { DEFAULT_MODELS, generate, pickProvider, type AIMessage, type AIProviderName } from "./providers";
+import { DEFAULT_MODELS, pickProvider, routerExtrasConfigured, type AIMessage, type AIProviderName } from "./providers";
+import { generateRouted, RouterError } from "./router";
 
 export type AIFeature = "contact_summary" | "followup_draft" | "agent_chat" | "site_builder";
 
 export type AIOutcome =
-  | { ok: true; text: string; provider: AIProviderName; model: string; credits: number }
-  | { ok: false; error: string };
+  | { ok: true; text: string; provider: AIProviderName | string; model: string; credits: number }
+  | { ok: false; error: string; retryInMs?: number | null };
 
 /**
  * Metered AI call:
@@ -28,7 +29,7 @@ export async function runAI(input: {
   /** ask for a single JSON object (site builder) */
   json?: boolean;
 }): Promise<AIOutcome> {
-  const provider = pickProvider(input.provider);
+  const provider = pickProvider(input.provider) ?? (routerExtrasConfigured() ? input.provider ?? "gemini" : null);
   if (!provider) return { ok: false, error: "ai.notConfigured" };
 
   const supabase = await createClient();
@@ -44,13 +45,16 @@ export async function runAI(input: {
 
   const model = input.provider === provider && input.model ? input.model : DEFAULT_MODELS[provider];
   try {
-    const result = await generate(provider, {
+    // AI router: the chosen provider first, then every other configured provider — fast failover, no retry storms
+    const result = await generateRouted({
+      preferred: input.provider ?? provider,
       model,
       system: input.system,
       messages: input.messages,
       temperature: input.temperature ?? 0.3,
       maxTokens: input.maxTokens ?? 700,
       json: input.json,
+      budgetMs: input.feature === "site_builder" ? 55_000 : 30_000,
     });
     await supabase.rpc("finalize_ai_usage", {
       p_usage_id: usageId,
@@ -79,6 +83,7 @@ export async function runAI(input: {
       p_ok: false,
     });
     // provider overloaded / rate-limited → tell the user to retry shortly instead of a generic failure
+    if (err instanceof RouterError) return { ok: false, error: err.busy ? "ai.busy" : "ai.failed", retryInMs: err.retryInMs };
     if (/_(429|500|502|503|504)\b/.test((err as Error).message ?? "")) return { ok: false, error: "ai.busy" };
     return { ok: false, error: "ai.failed" };
   }

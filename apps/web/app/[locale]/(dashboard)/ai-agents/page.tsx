@@ -12,7 +12,7 @@ import { UsageMeter } from "@/components/billing/usage-meter";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
-import { DEFAULT_MODELS, pickProvider } from "@/lib/ai/providers";
+import { DEFAULT_MODELS, pickProvider, routerExtrasConfigured } from "@/lib/ai/providers";
 import { formatNumber } from "@/lib/format";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -39,7 +39,7 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
   const e = ((ent ?? []) as { limits: Record<string, number | null>; ai_credits_used: number }[])[0];
   const creditLimit = e?.limits?.ai_credits_monthly ?? null;
   const used = Number(e?.ai_credits_used ?? 0);
-  const provider = pickProvider();
+  const provider = pickProvider() ?? (routerExtrasConfigured() ? "gemini" : null);
   const siteCaps = await aiSiteCaps(ctx.org.id);
   const canManage = ctx.can("ai.manage");
   const defaults = { openai: DEFAULT_MODELS.openai, anthropic: DEFAULT_MODELS.anthropic, gemini: DEFAULT_MODELS.gemini, provider: provider ?? "anthropic" };

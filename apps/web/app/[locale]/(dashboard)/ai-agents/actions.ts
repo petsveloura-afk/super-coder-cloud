@@ -195,7 +195,7 @@ export async function createQuickAgentAction(input: {
   const ctx = await getOrgContext(locale);
   if (!ctx.can("ai.manage")) return { error: "errors.forbidden" };
   const provider = (["openai", "anthropic", "gemini"] as const).includes(input.provider) ? input.provider : "gemini";
-  const model = /^[A-Za-z0-9._:-]{2,80}$/.test(input.model) ? input.model : "gemini-flash-latest";
+  const model = /^[A-Za-z0-9._:-]{2,80}$/.test(input.model) ? input.model : "gemini-3.8-flash";
   const supabase = await createClient();
   const { error } = await supabase.from("ai_agents").insert({
     organization_id: ctx.org.id,

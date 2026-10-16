@@ -158,6 +158,13 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     .maybeSingle();
   if (!agent) return { replied: false, handoff: false, reason: "no_agent" };
 
+  // wave 9: a retry (safety net / in-run retry) never answers twice — skip when the last
+  // message is already a real reply (not the short "on it" hold message)
+  if (input.retry) {
+    const { data: last } = await admin.from("messages").select("direction, meta").eq("conversation_id", input.conversationId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (last && last.direction === "out" && (last.meta as { fallback?: boolean } | null)?.fallback !== true) return { replied: false, handoff: false, reason: "already_answered" };
+  }
+
   // debounce: answer only the latest of several quick messages
   if (input.debounceMs && input.debounceMs > 0) {
     await sleep(input.debounceMs);
@@ -293,9 +300,26 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     // provider busy: a short "on it" — the conversation stays with the agent and the
     // safety net (cron, every 1–5 min) answers properly; never a second holding message
     if (input.retry) return { replied: false, handoff: false, reason: out.error };
+    // wave 9: at most ONE "on it" message per conversation every 15 minutes
+    const { data: recentHold } = await admin
+      .from("messages")
+      .select("id")
+      .eq("conversation_id", conv.id)
+      .eq("direction", "out")
+      .eq("meta->>fallback", "true")
+      .gt("created_at", new Date(Date.now() - 15 * 60_000).toISOString())
+      .limit(1)
+      .maybeSingle();
     const hold = formatForChannel(busyMessage(locale), ch);
-    await sendToConversation(orgId, conv.id as string, hold, undefined, { aiAgentId: agent.id as string, meta: { fallback: true } });
-    return { replied: true, handoff: false, reason: out.error, text: hold };
+    if (!recentHold) await sendToConversation(orgId, conv.id as string, hold, undefined, { aiAgentId: agent.id as string, meta: { fallback: true } });
+    // wave 9: when a provider frees up soon, answer from this same run instead of waiting for the cron
+    const waitMs = (out as { retryInMs?: number | null }).retryInMs;
+    if (typeof waitMs === "number" && waitMs <= 40_000) {
+      await sleep(Math.max(waitMs, 3000));
+      const again = await handleInboundWithAI({ conversationId: conv.id as string, retry: true });
+      if (again.replied) return again;
+    }
+    return { replied: !recentHold, handoff: false, reason: out.error, text: recentHold ? undefined : hold };
   }
   const tools = parseAgentTools(out.text);
   void parseAutopilotReply; // (wave 6 parser kept for compatibility; the tools parser is a superset)

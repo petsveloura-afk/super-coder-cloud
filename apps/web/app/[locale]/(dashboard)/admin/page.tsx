@@ -9,6 +9,8 @@ import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatNumber } from "@/lib/format";
 import { AdminPayments } from "@/components/admin/admin-payments";
+import { AiHealth } from "@/components/admin/ai-health";
+import { providerKeys, ROUTE_PROVIDERS } from "@/lib/ai/router-core";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -59,6 +61,7 @@ export default async function AdminPage({ params, searchParams }: { params: Prom
   return (
     <>
       <PageHeader title={t("admin.title")} description={t("admin.subtitle")} />
+      <AiHealth configured={Object.fromEntries(ROUTE_PROVIDERS.map((p) => [p, providerKeys(p, process.env).length]))} />
       <AdminPayments locale={locale} />
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map(([k, n, Icon]) => (

@@ -41,3 +41,33 @@ export async function setFlagAction(fd: FormData): Promise<ActionState> {
   revalidatePath(`/${locale}/admin`);
   return { ok: true, message: "admin.flagSaved" };
 }
+
+/* ------------------------------------------------ wave 9: AI health (platform admin) */
+
+export interface AiProbeRow {
+  provider: string;
+  model: string;
+  keyId: string;
+  ok: boolean;
+  ms: number;
+  kind?: string;
+  reason?: string;
+}
+
+/** Sends one tiny request through every configured AI key and reports the real status of each. */
+export async function probeAiAction(locale: string): Promise<ActionState<{ rows: AiProbeRow[] }>> {
+  const ctx = await getOrgContext(locale === "en" || locale === "ar" ? locale : "he");
+  if (!ctx.isPlatformAdmin) return { error: "errors.forbidden" };
+  const { probeAll } = await import("@/lib/ai/router");
+  const rows = await probeAll();
+  return { ok: true, data: { rows } };
+}
+
+/** Forget every "resting" key/model (after adding new keys or upgrading a plan). */
+export async function resetAiRestsAction(locale: string): Promise<ActionState> {
+  const ctx = await getOrgContext(locale === "en" || locale === "ar" ? locale : "he");
+  if (!ctx.isPlatformAdmin) return { error: "errors.forbidden" };
+  const { clearRests } = await import("@/lib/ai/router");
+  await clearRests();
+  return { ok: true, message: "admin.aiHealth.resetDone" };
+}

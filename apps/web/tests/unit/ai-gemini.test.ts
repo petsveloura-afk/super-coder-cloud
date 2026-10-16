@@ -111,7 +111,7 @@ describe("Gemini provider", () => {
     vi.stubGlobal("fetch", fetchMock);
     const r = await generate("gemini", req());
     expect(r.text).toBe("lite ok");
-    expect(fetchMock.mock.calls.map(modelOf)).toEqual(["gemini-flash-latest", "gemini-3.8-flash", "gemini-flash-lite-latest"]);
+    expect(fetchMock.mock.calls.map(modelOf)).toEqual(["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.5-flash-lite"]);
   });
 
   it("gives up after a bounded number of calls and reports the provider error", async () => {

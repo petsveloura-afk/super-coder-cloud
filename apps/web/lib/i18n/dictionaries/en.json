@@ -1929,6 +1929,34 @@
       "off": "Not set",
       "revenue30": "Revenue · 30 days",
       "none": "No payments in the last 30 days yet."
+    },
+    "aiHealth": {
+      "title": "AI engines check",
+      "subtitle": "Sends one tiny request through every AI key you configured and shows the real status: OK, temporary limit, daily quota used up or bad key. The agent switches between all working engines by itself.",
+      "run": "Check now",
+      "reset": "Reset blocks",
+      "resetDone": "Blocks cleared — the agent will try every key again",
+      "keys": "{n} keys",
+      "none": "not set",
+      "noKeys": "No AI key is configured — the agent cannot answer. Add at least one key in Vercel (recommended: Groq + Gemini).",
+      "summary": "{ok} of {total} keys working",
+      "ok": "OK",
+      "kind": {
+        "rate": "per-minute limit",
+        "daily": "daily quota used up",
+        "model": "model not available",
+        "auth": "invalid key",
+        "server": "provider error",
+        "other": "error"
+      },
+      "fix": {
+        "rate": "The provider's per-minute limit — the agent skips this key for ~30 seconds and uses another engine.",
+        "daily": "Today's free quota is used up; it resets at midnight California time. Several keys of the same Google project share one quota — create a key in a separate project, or add Groq / Cerebras.",
+        "model": "This model is not available for this account — the agent moves to the next model automatically.",
+        "auth": "The key is wrong, deleted or blocked — copy it again from the provider into Vercel and redeploy.",
+        "server": "Temporary provider problem — the agent continues with another engine.",
+        "other": "Unexpected error — details below."
+      }
     }
   },
   "chat": {

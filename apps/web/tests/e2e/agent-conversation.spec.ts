@@ -211,3 +211,53 @@ test("busy AI provider: the customer gets a short hold message, the conversation
   await page.locator("[data-conversation]").first().click();
   await expect(page.getByTestId("ai-mode")).toHaveAttribute("data-mode", "auto");
 });
+
+test("AI router: when the main AI engine is limited, a second engine answers at once — no hold message, no handoff", async ({ request }) => {
+  test.skip(!mocked || !token, "needs the provider mock and the first test");
+  test.setTimeout(120_000);
+  await request.post(`${MOCK}/_busy?ms=60000&only=anthropic`);
+  try {
+    const chat = String(50_000_000 + (Date.now() % 49_999_999));
+    const toChat = (c: Call) => String(c.body?.chat_id) === chat;
+    const r = await request.post(`/api/channels/telegram/${token}`, {
+      headers: { "X-Telegram-Bot-Api-Secret-Token": token },
+      data: { update_id: 950, message: { message_id: 950, chat: { id: Number(chat), type: "private" }, from: { id: Number(chat), first_name: "מיכל" }, text: "כמה עולה תספורת?" } },
+    });
+    expect(r.ok()).toBe(true);
+    const t0 = Date.now();
+    const answer = await waitFor(request, (c) => c.method === "sendMessage" && toChat(c) && /AUTOPILOT ✓ \[groq\]/.test(c.body?.text ?? ""), "answer from the second engine", 30_000);
+    expect(answer.body!.text).toContain("150");
+    expect(Date.now() - t0).toBeLessThan(20_000);
+    expect((await calls(request)).some((c) => c.method === "sendMessage" && toChat(c) && /קיבלתי/.test(c.body?.text ?? ""))).toBe(false);
+    // the Groq request asked for fast (low) reasoning
+    expect((await calls(request)).some((c) => c.provider === "groq" && c.kind === "autopilot")).toBe(true);
+  } finally {
+    await request.post(`${MOCK}/_busy?ms=0`);
+  }
+});
+
+test("platform admin: AI engines check shows the real status of every key", async ({ page, request }) => {
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  test.skip(!mocked || !service || !supabaseUrl || !email, "needs the mock, the service role and the first test");
+  test.setTimeout(120_000);
+  await signIn(page, email);
+  await page.waitForURL((u) => !/\/login/.test(u.pathname), { timeout: 30_000 });
+  const headers = { apikey: service!, Authorization: `Bearer ${service}`, "Content-Type": "application/json" };
+  const prof = (await (await request.get(`${supabaseUrl}/rest/v1/profiles?select=id&email=eq.${encodeURIComponent(email)}`, { headers })).json()) as { id: string }[];
+  expect((await request.post(`${supabaseUrl}/rest/v1/platform_admins`, { headers, data: { user_id: prof[0]!.id } })).ok()).toBe(true);
+  try {
+    await page.goto("/he/admin");
+    const box = page.getByTestId("ai-health");
+    await expect(box).toBeVisible();
+    await expect(box).toContainText("Groq · 1 מפתחות");
+    await box.getByTestId("ai-health-run").click();
+    await expect(page.getByTestId("ai-health-summary")).toContainText("מתוך", { timeout: 30_000 });
+    await expect(box.locator('[data-ok="1"]').first()).toBeVisible();
+    await shot(page, "c4-admin-ai-health");
+    await box.getByRole("button", { name: "איפוס חסימות" }).click();
+    await expect(page.getByText("החסימות אופסו").first()).toBeVisible();
+  } finally {
+    await request.delete(`${supabaseUrl}/rest/v1/platform_admins?user_id=eq.${prof[0]!.id}`, { headers });
+  }
+});

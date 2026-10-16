@@ -37,7 +37,7 @@ export const DEFAULT_MODELS: Record<AIProviderName, string> = {
   openai: process.env.AI_OPENAI_MODEL || "gpt-4o-mini",
   anthropic: process.env.AI_ANTHROPIC_MODEL || "claude-haiku-5-5",
   // "latest" alias follows Google's current Flash model (older ids get retired for new users)
-  gemini: process.env.AI_GEMINI_MODEL || "gemini-flash-latest",
+  gemini: process.env.AI_GEMINI_MODEL || "gemini-3.8-flash",
 };
 
 /**
@@ -55,6 +55,11 @@ export function providerConfigured(p: AIProviderName): boolean {
 }
 
 /** First configured provider, preferring the requested one. */
+/** Any key of the extra free providers the AI router can use (Groq, Cerebras, OpenRouter, Mistral). */
+export function routerExtrasConfigured(env: Record<string, string | undefined> = process.env): boolean {
+  return ["GROQ_API_KEY", "CEREBRAS_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY"].some((b) => Boolean(env[b] || env[`${b}S`] || env[`${b}_2`]));
+}
+
 export function pickProvider(preferred?: AIProviderName): AIProviderName | null {
   if (preferred && providerConfigured(preferred)) return preferred;
   if (providerConfigured("anthropic")) return "anthropic";
@@ -167,7 +172,7 @@ async function geminiOnce(req: AIRequest, key: string): Promise<AIResult> {
     error?: { status?: string; message?: string };
   };
   // status + Google's reason go to the server log (never to the browser)
-  if (!res.ok) throw new Error(`gemini_${res.status}${json.error?.status ? `:${json.error.status}` : ""}${json.error?.message ? `:${json.error.message.slice(0, 200)}` : ""}`);
+  if (!res.ok) throw new Error(`gemini_${res.status}${json.error?.status ? `:${json.error.status}` : ""}${json.error?.message ? `:${json.error.message.slice(0, 700)}` : ""}`);
   const text = (json.candidates?.[0]?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("").trim();
   if (!text) console.error("gemini empty answer", json.candidates?.[0]?.finishReason ?? "no_candidates");
   return {
@@ -195,7 +200,7 @@ const modelGone = (e: unknown) => /^gemini_404\b/.test((e as Error).message ?? "
 async function gemini(req: AIRequest): Promise<AIResult> {
   const keys = geminiKeys();
   if (!keys.length) throw new Error("gemini_not_configured");
-  const fallbacks = (process.env.AI_GEMINI_FALLBACK_MODELS || "gemini-flash-latest,gemini-3.8-flash,gemini-flash-lite-latest,gemini-3.5-flash-lite")
+  const fallbacks = (process.env.AI_GEMINI_FALLBACK_MODELS || "gemini-3.8-flash,gemini-3.5-flash-lite,gemini-3.6-flash,gemini-2.5-flash")
     .split(",")
     .map((m) => m.trim())
     .filter((m) => m && m !== req.model);
@@ -245,4 +250,81 @@ export async function generate(provider: AIProviderName, req: AIRequest): Promis
       wait = Math.min(wait * 2, 15_000);
     }
   }
+}
+
+/* ------------------------------------------------------------------ wave 9: router building blocks */
+
+/** One Gemini call with one key and one model (no internal retries) — used by the AI router. */
+export async function geminiCall(req: AIRequest, key: string): Promise<AIResult> {
+  return geminiOnce(req, key);
+}
+
+/**
+ * Any OpenAI-compatible chat API (Groq, Cerebras, OpenRouter, Mistral, …) — one call, no retries.
+ * Errors: `${name}_${status}:${message}` (+ `|retry=<seconds>` when the server says when to retry).
+ */
+export async function openaiCompatibleCall(
+  req: AIRequest,
+  opts: { name: string; baseUrl: string; key: string; timeoutMs?: number; headers?: Record<string, string> },
+): Promise<{ text: string; inputTokens: number; outputTokens: number; model: string }> {
+  const reasoning = /gpt-oss/i.test(req.model);
+  const res = await fetch(`${opts.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${opts.key}`, "Content-Type": "application/json", ...(opts.headers ?? {}) },
+    body: JSON.stringify({
+      model: req.model,
+      temperature: req.temperature,
+      max_tokens: reasoning ? req.maxTokens + 1024 : req.maxTokens,
+      messages: [{ role: "system", content: req.system }, ...req.messages],
+      ...(reasoning ? { reasoning_effort: "low" } : {}),
+      ...(req.json ? { response_format: { type: "json_object" } } : {}),
+    }),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 25_000),
+    cache: "no-store",
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    choices?: { message?: { content?: string | null } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+    model?: string;
+    error?: { message?: string } | string;
+  };
+  if (!res.ok) {
+    const msg = typeof json.error === "string" ? json.error : (json.error?.message ?? "");
+    const ra = Number(res.headers.get("retry-after") ?? "");
+    throw new Error(`${opts.name}_${res.status}:${msg.slice(0, 500)}${Number.isFinite(ra) && ra > 0 ? `|retry=${ra}` : ""}`);
+  }
+  const text = (json.choices?.[0]?.message?.content ?? "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  return { text, inputTokens: json.usage?.prompt_tokens ?? 0, outputTokens: json.usage?.completion_tokens ?? 0, model: json.model ?? req.model };
+}
+
+/** Anthropic call with an explicit key (router) — same request as `anthropic`. */
+export async function anthropicCall(req: AIRequest, key: string): Promise<AIResult> {
+  const base = (process.env.AI_ANTHROPIC_BASE_URL || "https://api.anthropic.com/v1").replace(/\/$/, "");
+  const res = await fetch(`${base}/messages`, {
+    method: "POST",
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+    body: JSON.stringify({ model: req.model, max_tokens: req.maxTokens, temperature: req.temperature, system: req.system, messages: req.messages }),
+    signal: AbortSignal.timeout(30_000),
+    cache: "no-store",
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    content?: { type: string; text?: string }[];
+    usage?: { input_tokens?: number; output_tokens?: number };
+    model?: string;
+    error?: { message?: string };
+  };
+  if (!res.ok) throw new Error(`anthropic_${res.status}:${(json.error?.message ?? "").slice(0, 300)}`);
+  return {
+    text: (json.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n").trim(),
+    inputTokens: json.usage?.input_tokens ?? 0,
+    outputTokens: json.usage?.output_tokens ?? 0,
+    model: json.model ?? req.model,
+    provider: "anthropic",
+  };
+}
+
+/** OpenAI call with an explicit key (router). */
+export async function openaiCall(req: AIRequest, key: string): Promise<AIResult> {
+  const r = await openaiCompatibleCall(req, { name: "openai", baseUrl: process.env.AI_OPENAI_BASE_URL || "https://api.openai.com/v1", key, timeoutMs: 30_000 });
+  return { ...r, provider: "openai" };
 }
