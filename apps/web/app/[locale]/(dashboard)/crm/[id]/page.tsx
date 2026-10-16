@@ -13,8 +13,14 @@ import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { auditLabel } from "@/lib/i18n/translate";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate, formatDateTime, formatPhone } from "@/lib/format";
+import { formatCurrency, formatDate, formatDateTime, formatPhone } from "@/lib/format";
 import { initials } from "@/lib/utils";
+import { TagsEditor } from "@/components/crm/tags-editor";
+import { DuplicatesList, type DuplicateRow } from "@/components/crm/duplicates";
+import { EditDealDialog, NewDealButton, type DealPickers, type DealRecord } from "@/components/pipelines/deal-form";
+import { NewTaskButton, TaskCheckbox } from "@/components/tasks/task-form";
+import { companyOptions, contactOptions, memberOptions, pipelinesWithStages } from "@/lib/lookups";
+import { MessageContactButton } from "@/components/inbox/inbox-client";
 
 type Params = Promise<{ locale: string; id: string }>;
 
@@ -60,6 +66,52 @@ export default async function ContactDetailPage({ params }: { params: Params }) 
           .limit(20)
       : Promise.resolve({ data: [] }),
   ]);
+  // v4 (wave 1): tags, deals, tasks and possible duplicates for this contact.
+  const [tagRes, allTagRes, dealRes, taskRes, dupRes, pipelines, contactOpts, companyOpts, memberOpts] = await Promise.all([
+    supabase.from("contact_tags").select("tags(name, color)").eq("organization_id", ctx.org.id).eq("contact_id", contact.id),
+    supabase.from("tags").select("name").eq("organization_id", ctx.org.id).order("name").limit(500),
+    ctx.can("deals.read")
+      ? supabase
+          .from("deals")
+          .select("id, title, value, currency, pipeline_id, stage_id, contact_id, company_id, expected_close_date, owner_id, status")
+          .eq("organization_id", ctx.org.id)
+          .eq("contact_id", contact.id)
+          .order("created_at", { ascending: false })
+          .limit(50)
+      : Promise.resolve({ data: [] }),
+    ctx.can("tasks.read")
+      ? supabase
+          .from("tasks")
+          .select("id, title, status, due_at")
+          .eq("organization_id", ctx.org.id)
+          .eq("contact_id", contact.id)
+          .order("due_at", { ascending: true, nullsFirst: false })
+          .limit(50)
+      : Promise.resolve({ data: [] }),
+    ctx.can("contacts.delete") ? supabase.rpc("find_duplicate_contacts", { p_org: ctx.org.id, p_contact: contact.id }) : Promise.resolve({ data: [] }),
+    pipelinesWithStages(ctx.org.id),
+    contactOptions(ctx.org.id),
+    companyOptions(ctx.org.id),
+    memberOptions(ctx.org.id),
+  ]);
+  const contactTags = ((tagRes.data ?? []) as unknown as { tags: { name: string; color: string } | null }[])
+    .map((r) => r.tags)
+    .filter((x): x is { name: string; color: string } => Boolean(x));
+  const allTags = (allTagRes.data ?? []).map((x) => x.name as string);
+  const contactDeals = ((dealRes.data ?? []) as DealRecord[]).map((d) => ({ ...d, value: Number(d.value) }));
+  const contactTasks = (taskRes.data ?? []) as { id: string; title: string; status: string; due_at: string | null }[];
+  const duplicates = (dupRes.data ?? []) as DuplicateRow[];
+  const dealPickers: DealPickers = {
+    pipelines: pipelines.map((p) => ({ id: p.id, name: p.name, stages: p.stages.map((st) => ({ id: st.id, name: st.name })) })),
+    contacts: contactOpts,
+    companies: companyOpts,
+    members: memberOpts,
+  };
+
+  // v4 (wave 3): channels this workspace can message through
+  const { data: channelRows } = ctx.can("inbox.reply") ? await supabase.from("channel_accounts").select("kind, status").eq("organization_id", ctx.org.id) : { data: [] };
+  const connectedChannels = (channelRows ?? []).filter((r) => r.status !== "disabled").map((r) => r.kind as string);
+
   const notes = (notesRes.data ?? []) as Pick<NoteRow, "id" | "body" | "created_at" | "created_by">[];
   const audit = (auditRes.data ?? []) as Pick<AuditLogRow, "id" | "action" | "metadata" | "created_at">[];
 
@@ -95,9 +147,13 @@ export default async function ContactDetailPage({ params }: { params: Params }) 
                   {t("crm.createdAt")}: {formatDate(locale, contact.created_at)}
                 </span>
               </div>
+              <div className="mt-2">
+                <TagsEditor contactId={contact.id} tags={contactTags} allTags={allTags} canWrite={ctx.can("contacts.write")} />
+              </div>
             </div>
           </div>
           <div className="flex gap-2">
+            {ctx.can("inbox.reply") && connectedChannels.length ? <MessageContactButton contactId={contact.id} channels={connectedChannels} /> : null}
             {ctx.can("contacts.write") ? <ContactDialog contact={contact} /> : null}
             {ctx.can("contacts.delete") ? <DeleteContactButton id={contact.id} /> : null}
           </div>
@@ -132,6 +188,64 @@ export default async function ContactDetailPage({ params }: { params: Params }) 
         </Card>
 
         <div className="space-y-4">
+        {duplicates.length > 0 ? (
+          <Card className="border-gold/40">
+            <CardHeader title={t("merge.title", { count: duplicates.length })} description={t("merge.hint")} />
+            <DuplicatesList contactId={contact.id} rows={duplicates} />
+          </Card>
+        ) : null}
+        {ctx.can("deals.read") ? (
+          <Card>
+            <CardHeader
+              title={t("deals.pageTitle")}
+              action={ctx.can("deals.write") ? <NewDealButton pickers={dealPickers} defaults={{ contact_id: contact.id, company_id: contact.company_id, currency: ctx.org.currency || "ILS" }} variant="secondary" /> : null}
+            />
+            {contactDeals.length === 0 ? (
+              <p className="p-5 text-center text-sm text-subtle">{t("deals.none")}</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {contactDeals.map((d) => (
+                  <li key={d.id}>
+                    <EditDealDialog
+                      deal={d}
+                      pickers={dealPickers}
+                      canWrite={ctx.can("deals.write")}
+                      canDelete={ctx.can("deals.delete")}
+                      trigger={
+                        <button type="button" className="flex w-full items-center gap-3 px-5 py-3 text-start text-sm hover:bg-surface-hover">
+                          <span className="min-w-0 flex-1 truncate font-medium">{d.title}</span>
+                          <span className="text-[12px] text-muted">{t(`deals.statuses.${d.status}`)}</span>
+                          <bdi dir="ltr" className="font-semibold">{formatCurrency(locale, d.value, d.currency)}</bdi>
+                        </button>
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        ) : null}
+        {ctx.can("tasks.read") ? (
+          <Card>
+            <CardHeader
+              title={t("tasks.title")}
+              action={ctx.can("tasks.write") ? <NewTaskButton members={memberOpts} contacts={contactOpts} defaults={{ contact_id: contact.id }} variant="secondary" size="sm" /> : null}
+            />
+            {contactTasks.length === 0 ? (
+              <p className="p-5 text-center text-sm text-subtle">{t("tasks.none")}</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {contactTasks.map((task) => (
+                  <li key={task.id} className="flex items-center gap-3 px-5 py-3 text-sm">
+                    <TaskCheckbox id={task.id} done={task.status === "done"} label={task.title} disabled={!ctx.can("tasks.write") || task.status === "canceled"} />
+                    <span className={`min-w-0 flex-1 truncate ${task.status === "done" ? "text-subtle line-through" : ""}`}>{task.title}</span>
+                    {task.due_at ? <span className="text-[12px] text-muted">{formatDateTime(locale, task.due_at)}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        ) : null}
         {ctx.can("ai.use") ? (
           <Card>
             <CardHeader title={t("ai.assistant")} description={t("ai.assistantHint")} />

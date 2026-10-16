@@ -17,9 +17,12 @@ function authorized(request: NextRequest): boolean {
 /**
  * GET /api/keepalive
  * Called daily by Vercel Cron and by the GitHub "Keep alive" workflow.
- * Runs one trivial database round-trip (public.ping()) so the Supabase
- * Free project registers activity and is not paused for inactivity.
- * Exposes no data. Requires `Authorization: Bearer <CRON_SECRET>` when set.
+ *  1. one trivial database round-trip (public.ping()) so the Supabase Free
+ *     project registers activity and is not paused for inactivity;
+ *  2. when CRON_SECRET + SUPABASE_SERVICE_ROLE_KEY are configured and the caller
+ *     is authorized, runs public.run_maintenance() (cleanup jobs) — this replaces
+ *     the need for a separately hosted worker.
+ * Exposes no business data. Requires `Authorization: Bearer <CRON_SECRET>` when set.
  */
 export async function GET(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -31,8 +34,20 @@ export async function GET(request: NextRequest) {
   });
   const { data, error } = await supabase.rpc("ping");
   const ok = !error && data === true;
+
+  let maintenance: "ran" | "skipped" | "failed" = "skipped";
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (ok && serviceKey && process.env.CRON_SECRET) {
+    const admin = createSupabase(publicEnv.supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const m = await admin.rpc("run_maintenance");
+    maintenance = m.error ? "failed" : "ran";
+    if (m.error) console.error("maintenance failed", m.error.message);
+  }
+
   return NextResponse.json(
-    { ok, db: ok ? "reachable" : "unreachable", ms: Date.now() - started, time: new Date().toISOString() },
+    { ok, db: ok ? "reachable" : "unreachable", maintenance, ms: Date.now() - started, time: new Date().toISOString() },
     { status: ok ? 200 : 503, headers: { "Cache-Control": "no-store" } },
   );
 }

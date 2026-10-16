@@ -3,8 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { publicEnv } from "@/lib/env";
 
 /**
- * Refreshes the Supabase auth session inside proxy.ts and returns the user
- * (validated with the Auth server via getUser, not just decoded locally).
+ * Refreshes the Supabase auth session inside proxy.ts and returns the user.
+ * Uses getClaims(): with asymmetric JWT signing keys (default for new Supabase
+ * projects) the token signature is verified locally against the cached JWKS —
+ * no Auth round-trip per request. With a symmetric secret it falls back to a
+ * server check (same as getUser). Expired tokens are refreshed first.
  */
 export async function updateSession(request: NextRequest, response: NextResponse) {
   let res = response;
@@ -21,8 +24,8 @@ export async function updateSession(request: NextRequest, response: NextResponse
       },
     },
   });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data } = await supabase.auth.getClaims();
+  const sub = data?.claims?.sub;
+  const user = typeof sub === "string" && sub ? { id: sub } : null;
   return { response: res, user };
 }

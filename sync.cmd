@@ -11,6 +11,14 @@ cd /d "%~dp0"
 
 where git >nul 2>&1 || (echo [x] git is not installed & exit /b 1)
 
+REM Must run inside the project (the folder that contains .git)
+git rev-parse --is-inside-work-tree >nul 2>&1
+if errorlevel 1 (
+  echo [x] This folder is not the project. Copy sync.cmd into the project folder
+  echo     ^(the one with .git, apps, packages, supabase^) and run it from there.
+  exit /b 1
+)
+
 set "MSG=%~1"
 if "%MSG%"=="" set "MSG=sync %DATE% %TIME%"
 
@@ -32,7 +40,17 @@ if errorlevel 1 (
 
 echo [3/4] Pushing to GitHub (main)...
 git push origin main
-if errorlevel 1 (echo [x] push failed - see message above & exit /b 1)
+if errorlevel 1 (
+  echo     GitHub has newer commits - pulling them first ^(rebase^)...
+  git pull --rebase origin main
+  if errorlevel 1 (
+    echo [x] Automatic merge stopped on a conflict. Nothing was lost.
+    echo     Run:  git rebase --abort   to go back, then send the output to support.
+    exit /b 1
+  )
+  git push origin main
+  if errorlevel 1 (echo [x] push failed - see message above & exit /b 1)
+)
 
 if /I "%~2"=="local" (
   echo [4/4] Deploying to Vercel from this computer...

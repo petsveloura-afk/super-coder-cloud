@@ -39,7 +39,9 @@ export async function createOrg(page: Page, name: string, slug: string) {
 }
 
 export async function shot(page: Page, name: string) {
-  if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: false });
+  // Diagnostic screenshots only (sandbox/local). A slow software-rendered browser must
+  // never fail a functional test, so the capture is time-boxed and best-effort.
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: false, timeout: 15_000 }).catch(() => {});
 }
 
 /**

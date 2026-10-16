@@ -19,8 +19,10 @@ const ranks = {
 
 // Applied migrations are never edited: each permission change gets a NEW file
 // name here, and the newest file fully re-seeds role_permissions.
-// History: 0003_permissions_seed (v1) → 0011_permissions_v2 (billing.read, ai.use, ai.manage).
-const OUT_NAME = "20261015000011_permissions_v2.sql";
+// History: 0003_permissions_seed (v1) → 0011_permissions_v2 (billing.read, ai.use, ai.manage)
+//          → 0015_permissions_v3 (automations, api, inbox, campaigns, forms, appointments,
+//            tickets, finance, websites).
+const OUT_NAME = "20261015000015_permissions_v3.sql";
 
 const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
 let sql = `-- ============================================================================

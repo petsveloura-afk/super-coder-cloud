@@ -39,6 +39,7 @@ test("sign up → create workspace → empty dashboard with real zero KPIs", asy
 });
 
 test("create, view, note, edit and search a contact", async ({ page }) => {
+  test.setTimeout(120_000); // long multi-step journey; slow CI browsers must not flake it
   await signIn(page, owner.email);
   await page.waitForURL(/\/he\/overview/);
   await page.goto("/he/crm");
@@ -110,6 +111,15 @@ test("owner invites a teammate as sales; teammate joins with limited permissions
   inviteLink = (await d.locator("code").textContent())!.trim();
   expect(inviteLink).toContain("/he/onboarding?invite=");
   await shot(page, "07-invite-created");
+  if (process.env.E2E_PROVIDERS_MOCKED === "true") {
+    // Email provider (Resend) is mocked: the invitation must actually be emailed.
+    await expect(d).toContainText("ההזמנה נשלחה במייל");
+    const mockBase = process.env.E2E_MOCK_BASE ?? "http://127.0.0.1:4010";
+    const sent = (await (await page.request.get(`${mockBase}/resend/_sent`)).json()) as { to: string[]; subject: string }[];
+    const mail = sent.find((m) => m.to.includes(invitee.email));
+    expect(mail, "invitation email was sent to the invitee").toBeTruthy();
+    expect(mail!.subject).toContain("Super Coder Cloud");
+  }
 
   const ctx = await browser.newContext();
   const p2 = await ctx.newPage();
@@ -141,12 +151,18 @@ test("a different tenant cannot reach organization A's data by URL or API", asyn
   await expect(page.getByText("אין עדיין אנשי קשר")).toBeVisible();
 });
 
-test("unimplemented modules are labelled honestly, not faked", async ({ page }) => {
+test("every module is implemented; unknown modules and the admin console 404 for normal users", async ({ page }) => {
   await signIn(page, owner.email);
   await page.waitForURL(/overview/);
-  await page.goto("/he/automations");
-  await expect(page.getByText("אוטומציות — טרם מומש")).toBeVisible();
+  // all nav modules are live now (no "not implemented" placeholders left)
+  for (const m of ["support", "finance", "websites"]) {
+    await page.goto(`/he/${m}`);
+    await expect(page.getByText(/טרם מומש/)).toHaveCount(0);
+    await expect(page.locator("h1").first()).toBeVisible();
+  }
   await page.goto("/he/not-a-module");
+  await expectNotFound(page);
+  await page.goto("/he/admin");
   await expectNotFound(page);
 });
 

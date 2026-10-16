@@ -45,3 +45,15 @@ Missing optional credentials disable the integration: `integrationAvailability()
 | `CRON_SECRET` | recommended | **server** | protects `/api/keepalive` (Vercel Cron sends it automatically) | `openssl rand -hex 24` |
 
 Without payment variables the billing page still works (plans, usage, limits) and shows "online payments not enabled"; a platform admin can assign plans manually with `select public.admin_set_plan('<org-id>', 'pro');` in the Supabase SQL editor.
+
+## v3 additions
+| Variable | Required | Scope | Used by | Where to get it |
+|---|---|---|---|---|
+| `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM_ADDRESS` | for email | **server** | team invitation emails (Resend REST) | resend.com → API Keys (`re_…`); sender on a verified domain |
+| `EMAIL_PROVIDER_API_BASE` | no | server | override the Resend endpoint (tests / proxy) | default `https://api.resend.com` |
+| `SUPABASE_SERVICE_ROLE_KEY` + `CRON_SECRET` | for maintenance | **server** | daily `run_maintenance()` via `/api/keepalive` | Supabase → Project Settings → API Keys → Secret key |
+
+All of the above can be written for you by `setup.cmd` (see docs/COMMERCIAL.md → "v3 — activation").
+
+## v4 wave 4 additions
+No new environment variables. Online invoice payments use **each organization's own Stripe keys**, entered in *Finance → Settings* and stored encrypted with `ENCRYPTION_KEY` (must be set). Each organization gets its own webhook URL: `/api/webhooks/payments/{token}` (event `checkout.session.completed`). `PAYMENT_PROVIDER_API_BASE` (tests only) also redirects these calls.

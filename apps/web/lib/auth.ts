@@ -28,12 +28,23 @@ export interface OrgContext {
   can: (p: Permission) => boolean;
 }
 
-/** Validated user (round-trips to Supabase Auth; never trusts a decoded cookie alone). */
-export const getUser = cache(async () => {
+export interface SessionUser {
+  id: string;
+  email: string | undefined;
+}
+
+/**
+ * Verified user for this request (cached per request).
+ * getClaims() verifies the JWT signature (locally with asymmetric signing keys,
+ * otherwise via the Auth server) — never trusts an unverified cookie. Postgres
+ * RLS independently verifies the same JWT on every query.
+ */
+export const getUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return null;
-  return data.user;
+  const { data, error } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (error || !claims?.sub) return null;
+  return { id: String(claims.sub), email: typeof claims.email === "string" ? claims.email : undefined };
 });
 
 export async function requireUser(locale: Locale) {

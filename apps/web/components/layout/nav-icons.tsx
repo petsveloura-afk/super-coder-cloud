@@ -1,5 +1,7 @@
 import {
   BarChart3,
+  Building2,
+  CheckSquare,
   Bot,
   CalendarClock,
   CreditCard,
@@ -16,12 +18,15 @@ import {
   UsersRound,
   Wallet,
   Workflow,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 
 export const NAV_ICONS: Record<string, LucideIcon> = {
   overview: LayoutDashboard,
   crm: Users,
+  companies: Building2,
+  tasks: CheckSquare,
   pipelines: KanbanSquare,
   inbox: Inbox,
   automations: Workflow,
@@ -37,4 +42,5 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   team: UsersRound,
   billing: CreditCard,
   settings: Settings,
+  admin: ShieldCheck,
 };

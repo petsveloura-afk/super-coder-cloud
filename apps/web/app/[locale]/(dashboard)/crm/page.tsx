@@ -6,6 +6,7 @@ import type { ContactRow } from "@scc/database";
 import { Card, EmptyState, Ltr, PageHeader } from "@/components/ui/primitives";
 import { ContactDialog } from "@/components/crm/contact-form";
 import { StatusBadge } from "@/components/crm/status-badge";
+import { ImportContactsDialog } from "@/components/crm/import-dialog";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -77,6 +78,7 @@ export default async function ContactsPage({ params, searchParams }: { params: P
                 <Download className="h-4 w-4" /> {t("crm.exportCsv")}
               </a>
             ) : null}
+            {canWrite ? <ImportContactsDialog /> : null}
             {canWrite ? <ContactDialog defaultOpen={sp.new === "1"} /> : null}
           </>
         }

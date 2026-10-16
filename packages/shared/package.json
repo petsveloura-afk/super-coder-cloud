@@ -12,7 +12,9 @@
     "./env": "./src/env.ts",
     "./crypto": "./src/crypto.ts",
     "./billing": "./src/billing.ts",
-    "./stripe": "./src/stripe.ts"
+    "./stripe": "./src/stripe.ts",
+    "./automations": "./src/automations.ts",
+    "./engagement": "./src/engagement.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

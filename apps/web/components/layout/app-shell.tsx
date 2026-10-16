@@ -34,8 +34,8 @@ const SECTIONS: { key: NavSection; label: "nav.sectionCore" | "nav.sectionGrowth
   { key: "ops", label: "nav.sectionOps" },
 ];
 
-function useVisibleItems(permissions: Permission[]) {
-  return NAV_ITEMS.filter((i) => !i.permission || permissions.includes(i.permission));
+function useVisibleItems(permissions: Permission[], isPlatformAdmin = false) {
+  return NAV_ITEMS.filter((i) => (!i.platformOnly || isPlatformAdmin) && (!i.permission || permissions.includes(i.permission)));
 }
 
 function NavLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed?: boolean; onNavigate?: () => void }) {
@@ -72,9 +72,9 @@ function NavLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed?: b
   );
 }
 
-function NavList({ permissions, collapsed, onNavigate }: { permissions: Permission[]; collapsed?: boolean; onNavigate?: () => void }) {
+function NavList({ permissions, collapsed, onNavigate, isPlatformAdmin }: { permissions: Permission[]; collapsed?: boolean; onNavigate?: () => void; isPlatformAdmin?: boolean }) {
   const { t } = useI18n();
-  const items = useVisibleItems(permissions);
+  const items = useVisibleItems(permissions, isPlatformAdmin);
   return (
     <nav className="space-y-5" aria-label={t("nav.menu")}>
       {SECTIONS.map((s) => (
@@ -266,7 +266,7 @@ export function AppShell(props: ShellProps) {
   const collapsed = useSyncExternalStore(subscribeSidebar, readSidebar, () => false);
   const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
-  const items = useVisibleItems(props.permissions);
+  const items = useVisibleItems(props.permissions, props.isPlatformAdmin);
 
   const toggle = () => {
     try {
@@ -293,7 +293,7 @@ export function AppShell(props: ShellProps) {
         </div>
         <WorkspaceSwitcher org={props.org} workspaces={props.workspaces} collapsed={collapsed} />
         <div className="-mx-1 mt-5 flex-1 overflow-y-auto px-1">
-          <NavList permissions={props.permissions} collapsed={collapsed} />
+          <NavList permissions={props.permissions} collapsed={collapsed} isPlatformAdmin={props.isPlatformAdmin} />
         </div>
         <button
           type="button"
@@ -370,7 +370,7 @@ export function AppShell(props: ShellProps) {
             <div className="space-y-5">
               <GlobalSearch />
               <WorkspaceSwitcher org={props.org} workspaces={props.workspaces} />
-              <NavList permissions={props.permissions} onNavigate={() => setMoreOpen(false)} />
+              <NavList permissions={props.permissions} onNavigate={() => setMoreOpen(false)} isPlatformAdmin={props.isPlatformAdmin} />
             </div>
           </Dialog>
         </div>

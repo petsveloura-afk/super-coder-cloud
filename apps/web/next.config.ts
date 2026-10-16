@@ -37,6 +37,15 @@ const securityHeaders = [
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ];
 
+// Public forms and booking pages may be embedded (iframe) on customers' websites.
+// CSP frame-ancestors overrides X-Frame-Options in all modern browsers.
+const embeddableCsp = csp.replace("frame-ancestors 'none'", "frame-ancestors *");
+const embeddableHeaders = [{ key: "Content-Security-Policy", value: embeddableCsp }];
+
+// Published websites (/s) may show images hosted anywhere over https (hero images).
+const siteCsp = csp.replace("img-src 'self'", "img-src 'self' https:");
+const siteHeaders = [{ key: "Content-Security-Policy", value: siteCsp }];
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
@@ -44,6 +53,9 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      { source: "/:locale(he|ar|en)/f/:slug*", headers: embeddableHeaders },
+      { source: "/:locale(he|ar|en)/book/:slug*", headers: embeddableHeaders },
+      { source: "/:locale(he|ar|en)/s/:slug*", headers: siteHeaders },
       {
         source: "/sw.js",
         headers: [

@@ -13,7 +13,7 @@ import type { ActionState } from "@/lib/action-state";
 export function InviteDialog({ roles }: { roles: OrgRole[] }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
-  const [state, action] = useActionState(createInvitationAction, {} as ActionState<{ link: string }>);
+  const [state, action] = useActionState(createInvitationAction, {} as ActionState<{ link: string; emailed?: boolean }>);
   const err = useFieldError(state);
   const [copied, setCopied] = useState(false);
   return (
@@ -30,7 +30,7 @@ export function InviteDialog({ roles }: { roles: OrgRole[] }) {
       {state.ok && state.data ? (
         <div className="space-y-3">
           <FormAlert state={state} />
-          <p className="text-sm text-muted">{t("team.inviteLinkHint")}</p>
+          <p className="text-sm text-muted">{t(state.data.emailed ? "team.inviteLinkBackup" : "team.inviteLinkHint")}</p>
           <div className="flex items-center gap-2">
             <code className="min-w-0 flex-1 truncate rounded-lg border border-line bg-bg px-3 py-2.5 text-[12px]" dir="ltr">
               {state.data.link}

@@ -10,6 +10,8 @@ import { publicEnv } from "@/lib/env";
 import { isLocale, type Locale } from "@/lib/i18n/config";
 import { createClient } from "@/lib/supabase/server";
 import { dbErrorKey, formValues, type ActionState } from "@/lib/action-state";
+import { invitationEmail, sendEmail } from "@/lib/email/send";
+import { getT } from "@/lib/i18n/server";
 
 function loc(fd: FormData): Locale {
   const l = fd.get("locale");
@@ -21,7 +23,10 @@ const inviteSchema = z.object({
   role: z.enum(ORG_ROLES),
 });
 
-export async function createInvitationAction(_prev: ActionState<{ link: string }>, fd: FormData): Promise<ActionState<{ link: string }>> {
+export async function createInvitationAction(
+  _prev: ActionState<{ link: string; emailed?: boolean }>,
+  fd: FormData,
+): Promise<ActionState<{ link: string; emailed?: boolean }>> {
   const locale = loc(fd);
   const ctx = await getOrgContext(locale);
   const values = formValues(fd, ["email", "role"]);
@@ -49,7 +54,22 @@ export async function createInvitationAction(_prev: ActionState<{ link: string }
     p_metadata: { role: parsed.data.role },
   });
   revalidatePath(`/${locale}/team`);
-  return { ok: true, message: "team.inviteCreated", data: { link: `${publicEnv.appUrl}/${locale}/onboarding?invite=${token}` } };
+  const link = `${publicEnv.appUrl}/${locale}/onboarding?invite=${token}`;
+
+  // Send the invitation by email when a provider is configured (never from demo workspaces).
+  let emailed = false;
+  if (!ctx.org.is_demo) {
+    const { t } = await getT(locale);
+    const mail = invitationEmail({
+      locale,
+      orgName: ctx.org.name,
+      inviterName: ctx.profile?.full_name || ctx.email,
+      roleLabel: t(`team.roles.${parsed.data.role}`),
+      link,
+    });
+    emailed = (await sendEmail({ to: parsed.data.email, ...mail })).sent;
+  }
+  return { ok: true, message: emailed ? "team.inviteEmailed" : "team.inviteCreated", data: { link, emailed } };
 }
 
 export async function revokeInvitationAction(fd: FormData) {

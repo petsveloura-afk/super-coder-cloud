@@ -21,7 +21,7 @@ export function FormAlert({ state }: { state: ActionState<unknown> }) {
     return (
       <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger/30 bg-danger-soft px-3.5 py-3 text-sm text-danger">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-        <span>{t(state.error)}</span>
+        <span>{t(state.error, state.messageParams)}</span>
       </div>
     );
   }

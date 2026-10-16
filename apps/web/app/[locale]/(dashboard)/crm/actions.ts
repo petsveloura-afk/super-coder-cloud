@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { contactSchema, fieldErrors, uuidSchema } from "@scc/shared/validators";
 import { getOrgContext } from "@/lib/auth";
+import { kickJobs } from "@/lib/jobs/kick";
 import { isLocale, type Locale } from "@/lib/i18n/config";
 import { createClient } from "@/lib/supabase/server";
 import { dbErrorKey, formValues, type ActionState } from "@/lib/action-state";
@@ -69,6 +70,7 @@ export async function createContactAction(_prev: ActionState<{ id: string }>, fd
   }
   revalidatePath(`/${locale}/crm`);
   revalidatePath(`/${locale}/overview`);
+  kickJobs();
   return { ok: true, message: "crm.created", data: { id: data.id } };
 }
 
@@ -96,6 +98,7 @@ export async function updateContactAction(_prev: ActionState<{ id: string }>, fd
   if (!data?.length) return { error: "errors.notFound", values }; // RLS hid it or it doesn't exist
   revalidatePath(`/${locale}/crm`);
   revalidatePath(`/${locale}/crm/${id.data}`);
+  kickJobs();
   return { ok: true, message: "crm.updated", data: { id: id.data } };
 }
 
@@ -129,5 +132,6 @@ export async function addNoteAction(_prev: ActionState, fd: FormData): Promise<A
   // A contact id from another tenant fails the composite FK / RLS check here.
   if (error) return { error: dbErrorKey(error) };
   revalidatePath(`/${locale}/crm/${parsed.data.contactId}`);
+  kickJobs();
   return { ok: true, message: "crm.noteAdded" };
 }

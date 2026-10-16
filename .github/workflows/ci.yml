@@ -62,7 +62,7 @@ jobs:
           version: latest
       - run: pnpm install --frozen-lockfile
       - name: Start Supabase (applies migrations + seed)
-        run: supabase start -x studio,imgproxy,inbucket,edge-runtime,logflare,vector,supavisor
+        run: supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor
       - name: Export local Supabase env
         run: |
           supabase status -o env > /tmp/sb.env

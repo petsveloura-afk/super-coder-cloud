@@ -83,7 +83,8 @@ test("keep-alive endpoint performs a DB round-trip and exposes no data", async (
   expect(r.status()).toBe(200);
   const j = await r.json();
   expect(j.ok).toBe(true);
-  expect(Object.keys(j).sort()).toEqual(["db", "ms", "ok", "time"]);
+  expect(Object.keys(j).sort()).toEqual(["db", "maintenance", "ms", "ok", "time"]);
+  if (process.env.CRON_SECRET) expect(j.maintenance).toBe("ran");
   if (process.env.CRON_SECRET) expect((await request.get("/api/keepalive")).status()).toBe(401);
 });
 
