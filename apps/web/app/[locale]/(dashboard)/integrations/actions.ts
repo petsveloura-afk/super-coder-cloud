@@ -205,7 +205,7 @@ export async function connectChannelAction(_prev: ActionState, fd: FormData): Pr
   if (kind === "telegram" && token) {
     const { publicEnv } = await import("@/lib/env");
     const url = `${publicEnv.appUrl.replace(/\/$/, "")}/api/channels/telegram/${token}`;
-    const hook = await providers.telegramCall(v.bot_token!, "setWebhook", { url, secret_token: token, allowed_updates: ["message", "edited_message", "channel_post"], drop_pending_updates: false });
+    const hook = await providers.telegramCall(v.bot_token!, "setWebhook", { url, secret_token: token, allowed_updates: [...(await import("@/lib/channels/telegram-setup")).TELEGRAM_UPDATES], drop_pending_updates: false });
     if (!hook.ok) {
       await supabase.from("channel_accounts").update({ status: "error", last_error: `setWebhook: ${hook.error ?? ""}`.slice(0, 500) }).eq("organization_id", ctx.org.id).eq("kind", kind);
       revalidatePath(`/${locale}/integrations`);
@@ -458,3 +458,102 @@ export async function telegramUserPasswordAction(input: { locale: string; passwo
   const st = await tgUserPassword(acc.id, pw);
   return { status: st.status, error: st.error ?? null };
 }
+
+/* ---------------------------------------- wave 10: team updates (who gets the agent's conversations) ---- */
+
+const recipientSchema = z.object({
+  kind: z.enum(["email", "telegram", "whatsapp", "sms"]),
+  target: z.string().trim().max(200).optional().default(""),
+  label: z.string().trim().max(80).optional().default(""),
+  events: z.array(z.enum(["messages", "leads", "handoff"])).min(1),
+});
+
+/** Adds a person who gets updates. Telegram → an invite link they open in the business's bot. */
+export async function addRecipientAction(input: { locale: string; kind: string; target?: string; label?: string; events: string[] }): Promise<ActionState<{ invite?: string }>> {
+  const ctx = await getOrgContext(input.locale === "en" || input.locale === "ar" ? input.locale : "he");
+  if (!ctx.can("integrations.manage")) return { error: "errors.forbidden" };
+  const p = recipientSchema.safeParse(input);
+  if (!p.success) return { error: "notify.invalid" };
+  const { normalizeTarget, newInviteCode } = await import("@/lib/notify/format");
+  const supabase = await createClient();
+  let target: string | null = null;
+  let invite: string | null = null;
+  if (p.data.kind === "telegram") {
+    const { data: bot } = await supabase.from("channel_accounts").select("config").eq("organization_id", ctx.org.id).eq("kind", "telegram").maybeSingle();
+    if (!bot) return { error: "notify.needBot" };
+    invite = newInviteCode();
+  } else {
+    target = normalizeTarget(p.data.kind, p.data.target);
+    if (!target) return { error: p.data.kind === "email" ? "notify.badEmail" : "notify.badPhone" };
+  }
+  const { error } = await supabase.from("notify_recipients").insert({
+    organization_id: ctx.org.id,
+    kind: p.data.kind,
+    target,
+    label: p.data.label || null,
+    events: p.data.events,
+    invite_code: invite,
+    verified_at: target ? new Date().toISOString() : null,
+    created_by: ctx.userId,
+  });
+  if (error) return { error: error.message.includes("plan_limit:notify_recipients") ? "notify.tooMany" : dbErrorKey(error) };
+  revalidatePath(`/${input.locale}/integrations`);
+  return { ok: true, message: "notify.added", data: invite ? { invite } : {} };
+}
+
+export async function updateRecipientAction(input: { locale: string; id: string; enabled?: boolean; events?: string[] }): Promise<ActionState> {
+  const ctx = await getOrgContext(input.locale === "en" || input.locale === "ar" ? input.locale : "he");
+  if (!ctx.can("integrations.manage")) return { error: "errors.forbidden" };
+  if (!uuidSchema.safeParse(input.id).success) return { error: "validation.invalidId" };
+  const patch: Record<string, unknown> = {};
+  if (typeof input.enabled === "boolean") patch.enabled = input.enabled;
+  if (input.events) {
+    const ev = z.array(z.enum(["messages", "leads", "handoff"])).min(1).safeParse(input.events);
+    if (!ev.success) return { error: "notify.invalid" };
+    patch.events = ev.data;
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.from("notify_recipients").update(patch).eq("id", input.id).eq("organization_id", ctx.org.id);
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${input.locale}/integrations`);
+  return { ok: true };
+}
+
+export async function deleteRecipientAction(input: { locale: string; id: string }): Promise<ActionState> {
+  const ctx = await getOrgContext(input.locale === "en" || input.locale === "ar" ? input.locale : "he");
+  if (!ctx.can("integrations.manage")) return { error: "errors.forbidden" };
+  if (!uuidSchema.safeParse(input.id).success) return { error: "validation.invalidId" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("notify_recipients").delete().eq("id", input.id).eq("organization_id", ctx.org.id);
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${input.locale}/integrations`);
+  return { ok: true };
+}
+
+/** Sends a sample update to one recipient right now. */
+export async function testRecipientAction(input: { locale: string; id: string }): Promise<ActionState> {
+  const ctx = await getOrgContext(input.locale === "en" || input.locale === "ar" ? input.locale : "he");
+  if (!ctx.can("integrations.manage")) return { error: "errors.forbidden" };
+  if (!uuidSchema.safeParse(input.id).success) return { error: "validation.invalidId" };
+  const supabase = await createClient();
+  const { data: r } = await supabase.from("notify_recipients").select("id, kind, target, label, events").eq("id", input.id).eq("organization_id", ctx.org.id).maybeSingle();
+  if (!r) return { error: "errors.notFound" };
+  if (!r.target) return { error: "notify.notLinked" };
+  const { sendToRecipient, inboxLink } = await import("@/lib/notify/forward");
+  const res = await sendToRecipient(ctx.org.id, r as never, "leads", {
+    orgName: ctx.org.name,
+    channel: "telegram",
+    customer: "לקוח לדוגמה",
+    lead: { name: "דנה כהן", phone: "050-1234567", need: "בדיקת עדכונים", score: "hot", summary: "זו הודעת בדיקה: ככה ייראו העדכונים שלכם." },
+    link: inboxLink(null),
+  });
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  await createAdminClient()
+    .from("notify_recipients")
+    .update(res.ok ? { last_sent_at: new Date().toISOString(), last_error: null } : { last_error: (res.error ?? "failed").slice(0, 300) })
+    .eq("id", r.id);
+  revalidatePath(`/${input.locale}/integrations`);
+  return res.ok ? { ok: true, message: "notify.testSent" } : { error: "notify.testFailed", messageParams: { detail: res.error ?? "" } };
+}
+
+/** Telegram Business: give the agent back a chat the owner took over / stop it in one chat — via inbox ai-mode (existing). */

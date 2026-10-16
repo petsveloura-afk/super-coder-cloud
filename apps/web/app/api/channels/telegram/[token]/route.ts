@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { ingest } from "@/lib/channels/ingest";
+import { handleTelegramBusiness, handleTelegramSpecial, type TgBusinessConnection, type TgBusinessMessage } from "@/lib/channels/telegram-business";
 
 export const dynamic = "force-dynamic";
 // the AI agent answers in the background (after the response) and may wait for a busy provider
@@ -41,7 +42,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!/^[a-f0-9]{48}$/.test(token)) return NextResponse.json({ ok: false }, { status: 404 });
   const header = request.headers.get("x-telegram-bot-api-secret-token") ?? "";
   if (!same(header, token)) return NextResponse.json({ ok: false }, { status: 401 });
-  const update = (await request.json().catch(() => null)) as { message?: TgMessage; edited_message?: TgMessage; channel_post?: TgMessage } | null;
+  const update = (await request.json().catch(() => null)) as {
+    message?: TgMessage;
+    edited_message?: TgMessage;
+    channel_post?: TgMessage;
+    business_connection?: TgBusinessConnection;
+    business_message?: TgBusinessMessage;
+    edited_business_message?: TgBusinessMessage;
+    deleted_business_messages?: unknown;
+    callback_query?: { id: string };
+  } | null;
+  // wave 10: Telegram Business (the bot runs a personal account's chats) — separate update types
+  if (update?.business_connection || update?.business_message || update?.edited_business_message || update?.deleted_business_messages) {
+    await handleTelegramBusiness(token, update).catch((e) => console.error("telegram business update failed", (e as Error).message));
+    return NextResponse.json({ ok: true });
+  }
+  // invited team members linking themselves (/start n_<code>) and /stop_updates — never a customer conversation
+  if (update?.message && (await handleTelegramSpecial(token, update.message).catch(() => false))) return NextResponse.json({ ok: true });
   const msg = update?.message ?? update?.edited_message ?? update?.channel_post;
   if (!msg) return NextResponse.json({ ok: true }); // other update types are acknowledged and ignored
 

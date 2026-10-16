@@ -39,6 +39,18 @@ async function providerSend(kind: Kind | "web", orgId: string, externalId: strin
     const { bridgeSend } = await import("./wa-bridge");
     const { buttonsAsText } = await import("@/lib/ai/autopilot-core");
     r = await bridgeSend(acc, externalId, rich?.buttons?.length ? buttonsAsText(text, rich.buttons) : text);
+  } else if (kind === "telegram" && externalId.startsWith("biz:")) {
+    // wave 10: Telegram Business chat — reply on behalf of the owner's account (business_connection_id),
+    // plain human-looking text (choices as a numbered list, no bot keyboards)
+    const { telegramHtml, buttonsAsText } = await import("@/lib/ai/autopilot-core");
+    const connection = await businessConnectionFor(orgId, externalId, conversationId);
+    if (!connection) r = { ok: false, error: "business_connection_missing", permanent: true };
+    else {
+      const body = rich?.buttons?.length ? buttonsAsText(text, rich.buttons) : text;
+      const chat_id = externalId.slice(4);
+      r = await telegramCall(acc.secrets.bot_token ?? "", "sendMessage", { business_connection_id: connection, chat_id, text: rich?.html ? telegramHtml(body) : body, ...(rich?.html ? { parse_mode: "HTML" } : {}) });
+      if (!r.ok && rich?.html && /parse|entit/i.test(r.error ?? "")) r = await telegramCall(acc.secrets.bot_token ?? "", "sendMessage", { business_connection_id: connection, chat_id, text: body });
+    }
   } else if (kind === "telegram") {
     if (rich) {
       const { telegramHtml } = await import("@/lib/ai/autopilot-core");
@@ -161,7 +173,12 @@ export async function sendMediaToConversation(orgId: string, conversationId: str
   if (channel !== "web") {
     const acc = await loadAccount(orgId, channel as Kind);
     if (!acc) r = { ok: false, error: "channel_not_connected", permanent: true };
-    else if (channel === "telegram") r = await telegramCall(acc.secrets.bot_token ?? "", "sendPhoto", { chat_id: conv.external_id, photo: item.url, caption });
+    else if (channel === "telegram" && String(conv.external_id).startsWith("biz:")) {
+      const connection = await businessConnectionFor(orgId, String(conv.external_id), conv.id as string);
+      r = connection
+        ? await telegramCall(acc.secrets.bot_token ?? "", "sendPhoto", { business_connection_id: connection, chat_id: String(conv.external_id).slice(4), photo: item.url, caption })
+        : { ok: false, error: "business_connection_missing", permanent: true };
+    } else if (channel === "telegram") r = await telegramCall(acc.secrets.bot_token ?? "", "sendPhoto", { chat_id: conv.external_id, photo: item.url, caption });
     else if (channel === "whatsapp") r = await whatsappSendImage(acc.secrets.access_token ?? "", acc.config.phone_number_id ?? "", `+${String(conv.external_id).replace(/^\+/, "")}`, item.url, caption);
     else if (channel === "whatsapp_qr") {
       const { bridgeCall } = await import("./wa-bridge");
@@ -172,4 +189,12 @@ export async function sendMediaToConversation(orgId: string, conversationId: str
   if (msg) await admin.from("messages").update({ status: r.ok ? "sent" : "failed", error: r.ok ? null : (r.error ?? "send_failed").slice(0, 500), external_id: r.externalId ?? null }).eq("id", msg.id);
   await admin.from("conversations").update({ last_message_at: new Date().toISOString(), last_message_preview: `🖼️ ${item.title}`.slice(0, 200) }).eq("id", conv.id);
   return { ok: r.ok, messageId: msg?.id as string | undefined, error: r.error };
+}
+
+/** Telegram Business: the connection id of a "biz:<chat>" conversation. */
+export async function businessConnectionFor(orgId: string, externalId: string, conversationId?: string | null): Promise<string | null> {
+  const admin = createAdminClient();
+  const q = admin.from("conversations").select("business_connection_id").eq("organization_id", orgId);
+  const { data } = conversationId ? await q.eq("id", conversationId).maybeSingle() : await q.eq("channel", "telegram").eq("external_id", externalId).maybeSingle();
+  return (data?.business_connection_id as string | null | undefined) ?? null;
 }

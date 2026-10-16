@@ -8,6 +8,7 @@ import { ApiDocs, ApiKeys, Webhooks, type ApiKeyRow, type WebhookRow } from "@/c
 import { ChannelsSection } from "@/components/integrations/channels-section";
 import { ConnectHub, type HubProps } from "@/components/integrations/connect-hub";
 import { IntegrationsNotice } from "@/components/integrations/integrations-notice";
+import { TeamUpdates, type BusinessView, type RecipientView } from "@/components/integrations/team-updates";
 import { metaPublicConfig } from "@/lib/channels/meta";
 import { bridgeConfigured } from "@/lib/channels/wa-bridge";
 import { mailOAuthConfigured } from "@/lib/channels/oauth-mail";
@@ -83,6 +84,14 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
     canManage: canChannels,
   };
 
+  // wave 10 — team updates + Telegram Business
+  const [{ data: recRows }, { data: bizRows }] = canChannels
+    ? await Promise.all([
+        supabase.from("notify_recipients").select("id, kind, target, label, events, enabled, invite_code, last_sent_at, last_error, sent_count").eq("organization_id", ctx.org.id).order("created_at"),
+        supabase.from("telegram_business_connections").select("id, owner_name, owner_username, can_reply, is_enabled, messages_in, messages_out, last_message_at").eq("organization_id", ctx.org.id).order("updated_at", { ascending: false }),
+      ])
+    : [{ data: [] }, { data: [] }];
+
   return (
     <>
       <PageHeader title={t("integrations.title")} description={t("integrations.hubSubtitle")} />
@@ -90,6 +99,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
         <IntegrationsNotice />
       </Suspense>
       {canChannels ? <ConnectHub {...hub} /> : null}
+      {canChannels ? <TeamUpdates recipients={(recRows ?? []) as RecipientView[]} business={(bizRows ?? []) as BusinessView[]} botUsername={tg?.config.username || null} /> : null}
 
       {ctx.isPlatformAdmin ? (
       <Card className="mb-4">

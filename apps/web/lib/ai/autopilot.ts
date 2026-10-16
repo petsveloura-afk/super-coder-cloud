@@ -45,6 +45,8 @@ export interface AutopilotResult {
   reason?: string;
   text?: string;
   lead?: LeadCaptureResult | null;
+  /** wave 10: the lead details the agent captured (for team updates) */
+  leadData?: LeadData | null;
 }
 
 export interface LeadCaptureResult {
@@ -66,7 +68,12 @@ async function typingIndicator(orgId: string, channel: AutopilotChannel, externa
     const { loadAccount } = await import("@/lib/channels/accounts");
     const { telegramCall } = await import("@/lib/channels/providers");
     const acc = await loadAccount(orgId, "telegram");
-    if (acc?.secrets.bot_token) await telegramCall(acc.secrets.bot_token, "sendChatAction", { chat_id: externalId, action: "typing" });
+    if (acc?.secrets.bot_token && externalId.startsWith("biz:")) {
+      // Telegram Business: "typing…" in the owner's chat with the customer
+      const { businessConnectionFor } = await import("@/lib/channels/send-message");
+      const connection = await businessConnectionFor(orgId, externalId);
+      if (connection) await telegramCall(acc.secrets.bot_token, "sendChatAction", { business_connection_id: connection, chat_id: externalId.slice(4), action: "typing" });
+    } else if (acc?.secrets.bot_token) await telegramCall(acc.secrets.bot_token, "sendChatAction", { chat_id: externalId, action: "typing" });
   } catch {
     /* cosmetic only */
   }
@@ -337,7 +344,7 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
   let lead: LeadCaptureResult | null = null;
   if (tools.lead) lead = await captureLead({ orgId, conversationId: conv.id as string, lead: tools.lead, channel: ch, title: (conv.title as string | null) ?? null });
   if (tools.handoff) await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: tools.reason ?? "agent" });
-  return { replied: true, handoff: tools.handoff, text, lead };
+  return { replied: true, handoff: tools.handoff, reason: tools.handoff ? (tools.reason ?? "agent") : undefined, text, lead, leadData: tools.lead ?? null };
 }
 
 /** Fire-and-forget after the webhook response was sent (Vercel keeps the function alive). */
@@ -346,14 +353,17 @@ export async function scheduleAutopilot(input: { conversationId: string; message
     const { after } = await import("next/server");
     after(async () => {
       try {
-        await handleInboundWithAI(input);
+        const res = await handleInboundWithAI(input);
+        await forwardAfterAutopilot(input.conversationId, res);
       } catch (e) {
         console.error("autopilot failed", (e as Error).message);
       }
     });
   } catch {
     // outside a request scope (tests / scripts): run inline
-    await handleInboundWithAI(input).catch((e) => console.error("autopilot failed", (e as Error).message));
+    await handleInboundWithAI(input)
+      .then((res) => forwardAfterAutopilot(input.conversationId, res))
+      .catch((e) => console.error("autopilot failed", (e as Error).message));
   }
 }
 
@@ -369,9 +379,47 @@ export async function runPendingReplies(budgetMs = 40_000): Promise<{ checked: n
     try {
       const out = await handleInboundWithAI({ conversationId: r.conversation_id, retry: true });
       if (out.replied) replied++;
+      await forwardAfterAutopilot(r.conversation_id, out);
     } catch (e) {
       console.error("pending reply failed", (e as Error).message);
     }
   }
   return { checked: rows.length, replied };
+}
+
+/**
+ * wave 10 — team updates: after the agent handled a message, the people the business
+ * invited (e-mail / Telegram / WhatsApp / SMS) get the exchange, new leads and
+ * handoffs. Messages the agent could not take (human mode, no agent) go to them too.
+ */
+export async function forwardAfterAutopilot(conversationId: string, res: AutopilotResult): Promise<void> {
+  try {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return;
+    const skip = ["no_service_key", "not_found", "channel", "already_answered", "superseded", "rate_limited", "empty"];
+    if (res.reason && skip.includes(res.reason)) return;
+    const busy = Boolean(res.reason && /^ai\.(busy|failed)/.test(res.reason));
+    if (busy) return; // the real answer follows — forwarded then
+    const admin = createAdminClient();
+    const { data: conv } = await admin.from("conversations").select("id, organization_id, channel, title, external_id").eq("id", conversationId).maybeSingle();
+    if (!conv) return;
+    const { data: lastIn } = await admin.from("messages").select("body").eq("conversation_id", conversationId).eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const { forwardToTeam } = await import("@/lib/notify/forward");
+    const base = {
+      conversationId,
+      customer: (conv.title as string | null) ?? null,
+      channel: conv.channel as string,
+      customerText: (lastIn?.body as string | undefined) ?? null,
+      excludeTarget: conv.channel === "telegram" ? String(conv.external_id).replace(/^biz:/, "") : null,
+    };
+    const orgId = conv.organization_id as string;
+    if (res.reason === "human_mode" || res.reason === "no_agent") {
+      await forwardToTeam(orgId, "messages", base);
+      return;
+    }
+    if (res.replied && res.text) await forwardToTeam(orgId, "messages", { ...base, agentText: res.text });
+    if (res.leadData && (res.leadData.name || res.leadData.phone || res.leadData.email)) await forwardToTeam(orgId, "leads", { ...base, lead: res.leadData });
+    if (res.handoff) await forwardToTeam(orgId, "handoff", { ...base, reason: res.reason ?? null });
+  } catch (e) {
+    console.error("team update failed", (e as Error).message);
+  }
 }

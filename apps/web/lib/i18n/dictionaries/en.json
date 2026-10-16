@@ -1977,5 +1977,61 @@
     "send": "Send",
     "leaveDetails": "Leave your details for a call back",
     "poweredBy": "Powered by"
+  },
+  "notify": {
+    "title": "Who else gets the updates",
+    "subtitle": "Besides the inbox, invite people to get every conversation the agent handles, every new lead and every request for a person — on Telegram, e-mail, WhatsApp or SMS.",
+    "kind": "Send by",
+    "target": "Address or number",
+    "label": "Name (optional)",
+    "labelPlaceholder": "Name (e.g. Dan, sales manager)",
+    "kinds": {
+      "telegram": "Telegram",
+      "email": "E-mail",
+      "whatsapp": "WhatsApp",
+      "sms": "SMS"
+    },
+    "events": {
+      "messages": "Every conversation",
+      "leads": "New leads",
+      "handoff": "Request for a person"
+    },
+    "telegramHint": "Creates a personal invite link to {bot} — send it to the person; they press Start and updates arrive in their Telegram.",
+    "needBot": "Connect a Telegram bot first (above) — updates are sent through it.",
+    "whatsappHint": "Sent through your connected WhatsApp (QR or official). On the official API Meta only allows messages to people who wrote in the last 24 hours.",
+    "smsHint": "Sent through your connected Twilio, shortened.",
+    "add": "Add",
+    "createInvite": "Create invite link",
+    "added": "Added — the invite link was copied if one was created",
+    "copied": "Link copied",
+    "copy": "Copy",
+    "invalid": "Invalid details",
+    "badEmail": "Invalid e-mail address",
+    "badPhone": "Invalid phone number",
+    "tooMany": "Up to 20 recipients",
+    "notLinked": "The recipient has not opened the invite link yet",
+    "active": "Active",
+    "paused": "Paused",
+    "waiting": "Waiting for Telegram",
+    "error": "Delivery error",
+    "test": "Send test",
+    "testSent": "Test sent",
+    "testFailed": "Sending failed: {detail}",
+    "pause": "Pause",
+    "resume": "Resume",
+    "business": {
+      "title": "Telegram Business — the agent answers from your own account",
+      "subtitle": "Add the bot as a chatbot to your Telegram account and the agent answers customers who write to you directly. When you type yourself, the agent steps back in that chat.",
+      "owner": "Your account",
+      "active": "Connected · answering",
+      "noReply": "Connected · no reply permission",
+      "off": "Disconnected",
+      "counts": "{in} in · {out} by you",
+      "step1": "In Telegram (Premium required): Settings → Telegram Business → Chatbots.",
+      "step2": "Type {bot} and choose the bot.",
+      "step2NoBot": "Connect a Telegram bot above first, then type its username.",
+      "step3": "Allow it to manage / reply to messages and choose which chats.",
+      "step4": "Done — messages appear in the inbox and the agent answers within Telegram's 24-hour window."
+    }
   }
 }

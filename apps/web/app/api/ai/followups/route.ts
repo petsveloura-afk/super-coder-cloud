@@ -21,7 +21,9 @@ async function handle(request: NextRequest) {
   // first the safety net (unanswered customer messages), then follow-ups
   const pending = await runPendingReplies(25_000);
   const summary = await runFollowups(25_000);
-  return NextResponse.json({ ok: true, ...summary, pending }, { headers: { "Cache-Control": "no-store" } });
+  // wave 10: bots connected before the Telegram Business update get the full update list
+  const healed = await import("@/lib/channels/telegram-setup").then((m) => m.healTelegramWebhooks(5)).catch(() => 0);
+  return NextResponse.json({ ok: true, ...summary, pending, healed }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export const GET = handle;

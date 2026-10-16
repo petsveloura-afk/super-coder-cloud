@@ -133,3 +133,6 @@ Every AI call (agent replies, studio chat, site builder) goes through `lib/ai/ro
 
 Defaults: Gemini `gemini-3.8-flash, gemini-3.5-flash-lite, gemini-3.6-flash, gemini-2.5-flash`; Groq `openai/gpt-oss-120b, llama-3.3-70b-versatile`; Cerebras `gpt-oss-120b, qwen-3.8-27b`; OpenRouter `openrouter/free`; Mistral `mistral-small-latest`.
 Platform admin → "AI engines check" probes every key and can clear the rests.
+
+## v10 — Telegram Business + team updates
+No new variables. The Telegram webhook now subscribes to `message, edited_message, channel_post, callback_query, business_connection, business_message, edited_business_message, deleted_business_messages` (`TELEGRAM_UPDATES` in `lib/channels/telegram-setup.ts`); existing bots are re-registered automatically by `/api/ai/followups` (cron). Business chats are stored as conversations `telegram` / `biz:<chat id>` with `business_connection_id`. Team updates use table `notify_recipients` (e-mail via `EMAIL_PROVIDER_API_KEY`, Telegram via the org's bot, WhatsApp via QR bridge / Cloud API, SMS via Twilio). Migration: `20261015000027_telegram_business_notify.sql`.
