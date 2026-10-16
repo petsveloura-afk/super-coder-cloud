@@ -116,7 +116,7 @@ export function buildCandidates(input: { preferred?: string | null; model?: stri
   return out;
 }
 
-export type FailureKind = "rate" | "daily" | "model" | "auth" | "server" | "other";
+export type FailureKind = "rate" | "daily" | "model" | "auth" | "server" | "other" | "noquota";
 
 export interface Classified {
   kind: FailureKind;
@@ -138,6 +138,8 @@ export function classifyError(message: string, now = new Date()): Classified {
   const m = message ?? "";
   const status = Number(/^[a-z]+_(\d{3})/.exec(m)?.[1] ?? 0);
   const retryS = Number(/retry=(\d+(?:\.\d+)?)/.exec(m)?.[1] ?? /retry in ([\d.]+)\s*s/i.exec(m)?.[1] ?? /"retryDelay":\s*"(\d+)/.exec(m)?.[1] ?? 0);
+  // wave 11: "limit: 0" = this project has NO free quota for this model (not a temporary limit) → skip the model for this key for hours
+  if ((status === 429 || /RESOURCE_EXHAUSTED/i.test(m)) && /limit:\s*0\b/i.test(m)) return { kind: "noquota", restMs: 6 * 3600_000, scope: "key+model", reason: "no free quota for this model" };
   if (status === 429 || /RESOURCE_EXHAUSTED|rate.?limit|quota/i.test(m)) {
     if (/per ?day|PerDay|daily|requests per day|RPD/i.test(m)) return { kind: "daily", restMs: Math.min(untilDailyReset(now), 3 * 3600_000), scope: "key+model", reason: "daily quota used up" };
     return { kind: "rate", restMs: Math.min(Math.max(retryS * 1000, 20_000), 120_000), scope: "key+model", reason: "per-minute limit" };

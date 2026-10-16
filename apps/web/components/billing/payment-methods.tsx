@@ -6,9 +6,10 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import type { Locale } from "@/lib/i18n/config";
 
 /** Pay buttons for a plan: PayPal (PayPal or card), Lemon Squeezy (card / Apple Pay / PayPal), crypto. */
-export async function PaymentMethods({ locale, plan, interval, methods, withDivider }: { locale: Locale; plan: string; interval: "month" | "year"; methods: ("paypal" | "lemonsqueezy" | "crypto")[]; withDivider?: boolean }) {
+export async function PaymentMethods({ locale, plan, interval, methods, withDivider }: { locale: Locale; plan: string; interval: "month" | "year"; methods: ("paypal" | "lemonsqueezy" | "crypto" | "paypal_card")[]; withDivider?: boolean }) {
   const { t } = await getT(locale);
   const meta = {
+    paypal_card: { icon: CreditCard, label: t("billing.pay.paypalCard"), sub: t("billing.pay.paypalCardSub"), cls: "bg-[#0f172a] text-white ring-1 ring-white/10 hover:brightness-125" },
     paypal: { icon: Wallet, label: t("billing.pay.paypal"), sub: t("billing.pay.paypalSub"), cls: "bg-[#FFC439] text-[#111] hover:brightness-95" },
     lemonsqueezy: { icon: CreditCard, label: t("billing.pay.card"), sub: t("billing.pay.cardSub"), cls: "bg-accent-solid text-white hover:bg-accent-solid-hover" },
     crypto: { icon: Bitcoin, label: t("billing.pay.crypto"), sub: t("billing.pay.cryptoSub"), cls: "border border-line-strong bg-surface hover:bg-surface-hover" },

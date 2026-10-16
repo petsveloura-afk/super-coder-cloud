@@ -45,6 +45,9 @@ describe("router core", () => {
     expect(daily.kind).toBe("daily");
     expect(daily.restMs).toBe(3 * 3600_000);
     expect(classifyError("groq_429:Rate limit reached|retry=7").restMs).toBe(20_000);
+    // wave 11: "limit: 0" = no free quota for this model in this project (not a temporary limit)
+    const none = classifyError("gemini_429:RESOURCE_EXHAUSTED:You exceeded your current quota. Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-3.8-flash");
+    expect(none).toMatchObject({ kind: "noquota", scope: "key+model", restMs: 6 * 3600_000 });
     expect(classifyError("gemini_404:NOT_FOUND:models/gemini-flash-latest is not found")).toMatchObject({ kind: "model", scope: "model" });
     expect(classifyError("gemini_400:INVALID_ARGUMENT:API key not valid. Please pass a valid API key.")).toMatchObject({ kind: "auth", scope: "key" });
     expect(classifyError("cerebras_401:Wrong API Key")).toMatchObject({ kind: "auth" });
@@ -149,5 +152,73 @@ describe("router (generateRouted)", () => {
     const { generateRouted } = await import("@/lib/ai/router");
     await expect(generateRouted({ system: "s", messages: [] })).rejects.toMatchObject({ message: "ai_not_configured", busy: false });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("admin AI health probe (wave 11)", () => {
+  const saved = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved };
+    vi.unstubAllGlobals();
+  });
+
+  it("tries the next model when a key has no free quota on the first one, and reports which model works", async () => {
+    vi.resetModules();
+    for (const k of Object.keys(process.env)) if (/_API_KEY|AI_PROVIDER_ORDER|SUPABASE_SERVICE_ROLE_KEY|AI_.*_MODELS/.test(k)) delete process.env[k];
+    process.env.GEMINI_API_KEY = G1;
+    process.env.AI_GEMINI_BASE_URL = "https://gemini.example/v1beta";
+    process.env.AI_GEMINI_MODELS = "gemini-3.8-flash,gemini-3.5-flash-lite";
+    const fetchMock = vi.fn(async (url: string) =>
+      String(url).includes("gemini-3.8-flash")
+        ? new Response(JSON.stringify({ error: { status: "RESOURCE_EXHAUSTED", message: "You exceeded your current quota. For more information on this error, head to: https://ai.google.dev/x. Quota exceeded for metric: generate_content_free_tier_requests, limit: 0, model: gemini-3.8-flash" } }), { status: 429 })
+        : new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "OK" }] } }] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { probeAll } = await import("@/lib/ai/router");
+    const [row] = await probeAll();
+    expect(row).toMatchObject({ provider: "gemini", model: "gemini-3.5-flash-lite", ok: true, tried: ["gemini-3.8-flash", "gemini-3.5-flash-lite"] });
+  });
+
+  it("reports a readable reason (no doc links) when every model fails", async () => {
+    vi.resetModules();
+    for (const k of Object.keys(process.env)) if (/_API_KEY|AI_PROVIDER_ORDER|SUPABASE_SERVICE_ROLE_KEY|AI_.*_MODELS/.test(k)) delete process.env[k];
+    process.env.GEMINI_API_KEY = G1;
+    process.env.AI_GEMINI_BASE_URL = "https://gemini.example/v1beta";
+    process.env.AI_GEMINI_MODELS = "gemini-3.8-flash";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { status: "RESOURCE_EXHAUSTED", message: "You exceeded your current quota. For more information on this error, head to: https://ai.google.dev/x. limit: 0" } }), { status: 429 })));
+    const { probeAll } = await import("@/lib/ai/router");
+    const [row] = await probeAll();
+    expect(row!.ok).toBe(false);
+    expect(row!.kind).toBe("noquota");
+    expect(row!.reason).not.toContain("https://");
+  });
+});
+
+describe("router: one limited provider never blocks the next (wave 11)", () => {
+  const saved = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved };
+    vi.unstubAllGlobals();
+  });
+
+  it("3 limited Gemini keys → after 2 failed Gemini calls it moves on and Groq answers", async () => {
+    vi.resetModules();
+    for (const k of Object.keys(process.env)) if (/_API_KEY|AI_PROVIDER_ORDER|SUPABASE_SERVICE_ROLE_KEY|AI_.*_MODELS|AI_ROUTER/.test(k)) delete process.env[k];
+    process.env.GEMINI_API_KEY = G1;
+    process.env.GEMINI_API_KEY_2 = G2;
+    process.env.GEMINI_API_KEY_3 = "AIzaGeminiKeyNumberThree_cccccc3";
+    process.env.GROQ_API_KEY = GROQ;
+    process.env.AI_GEMINI_BASE_URL = "https://gemini.example/v1beta";
+    process.env.AI_GROQ_BASE_URL = "https://groq.example/openai/v1";
+    const fetchMock = vi.fn(async (url: string) =>
+      String(url).includes("gemini.example")
+        ? new Response(JSON.stringify({ error: { status: "RESOURCE_EXHAUSTED", message: "Quota exceeded. Please retry in 20s." } }), { status: 429 })
+        : new Response(JSON.stringify({ choices: [{ message: { content: "שלום מ-Groq" } }] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { generateRouted } = await import("@/lib/ai/router");
+    const r = await generateRouted({ preferred: "gemini", model: "gemini-flash-latest", system: "s", messages: [{ role: "user", content: "x" }] });
+    expect(r.provider).toBe("groq");
+    expect(r.attempts.map((a) => a.provider)).toEqual(["gemini", "gemini", "groq"]);
   });
 });

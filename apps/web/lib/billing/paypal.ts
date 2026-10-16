@@ -18,7 +18,7 @@ export function paypalConfigured(): boolean {
 }
 
 const base = () =>
-  (process.env.PAYPAL_API_BASE || (process.env.PAYPAL_MODE === "sandbox" ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com")).replace(/\/$/, "");
+  (process.env.PAYPAL_API_BASE || ((process.env.PAYPAL_MODE ?? "").trim().toLowerCase() === "sandbox" ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com")).replace(/\/$/, "");
 
 let cached: { token: string; until: number } | null = null;
 
@@ -27,7 +27,8 @@ async function token(): Promise<string> {
   const res = await fetch(`${base()}/v1/oauth2/token`, {
     method: "POST",
     headers: {
-      Authorization: `Basic ${Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`).toString("base64")}`,
+      // trimmed: a space / line break copied with the key is a common cause of "Client Authentication failed"
+      Authorization: `Basic ${Buffer.from(`${(process.env.PAYPAL_CLIENT_ID ?? "").trim()}:${(process.env.PAYPAL_CLIENT_SECRET ?? "").trim()}`).toString("base64")}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
@@ -194,4 +195,122 @@ export async function verifyPayPalWebhook(headers: Headers, event: unknown): Pro
   } catch {
     return false;
   }
+}
+
+/* ------------------------------------------- wave 11: card payment without a PayPal account */
+
+/**
+ * One-time PayPal order that opens straight on the card form (guest checkout):
+ * the customer pays by debit / credit card WITHOUT a PayPal account (PayPal
+ * decides availability by country / card). Pays one period in advance (month /
+ * year), like crypto; a reminder is sent before it ends.
+ */
+export async function createPayPalCardOrder(input: { orgId: string; plan: string; interval: "month" | "year"; locale: string; returnUrl: string; cancelUrl: string }): Promise<string> {
+  const price = await planPrice(input.plan, input.interval);
+  if (!price) throw new Error("no_price");
+  const { buildOrderRef } = await import("./payments-core");
+  const nonce = Math.random().toString(36).slice(2, 12).replace(/[^a-z0-9]/gi, "") || "n0nce1";
+  const ref = buildOrderRef(input.orgId, input.plan, input.interval, nonce);
+  const order = await pp<{ id: string; links?: { rel: string; href: string }[] }>("/v2/checkout/orders", {
+    method: "POST",
+    requestId: `scc-order-${nonce}`,
+    body: {
+      intent: "CAPTURE",
+      purchase_units: [
+        {
+          reference_id: `${input.plan}-${input.interval}`,
+          custom_id: ref,
+          description: `Super Coder Cloud — ${input.plan} (${input.interval === "year" ? "12 months" : "1 month"})`,
+          amount: { currency_code: price.currency, value: moneyString(price.amount) },
+        },
+      ],
+      payment_source: {
+        paypal: {
+          experience_context: {
+            brand_name: (process.env.BILLING_BUSINESS_NAME || "Super Coder Cloud").slice(0, 127),
+            locale: input.locale === "en" ? "en-US" : input.locale === "ar" ? "ar-EG" : "he-IL",
+            landing_page: "GUEST_CHECKOUT",
+            user_action: "PAY_NOW",
+            shipping_preference: "NO_SHIPPING",
+            return_url: input.returnUrl,
+            cancel_url: input.cancelUrl,
+          },
+        },
+      },
+    },
+  });
+  const link = order.links?.find((l) => l.rel === "payer-action")?.href ?? order.links?.find((l) => l.rel === "approve")?.href;
+  if (!link) throw new Error("paypal_no_payer_action_link");
+  return link;
+}
+
+interface PayPalOrder {
+  id: string;
+  status: string;
+  payer?: { payer_id?: string; email_address?: string; name?: { given_name?: string; surname?: string } };
+  purchase_units?: {
+    custom_id?: string;
+    payments?: { captures?: { id: string; status: string; custom_id?: string; amount?: { value?: string; currency_code?: string } }[] };
+  }[];
+}
+
+/**
+ * Captures an approved card order (return page or webhook) and activates the plan for the
+ * paid period. Idempotent: the same order never extends twice.
+ */
+export async function capturePayPalCardOrder(orderId: string): Promise<{ ok: boolean; orgId?: string; plan?: string; status?: string }> {
+  if (!/^[A-Z0-9]{8,40}$/.test(orderId)) return { ok: false };
+  let order: PayPalOrder;
+  try {
+    order = await pp<PayPalOrder>(`/v2/checkout/orders/${orderId}/capture`, { method: "POST", body: {}, requestId: `scc-capture-${orderId}` });
+  } catch (e) {
+    // already captured (return page + webhook) → read it
+    if (!/ORDER_ALREADY_CAPTURED|422/.test((e as Error).message)) throw e;
+    order = await pp<PayPalOrder>(`/v2/checkout/orders/${orderId}`);
+  }
+  const pu = order.purchase_units?.[0];
+  const cap = pu?.payments?.captures?.[0];
+  const { parseOrderRef, prepaidPeriodEnd } = await import("./payments-core");
+  const ref = parseOrderRef(cap?.custom_id ?? pu?.custom_id);
+  if (!ref) return { ok: false };
+  if (order.status !== "COMPLETED" || !cap || cap.status !== "COMPLETED") return { ok: true, orgId: ref.org, plan: ref.plan, status: cap?.status ?? order.status };
+  const admin = createAdminClient();
+  const eventId = `order:${order.id}:captured`;
+  const { error: dup } = await admin.from("billing_events").insert({ provider: "paypal", event_id: eventId, type: "order.captured", organization_id: ref.org });
+  if (dup) return { ok: true, orgId: ref.org, plan: ref.plan, status: "COMPLETED" }; // already applied
+  try {
+    const { data: sub } = await admin.from("subscriptions").select("plan_key, status, current_period_end, provider, provider_subscription_id").eq("organization_id", ref.org).maybeSingle();
+    const renewing = sub && sub.status === "active" && sub.plan_key === ref.plan && (sub.provider === "nowpayments" || String(sub.provider_subscription_id ?? "").startsWith("order:"));
+    const periodEnd = prepaidPeriodEnd(ref.interval, renewing ? (sub.current_period_end as string | null) : null);
+    await applyPlan({ orgId: ref.org, plan: ref.plan, status: "active", provider: "paypal", customer: order.payer?.payer_id ?? null, subscription: `order:${order.id}`, interval: ref.interval, periodEnd });
+    await admin.from("subscriptions").update({ renewal_reminded_at: null }).eq("organization_id", ref.org);
+    await recordPayment({
+      orgId: ref.org,
+      provider: "paypal",
+      externalId: `capture:${cap.id}`,
+      plan: ref.plan,
+      interval: ref.interval,
+      amount: Number(cap.amount?.value ?? 0),
+      currency: cap.amount?.currency_code ?? "ILS",
+      email: order.payer?.email_address ?? null,
+      name: [order.payer?.name?.given_name, order.payer?.name?.surname].filter(Boolean).join(" ") || null,
+      periodEnd,
+      meta: { order: order.id, card: true },
+    });
+    return { ok: true, orgId: ref.org, plan: ref.plan, status: "COMPLETED" };
+  } catch (e) {
+    await admin.from("billing_events").delete().eq("provider", "paypal").eq("event_id", eventId);
+    throw e;
+  }
+}
+
+/** Human-readable reason for a failed checkout (shown to the business owner). */
+export function paypalErrorCode(message: string): string {
+  if (/paypal_auth_401|invalid_client|Client Authentication failed/i.test(message)) return "paypal_auth";
+  if (/CURRENCY_NOT_SUPPORTED|currency/i.test(message)) return "paypal_currency";
+  if (/PERMISSION_DENIED|NOT_AUTHORIZED|403/i.test(message)) return "paypal_permission";
+  if (/no_price/.test(message)) return "no_price";
+  if (/paypal_4\d\d/.test(message)) return "paypal_request";
+  if (/paypal_5\d\d|timeout|aborted|fetch failed/i.test(message)) return "paypal_down";
+  return "provider";
 }

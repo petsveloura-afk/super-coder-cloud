@@ -141,17 +141,23 @@ export async function generateRouted(input: {
   const attempts: RouteAttempt[] = [];
   const triedModelGone = new Set<string>();
   let onlyBusy = true;
+  // wave 11: at most N failed calls per provider in one request — a provider whose project is
+  // limited (all keys share one Google quota) must never eat the whole budget before the next provider
+  const perProvider = Math.max(1, Number(process.env.AI_ROUTER_PER_PROVIDER) || 2);
+  const failedBy = new Map<string, number>();
   for (const c of cands) {
     if (attempts.length >= maxCalls) break;
     const left = budget - (Date.now() - started);
     if (attempts.length > 0 && left < 4000) break;
     if (isResting(c, rests)) continue;
     if (triedModelGone.has(`${c.provider}|${c.model}`)) continue;
+    if ((failedBy.get(c.provider) ?? 0) >= perProvider) continue;
     const t0 = Date.now();
     try {
       const r = await callOne(c, { system: input.system, messages: input.messages, temperature: input.temperature ?? 0.4, maxTokens: input.maxTokens ?? 600, json: input.json }, Math.min(25_000, left));
       if (!r.text) {
         attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, reason: "empty answer" });
+        failedBy.set(c.provider, (failedBy.get(c.provider) ?? 0) + 1);
         onlyBusy = false;
         continue;
       }
@@ -163,6 +169,7 @@ export async function generateRouted(input: {
       attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, reason: cl.reason });
       console.error("ai router: candidate failed", c.provider, c.model, c.keyId, cl.kind, msg.slice(0, 240));
       if (cl.kind === "model") triedModelGone.add(`${c.provider}|${c.model}`);
+      failedBy.set(c.provider, (failedBy.get(c.provider) ?? 0) + 1);
       if (cl.kind !== "rate" && cl.kind !== "daily" && cl.kind !== "server") onlyBusy = false;
       await rest(restKey(c, cl.scope), cl.restMs, `${cl.kind}: ${cl.reason}`);
     }
@@ -171,25 +178,38 @@ export async function generateRouted(input: {
   throw new RouterError(attempts.length ? `ai_all_failed:${attempts.map((a) => `${a.provider}/${a.model}:${a.reason}`).join(",").slice(0, 400)}` : "ai_all_resting", attempts, retryIn, onlyBusy || !attempts.length);
 }
 
-/** Admin health check: one tiny call per key (first model of each provider), never using rests. */
-export async function probeAll(): Promise<{ provider: RouteProvider; model: string; keyId: string; ok: boolean; ms: number; kind?: string; reason?: string }[]> {
+/** Readable provider error for the admin panel (drops long doc links). */
+function readable(msg: string) {
+  return msg.replace(/For more information[^.]*\.?\s*/gi, "").replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 300);
+}
+
+/**
+ * Admin health check: per key, tries the provider's models in order until one answers
+ * (so a key that only lacks quota on one model shows which model works). Never uses rests.
+ */
+export async function probeAll(): Promise<{ provider: RouteProvider; model: string; keyId: string; ok: boolean; ms: number; kind?: string; reason?: string; tried?: string[] }[]> {
   const cands = buildCandidates({ env: process.env, random: () => 0 });
-  const seen = new Set<string>();
-  const firstPerKey = cands.filter((c) => {
-    if (seen.has(c.keyId)) return false;
-    seen.add(c.keyId);
-    return true;
-  });
+  const byKey = new Map<string, RouteCandidate[]>();
+  for (const c of cands) byKey.set(c.keyId, [...(byKey.get(c.keyId) ?? []), c]);
   return Promise.all(
-    firstPerKey.slice(0, 30).map(async (c) => {
-      const t0 = Date.now();
-      try {
-        const r = await callOne(c, { system: "Reply with the single word OK.", messages: [{ role: "user", content: "ping" }], temperature: 0, maxTokens: 8 }, 15_000);
-        return { provider: c.provider, model: c.model, keyId: c.keyId, ok: Boolean(r.text), ms: Date.now() - t0, ...(r.text ? {} : { kind: "other", reason: "empty answer" }) };
-      } catch (e) {
-        const cl = classifyError((e as Error).message ?? "");
-        return { provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, kind: cl.kind, reason: ((e as Error).message ?? "").slice(0, 160) };
+    [...byKey.values()].slice(0, 30).map(async (list) => {
+      const tried: string[] = [];
+      let last: { provider: RouteProvider; model: string; keyId: string; ok: boolean; ms: number; kind?: string; reason?: string } | null = null;
+      for (const c of list.slice(0, 4)) {
+        const t0 = Date.now();
+        tried.push(c.model);
+        try {
+          const r = await callOne(c, { system: "Reply with the single word OK.", messages: [{ role: "user", content: "ping" }], temperature: 0, maxTokens: 256 }, 20_000);
+          if (r.text) return { provider: c.provider, model: c.model, keyId: c.keyId, ok: true, ms: Date.now() - t0, tried };
+          last = { provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, kind: "other", reason: "empty answer" };
+        } catch (e) {
+          const msg = (e as Error).message ?? "";
+          const cl = classifyError(msg);
+          last = { provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, kind: cl.kind, reason: readable(msg) };
+          if (cl.kind === "auth") break; // a bad key fails on every model
+        }
       }
+      return { ...last!, tried };
     }),
   );
 }

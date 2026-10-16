@@ -95,6 +95,11 @@ export function AiHealth({ configured }: { configured: Record<string, number> })
                     <span dir="ltr" className="text-[11.5px] text-subtle">{r.model}</span>
                     <Badge tone={r.ok ? "success" : r.kind === "rate" || r.kind === "daily" ? "warning" : "danger"}>{r.ok ? `${t("admin.aiHealth.ok")} · ${(r.ms / 1000).toFixed(1)}s` : t(`admin.aiHealth.kind.${r.kind ?? "other"}`)}</Badge>
                   </div>
+                  {r.tried && r.tried.length > 1 ? (
+                    <p className="mt-1 text-[11.5px] text-subtle">
+                      {t("admin.aiHealth.tried")} <span dir="ltr">{r.tried.join(" → ")}</span>
+                    </p>
+                  ) : null}
                   {!r.ok ? <p className="mt-1 text-[12px] leading-relaxed text-muted">{t(`admin.aiHealth.fix.${r.kind ?? "other"}`)}</p> : null}
                   {!r.ok && r.reason ? (
                     <p dir="ltr" className="mt-1 break-all text-[11px] text-subtle">

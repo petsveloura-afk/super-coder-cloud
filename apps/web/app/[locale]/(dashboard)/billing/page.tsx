@@ -51,6 +51,14 @@ const ERROR_KEYS: Record<string, string> = {
   rate_limited: "ai.rateLimited",
   no_customer: "billing.noCustomer",
   invalid: "errors.generic",
+  // wave 11: exact reasons
+  paypal_auth: "billing.pay.err.paypal_auth",
+  paypal_currency: "billing.pay.err.paypal_currency",
+  paypal_permission: "billing.pay.err.paypal_permission",
+  paypal_request: "billing.pay.err.paypal_request",
+  paypal_down: "billing.pay.err.paypal_down",
+  no_price: "billing.pay.err.no_price",
+  capture_failed: "billing.pay.err.capture_failed",
 };
 
 export default async function BillingPage({
@@ -77,7 +85,7 @@ export default async function BillingPage({
     ? await supabase.from("billing_payments").select("id, provider, plan_key, billing_interval, amount, currency, status, receipt_number, paid_at").eq("organization_id", ctx.org.id).order("paid_at", { ascending: false }).limit(50)
     : { data: [] };
   const methodFor = (plan: string) => [
-    ...(paypalConfigured() ? (["paypal"] as const) : []),
+    ...(paypalConfigured() ? (["paypal_card", "paypal"] as const) : []),
     ...(lemonConfigured() && lemonVariant(plan, interval) ? (["lemonsqueezy"] as const) : []),
     ...(cryptoConfigured() ? (["crypto"] as const) : []),
   ];

@@ -55,6 +55,42 @@ test("PayPal: pay for Pro with PayPal / card → plan active, receipt, then canc
   await expect(page.getByText("חינם").first()).toBeVisible();
 });
 
+test("card without a PayPal account: PayPal's card form (guest checkout) → captured → plan active for the paid period, receipt", async ({ page, request }) => {
+  test.skip(!mocked, "needs the provider mock");
+  test.setTimeout(150_000);
+  await signUp(page, { name: "Card Guest", email: uniqueEmail("ppcard") });
+  await createOrg(page, "Card Guest Co", `ppcard-${Date.now()}`);
+  await page.goto("/he/billing");
+  const pro = page.getByTestId("pay-pro");
+  const card = pro.locator('[data-method="paypal_card"]');
+  await expect(card).toContainText("כרטיס אשראי");
+  await expect(card).toContainText("בלי להירשם ל-PayPal");
+  await card.click();
+  await expect(page).toHaveURL(/\/he\/billing\?checkout=success/, { timeout: 30_000 });
+  // the order opened straight on the card form and was captured once
+  const order = (await calls(request)).filter((c) => c.provider === "paypal" && c.kind === "order").pop() as unknown as { id: string; landing_page: string; user_action: string; custom_id: string; amount: { value: string; currency_code: string } };
+  expect(order.landing_page).toBe("GUEST_CHECKOUT");
+  expect(order.user_action).toBe("PAY_NOW");
+  expect(order.amount).toEqual({ value: "149.00", currency_code: "ILS" });
+  expect(order.custom_id).toMatch(/^[0-9a-f-]{36}:pro:month:[a-z0-9]+$/);
+  await expect(page.locator("main").getByText("Pro", { exact: true }).first()).toBeVisible();
+  const history = page.getByTestId("payment-history");
+  await expect(history).toContainText("149");
+  // PayPal's webhooks for the same order (approved / capture completed) never extend the period twice
+  const before = await page.locator("main").innerText();
+  for (const [type, resource] of [
+    ["CHECKOUT.ORDER.APPROVED", { id: order.id }],
+    ["PAYMENT.CAPTURE.COMPLETED", { id: `CAP${order.id}`, supplementary_data: { related_ids: { order_id: order.id } } }],
+  ] as const) {
+    const r = await request.post("/api/webhooks/paypal", { headers: { "paypal-transmission-sig": "good-sig" }, data: { id: `WH-${type}-${Date.now()}`, event_type: type, resource } });
+    expect(r.ok()).toBe(true);
+  }
+  await page.reload();
+  await expect(page.getByTestId("payment-history").locator("li")).toHaveCount(1);
+  expect((await page.locator("main").innerText()).match(/\d{1,2}[./]\d{1,2}[./]\d{2,4}/g)?.[0]).toBe(before.match(/\d{1,2}[./]\d{1,2}[./]\d{2,4}/g)?.[0]);
+  await shot(page, "b3-card-guest");
+});
+
 test("crypto: pay for Business → signed IPN activates a prepaid period with a receipt (idempotent)", async ({ page, request }) => {
   test.skip(!mocked, "needs the provider mock");
   test.setTimeout(150_000);

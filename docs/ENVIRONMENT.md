@@ -136,3 +136,8 @@ Platform admin → "AI engines check" probes every key and can clear the rests.
 
 ## v10 — Telegram Business + team updates
 No new variables. The Telegram webhook now subscribes to `message, edited_message, channel_post, callback_query, business_connection, business_message, edited_business_message, deleted_business_messages` (`TELEGRAM_UPDATES` in `lib/channels/telegram-setup.ts`); existing bots are re-registered automatically by `/api/ai/followups` (cron). Business chats are stored as conversations `telegram` / `biz:<chat id>` with `business_connection_id`. Team updates use table `notify_recipients` (e-mail via `EMAIL_PROVIDER_API_KEY`, Telegram via the org's bot, WhatsApp via QR bridge / Cloud API, SMS via Twilio). Migration: `20261015000027_telegram_business_notify.sql`.
+
+## v11 — PayPal card checkout + router tuning
+- Card payments without a PayPal account: one-time PayPal Orders v2 with `landing_page: GUEST_CHECKOUT`, captured on `/api/billing/paypal/order-return` (and by the webhook on `CHECKOUT.ORDER.APPROVED` / `PAYMENT.CAPTURE.COMPLETED`). Prepaid like crypto (`subscriptions.provider_subscription_id = 'order:<id>'`, expired by `sweep_prepaid_subscriptions`, migration `20261015000028_paypal_card_prepaid.sql`). No new variables.
+- `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` / `PAYPAL_MODE` are trimmed. Checkout errors are shown on the billing page (`?error=paypal_auth|paypal_currency|paypal_permission|paypal_request|paypal_down`).
+- `AI_ROUTER_PER_PROVIDER` (default 2): max failed calls per provider in one request before moving to the next provider.

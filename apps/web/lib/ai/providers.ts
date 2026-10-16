@@ -274,7 +274,8 @@ export async function openaiCompatibleCall(
     body: JSON.stringify({
       model: req.model,
       temperature: req.temperature,
-      max_tokens: reasoning ? req.maxTokens + 1024 : req.maxTokens,
+      // reasoning models (gpt-oss, many OpenRouter free models) think before answering — leave room for the answer
+      max_tokens: reasoning || opts.name === "openrouter" ? req.maxTokens + 1024 : req.maxTokens,
       messages: [{ role: "system", content: req.system }, ...req.messages],
       ...(reasoning ? { reasoning_effort: "low" } : {}),
       ...(req.json ? { response_format: { type: "json_object" } } : {}),

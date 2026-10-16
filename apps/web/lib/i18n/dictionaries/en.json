@@ -420,7 +420,18 @@
       "legalNote": "This document is generated automatically as a payment confirmation. A tax invoice, when required, is issued separately.",
       "providerReceipt": "Payment provider's receipt",
       "backToBilling": "← Back to billing",
-      "print": "Print / save as PDF"
+      "print": "Print / save as PDF",
+      "paypalCard": "Credit card",
+      "paypalCardSub": "No PayPal account needed · prepaid period",
+      "err": {
+        "paypal_auth": "PayPal rejected the credentials — make sure PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are from the same Live app (or set PAYPAL_MODE=sandbox for tests), then redeploy.",
+        "paypal_currency": "Your PayPal account doesn't accept this plan's currency — in PayPal: Settings → Payments → currencies, accept ILS.",
+        "paypal_permission": "Your PayPal account isn't allowed to do this — a verified Business account is required; in developer.paypal.com make sure the app has Accept payments and Subscriptions.",
+        "paypal_request": "PayPal rejected the request — details are in the server log (Vercel → Logs → checkout failed).",
+        "paypal_down": "PayPal is not available right now — try again in a few minutes.",
+        "no_price": "This plan has no price set.",
+        "capture_failed": "The payment wasn't completed. If the card was charged, the plan activates automatically within minutes; otherwise try again."
+      }
     }
   },
   "ai": {
@@ -1947,7 +1958,8 @@
         "model": "model not available",
         "auth": "invalid key",
         "server": "provider error",
-        "other": "error"
+        "other": "error",
+        "noquota": "no free quota"
       },
       "fix": {
         "rate": "The provider's per-minute limit — the agent skips this key for ~30 seconds and uses another engine.",
@@ -1955,8 +1967,10 @@
         "model": "This model is not available for this account — the agent moves to the next model automatically.",
         "auth": "The key is wrong, deleted or blocked — copy it again from the provider into Vercel and redeploy.",
         "server": "Temporary provider problem — the agent continues with another engine.",
-        "other": "Unexpected error — details below."
-      }
+        "other": "Unexpected error — details below.",
+        "noquota": "This key's Google project has no free quota for this model; the agent tries other models by itself. If none works, create a key in a new project, or keep Groq as the main engine."
+      },
+      "tried": "Models tried:"
     }
   },
   "chat": {

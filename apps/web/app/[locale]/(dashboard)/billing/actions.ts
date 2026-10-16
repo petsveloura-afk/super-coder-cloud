@@ -88,7 +88,7 @@ export async function openPortalAction(fd: FormData) {
 const methodSchema = z.object({
   plan: z.enum(["pro", "business"]),
   interval: z.enum(["month", "year"]),
-  method: z.enum(["paypal", "lemonsqueezy", "crypto"]),
+  method: z.enum(["paypal", "lemonsqueezy", "crypto", "paypal_card"]),
 });
 
 /** One entry point for the new payment methods; every method redirects to the provider's secure page. */
@@ -107,7 +107,19 @@ export async function startPaymentAction(fd: FormData) {
   const { plan, interval, method } = parsed.data;
   let url: string | null = null;
   try {
-    if (method === "paypal") {
+    if (method === "paypal_card") {
+      // wave 11: card WITHOUT a PayPal account — PayPal's card form (guest checkout), paid in advance
+      const { createPayPalCardOrder, paypalConfigured } = await import("@/lib/billing/paypal");
+      if (!paypalConfigured()) redirect(`${back}?error=not_configured`);
+      url = await createPayPalCardOrder({
+        orgId: ctx.org.id,
+        plan,
+        interval,
+        locale,
+        returnUrl: `${app}/api/billing/paypal/order-return?locale=${locale}`,
+        cancelUrl: `${app}${back}?checkout=canceled`,
+      });
+    } else if (method === "paypal") {
       const { createPayPalSubscription, paypalConfigured } = await import("@/lib/billing/paypal");
       if (!paypalConfigured()) redirect(`${back}?error=not_configured`);
       url = await createPayPalSubscription({
@@ -138,7 +150,10 @@ export async function startPaymentAction(fd: FormData) {
   } catch (e) {
     if ((e as { digest?: string }).digest?.startsWith("NEXT_REDIRECT")) throw e;
     console.error("checkout failed", method, (e as Error).message);
-    redirect(`${back}?error=provider`);
+    // wave 11: tell the owner WHY (wrong keys, currency, PayPal down…) instead of a generic error
+    const { paypalErrorCode } = await import("@/lib/billing/paypal");
+    const code = method === "paypal" || method === "paypal_card" ? paypalErrorCode((e as Error).message ?? "") : "provider";
+    redirect(`${back}?error=${code}`);
   }
   if (!url) redirect(`${back}?error=provider`);
   redirect(url);

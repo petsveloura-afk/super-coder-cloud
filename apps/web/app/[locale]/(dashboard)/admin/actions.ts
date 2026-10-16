@@ -52,6 +52,8 @@ export interface AiProbeRow {
   ms: number;
   kind?: string;
   reason?: string;
+  /** models tried for this key, in order (wave 11) */
+  tried?: string[];
 }
 
 /** Sends one tiny request through every configured AI key and reports the real status of each. */
