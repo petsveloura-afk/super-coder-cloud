@@ -12,7 +12,7 @@ import { stripeConfigured, priceIdFor } from "@/lib/billing/stripe";
 import { cn } from "@/lib/utils";
 import { cancelPayPalAction, openPortalAction, startCheckoutAction } from "./actions";
 import { PaymentMethods, PaymentHistory, type PaymentRow } from "@/components/billing/payment-methods";
-import { paypalConfigured } from "@/lib/billing/paypal";
+import { paypalConfigured, paypalSdkConfig } from "@/lib/billing/paypal";
 import { lemonConfigured, lemonVariant } from "@/lib/billing/lemonsqueezy";
 import { cryptoConfigured } from "@/lib/billing/nowpayments";
 
@@ -85,11 +85,14 @@ export default async function BillingPage({
     ? await supabase.from("billing_payments").select("id, provider, plan_key, billing_interval, amount, currency, status, receipt_number, paid_at").eq("organization_id", ctx.org.id).order("paid_at", { ascending: false }).limit(50)
     : { data: [] };
   const methodFor = (plan: string) => [
-    ...(paypalConfigured() ? (["paypal_card", "paypal"] as const) : []),
+    // wave 12: card first; the PayPal recurring-subscription button only when PAYPAL_SHOW_SUBSCRIPTION=true
+    ...(paypalConfigured() ? (["paypal_card"] as const) : []),
+    ...(paypalConfigured() && process.env.PAYPAL_SHOW_SUBSCRIPTION === "true" ? (["paypal"] as const) : []),
     ...(lemonConfigured() && lemonVariant(plan, interval) ? (["lemonsqueezy"] as const) : []),
     ...(cryptoConfigured() ? (["crypto"] as const) : []),
   ];
   const anyExtra = paypalConfigured() || lemonConfigured() || cryptoConfigured();
+  const sdk = paypalSdkConfig();
   const ent = ((entRows ?? []) as Entitlements[])[0];
   const plans = (plansData ?? []) as PlanRow[];
   const current = ent?.plan_key ?? "free";
@@ -295,7 +298,18 @@ export default async function BillingPage({
                   <p className="text-center text-[13px] text-subtle">{!canManage ? t("billing.readOnly") : t("billing.contactAdmin")}</p>
                 ) : null}
                 {!isCurrent && (p.key === "pro" || p.key === "business") && canManage && !ctx.org.is_demo && methodFor(p.key).length ? (
-                  <PaymentMethods locale={locale} plan={p.key} interval={interval} methods={methodFor(p.key)} withDivider={purchasable} />
+                  <PaymentMethods
+                    locale={locale}
+                    plan={p.key}
+                    interval={interval}
+                    methods={methodFor(p.key)}
+                    withDivider={purchasable}
+                    inlineCard={
+                      sdk
+                        ? { ...sdk, currency: String(p.currency ?? "ILS").toUpperCase(), planName: t(`billing.plans.${p.key}.name`), priceLabel: `${formatCurrency(locale, price, p.currency)} ${t(interval === "year" ? "billing.perYear" : "billing.perMonth")}` }
+                        : null
+                    }
+                  />
                 ) : null}
               </div>
             </Card>

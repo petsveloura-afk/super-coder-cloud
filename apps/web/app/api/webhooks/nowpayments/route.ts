@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cryptoConfigured } from "@/lib/billing/nowpayments";
 import { parseOrderRef, prepaidPeriodEnd, verifyNowPaymentsSignature } from "@/lib/billing/payments-core";
-import { applyPlan, recordPayment } from "@/lib/billing/receipts";
+import { applyPlan, planPrice, recordPayment } from "@/lib/billing/receipts";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +29,12 @@ export async function POST(request: NextRequest) {
   if (!ref) return NextResponse.json({ received: true, ignored: "bad_order" });
   // only the final state activates the plan
   if (ipn.payment_status !== "finished") return NextResponse.json({ received: true, status: ipn.payment_status });
+  // wave 12: the plan is given only for its real price (invoice amount = plan price)
+  const expected = await planPrice(ref.plan, ref.interval, true).catch(() => null);
+  if (expected && (String(ipn.price_currency ?? "").toUpperCase() !== expected.currency.toUpperCase() || Number(ipn.price_amount ?? 0) + 0.01 < expected.amount)) {
+    console.error(`nowpayments ${ipn.payment_id}: amount mismatch (${ipn.price_amount} ${ipn.price_currency} for ${ref.plan}/${ref.interval})`);
+    return NextResponse.json({ received: true, ignored: "amount_mismatch" });
+  }
   const admin = createAdminClient();
   const eventId = `payment:${ipn.payment_id}:finished`;
   const { error: dup } = await admin.from("billing_events").insert({ provider: "nowpayments", event_id: eventId, type: "payment.finished", organization_id: ref.org });

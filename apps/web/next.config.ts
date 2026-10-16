@@ -53,6 +53,28 @@ const integrationsCsp = csp
   .concat("; frame-src https://www.facebook.com https://web.facebook.com https://business.facebook.com");
 const integrationsHeaders = [{ key: "Content-Security-Policy", value: integrationsCsp }];
 
+// Billing: PayPal's card form (JS SDK) runs inside the page — allowed on this page only.
+const paypalExtra = (() => {
+  try {
+    return process.env.PAYPAL_SDK_URL ? new URL(process.env.PAYPAL_SDK_URL).origin : "";
+  } catch {
+    return "";
+  }
+})();
+const paypalHosts = `https://www.paypal.com https://*.paypal.com https://www.paypalobjects.com https://*.paypalobjects.com https://*.braintreegateway.com ${paypalExtra}`.trim();
+const billingCsp = csp
+  .replace("script-src 'self' 'unsafe-inline'", `script-src 'self' 'unsafe-inline' ${paypalHosts}`)
+  .replace(/connect-src ([^;]*)/, `connect-src $1 ${paypalHosts}`)
+  .replace(/img-src ([^;]*)/, `img-src $1 ${paypalHosts}`)
+  .replace("form-action 'self'", `form-action 'self' ${paypalHosts}`)
+  .concat(`; frame-src ${paypalHosts}`);
+const billingHeaders = [
+  { key: "Content-Security-Policy", value: billingCsp },
+  // PayPal may open a small secure window for some cards / 3-D Secure
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(self \"https://www.paypal.com\")" },
+];
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   // node-only mail libraries (IMAP / SMTP / MIME) stay external to the server bundle
@@ -70,6 +92,7 @@ const nextConfig: NextConfig = {
       // embeddable website chat (iframe from /widget.js on customers' sites)
       { source: "/:locale(he|ar|en)/chat/:org*", headers: embeddableHeaders },
       { source: "/:locale(he|ar|en)/integrations", headers: integrationsHeaders },
+      { source: "/:locale(he|ar|en)/billing", headers: billingHeaders },
       { source: "/widget.js", headers: [{ key: "Cache-Control", value: "public, max-age=3600" }, { key: "Access-Control-Allow-Origin", value: "*" }] },
       {
         source: "/sw.js",

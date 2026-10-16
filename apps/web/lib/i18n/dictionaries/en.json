@@ -431,7 +431,15 @@
         "paypal_down": "PayPal is not available right now — try again in a few minutes.",
         "no_price": "This plan has no price set.",
         "capture_failed": "The payment wasn't completed. If the card was charged, the plan activates automatically within minutes; otherwise try again."
-      }
+      },
+      "cardTitle": "Pay by card — {plan}",
+      "cardDesc": "Enter your card details right here — no PayPal account needed.",
+      "cardInlineSub": "Visa · Mastercard · Amex",
+      "cardPaid": "Payment received — your plan is active 🎉",
+      "processing": "Confirming the payment…",
+      "cardFallback": "The card form couldn't load here — continue to the secure card form:",
+      "cardContinue": "Continue to card payment",
+      "cardSecure": "Encrypted secure payment processed by PayPal — we never store card details."
     }
   },
   "ai": {
@@ -659,6 +667,49 @@
       "badImage": "Only PNG, JPG, WEBP or GIF images",
       "tooBig": "The image is larger than 5MB",
       "uploadFailed": "Upload failed, try again"
+    },
+    "hours": {
+      "title": "Opening hours",
+      "hint": "The agent knows when you are open, books appointments and deliveries only within opening hours, and after hours tries to close for the next opening or says you are closed.",
+      "enable": "Enable opening hours",
+      "tz": "Time zone",
+      "afterHours": "Outside opening hours",
+      "after": {
+        "book_next": "Answer and try to close for the next opening (recommended)",
+        "closed_message": "Say we are closed and collect details for a call-back",
+        "answer_normally": "Answer normally"
+      },
+      "days": {
+        "sun": "Sunday",
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday"
+      },
+      "open": "Opens",
+      "close": "Closes",
+      "closed": "Closed",
+      "addBreak": "Second range (break)",
+      "copyAll": "Copy to all open days",
+      "midnightHint": "Ranges past midnight work too — e.g. 18:00–02:00.",
+      "holidays": "Closed dates (holidays, vacations)",
+      "closedNote": "Message to customers when closed (optional)",
+      "closedNotePh": "e.g. Closed for the holiday, back on Sunday 🙏"
+    },
+    "takeover": {
+      "title": "When you reply yourself",
+      "hint": "When you write to a customer yourself (from Telegram or WhatsApp on your phone), the agent pauses in that conversation. Choose after how long without a message from you the agent takes over again.",
+      "never": "Never automatically (manual only)",
+      "minutes": "Agent resumes after {n} minutes",
+      "hours": "Agent resumes after {n} hours"
+    },
+    "industry": {
+      "title": "Template by business type",
+      "hint": "Pick your business type and instantly get a conversation script, details to collect, menu buttons and a pricing-policy example — then edit freely.",
+      "confirm": "Load a new template? The script, details and menu will be replaced (pricing is kept if already filled).",
+      "loaded": "Template loaded: {name}. Edit and save."
     }
   },
   "deals": {
@@ -1570,7 +1621,8 @@
       "cold": "❄️ Cold lead",
       "deal": "Deal opened →"
     },
-    "leadNotification": "New lead from the agent: {name} ({score}) {need}"
+    "leadNotification": "New lead from the agent: {name} ({score}) {need}",
+    "ownerPhone": "Sent by you from the phone — the agent paused here"
   },
   "support": {
     "title": "Customer support",

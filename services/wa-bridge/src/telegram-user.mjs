@@ -41,6 +41,26 @@ export async function toTelegramUserEvent(event) {
   };
 }
 
+/**
+ * Wave 12 — a message the account owner sent himself (from his phone / Telegram app)
+ * in a private chat → `owner_message`, so the agent steps back in that chat.
+ * Messages the bridge itself sent (`sentIds`) and "Saved Messages" are ignored.
+ */
+export function toTelegramOwnerEvent(event, sentIds = new Set(), meId = null) {
+  const m = event?.message;
+  if (!m || !m.out) return null;
+  if (event.isPrivate === false) return null;
+  const uid = String(m.peerId?.userId ?? m.chatId ?? "");
+  if (!/^\d{3,20}$/.test(uid)) return null;
+  if (meId && uid === String(meId)) return null;
+  const id = `${uid}:${m.id}`;
+  if (sentIds.has(id)) return null;
+  const text = String(m.message ?? "").slice(0, 8000);
+  const media = m.media ? { type: m.photo ? "photo" : m.document ? "document" : "media" } : null;
+  if (!text && !media) return null;
+  return { type: "owner_message", id, to: uid, text, media };
+}
+
 export class TelegramUserManager {
   /**
    * @param {object} o
@@ -49,7 +69,8 @@ export class TelegramUserManager {
    * @param {{apiId:number, apiHash:string}|null} o.api
    * @param {object} o.lib  { TelegramClient, StringSession, NewMessage, Api, bigInt }
    */
-  constructor({ dataDir, secret, api, lib, fetchImpl = fetch, logger = console }) {
+  constructor({ dataDir, secret, api, lib, fetchImpl = fetch, logger = console, ownerDelayMs = 1500 }) {
+    this.ownerDelayMs = ownerDelayMs;
     this.dataDir = dataDir;
     this.secret = secret;
     this.api = api;
@@ -174,6 +195,15 @@ export class TelegramUserManager {
       void accessHash;
       this.post(id, payload).catch(() => {});
     }, new NewMessage({ incoming: true }));
+    // wave 12: what the owner writes himself → recorded, the agent steps back in that chat
+    s.sentIds = s.sentIds ?? new Set();
+    s.meId = me?.id != null ? String(me.id) : null;
+    s.client.addEventHandler((event) => {
+      setTimeout(() => {
+        const ev = toTelegramOwnerEvent(event, s.sentIds, s.meId);
+        if (ev) this.post(id, ev).catch(() => {});
+      }, this.ownerDelayMs ?? 1500).unref?.();
+    }, new NewMessage({ outgoing: true }));
     await this.post(id, { type: "status", status: "connected", phone: s.phone, name: s.name, username: s.username });
   }
 
@@ -199,6 +229,11 @@ export class TelegramUserManager {
     const hash = s.peers[uid];
     const peer = hash && Api && bigInt ? new Api.InputPeerUser({ userId: bigInt(uid), accessHash: bigInt(hash) }) : uid;
     const r = await s.client.sendMessage(peer, { message: body });
+    if (r?.id != null) {
+      s.sentIds = s.sentIds ?? new Set();
+      s.sentIds.add(`${uid}:${r.id}`);
+      if (s.sentIds.size > 500) s.sentIds.delete(s.sentIds.values().next().value);
+    }
     return r?.id != null ? `${uid}:${r.id}` : null;
   }
 

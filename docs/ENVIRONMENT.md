@@ -141,3 +141,8 @@ No new variables. The Telegram webhook now subscribes to `message, edited_messag
 - Card payments without a PayPal account: one-time PayPal Orders v2 with `landing_page: GUEST_CHECKOUT`, captured on `/api/billing/paypal/order-return` (and by the webhook on `CHECKOUT.ORDER.APPROVED` / `PAYMENT.CAPTURE.COMPLETED`). Prepaid like crypto (`subscriptions.provider_subscription_id = 'order:<id>'`, expired by `sweep_prepaid_subscriptions`, migration `20261015000028_paypal_card_prepaid.sql`). No new variables.
 - `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` / `PAYPAL_MODE` are trimmed. Checkout errors are shown on the billing page (`?error=paypal_auth|paypal_currency|paypal_permission|paypal_request|paypal_down`).
 - `AI_ROUTER_PER_PROVIDER` (default 2): max failed calls per provider in one request before moving to the next provider.
+
+## v12 — in-page card form
+- Billing page loads the PayPal JS SDK (`https://www.paypal.com/sdk/js`, card funding) inside a dialog; orders are created/captured by server actions (`createCardOrderAction`, `captureCardOrderAction`). CSP for `/:locale/billing` allows PayPal hosts (script/frame/connect/img) and `Cross-Origin-Opener-Policy: same-origin-allow-popups`.
+- `PAYPAL_SHOW_SUBSCRIPTION=true` also shows the PayPal recurring-subscription button (hidden by default).
+- `PAYPAL_SDK_URL` overrides the SDK URL (tests only).

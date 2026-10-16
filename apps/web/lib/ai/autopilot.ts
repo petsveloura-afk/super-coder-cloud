@@ -149,7 +149,22 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     .eq("id", input.conversationId)
     .maybeSingle();
   if (!conv) return { replied: false, handoff: false, reason: "not_found" };
-  if (conv.ai_mode !== "auto") return { replied: false, handoff: false, reason: "human_mode" };
+  if (conv.ai_mode !== "auto") {
+    // wave 12: the owner wrote himself and has been quiet for the agent's "resume after" time → the agent comes back
+    const { data: ra } = await admin
+      .from("ai_agents")
+      .select("profile")
+      .eq("organization_id", conv.organization_id as string)
+      .eq("enabled", true)
+      .contains("autopilot_channels", [conv.channel as string])
+      .order("created_at")
+      .limit(1)
+      .maybeSingle();
+    const minutes = Number((ra?.profile as { resume_after_minutes?: number } | null)?.resume_after_minutes ?? 0);
+    const { maybeResumeAgent } = await import("@/lib/channels/owner");
+    if (!(minutes > 0 && (await maybeResumeAgent(conv.id as string, minutes)))) return { replied: false, handoff: false, reason: "human_mode" };
+    conv.ai_mode = "auto";
+  }
   const channel = conv.channel as string;
   if (!isAutopilotChannel(channel)) return { replied: false, handoff: false, reason: "channel" };
   const orgId = conv.organization_id as string;
@@ -282,6 +297,7 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     goal: (agent.lead_goal as string | null) ?? "lead",
     channel: ch,
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
+    locale,
   })}`;
   await typingIndicator(orgId, ch, conv.external_id as string);
 

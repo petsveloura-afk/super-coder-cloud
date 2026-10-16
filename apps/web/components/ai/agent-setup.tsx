@@ -9,6 +9,8 @@ import { useI18n } from "@/lib/i18n/client";
 import { Button, Input, Textarea } from "@/components/ui/primitives";
 import { saveAgentSetupAction, uploadAgentMediaAction } from "@/app/[locale]/(dashboard)/ai-agents/actions";
 import { cn } from "@/lib/utils";
+import { DEFAULT_SCHEDULE, HoursEditor, IndustryPicker, TakeoverEditor } from "@/components/ai/agent-hours";
+import { DAYS, type BusinessSchedule } from "@/lib/ai/schedule";
 
 /**
  * Agent conversation setup — everything through the UI:
@@ -28,6 +30,9 @@ export interface SetupAgent {
     links?: string[];
     menu?: string[];
     media?: { title: string; url: string; caption?: string }[];
+    schedule?: BusinessSchedule | null;
+    resume_after_minutes?: number;
+    industry?: string;
   } | null;
 }
 
@@ -134,6 +139,13 @@ async function shrink(file: File): Promise<Blob> {
   return await new Promise<Blob>((res) => canvas.toBlob((b) => res(b ?? file), "image/jpeg", 0.85));
 }
 
+/** every day present, only complete "HH:MM" ranges (an emptied time field never blocks saving) */
+function cleanSchedule(s: BusinessSchedule): BusinessSchedule {
+  const ok = (v: string) => /^([01]\d|2[0-4]):[0-5]\d$/.test(v);
+  const days = Object.fromEntries(DAYS.map((d) => [d, (s.days?.[d] ?? []).filter((r) => ok(r.open) && ok(r.close) && r.open !== r.close).slice(0, 2)]));
+  return { ...s, enabled: s.enabled !== false, days, closed_dates: s.closed_dates ?? [], closed_note: (s.closed_note ?? "").slice(0, 300) };
+}
+
 export function AgentSetup({ agent }: { agent: SetupAgent }) {
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -145,13 +157,16 @@ export function AgentSetup({ agent }: { agent: SetupAgent }) {
   const [menu, setMenu] = useState<string[]>(p.menu ?? []);
   const [media, setMedia] = useState<{ title: string; url: string; caption?: string }[]>(p.media ?? []);
   const [uploading, setUploading] = useState(false);
+  const [schedule, setSchedule] = useState<BusinessSchedule>(p.schedule ? { ...DEFAULT_SCHEDULE, ...p.schedule } : DEFAULT_SCHEDULE);
+  const [resumeAfter, setResumeAfter] = useState<number>(p.resume_after_minutes ?? 0);
+  const [industry, setIndustry] = useState<string>(p.industry ?? "");
   const [pending, start] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
   const goal = agent.lead_goal ?? "lead";
 
   const save = () =>
     start(async () => {
-      const r = await saveAgentSetupAction({ locale, id: agent.id, flow: flow.filter((x) => x.trim()), fields: fields.filter((x) => x.trim()), pricing, links: links.filter((x) => x.trim()), menu: menu.filter((x) => x.trim()), media });
+      const r = await saveAgentSetupAction({ locale, id: agent.id, flow: flow.filter((x) => x.trim()), fields: fields.filter((x) => x.trim()), pricing, links: links.filter((x) => x.trim()), menu: menu.filter((x) => x.trim()), media, schedule: cleanSchedule(schedule), resume_after_minutes: resumeAfter, industry });
       if (r.error) toast.error(t(r.error));
       else {
         toast.success(t("ai.saved"));
@@ -161,6 +176,19 @@ export function AgentSetup({ agent }: { agent: SetupAgent }) {
 
   return (
     <div className="space-y-4 pb-24" data-testid="agent-setup">
+      <IndustryPicker
+        value={industry}
+        onPick={(ind) => {
+          const L = locale === "he" ? ind.he : ind.en;
+          setIndustry(ind.key);
+          setFlow([...L.flow]);
+          setFields([...L.fields]);
+          setMenu([...L.menu]);
+          if (!pricing.trim()) setPricing(L.pricing);
+          toast.success(t("ai.industry.loaded", { name: L.name }));
+        }}
+      />
+
       <Section icon={ListOrdered} title={t("ai.setup.flowTitle")} hint={t("ai.setup.flowHint")}>
         {!flow.length ? (
           <Button type="button" variant="secondary" size="sm" className="mb-2" onClick={() => setFlow(t(`ai.setup.flowTemplates.${goal}`).split("\n").filter(Boolean))} data-testid="flow-template">
@@ -250,6 +278,10 @@ export function AgentSetup({ agent }: { agent: SetupAgent }) {
           ) : null}
         </div>
       </Section>
+
+      <HoursEditor value={schedule} onChange={setSchedule} />
+
+      <TakeoverEditor minutes={resumeAfter} onChange={setResumeAfter} />
 
       <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-30 px-4 lg:bottom-6 lg:start-auto lg:end-8 lg:w-auto lg:px-0">
         <Button onClick={save} loading={pending} className="h-12 w-full shadow-xl lg:w-auto" data-testid="setup-save">

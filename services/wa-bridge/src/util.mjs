@@ -85,3 +85,49 @@ export function toInboundEvent(msg) {
   if (!text && !media) return null;
   return { type: "message", id: key.id ?? null, from, name: msg.pushName ?? null, text: String(text).slice(0, 8000), isGroup: false, media };
 }
+
+/**
+ * Wave 12 — a message the account owner typed himself on his phone (WhatsApp
+ * app / WhatsApp Web) in a private chat. The web app records it in the
+ * conversation and the AI agent steps back so the owner leads that chat.
+ * Messages the bridge itself sent (`sentIds`) and the owner's own "message
+ * yourself" chat are ignored. Returns null when it must be ignored.
+ */
+export function toOwnerEvent(msg, sentIds = new Set(), ownPhone = null) {
+  const key = msg?.key ?? {};
+  if (!key.fromMe) return null;
+  if (key.id && sentIds.has(key.id)) return null;
+  const remote = key.remoteJid ?? "";
+  if (!remote || remote.endsWith("@g.us") || remote.endsWith("@broadcast") || remote.endsWith("@newsletter")) return null;
+  const to = phoneFromJid(remote) ?? phoneFromJid(key.senderPn ?? "") ?? phoneFromJid(key.participantPn ?? "") ?? null;
+  if (!to || (ownPhone && to === ownPhone)) return null;
+  // protocol messages (reactions, deletes, edits, receipts) carry no text for the customer
+  const m = msg.message ?? {};
+  if (m.protocolMessage || m.reactionMessage) return null;
+  const text = messageText(m);
+  const media = messageMedia(m);
+  if (!text && !media) return null;
+  return { type: "owner_message", id: key.id ?? null, to, text: String(text).slice(0, 8000), media };
+}
+
+/** A bounded set of message ids (the newest `max` are kept). */
+export class RecentIds {
+  constructor(max = 500) {
+    this.max = max;
+    this.set = new Set();
+  }
+  add(id) {
+    if (!id) return;
+    this.set.add(id);
+    if (this.set.size > this.max) this.set.delete(this.set.values().next().value);
+  }
+  has(id) {
+    return this.set.has(id);
+  }
+}
+
+/** WhatsApp-style message id for messages the bridge sends (known before the send). */
+export function newMessageId() {
+  const hex = Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join("").toUpperCase();
+  return `3EB0${hex}`;
+}

@@ -9,7 +9,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 interface TgUserEvent {
-  type: "message" | "status";
+  type: "message" | "status" | "owner_message";
+  // owner_message (wave 12): the owner wrote it himself from his Telegram app
+  to?: string;
   id?: string;
   from?: string; // Telegram user id
   name?: string | null;
@@ -44,6 +46,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         updated_at: new Date().toISOString(),
       })
       .eq("id", acc.id);
+    return NextResponse.json({ ok: true });
+  }
+
+  // wave 12: the owner answered himself → recorded, the agent steps back in that chat
+  if (ev.type === "owner_message" && ev.to && /^\d{3,20}$/.test(ev.to)) {
+    const { ingestOwnerMessage } = await import("@/lib/channels/owner");
+    await ingestOwnerMessage({ kind: "telegram_user", token, chat: ev.to, text: ev.text ?? "", messageId: ev.id ?? null, media: ev.media ?? null });
     return NextResponse.json({ ok: true });
   }
 

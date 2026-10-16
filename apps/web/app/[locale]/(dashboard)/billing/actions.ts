@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { PLAN_KEYS } from "@scc/shared/billing";
 import { getOrgContext } from "@/lib/auth";
@@ -176,4 +177,45 @@ export async function cancelPayPalAction(fd: FormData) {
     redirect(`${back}?error=provider`);
   }
   redirect(`${back}?checkout=canceled`);
+}
+
+/* ------------------------------------------- wave 12: in-page card form (PayPal JS SDK card button) */
+
+/** Creates the PayPal order the in-page card form pays. Returns the order id. */
+export async function createCardOrderAction(input: { locale: string; plan: string; interval: string }): Promise<{ id?: string; error?: string }> {
+  const ctx = await getOrgContext(input.locale === "en" || input.locale === "ar" ? input.locale : "he");
+  if (!ctx.can("billing.manage")) return { error: "forbidden" };
+  if (ctx.org.is_demo) return { error: "demo" };
+  const parsed = methodSchema.pick({ plan: true, interval: true }).safeParse({ plan: input.plan, interval: input.interval });
+  if (!parsed.success) return { error: "invalid" };
+  const supabase = await createClient();
+  const { data: ok } = await supabase.rpc("check_rate_limit", { p_key: "checkout", p_limit: 20, p_window_seconds: 3600 });
+  if (ok !== true) return { error: "rate_limited" };
+  const { createPayPalSdkOrder, paypalConfigured, paypalErrorCode } = await import("@/lib/billing/paypal");
+  if (!paypalConfigured()) return { error: "not_configured" };
+  try {
+    const o = await createPayPalSdkOrder({ orgId: ctx.org.id, plan: parsed.data.plan, interval: parsed.data.interval });
+    return { id: o.id };
+  } catch (e) {
+    console.error("card order failed", (e as Error).message);
+    return { error: paypalErrorCode((e as Error).message ?? "") };
+  }
+}
+
+/** Captures the order after the card was approved in the page; the plan is active right away. */
+export async function captureCardOrderAction(input: { locale: string; orderId: string }): Promise<{ ok?: boolean; status?: string; error?: string }> {
+  const ctx = await getOrgContext(input.locale === "en" || input.locale === "ar" ? input.locale : "he");
+  if (!ctx.can("billing.manage")) return { error: "forbidden" };
+  if (!/^[A-Z0-9]{8,40}$/.test(input.orderId ?? "")) return { error: "invalid" };
+  const { capturePayPalCardOrder } = await import("@/lib/billing/paypal");
+  try {
+    const r = await capturePayPalCardOrder(input.orderId);
+    if (!r.ok) return { error: "capture_failed" };
+    if (r.orgId && r.orgId !== ctx.org.id) return { error: "invalid" };
+    revalidatePath(`/${input.locale}/billing`);
+    return { ok: true, status: r.status };
+  } catch (e) {
+    console.error("card capture failed", (e as Error).message);
+    return { error: "capture_failed" };
+  }
 }

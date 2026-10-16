@@ -4,10 +4,27 @@ import { startPaymentAction } from "@/app/[locale]/(dashboard)/billing/actions";
 import { getT } from "@/lib/i18n/server";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Locale } from "@/lib/i18n/config";
+import { CardCheckout } from "./card-checkout";
 
 /** Pay buttons for a plan: PayPal (PayPal or card), Lemon Squeezy (card / Apple Pay / PayPal), crypto. */
-export async function PaymentMethods({ locale, plan, interval, methods, withDivider }: { locale: Locale; plan: string; interval: "month" | "year"; methods: ("paypal" | "lemonsqueezy" | "crypto" | "paypal_card")[]; withDivider?: boolean }) {
+export async function PaymentMethods({
+  locale,
+  plan,
+  interval,
+  methods,
+  withDivider,
+  inlineCard,
+}: {
+  locale: Locale;
+  plan: string;
+  interval: "month" | "year";
+  methods: ("paypal" | "lemonsqueezy" | "crypto" | "paypal_card")[];
+  withDivider?: boolean;
+  /** wave 12: card form inside the page (PayPal JS SDK) — replaces the redirect card button */
+  inlineCard?: { clientId: string; sdkUrl: string; currency: string; priceLabel: string; planName: string } | null;
+}) {
   const { t } = await getT(locale);
+  if (inlineCard) methods = methods.filter((m) => m !== "paypal_card");
   const meta = {
     paypal_card: { icon: CreditCard, label: t("billing.pay.paypalCard"), sub: t("billing.pay.paypalCardSub"), cls: "bg-[#0f172a] text-white ring-1 ring-white/10 hover:brightness-125" },
     paypal: { icon: Wallet, label: t("billing.pay.paypal"), sub: t("billing.pay.paypalSub"), cls: "bg-[#FFC439] text-[#111] hover:brightness-95" },
@@ -17,6 +34,7 @@ export async function PaymentMethods({ locale, plan, interval, methods, withDivi
   return (
     <div className="mt-2 space-y-2" data-testid={`pay-${plan}`}>
       {withDivider ? <div className="text-center text-[11px] text-subtle">{t("billing.pay.or")}</div> : null}
+      {inlineCard ? <CardCheckout plan={plan} planName={inlineCard.planName} interval={interval} priceLabel={inlineCard.priceLabel} currency={inlineCard.currency} clientId={inlineCard.clientId} sdkUrl={inlineCard.sdkUrl} /> : null}
       {methods.map((m) => {
         const M = meta[m];
         return (

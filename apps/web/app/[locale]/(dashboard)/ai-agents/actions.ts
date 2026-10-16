@@ -257,6 +257,20 @@ const setupSchema = z.object({
   media: z
     .array(z.object({ title: z.string().trim().min(1).max(80), url: z.string().trim().max(1000).refine(isMediaUrl), caption: z.string().trim().max(300).optional().default("") }))
     .max(20),
+  // wave 12: opening hours, owner take-over, industry
+  schedule: z
+    .object({
+      enabled: z.boolean(),
+      tz: z.string().trim().max(60).optional(),
+      days: z.partialRecord(z.enum(["sun", "mon", "tue", "wed", "thu", "fri", "sat"]), z.array(z.object({ open: z.string().regex(/^([01]\d|2[0-4]):[0-5]\d$/), close: z.string().regex(/^([01]\d|2[0-4]):[0-5]\d$/) })).max(2)).optional(),
+      closed_dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(60).optional(),
+      after_hours: z.enum(["book_next", "closed_message", "answer_normally"]).optional(),
+      closed_note: z.string().trim().max(300).optional(),
+    })
+    .nullable()
+    .optional(),
+  resume_after_minutes: z.number().int().min(0).max(1440).optional(),
+  industry: z.string().trim().max(40).optional(),
 });
 
 /** Saves the agent's conversation script, required details, pricing policy, links, menu and gallery. */
@@ -269,6 +283,9 @@ export async function saveAgentSetupAction(input: {
   links: string[];
   menu: string[];
   media: { title: string; url: string; caption?: string }[];
+  schedule?: import("@/lib/ai/schedule").BusinessSchedule | null;
+  resume_after_minutes?: number;
+  industry?: string;
 }): Promise<ActionState> {
   const locale: Locale = isLocale(input.locale) ? input.locale : "he";
   const ctx = await getOrgContext(locale);
@@ -286,6 +303,9 @@ export async function saveAgentSetupAction(input: {
     links: parsed.data.links,
     menu: parsed.data.menu,
     media: parsed.data.media,
+    ...(parsed.data.schedule !== undefined ? { schedule: parsed.data.schedule ? (parsed.data.schedule.enabled ? (await import("@/lib/ai/schedule")).normalizeSchedule(parsed.data.schedule) : { ...parsed.data.schedule, enabled: false }) : null } : {}),
+    ...(parsed.data.resume_after_minutes !== undefined ? { resume_after_minutes: parsed.data.resume_after_minutes } : {}),
+    ...(parsed.data.industry !== undefined ? { industry: parsed.data.industry } : {}),
   };
   const { error } = await supabase.from("ai_agents").update({ profile }).eq("id", parsed.data.id).eq("organization_id", ctx.org.id);
   if (error) return { error: dbErrorKey(error) };

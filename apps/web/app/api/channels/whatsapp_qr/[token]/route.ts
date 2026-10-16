@@ -9,7 +9,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 interface BridgeEvent {
-  type: "message" | "status";
+  type: "message" | "status" | "owner_message";
+  // owner_message (wave 12): the owner typed it himself on his phone
+  to?: string;
   // message
   id?: string;
   from?: string; // digits (international, no +)
@@ -47,6 +49,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         updated_at: new Date().toISOString(),
       })
       .eq("id", acc.id);
+    return NextResponse.json({ ok: true });
+  }
+
+  // wave 12: the owner answered himself from the phone → recorded, the agent steps back
+  if (ev.type === "owner_message" && ev.to && /^\d{6,20}$/.test(ev.to)) {
+    const { ingestOwnerMessage } = await import("@/lib/channels/owner");
+    await ingestOwnerMessage({ kind: "whatsapp_qr", token, chat: ev.to, text: ev.text ?? "", messageId: ev.id ?? null, media: ev.media ?? null });
     return NextResponse.json({ ok: true });
   }
 

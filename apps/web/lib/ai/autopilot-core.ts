@@ -300,6 +300,12 @@ export interface AgentProfile {
   menu?: string[];
   /** examples / portfolio images the agent can send */
   media?: AgentMedia[];
+  /** wave 12 — structured opening hours, holidays and after-hours behaviour */
+  schedule?: import("./schedule").BusinessSchedule | null;
+  /** wave 12 — when the owner/team replied himself, give the chat back to the agent after N minutes (0 = never) */
+  resume_after_minutes?: number;
+  /** wave 12 — business category (industry template that was loaded) */
+  industry?: string;
 }
 
 const TONES: Record<string, string> = {
@@ -334,12 +340,17 @@ export const CONVERSATION_INTELLIGENCE = [
   "- If a fact is not in the business information, say honestly that you will check with the team and capture the lead — never make it up.",
 ].join("\n");
 
+import { scheduleInstructions } from "./schedule";
+
 /** Extra system-prompt sections for the sales agent (profile, goal, sales method, tools). */
 export function salesAgentInstructions(input: {
   profile?: AgentProfile | null;
   goal?: string | null;
   channel: AutopilotChannel;
   leadKnown?: { score?: string | null } | null;
+  /** wave 12: clock for the opening-hours section (tests) */
+  now?: Date;
+  locale?: string;
 }): string {
   const p = input.profile ?? {};
   const facts = [
@@ -371,6 +382,7 @@ export function salesAgentInstructions(input: {
   ].filter(Boolean);
   return [
     CONVERSATION_INTELLIGENCE,
+    scheduleInstructions(p.schedule ?? null, input.now ?? new Date(), input.locale ?? "he"),
     ...extra,
     facts.length ? `Business profile (facts you may use):\n${facts.join("\n")}` : "",
     `Your goal: ${GOALS[input.goal ?? "lead"] ?? GOALS.lead}`,

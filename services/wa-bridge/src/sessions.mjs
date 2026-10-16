@@ -2,7 +2,7 @@
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import QRCode from "qrcode";
-import { jidFromPhone, phoneFromJid, sign, toInboundEvent, validSessionId } from "./util.mjs";
+import { RecentIds, jidFromPhone, newMessageId, phoneFromJid, sign, toInboundEvent, toOwnerEvent, validSessionId } from "./util.mjs";
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -15,7 +15,9 @@ export class SessionManager {
    * @param {Function} [o.fetchImpl]
    * @param {object} [o.logger]
    */
-  constructor({ dataDir, secret, baileys, fetchImpl = fetch, logger = console }) {
+  constructor({ dataDir, secret, baileys, fetchImpl = fetch, logger = console, ownerDelayMs = 1500 }) {
+    /** wave 12: owner messages are checked after a short delay so the bridge's own sends are recognised */
+    this.ownerDelayMs = ownerDelayMs;
     this.dataDir = dataDir;
     this.secret = secret;
     this.baileys = baileys;
@@ -60,6 +62,7 @@ export class SessionManager {
     const session = prev ?? { sock: null, status: "starting", qr: null, phone: null, name: null, callback, stopped: false, retries: 0, error: null };
     session.status = "starting";
     session.callback = callback;
+    session.sentIds = session.sentIds ?? new RecentIds(500);
     session.stopped = false;
     this.sessions.set(id, session);
 
@@ -85,6 +88,18 @@ export class SessionManager {
       this.onConnectionUpdate(id, u).catch((e) => this.log.error?.("connection.update failed", e?.message));
     });
     sock.ev.on("messages.upsert", ({ messages, type }) => {
+      // wave 12: what the owner types himself on the phone → recorded, the agent steps back
+      if (type === "notify" || type === "append") {
+        for (const m of messages ?? []) {
+          if (!m?.key?.fromMe) continue;
+          const ts = Number(m.messageTimestamp ?? 0);
+          if (ts && Date.now() / 1000 - ts > 300) continue; // history sync, not a live message
+          setTimeout(() => {
+            const ev = toOwnerEvent(m, session.sentIds, session.phone);
+            if (ev) this.post(id, ev).catch(() => {});
+          }, this.ownerDelayMs).unref?.();
+        }
+      }
       if (type !== "notify") return;
       for (const m of messages ?? []) {
         const ev = toInboundEvent(m);
@@ -98,8 +113,9 @@ export class SessionManager {
     const s = this.sessions.get(id);
     if (!s) return;
     if (u.qr) {
-      s.status = "qr";
+      // the image first, then the status — so a caller never sees "qr" without the picture
       s.qr = await QRCode.toDataURL(u.qr, { margin: 1, width: 320 });
+      s.status = "qr";
     }
     if (u.connection === "open") {
       s.status = "connected";
@@ -139,7 +155,10 @@ export class SessionManager {
     const body = String(text ?? "").slice(0, 4000);
     const img = typeof image === "string" && /^https:\/\/\S+$/.test(image) ? image : null;
     if (!body.trim() && !img) throw Object.assign(new Error("empty"), { code: 400 });
-    const r = await s.sock.sendMessage(jid, img ? { image: { url: img }, caption: body.slice(0, 1000) } : { text: body });
+    const messageId = newMessageId();
+    s.sentIds?.add(messageId);
+    const r = await s.sock.sendMessage(jid, img ? { image: { url: img }, caption: body.slice(0, 1000) } : { text: body }, { messageId });
+    s.sentIds?.add(r?.key?.id);
     return r?.key?.id ?? null;
   }
 

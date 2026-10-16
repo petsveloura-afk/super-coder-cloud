@@ -193,6 +193,11 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                           <Bot className="h-3.5 w-3.5" /> {t("inbox.aiReply")}
                         </p>
                       ) : null}
+                      {out && !m.ai_agent_id && (m.meta as { owner?: boolean } | null)?.owner ? (
+                        <p className="mb-1 inline-flex items-center gap-1 text-[11px] font-semibold opacity-80" data-testid="owner-badge">
+                          <Smartphone className="h-3.5 w-3.5" /> {t("inbox.ownerPhone")}
+                        </p>
+                      ) : null}
                       {(m.meta as { media?: { url?: string; title?: string } } | null)?.media?.url ? (
                         <a href={(m.meta as { media: { url: string } }).media.url} target="_blank" rel="noopener noreferrer" className="mb-1.5 block overflow-hidden rounded-xl" data-testid="inbox-image">
                           {/* eslint-disable-next-line @next/next/no-img-element -- the business's own gallery image */}

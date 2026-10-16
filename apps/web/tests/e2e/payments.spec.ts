@@ -62,16 +62,24 @@ test("card without a PayPal account: PayPal's card form (guest checkout) → cap
   await createOrg(page, "Card Guest Co", `ppcard-${Date.now()}`);
   await page.goto("/he/billing");
   const pro = page.getByTestId("pay-pro");
-  const card = pro.locator('[data-method="paypal_card"]');
+  // wave 12: the card form opens INSIDE our page (no PayPal window, no account)
+  const card = pro.locator('[data-method="card_inline"]');
   await expect(card).toContainText("כרטיס אשראי");
-  await expect(card).toContainText("בלי להירשם ל-PayPal");
   await card.click();
+  const dlg = page.getByTestId("card-checkout");
+  await expect(dlg).toContainText("Pro");
+  await expect(dlg).toContainText("149");
+  await expect(dlg.getByTestId("mock-card-form")).toBeVisible({ timeout: 20_000 });
+  const sdk = (await calls(request)).filter((c) => c.provider === "paypal" && c.kind === "sdk").pop() as unknown as { query: string };
+  expect(sdk.query).toContain("currency=ILS");
+  expect(sdk.query).toContain("enable-funding=card");
+  expect(sdk.query).toContain("locale=he_IL");
+  await shot(page, "b3-card-inline");
+  await dlg.getByTestId("mock-card-pay").click();
   await expect(page).toHaveURL(/\/he\/billing\?checkout=success/, { timeout: 30_000 });
-  // the order opened straight on the card form and was captured once
-  const order = (await calls(request)).filter((c) => c.provider === "paypal" && c.kind === "order").pop() as unknown as { id: string; landing_page: string; user_action: string; custom_id: string; amount: { value: string; currency_code: string } };
-  expect(order.landing_page).toBe("GUEST_CHECKOUT");
-  expect(order.user_action).toBe("PAY_NOW");
+  const order = (await calls(request)).filter((c) => c.provider === "paypal" && c.kind === "order").pop() as unknown as { id: string; landing_page?: string; user_action?: string; custom_id: string; amount: { value: string; currency_code: string } };
   expect(order.amount).toEqual({ value: "149.00", currency_code: "ILS" });
+  expect((await calls(request)).filter((c) => c.provider === "paypal" && (c as unknown as { kind: string; id: string }).kind === "capture" && (c as unknown as { id: string }).id === order.id)).toHaveLength(1);
   expect(order.custom_id).toMatch(/^[0-9a-f-]{36}:pro:month:[a-z0-9]+$/);
   await expect(page.locator("main").getByText("Pro", { exact: true }).first()).toBeVisible();
   const history = page.getByTestId("payment-history");
@@ -89,6 +97,60 @@ test("card without a PayPal account: PayPal's card form (guest checkout) → cap
   await expect(page.getByTestId("payment-history").locator("li")).toHaveCount(1);
   expect((await page.locator("main").innerText()).match(/\d{1,2}[./]\d{1,2}[./]\d{2,4}/g)?.[0]).toBe(before.match(/\d{1,2}[./]\d{1,2}[./]\d{2,4}/g)?.[0]);
   await shot(page, "b3-card-guest");
+});
+
+test("card fallback: when PayPal can't load the in-page form, one button opens PayPal's secure card page (guest checkout)", async ({ page, request }) => {
+  test.skip(!mocked, "needs the provider mock");
+  test.setTimeout(150_000);
+  await signUp(page, { name: "Card Fallback", email: uniqueEmail("ppfb") });
+  await createOrg(page, "Card Fallback Co", `ppfb-${Date.now()}`);
+  await page.route("**/paypal-sdk.js**", (r) => r.abort());
+  await page.goto("/he/billing");
+  await page.getByTestId("pay-pro").locator('[data-method="card_inline"]').click();
+  const dlg = page.getByTestId("card-checkout");
+  await expect(dlg.locator('[data-method="paypal_card"]')).toBeVisible({ timeout: 20_000 });
+  await dlg.locator('[data-method="paypal_card"]').click();
+  await expect(page).toHaveURL(/\/he\/billing\?checkout=success/, { timeout: 30_000 });
+  const order = (await calls(request)).filter((c) => c.provider === "paypal" && c.kind === "order").pop() as unknown as { landing_page: string; user_action: string };
+  expect(order.landing_page).toBe("GUEST_CHECKOUT");
+  expect(order.user_action).toBe("PAY_NOW");
+  await expect(page.getByTestId("payment-history")).toContainText("149");
+});
+
+test("a card order paid for less than the plan's price never activates the plan (wave 12)", async ({ page, request }) => {
+  test.skip(!mocked, "needs the provider mock");
+  test.setTimeout(120_000);
+  await signUp(page, { name: "Forger", email: uniqueEmail("ppforge") });
+  await createOrg(page, "Forge Co", `ppforge-${Date.now()}`);
+  await page.goto("/he/billing");
+  await page.getByTestId("pay-pro").locator('[data-method="card_inline"]').click();
+  await expect(page.getByTestId("card-checkout").getByTestId("mock-card-form")).toBeVisible({ timeout: 20_000 });
+  // the order our server created carries this org's reference
+  await page.getByTestId("card-checkout").getByTestId("mock-card-pay").click().catch(() => undefined);
+  await page.waitForURL(/checkout=success/, { timeout: 30_000 }).catch(() => undefined);
+  const real = (await calls(request)).filter((c) => c.provider === "paypal" && c.kind === "order").pop() as unknown as { custom_id: string };
+  const org = real.custom_id.split(":")[0];
+  // someone creates an order themselves (client-side) for Business/year at 1 ₪ and approves it
+  const forged = await (await request.post(`${MOCK}/paypal/v2/checkout/orders`, { data: { intent: "CAPTURE", purchase_units: [{ custom_id: `${org}:business:year:forged1`, amount: { currency_code: "ILS", value: "1.00" } }], payment_source: { paypal: { experience_context: { return_url: "http://localhost:3000/x" } } } } })).json();
+  await request.get(`${MOCK}/paypal/_approve?token=${forged.id}`);
+  const r = await request.post("/api/webhooks/paypal", { headers: { "paypal-transmission-sig": "good-sig" }, data: { id: `WH-forge-${Date.now()}`, event_type: "CHECKOUT.ORDER.APPROVED", resource: { id: forged.id } } });
+  expect(r.ok()).toBe(true);
+  await page.goto("/he/billing");
+  // only the real Pro payment (149) is in the history — the 1 ₪ Business order activated nothing
+  await expect(page.getByTestId("payment-history").locator("li")).toHaveCount(1);
+  await expect(page.getByTestId("payment-history")).not.toContainText("Business");
+});
+
+test("billing shows only the card option by default (PayPal subscription button is opt-in)", async ({ page }) => {
+  test.skip(!mocked, "needs the provider mock");
+  await signUp(page, { name: "Only Card", email: uniqueEmail("onlycard") });
+  await createOrg(page, "Only Card Co", `onlycard-${Date.now()}`);
+  await page.goto("/he/billing");
+  const pro = page.getByTestId("pay-pro");
+  await expect(pro.locator('[data-method="card_inline"]')).toBeVisible();
+  // in this test environment PAYPAL_SHOW_SUBSCRIPTION=true, so the subscription button is also there;
+  // without it (production default) only the card is shown — see methodFor() in billing/page.tsx
+  await expect(pro.locator('[data-method="paypal_card"]')).toHaveCount(0);
 });
 
 test("crypto: pay for Business → signed IPN activates a prepaid period with a receipt (idempotent)", async ({ page, request }) => {

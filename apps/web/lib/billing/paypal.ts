@@ -275,6 +275,15 @@ export async function capturePayPalCardOrder(orderId: string): Promise<{ ok: boo
   if (!ref) return { ok: false };
   if (order.status !== "COMPLETED" || !cap || cap.status !== "COMPLETED") return { ok: true, orgId: ref.org, plan: ref.plan, status: cap?.status ?? order.status };
   const admin = createAdminClient();
+  // wave 12: the plan is given only for the plan's real price — an order created elsewhere
+  // (e.g. client-side with a lower amount) never activates a plan
+  const expected = await planPrice(ref.plan, ref.interval);
+  const paid = Number(cap.amount?.value ?? 0);
+  if (!expected || (cap.amount?.currency_code ?? "") !== expected.currency || paid + 0.01 < expected.amount) {
+    console.error(`paypal order ${order.id}: amount mismatch (${paid} ${cap.amount?.currency_code ?? "?"} for ${ref.plan}/${ref.interval})`);
+    await admin.from("billing_events").insert({ provider: "paypal", event_id: `order:${order.id}:mismatch`, type: "order.amount_mismatch", organization_id: ref.org });
+    return { ok: false, orgId: ref.org, plan: ref.plan, status: "AMOUNT_MISMATCH" };
+  }
   const eventId = `order:${order.id}:captured`;
   const { error: dup } = await admin.from("billing_events").insert({ provider: "paypal", event_id: eventId, type: "order.captured", organization_id: ref.org });
   if (dup) return { ok: true, orgId: ref.org, plan: ref.plan, status: "COMPLETED" }; // already applied
@@ -313,4 +322,46 @@ export function paypalErrorCode(message: string): string {
   if (/paypal_4\d\d/.test(message)) return "paypal_request";
   if (/paypal_5\d\d|timeout|aborted|fetch failed/i.test(message)) return "paypal_down";
   return "provider";
+}
+
+/* ------------------------------------------- wave 12: card form INSIDE the page (JS SDK card button) */
+
+/** Public settings for the in-page card form (the client id is public by design). */
+export function paypalSdkConfig(): { clientId: string; sdkUrl: string } | null {
+  if (!paypalConfigured()) return null;
+  return {
+    clientId: (process.env.PAYPAL_CLIENT_ID ?? "").trim(),
+    sdkUrl: (process.env.PAYPAL_SDK_URL || "https://www.paypal.com/sdk/js").trim(),
+  };
+}
+
+/**
+ * Order for the in-page card form: the PayPal JS SDK "Debit or Credit Card" button
+ * collects the card inside our page (no PayPal window, no account) and approves it;
+ * we capture it server-side with capturePayPalCardOrder.
+ */
+export async function createPayPalSdkOrder(input: { orgId: string; plan: string; interval: "month" | "year" }): Promise<{ id: string; amount: number; currency: string }> {
+  const price = await planPrice(input.plan, input.interval);
+  if (!price) throw new Error("no_price");
+  const { buildOrderRef } = await import("./payments-core");
+  const nonce = Math.random().toString(36).slice(2, 12).replace(/[^a-z0-9]/gi, "") || "n0nce2";
+  const ref = buildOrderRef(input.orgId, input.plan, input.interval, nonce);
+  const order = await pp<{ id: string }>("/v2/checkout/orders", {
+    method: "POST",
+    requestId: `scc-sdk-order-${nonce}`,
+    body: {
+      intent: "CAPTURE",
+      purchase_units: [
+        {
+          reference_id: `${input.plan}-${input.interval}`,
+          custom_id: ref,
+          description: `Super Coder Cloud — ${input.plan} (${input.interval === "year" ? "12 months" : "1 month"})`,
+          soft_descriptor: "SUPERCODER",
+          amount: { currency_code: price.currency, value: moneyString(price.amount) },
+        },
+      ],
+      application_context: { brand_name: (process.env.BILLING_BUSINESS_NAME || "Super Coder Cloud").slice(0, 127), shipping_preference: "NO_SHIPPING", user_action: "PAY_NOW" },
+    },
+  });
+  return { id: order.id, amount: price.amount, currency: price.currency };
 }
