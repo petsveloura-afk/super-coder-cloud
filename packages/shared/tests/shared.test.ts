@@ -77,6 +77,8 @@ describe("env", () => {
     expect(a.openai).toBe(true);
     expect(a.whatsapp).toBe(false);
     expect(a.email).toBe(false);
+    expect(a.gemini).toBe(false);
+    expect(integrationAvailability({ GEMINI_API_KEY: "AIza-x" }).gemini).toBe(true);
   });
 });
 

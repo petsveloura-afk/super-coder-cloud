@@ -25,6 +25,7 @@ export const serverEnvSchema = publicEnvSchema.extend({
   DEMO_MODE: z.enum(["true", "false"]).optional().default("false"),
   OPENAI_API_KEY: optional,
   ANTHROPIC_API_KEY: optional,
+  GEMINI_API_KEY: optional,
   TELEGRAM_BOT_TOKEN: optional,
   META_APP_ID: optional,
   META_APP_SECRET: optional,
@@ -47,13 +48,14 @@ export function findLeakedSecrets(env: Record<string, string | undefined>): stri
   return Object.keys(env).filter((k) => k.startsWith("NEXT_PUBLIC_") && suspicious.test(k));
 }
 
-export type IntegrationKey = "openai" | "anthropic" | "telegram" | "whatsapp" | "email" | "sms" | "payments" | "queue";
+export type IntegrationKey = "openai" | "anthropic" | "gemini" | "telegram" | "whatsapp" | "email" | "sms" | "payments" | "queue";
 
 export function integrationAvailability(env: Partial<Record<keyof ServerEnv, string | undefined>> | Record<string, string | undefined>): Record<IntegrationKey, boolean> {
   const e = env as Partial<Record<keyof ServerEnv, string | undefined>>;
   return {
     openai: Boolean(e.OPENAI_API_KEY),
     anthropic: Boolean(e.ANTHROPIC_API_KEY),
+    gemini: Boolean(e.GEMINI_API_KEY),
     telegram: Boolean(e.TELEGRAM_BOT_TOKEN),
     whatsapp: Boolean(e.WHATSAPP_ACCESS_TOKEN && e.WHATSAPP_PHONE_NUMBER_ID),
     email: Boolean(e.EMAIL_PROVIDER_API_KEY && e.EMAIL_FROM_ADDRESS),

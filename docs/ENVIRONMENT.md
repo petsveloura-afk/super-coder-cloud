@@ -57,3 +57,12 @@ All of the above can be written for you by `setup.cmd` (see docs/COMMERCIAL.md �
 
 ## v4 wave 4 additions
 No new environment variables. Online invoice payments use **each organization's own Stripe keys**, entered in *Finance → Settings* and stored encrypted with `ENCRYPTION_KEY` (must be set). Each organization gets its own webhook URL: `/api/webhooks/payments/{token}` (event `checkout.session.completed`). `PAYMENT_PROVIDER_API_BASE` (tests only) also redirects these calls.
+
+## AI: Google Gemini (free tier)
+| Variable | Required | Where | Purpose | Get it |
+|---|---|---|---|---|
+| `GEMINI_API_KEY` | no | **server** | AI assistant + agents via Google Gemini (has a free tier) | aistudio.google.com → Get API key |
+| `AI_GEMINI_MODEL` | no | server | default Gemini model (default `gemini-2.5-flash`) | model id from Google |
+| `AI_GEMINI_BASE_URL` | no | server | tests / gateways only | — |
+
+Any one of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY` enables AI. When several are set, agents use the provider chosen per agent; the default order is Anthropic → OpenAI → Gemini.

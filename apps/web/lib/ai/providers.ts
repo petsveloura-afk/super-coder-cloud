@@ -1,10 +1,12 @@
 import "server-only";
 
 /**
- * AI provider abstraction (OpenAI + Anthropic) over plain HTTPS — no SDKs,
+ * AI provider abstraction (OpenAI + Anthropic + Google Gemini) over plain HTTPS — no SDKs,
  * keys stay on the server. Add providers by implementing `AIProvider`.
+ * Gemini has a free tier (aistudio.google.com → Get API key).
  */
-export type AIProviderName = "openai" | "anthropic";
+export type AIProviderName = "openai" | "anthropic" | "gemini";
+export const AI_PROVIDERS = ["anthropic", "openai", "gemini"] as const;
 
 export interface AIMessage {
   role: "user" | "assistant";
@@ -30,9 +32,11 @@ export interface AIResult {
 export const DEFAULT_MODELS: Record<AIProviderName, string> = {
   openai: process.env.AI_OPENAI_MODEL || "gpt-4o-mini",
   anthropic: process.env.AI_ANTHROPIC_MODEL || "claude-haiku-5-5",
+  gemini: process.env.AI_GEMINI_MODEL || "gemini-2.5-flash",
 };
 
 export function providerConfigured(p: AIProviderName): boolean {
+  if (p === "gemini") return Boolean(process.env.GEMINI_API_KEY);
   return p === "openai" ? Boolean(process.env.OPENAI_API_KEY) : Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
@@ -41,6 +45,7 @@ export function pickProvider(preferred?: AIProviderName): AIProviderName | null 
   if (preferred && providerConfigured(preferred)) return preferred;
   if (providerConfigured("anthropic")) return "anthropic";
   if (providerConfigured("openai")) return "openai";
+  if (providerConfigured("gemini")) return "gemini";
   return null;
 }
 
@@ -109,6 +114,36 @@ async function anthropic(req: AIRequest): Promise<AIResult> {
   };
 }
 
+/** Google Gemini (generateContent). AI_GEMINI_BASE_URL overrides the endpoint (tests / gateways). */
+async function gemini(req: AIRequest): Promise<AIResult> {
+  const base = (process.env.AI_GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
+  const res = await fetch(`${base}/models/${encodeURIComponent(req.model)}:generateContent`, {
+    method: "POST",
+    headers: { "x-goog-api-key": process.env.GEMINI_API_KEY ?? "", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: req.system ? { parts: [{ text: req.system }] } : undefined,
+      contents: req.messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+      generationConfig: { temperature: req.temperature, maxOutputTokens: req.maxTokens },
+    }),
+    signal: AbortSignal.timeout(45_000),
+    cache: "no-store",
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+    modelVersion?: string;
+  };
+  if (!res.ok) throw new Error(`gemini_${res.status}`);
+  return {
+    text: (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim(),
+    inputTokens: json.usageMetadata?.promptTokenCount ?? 0,
+    outputTokens: json.usageMetadata?.candidatesTokenCount ?? 0,
+    model: json.modelVersion ?? req.model,
+    provider: "gemini",
+  };
+}
+
 export async function generate(provider: AIProviderName, req: AIRequest): Promise<AIResult> {
+  if (provider === "gemini") return gemini(req);
   return provider === "openai" ? openai(req) : anthropic(req);
 }

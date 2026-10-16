@@ -7,9 +7,9 @@
 create schema if not exists auth;
 create schema if not exists extensions;
 
-do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
-do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
-do $$ begin create role service_role nologin bypassrls; exception when duplicate_object then null; end $$;
+do $$ begin create role anon nologin; exception when duplicate_object or unique_violation then null; end $$;  -- parallel test runs may race
+do $$ begin create role authenticated nologin; exception when duplicate_object or unique_violation then null; end $$;  -- parallel test runs may race
+do $$ begin create role service_role nologin bypassrls; exception when duplicate_object or unique_violation then null; end $$;  -- parallel test runs may race
 
 create table if not exists auth.users (
   id uuid primary key default gen_random_uuid(),

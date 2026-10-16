@@ -37,7 +37,7 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
   const used = Number(e?.ai_credits_used ?? 0);
   const provider = pickProvider();
   const canManage = ctx.can("ai.manage");
-  const defaults = { openai: DEFAULT_MODELS.openai, anthropic: DEFAULT_MODELS.anthropic, provider: provider ?? "anthropic" };
+  const defaults = { openai: DEFAULT_MODELS.openai, anthropic: DEFAULT_MODELS.anthropic, gemini: DEFAULT_MODELS.gemini, provider: provider ?? "anthropic" };
 
   return (
     <>

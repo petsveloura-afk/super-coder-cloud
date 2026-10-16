@@ -394,7 +394,7 @@
     "followup": "مسودة رسالة متابعة",
     "aiNotice": "تم إنشاؤه بالذكاء الاصطناعي — راجعه قبل الاستخدام",
     "saveAsNote": "حفظ كملاحظة",
-    "notConfigured": "لم يتم إعداد الذكاء الاصطناعي على الخادم. أضف ANTHROPIC_API_KEY أو OPENAI_API_KEY في متغيرات Vercel.",
+    "notConfigured": "لم يتم إعداد الذكاء الاصطناعي على الخادم. أضيفوا GEMINI_API_KEY (مجاني) أو ANTHROPIC_API_KEY أو OPENAI_API_KEY عبر setup.cmd.",
     "demoBlocked": "لا تُرسل طلبات ذكاء اصطناعي حقيقية في المساحة التجريبية",
     "rateLimited": "طلبات كثيرة جدًا. حاول بعد دقيقة.",
     "limitReached": "نفد رصيد الذكاء الاصطناعي لهذا الشهر. قم بترقية الباقة للمتابعة.",
@@ -830,7 +830,7 @@
     "platformHint": "تُفعَّل مرة واحدة عبر setup.cmd — لجميع المؤسسات",
     "platform": {
       "ai": "الذكاء الاصطناعي",
-      "aiHint": "أضف مفتاح Anthropic أو OpenAI في setup.cmd",
+      "aiHint": "أضيفوا مفتاح Gemini (مجاني) أو Anthropic أو OpenAI في setup.cmd",
       "email": "إرسال البريد",
       "emailHint": "أضف مفتاح Resend وعنوان المرسل في setup.cmd",
       "payments": "المدفوعات",

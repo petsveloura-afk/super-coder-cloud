@@ -206,3 +206,8 @@
 ## תוצאות בדיקות גל 4 (הורצו בפועל)
 - typecheck + lint: נקי · יחידה: web 33 / shared 42 · מסד נתונים: 81 (כולל 10 של גל 4)
 - E2E מלא: 34/34 (כולל 5 תרחישי גל 4 ונייד) · סריקת סודות (gitleaks): נקי
+
+# עדכון v4.1 — Google Gemini (AI בחינם) + תיקון CI (2026-10-16)
+- **Gemini** נוסף כספק AI שלישי (לצד Anthropic ו-OpenAI): מפתח חינמי מ-aistudio.google.com → `GEMINI_API_KEY` (נשאל ב-`setup.cmd`). ברירת מחדל `gemini-2.5-flash`, נבחר אוטומטית כשהוא המפתח היחיד, וזמין לבחירה לכל סוכן. מיגרציה `20261015000021_ai_gemini.sql`.
+- **תיקון CI:** בדיקות המסד והעובד רצו במקביל ויצרו את אותם תפקידי בדיקה (`anon`) באותו רגע → `duplicate key … pg_authid_rolname_index`. קובץ הבדיקה `supabase/tests/supabase_stub.sql` מתעלם עכשיו גם מהמרוץ הזה (בדיקות בלבד — לא נוגע במסד הייצור).
+- בדיקות: typecheck + lint נקי · יחידה web 36 (כולל 3 של Gemini) / shared 42 · מסד 81 · הרצה מקבילית על אשכול Postgres נקי — עברה.

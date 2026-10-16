@@ -394,7 +394,7 @@
     "followup": "טיוטת הודעת המשך",
     "aiNotice": "נוצר ע״י AI — בדקו לפני שימוש",
     "saveAsNote": "שמירה כהערה",
-    "notConfigured": "AI עדיין לא הוגדר בשרת. הוסיפו ANTHROPIC_API_KEY או OPENAI_API_KEY במשתני הסביבה של Vercel.",
+    "notConfigured": "AI עדיין לא הוגדר בשרת. הוסיפו GEMINI_API_KEY (חינם), ANTHROPIC_API_KEY או OPENAI_API_KEY דרך setup.cmd.",
     "demoBlocked": "בסביבת דמו לא נשלחות בקשות AI אמיתיות",
     "rateLimited": "יותר מדי בקשות. נסו שוב בעוד דקה.",
     "limitReached": "נגמרו קרדיטי ה-AI לחודש זה. שדרגו חבילה כדי להמשיך.",
@@ -830,7 +830,7 @@
     "platformHint": "מופעלים פעם אחת עם setup.cmd — לכל הארגונים",
     "platform": {
       "ai": "בינה מלאכותית",
-      "aiHint": "הוסיפו מפתח Anthropic או OpenAI ב-setup.cmd",
+      "aiHint": "הוסיפו מפתח Gemini (חינם), Anthropic או OpenAI ב-setup.cmd",
       "email": "שליחת מיילים",
       "emailHint": "הוסיפו מפתח Resend וכתובת שולח ב-setup.cmd",
       "payments": "תשלומים",

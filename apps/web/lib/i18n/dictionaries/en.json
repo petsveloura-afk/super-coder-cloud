@@ -394,7 +394,7 @@
     "followup": "Draft follow-up",
     "aiNotice": "AI-generated — review before use",
     "saveAsNote": "Save as note",
-    "notConfigured": "AI is not configured on the server yet. Add ANTHROPIC_API_KEY or OPENAI_API_KEY to the Vercel environment variables.",
+    "notConfigured": "AI is not configured on the server yet. Add GEMINI_API_KEY (free), ANTHROPIC_API_KEY or OPENAI_API_KEY via setup.cmd.",
     "demoBlocked": "No real AI requests are sent in demo workspaces",
     "rateLimited": "Too many requests. Try again in a minute.",
     "limitReached": "You've used this month's AI credits. Upgrade to continue.",
@@ -830,7 +830,7 @@
     "platformHint": "Enabled once with setup.cmd — for every workspace",
     "platform": {
       "ai": "AI",
-      "aiHint": "Add an Anthropic or OpenAI key in setup.cmd",
+      "aiHint": "Add a Gemini (free), Anthropic or OpenAI key in setup.cmd",
       "email": "E-mail sending",
       "emailHint": "Add a Resend key and sender address in setup.cmd",
       "payments": "Payments",

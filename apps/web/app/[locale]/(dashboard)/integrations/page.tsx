@@ -38,7 +38,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
 
   const avail = integrationAvailability(process.env);
   const platform = [
-    { icon: Bot, name: t("integrations.platform.ai"), on: avail.anthropic || avail.openai, hint: t("integrations.platform.aiHint") },
+    { icon: Bot, name: t("integrations.platform.ai"), on: avail.anthropic || avail.openai || avail.gemini, hint: t("integrations.platform.aiHint") },
     { icon: Mail, name: t("integrations.platform.email"), on: avail.email, hint: t("integrations.platform.emailHint") },
     { icon: CreditCard, name: t("integrations.platform.payments"), on: avail.payments, hint: t("integrations.platform.paymentsHint") },
     { icon: Timer, name: t("integrations.platform.jobs"), on: Boolean(process.env.CRON_SECRET && process.env.SUPABASE_SERVICE_ROLE_KEY), hint: t("integrations.platform.jobsHint") },

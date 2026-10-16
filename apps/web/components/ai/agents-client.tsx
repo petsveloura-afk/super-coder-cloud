@@ -16,7 +16,7 @@ export interface AgentRow {
   id: string;
   name: string;
   instructions: string;
-  provider: "openai" | "anthropic";
+  provider: "openai" | "anthropic" | "gemini";
   model: string;
   temperature: number;
   language: string;
@@ -24,12 +24,12 @@ export interface AgentRow {
   allowed_tools: string[];
 }
 
-export function AgentDialog({ agent, defaults }: { agent?: AgentRow; defaults: { openai: string; anthropic: string; provider: "openai" | "anthropic" } }) {
+export function AgentDialog({ agent, defaults }: { agent?: AgentRow; defaults: { openai: string; anthropic: string; gemini: string; provider: "openai" | "anthropic" | "gemini" } }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const [state, action] = useActionState(saveAgentAction, {} as ActionState);
   const err = useFieldError(state);
-  const [provider, setProvider] = useState<"openai" | "anthropic">(agent?.provider ?? defaults.provider);
+  const [provider, setProvider] = useState<"openai" | "anthropic" | "gemini">(agent?.provider ?? defaults.provider);
   const handled = useRef<ActionState | null>(null);
   useEffect(() => {
     if (state.ok && handled.current !== state) {
@@ -69,9 +69,10 @@ export function AgentDialog({ agent, defaults }: { agent?: AgentRow; defaults: {
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t("ai.provider")} htmlFor="agent-provider">
-            <Select id="agent-provider" name="provider" value={provider} onChange={(e) => setProvider(e.target.value as "openai" | "anthropic")} dir="ltr">
+            <Select id="agent-provider" name="provider" value={provider} onChange={(e) => setProvider(e.target.value as "openai" | "anthropic" | "gemini")} dir="ltr">
               <option value="anthropic">Anthropic (Claude)</option>
               <option value="openai">OpenAI</option>
+              <option value="gemini">Google Gemini</option>
             </Select>
           </Field>
           <Field label={t("ai.model")} htmlFor="agent-model" error={err("model")}>

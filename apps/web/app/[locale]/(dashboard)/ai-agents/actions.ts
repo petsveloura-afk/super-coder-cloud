@@ -20,7 +20,7 @@ function loc(fd: FormData): Locale {
 const agentSchema = z.object({
   name: z.string().trim().min(1, "validation.required").max(80, "validation.tooLong"),
   instructions: z.string().trim().max(8000, "validation.tooLong"),
-  provider: z.enum(["openai", "anthropic"]),
+  provider: z.enum(["openai", "anthropic", "gemini"]),
   model: z.string().trim().regex(/^[A-Za-z0-9._:-]{2,80}$/, "validation.invalidId"),
   temperature: z.coerce.number().min(0).max(1),
   language: z.enum(LOCALES),
@@ -138,7 +138,7 @@ export async function agentChatAction(
     orgId: ctx.org.id,
     feature: "agent_chat",
     agentId: agent.id,
-    provider: agent.provider as "openai" | "anthropic",
+    provider: agent.provider as "openai" | "anthropic" | "gemini",
     model: agent.model,
     system,
     messages,
