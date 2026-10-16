@@ -108,7 +108,7 @@ async function main() {
     ["SUPABASE_SERVICE_ROLE_KEY", "Supabase secret key (sb_secret_…) [Project Settings → API Keys → Secret keys] REQUIRED: ", true, (v) => /^(sb_secret_|eyJ)/.test(v)],
     ["ANTHROPIC_API_KEY", "Anthropic API key (sk-ant-…) for AI [optional]: ", true, (v) => v.startsWith("sk-ant-")],
     ["OPENAI_API_KEY", "OpenAI API key (sk-…) for AI [optional]: ", true, (v) => v.startsWith("sk-")],
-    ["GEMINI_API_KEY", "Google Gemini API key (AIza…) — FREE tier at aistudio.google.com → Get API key [optional]: ", true, (v) => /^AIza[0-9A-Za-z_-]{20,}$/.test(v)],
+    ["GEMINI_API_KEY", "Google Gemini API key (AIza… or AQ.…) — FREE tier at aistudio.google.com → Get API key [optional]: ", true, (v) => /^(AIza|AQ\.)[0-9A-Za-z._-]{20,}$/.test(v)],
     ["EMAIL_PROVIDER_API_KEY", "Resend API key (re_…) for emails [optional]: ", true, (v) => v.startsWith("re_")],
     ["EMAIL_FROM_ADDRESS", "Email sender, e.g. Super Coder <no-reply@yourdomain.com> [needed with Resend]: ", false, (v) => /@/.test(v)],
     ["VERCEL_TOKEN", "Vercel token for GitHub auto-deploy [vercel.com/account/settings/tokens] [optional]: ", true, (v) => v.length >= 20],

@@ -67,10 +67,15 @@ jobs:
         run: |
           supabase status -o env > /tmp/sb.env
           . /tmp/sb.env
+          echo "::add-mask::${SERVICE_ROLE_KEY:-$SECRET_KEY}"
           {
             echo "NEXT_PUBLIC_APP_URL=http://localhost:3000"
             echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
             echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            # server-side features (public REST API, inbound webhooks, job queue, admin E2E)
+            # need the LOCAL stack's service key — throwaway CI values, never production
+            echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY:-$SECRET_KEY}"
+            echo "ENCRYPTION_KEY=$(openssl rand -hex 32)"
           } >> "$GITHUB_ENV"
       - run: pnpm --filter @scc/web build
       - run: pnpm --filter @scc/web exec playwright install --with-deps chromium
