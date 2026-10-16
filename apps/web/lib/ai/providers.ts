@@ -117,23 +117,35 @@ async function anthropic(req: AIRequest): Promise<AIResult> {
 /** Google Gemini (generateContent). AI_GEMINI_BASE_URL overrides the endpoint (tests / gateways). */
 async function gemini(req: AIRequest): Promise<AIResult> {
   const base = (process.env.AI_GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
-  const res = await fetch(`${base}/models/${encodeURIComponent(req.model)}:generateContent`, {
-    method: "POST",
-    headers: { "x-goog-api-key": process.env.GEMINI_API_KEY ?? "", "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: req.system ? { parts: [{ text: req.system }] } : undefined,
-      contents: req.messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
-      generationConfig: {
-        temperature: req.temperature,
-        // Gemini 2.5 "thinking" tokens count against maxOutputTokens and can leave the answer
-        // empty; Flash models allow turning thinking off, others get extra room for it.
-        maxOutputTokens: /2\.5-flash/.test(req.model) ? req.maxTokens : req.maxTokens + 2048,
-        ...(/2\.5-flash/.test(req.model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-      },
-    }),
-    signal: AbortSignal.timeout(45_000),
-    cache: "no-store",
+  // keys pasted into dashboards often carry a stray space/newline/quote
+  const key = (process.env.GEMINI_API_KEY ?? "").trim().replace(/^["']|["']$/g, "");
+  const url = `${base}/models/${encodeURIComponent(req.model)}:generateContent`;
+  const body = JSON.stringify({
+    systemInstruction: req.system ? { parts: [{ text: req.system }] } : undefined,
+    contents: req.messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+    generationConfig: {
+      temperature: req.temperature,
+      // Gemini 2.5 "thinking" tokens count against maxOutputTokens and can leave the answer
+      // empty; Flash models allow turning thinking off, others get extra room for it.
+      maxOutputTokens: /2\.5-flash/.test(req.model) ? req.maxTokens : req.maxTokens + 2048,
+      ...(/2\.5-flash/.test(req.model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+    },
   });
+  const call = (withHeader: boolean) =>
+    fetch(withHeader ? url : `${url}?key=${encodeURIComponent(key)}`, {
+      method: "POST",
+      headers: withHeader ? { "x-goog-api-key": key, "Content-Type": "application/json" } : { "Content-Type": "application/json" },
+      body,
+      signal: AbortSignal.timeout(45_000),
+      cache: "no-store",
+    });
+  let res = await call(true);
+  // Newer "AQ." keys are rejected by some header paths but accepted as ?key= — retry once that way.
+  if (res.status === 400 || res.status === 401 || res.status === 403) {
+    const first = await res.text().catch(() => "");
+    console.error("gemini header auth failed, retrying with key param", res.status, first.slice(0, 300));
+    res = await call(false);
+  }
   const json = (await res.json().catch(() => ({}))) as {
     candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[];
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };

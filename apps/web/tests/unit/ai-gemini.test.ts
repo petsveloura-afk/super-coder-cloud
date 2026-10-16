@@ -52,6 +52,21 @@ describe("Gemini provider", () => {
     expect(body.generationConfig).toEqual({ temperature: 0.3, maxOutputTokens: 500, thinkingConfig: { thinkingBudget: 0 } });
   });
 
+  it("trims the key and retries with ?key= when header auth is rejected (AQ. keys)", async () => {
+    process.env.GEMINI_API_KEY = " AQ.test-key\n";
+    process.env.AI_GEMINI_BASE_URL = "https://gemini.example/v1beta";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { status: "UNAUTHENTICATED" } }), { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "ok" }] } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await generate("gemini", { model: "gemini-2.5-flash", system: "", messages: [{ role: "user", content: "x" }], temperature: 0, maxTokens: 10 });
+    expect(r.text).toBe("ok");
+    expect(fetchMock.mock.calls[0]![1].headers["x-goog-api-key"]).toBe("AQ.test-key");
+    expect(fetchMock.mock.calls[1]![0]).toBe("https://gemini.example/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.test-key");
+    expect(fetchMock.mock.calls[1]![1].headers["x-goog-api-key"]).toBeUndefined();
+  });
+
   it("throws a provider error on HTTP failure (credits are released by the caller)", async () => {
     process.env.GEMINI_API_KEY = "AIza-test";
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { status: "RESOURCE_EXHAUSTED", message: "quota" } }), { status: 429 })));
