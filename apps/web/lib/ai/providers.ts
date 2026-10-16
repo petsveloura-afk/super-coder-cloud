@@ -123,19 +123,29 @@ async function gemini(req: AIRequest): Promise<AIResult> {
     body: JSON.stringify({
       systemInstruction: req.system ? { parts: [{ text: req.system }] } : undefined,
       contents: req.messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
-      generationConfig: { temperature: req.temperature, maxOutputTokens: req.maxTokens },
+      generationConfig: {
+        temperature: req.temperature,
+        // Gemini 2.5 "thinking" tokens count against maxOutputTokens and can leave the answer
+        // empty; Flash models allow turning thinking off, others get extra room for it.
+        maxOutputTokens: /2\.5-flash/.test(req.model) ? req.maxTokens : req.maxTokens + 2048,
+        ...(/2\.5-flash/.test(req.model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+      },
     }),
     signal: AbortSignal.timeout(45_000),
     cache: "no-store",
   });
   const json = (await res.json().catch(() => ({}))) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[];
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
     modelVersion?: string;
+    error?: { status?: string; message?: string };
   };
-  if (!res.ok) throw new Error(`gemini_${res.status}`);
+  // status + Google's reason go to the server log (never to the browser)
+  if (!res.ok) throw new Error(`gemini_${res.status}${json.error?.status ? `:${json.error.status}` : ""}${json.error?.message ? `:${json.error.message.slice(0, 200)}` : ""}`);
+  const text = (json.candidates?.[0]?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("").trim();
+  if (!text) console.error("gemini empty answer", json.candidates?.[0]?.finishReason ?? "no_candidates");
   return {
-    text: (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim(),
+    text,
     inputTokens: json.usageMetadata?.promptTokenCount ?? 0,
     outputTokens: json.usageMetadata?.candidatesTokenCount ?? 0,
     model: json.modelVersion ?? req.model,

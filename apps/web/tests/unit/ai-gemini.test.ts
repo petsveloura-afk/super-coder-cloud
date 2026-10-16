@@ -49,12 +49,24 @@ describe("Gemini provider", () => {
     const body = JSON.parse(String(init.body));
     expect(body.systemInstruction.parts[0].text).toBe("You are helpful");
     expect(body.contents.map((c: { role: string }) => c.role)).toEqual(["user", "model", "user"]);
-    expect(body.generationConfig).toEqual({ temperature: 0.3, maxOutputTokens: 500 });
+    expect(body.generationConfig).toEqual({ temperature: 0.3, maxOutputTokens: 500, thinkingConfig: { thinkingBudget: 0 } });
   });
 
   it("throws a provider error on HTTP failure (credits are released by the caller)", async () => {
     process.env.GEMINI_API_KEY = "AIza-test";
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 429 })));
-    await expect(generate("gemini", { model: "gemini-2.5-flash", system: "", messages: [{ role: "user", content: "x" }], temperature: 0, maxTokens: 10 })).rejects.toThrow("gemini_429");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { status: "RESOURCE_EXHAUSTED", message: "quota" } }), { status: 429 })));
+    await expect(generate("gemini", { model: "gemini-2.5-flash", system: "", messages: [{ role: "user", content: "x" }], temperature: 0, maxTokens: 10 })).rejects.toThrow("gemini_429:RESOURCE_EXHAUSTED:quota");
+  });
+
+  it("ignores thought parts and gives non-Flash models extra room for thinking", async () => {
+    process.env.GEMINI_API_KEY = "AQ.test-key";
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
+      new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "thinking…", thought: true }, { text: "answer" }] } }] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await generate("gemini", { model: "gemini-2.5-pro", system: "", messages: [{ role: "user", content: "x" }], temperature: 0, maxTokens: 700 });
+    expect(r.text).toBe("answer");
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1].body));
+    expect(body.generationConfig).toEqual({ temperature: 0, maxOutputTokens: 2748 });
   });
 });
