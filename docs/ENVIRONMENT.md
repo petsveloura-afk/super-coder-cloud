@@ -66,3 +66,6 @@ No new environment variables. Online invoice payments use **each organization's 
 | `AI_GEMINI_BASE_URL` | no | server | tests / gateways only | — |
 
 Any one of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY` enables AI. When several are set, agents use the provider chosen per agent; the default order is Anthropic → OpenAI → Gemini.
+
+### Several Gemini keys (more free quota)
+Add extra keys in Vercel → Environment Variables as `GEMINI_API_KEY_2`, `GEMINI_API_KEY_3` … `GEMINI_API_KEY_10` (or all of them comma-separated in `GEMINI_API_KEYS`). Each request starts at a random key and moves to the next key when Google answers "busy"/"quota" (429/5xx); retired or busy models fall back along `AI_GEMINI_FALLBACK_MODELS` (default `gemini-flash-latest,gemini-3.8-flash,gemini-flash-lite-latest,gemini-3.5-flash-lite`). At most 6 calls per request.

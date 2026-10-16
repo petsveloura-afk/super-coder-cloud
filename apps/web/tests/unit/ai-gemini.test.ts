@@ -1,20 +1,42 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_MODELS, generate, pickProvider, providerConfigured } from "@/lib/ai/providers";
+import { DEFAULT_MODELS, generate, geminiKeys, pickProvider, providerConfigured } from "@/lib/ai/providers";
 
-/** Google Gemini provider (free tier): request shape, response parsing, provider selection. */
+/** Google Gemini provider (free tier): request shape, parsing, key pool, retries and model fallback. */
+const KEY_A = "AQ.test-key-aaaaaaaaaaaaaaaa";
+const KEY_B = "AIzaTestKeyBbbbbbbbbbbbbbbbbb";
+const ok = (text: string, extra: Record<string, unknown> = {}) => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }], ...extra }), { status: 200 });
+const fail = (status: number, s: string, message = "") => new Response(JSON.stringify({ error: { status: s, message } }), { status });
+const req = (model = "gemini-flash-latest", maxTokens = 10) => ({ model, system: "", messages: [{ role: "user" as const, content: "x" }], temperature: 0, maxTokens });
+const modelOf = (call: unknown[]) => String(call[0]).split("/models/")[1]!.split(":")[0];
+const keyOf = (call: unknown[]) => ((call[1] as RequestInit).headers as Record<string, string>)["x-goog-api-key"] ?? new URL(String(call[0])).searchParams.get("key");
+
 describe("Gemini provider", () => {
   const saved = { ...process.env };
   afterEach(() => {
     process.env = { ...saved };
     vi.unstubAllGlobals();
   });
-
-  it("is picked only when its key is set, after Anthropic and OpenAI", () => {
+  function only(...keys: string[]) {
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
-    delete process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEYS;
+    for (let i = 2; i <= 10; i++) delete process.env[`GEMINI_API_KEY_${i}`];
+    if (keys[0]) process.env.GEMINI_API_KEY = keys[0];
+    else delete process.env.GEMINI_API_KEY;
+    keys.slice(1).forEach((k, i) => (process.env[`GEMINI_API_KEY_${i + 2}`] = k));
+    process.env.AI_GEMINI_BASE_URL = "https://gemini.example/v1beta";
+    delete process.env.AI_GEMINI_FALLBACK_MODELS;
+  }
+
+  it("collects several keys (single, numbered, comma list), cleans and de-duplicates them", () => {
+    expect(geminiKeys({ GEMINI_API_KEY: ` ${KEY_A}\n`, GEMINI_API_KEY_2: KEY_B, GEMINI_API_KEYS: `"${KEY_A}", ${KEY_B}, short` })).toEqual([KEY_A, KEY_B]);
+    expect(geminiKeys({})).toEqual([]);
+  });
+
+  it("is picked only when a key is set, after Anthropic and OpenAI", () => {
+    only();
     expect(pickProvider()).toBeNull();
-    process.env.GEMINI_API_KEY = "AIza-test";
+    only(KEY_A);
     expect(providerConfigured("gemini")).toBe(true);
     expect(pickProvider()).toBe("gemini");
     expect(pickProvider("anthropic")).toBe("gemini"); // preferred but not configured → falls back
@@ -25,14 +47,11 @@ describe("Gemini provider", () => {
   });
 
   it("sends system + history in Gemini format and parses text and token usage", async () => {
-    process.env.GEMINI_API_KEY = "AIza-test";
-    process.env.AI_GEMINI_BASE_URL = "https://gemini.example/v1beta";
-    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
-      new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "שלום " }, { text: "עולם" }] } }], usageMetadata: { promptTokenCount: 120, candidatesTokenCount: 30 }, modelVersion: "gemini-2.5-flash" }), { status: 200 }),
-    );
+    only(KEY_A);
+    const fetchMock = vi.fn(async () => ok("שלום ", { candidates: [{ content: { parts: [{ text: "שלום " }, { text: "עולם" }] } }], usageMetadata: { promptTokenCount: 120, candidatesTokenCount: 30 }, modelVersion: "gemini-3.8-flash" }));
     vi.stubGlobal("fetch", fetchMock);
     const r = await generate("gemini", {
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       system: "You are helpful",
       messages: [
         { role: "user", content: "hi" },
@@ -42,74 +61,79 @@ describe("Gemini provider", () => {
       temperature: 0.3,
       maxTokens: 500,
     });
-    expect(r).toEqual({ text: "שלום עולם", inputTokens: 120, outputTokens: 30, model: "gemini-2.5-flash", provider: "gemini" });
-    const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe("https://gemini.example/v1beta/models/gemini-2.5-flash:generateContent");
-    expect((init.headers as Record<string, string>)["x-goog-api-key"]).toBe("AIza-test");
+    expect(r).toEqual({ text: "שלום עולם", inputTokens: 120, outputTokens: 30, model: "gemini-3.8-flash", provider: "gemini" });
+    const [url, init] = fetchMock.mock.calls[0]! as unknown as [string, RequestInit];
+    expect(url).toBe("https://gemini.example/v1beta/models/gemini-3.8-flash:generateContent");
+    expect((init.headers as Record<string, string>)["x-goog-api-key"]).toBe(KEY_A);
     const body = JSON.parse(String(init.body));
     expect(body.systemInstruction.parts[0].text).toBe("You are helpful");
     expect(body.contents.map((c: { role: string }) => c.role)).toEqual(["user", "model", "user"]);
-    expect(body.generationConfig).toEqual({ temperature: 0.3, maxOutputTokens: 500, thinkingConfig: { thinkingBudget: 0 } });
+    expect(body.generationConfig).toEqual({ temperature: 0.3, maxOutputTokens: 2548 }); // room for thinking
   });
 
-  it("trims the key and retries with ?key= when header auth is rejected (AQ. keys)", async () => {
-    process.env.GEMINI_API_KEY = " AQ.test-key\n";
-    process.env.AI_GEMINI_BASE_URL = "https://gemini.example/v1beta";
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { status: "UNAUTHENTICATED" } }), { status: 401 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "ok" }] } }] }), { status: 200 }));
+  it("turns thinking off for 2.5 Flash so the answer is never empty", async () => {
+    only(KEY_A);
+    const fetchMock = vi.fn(async () => ok("ok"));
     vi.stubGlobal("fetch", fetchMock);
-    const r = await generate("gemini", { model: "gemini-2.5-flash", system: "", messages: [{ role: "user", content: "x" }], temperature: 0, maxTokens: 10 });
+    await generate("gemini", req("gemini-2.5-flash", 500));
+    const body = JSON.parse(String((fetchMock.mock.calls[0]! as unknown as [string, RequestInit])[1].body));
+    expect(body.generationConfig).toEqual({ temperature: 0, maxOutputTokens: 500, thinkingConfig: { thinkingBudget: 0 } });
+  });
+
+  it("retries with ?key= when header auth is rejected (AQ. keys)", async () => {
+    only(KEY_A);
+    const fetchMock = vi.fn().mockResolvedValueOnce(fail(401, "UNAUTHENTICATED")).mockResolvedValueOnce(ok("ok"));
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await generate("gemini", req());
     expect(r.text).toBe("ok");
-    expect(fetchMock.mock.calls[0]![1].headers["x-goog-api-key"]).toBe("AQ.test-key");
-    expect(fetchMock.mock.calls[1]![0]).toBe("https://gemini.example/v1beta/models/gemini-2.5-flash:generateContent?key=AQ.test-key");
-    expect(fetchMock.mock.calls[1]![1].headers["x-goog-api-key"]).toBeUndefined();
+    expect(String(fetchMock.mock.calls[1]![0])).toBe(`https://gemini.example/v1beta/models/gemini-flash-latest:generateContent?key=${encodeURIComponent(KEY_A)}`);
+    expect((fetchMock.mock.calls[1]![1] as RequestInit).headers).not.toHaveProperty("x-goog-api-key");
   });
 
-  it("throws a provider error on HTTP failure (credits are released by the caller)", async () => {
-    process.env.GEMINI_API_KEY = "AIza-test";
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { status: "RESOURCE_EXHAUSTED", message: "quota" } }), { status: 429 })));
-    await expect(generate("gemini", { model: "gemini-2.5-flash", system: "", messages: [{ role: "user", content: "x" }], temperature: 0, maxTokens: 10 })).rejects.toThrow("gemini_429:RESOURCE_EXHAUSTED:quota");
+  it("on 503 'high demand' moves to the next key before changing model", async () => {
+    only(KEY_A, KEY_B);
+    vi.spyOn(Math, "random").mockReturnValue(0); // start at key #1
+    const fetchMock = vi.fn().mockResolvedValueOnce(fail(503, "UNAVAILABLE", "high demand")).mockResolvedValueOnce(ok("second key ok"));
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await generate("gemini", req());
+    expect(r.text).toBe("second key ok");
+    expect(fetchMock.mock.calls.map(keyOf)).toEqual([KEY_A, KEY_B]);
+    expect(fetchMock.mock.calls.map(modelOf)).toEqual(["gemini-flash-latest", "gemini-flash-latest"]);
   });
 
-  it("retries on 503 'high demand' and falls back to a lighter model", async () => {
-    process.env.GEMINI_API_KEY = "AQ.test-key";
-    process.env.AI_GEMINI_BASE_URL = "https://gemini.example/v1beta";
-    delete process.env.AI_GEMINI_FALLBACK_MODELS;
-    const busy = () => new Response(JSON.stringify({ error: { status: "UNAVAILABLE", message: "high demand" } }), { status: 503 });
+  it("falls back to the next model when one is busy or retired (404 'no longer available')", async () => {
+    only(KEY_A);
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(busy()) // gemini-flash-latest, try 1
-      .mockResolvedValueOnce(busy()) // gemini-flash-latest, try 2
-      .mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "fallback ok" }] } }], modelVersion: "gemini-2.5-flash" }), { status: 200 }));
+      .mockResolvedValueOnce(fail(503, "UNAVAILABLE", "high demand")) // gemini-flash-latest
+      .mockResolvedValueOnce(fail(404, "NOT_FOUND", "no longer available to new users")) // gemini-3.8-flash
+      .mockResolvedValueOnce(ok("lite ok")); // gemini-flash-lite-latest
     vi.stubGlobal("fetch", fetchMock);
-    const r = await generate("gemini", { model: "gemini-flash-latest", system: "", messages: [{ role: "user", content: "x" }], temperature: 0, maxTokens: 10 });
-    expect(r.text).toBe("fallback ok");
-    expect(fetchMock.mock.calls.map((c) => String(c[0]).split("/models/")[1])).toEqual([
-      "gemini-flash-latest:generateContent",
-      "gemini-flash-latest:generateContent",
-      "gemini-2.5-flash:generateContent",
-    ]);
+    const r = await generate("gemini", req());
+    expect(r.text).toBe("lite ok");
+    expect(fetchMock.mock.calls.map(modelOf)).toEqual(["gemini-flash-latest", "gemini-3.8-flash", "gemini-flash-lite-latest"]);
   });
 
-  it("does not retry non-transient errors (e.g. bad request)", async () => {
-    process.env.GEMINI_API_KEY = "AQ.test-key";
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: { status: "INVALID_ARGUMENT" } }), { status: 404 }));
+  it("gives up after a bounded number of calls and reports the provider error", async () => {
+    only(KEY_A, KEY_B);
+    const fetchMock = vi.fn(async () => fail(429, "RESOURCE_EXHAUSTED", "quota"));
     vi.stubGlobal("fetch", fetchMock);
-    await expect(generate("gemini", { model: "gemini-x", system: "", messages: [{ role: "user", content: "x" }], temperature: 0, maxTokens: 10 })).rejects.toThrow("gemini_404");
+    await expect(generate("gemini", req())).rejects.toThrow("gemini_429:RESOURCE_EXHAUSTED:quota");
+    expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(6);
+  });
+
+  it("does not retry non-transient errors (e.g. invalid argument)", async () => {
+    only(KEY_A);
+    const fetchMock = vi.fn(async () => fail(422, "INVALID_ARGUMENT"));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(generate("gemini", req("gemini-x"))).rejects.toThrow("gemini_422");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("ignores thought parts and gives non-Flash models extra room for thinking", async () => {
-    process.env.GEMINI_API_KEY = "AQ.test-key";
-    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
-      new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "thinking…", thought: true }, { text: "answer" }] } }] }), { status: 200 }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    const r = await generate("gemini", { model: "gemini-2.5-pro", system: "", messages: [{ role: "user", content: "x" }], temperature: 0, maxTokens: 700 });
+  it("ignores thought parts", async () => {
+    only(KEY_A);
+    vi.stubGlobal("fetch", vi.fn(async () => ok("", { candidates: [{ content: { parts: [{ text: "thinking…", thought: true }, { text: "answer" }] } }] })));
+    const r = await generate("gemini", req("gemini-3.8-flash", 700));
     expect(r.text).toBe("answer");
-    const body = JSON.parse(String(fetchMock.mock.calls[0]![1].body));
-    expect(body.generationConfig).toEqual({ temperature: 0, maxOutputTokens: 2748 });
   });
 });
