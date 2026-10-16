@@ -6,6 +6,8 @@ import { SiteBuilder } from "@/components/websites/site-builder";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { siteEmbedOptions, sitePublicBase } from "@/lib/websites";
+import { aiSiteCaps } from "@/lib/ai/site-builder";
+import { AiSiteCard } from "@/components/websites/ai-site-card";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -24,6 +26,7 @@ export default async function NewSitePage({ params }: { params: Promise<{ locale
     );
   }
   const embeds = await siteEmbedOptions(ctx.org.id);
+  const caps = await aiSiteCaps(ctx.org.id);
   const Back = locale === "en" ? ArrowLeft : ArrowRight;
   const slug = `${ctx.org.slug}-site`.replace(/[^a-z0-9-]/g, "-").slice(0, 50);
   return (
@@ -32,10 +35,12 @@ export default async function NewSitePage({ params }: { params: Promise<{ locale
         <Back className="h-4 w-4" /> {t("websites.title")}
       </Link>
       <PageHeader title={t("websites.new")} description={t("websites.newHint")} />
+      {ctx.can("ai.use") ? <AiSiteCard caps={{ full: caps.full, images: caps.images }} /> : null}
       <SiteBuilder
         forms={embeds.forms}
         bookings={embeds.bookings}
         publicBase={sitePublicBase(locale)}
+        aiImages={caps.images && ctx.can("ai.use")}
         initial={{
           name: ctx.org.name,
           slug,

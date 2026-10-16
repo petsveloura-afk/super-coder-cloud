@@ -69,3 +69,13 @@ Any one of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY` enables AI.
 
 ### Several Gemini keys (more free quota)
 Add extra keys in Vercel → Environment Variables as `GEMINI_API_KEY_2`, `GEMINI_API_KEY_3` … `GEMINI_API_KEY_10` (or all of them comma-separated in `GEMINI_API_KEYS`). Each request starts at a random key and moves to the next key when Google answers "busy"/"quota" (429/5xx); retired or busy models fall back along `AI_GEMINI_FALLBACK_MODELS` (default `gemini-flash-latest,gemini-3.8-flash,gemini-flash-lite-latest,gemini-3.5-flash-lite`). At most 6 calls per request.
+
+### AI website builder + AI images (wave 5)
+| Variable | Required | Where | Purpose |
+|---|---|---|---|
+| `AI_GEMINI_IMAGE_MODELS` | no | server | comma list of Gemini image models, tried in order (default `gemini-3.1-flash-image,gemini-2.5-flash-image,gemini-3.1-flash-lite-image`) |
+
+- AI images need a Gemini key **and** `SUPABASE_SERVICE_ROLE_KEY` (images are saved to the public Storage bucket `site-assets`, created by migration `20261015000022_ai_studio.sql`).
+- Plan gating (table `plans.features`): `ai_site_landing` on every plan; `ai_site_full` and `ai_images` on pro / business / enterprise only. A full-site request on the free plan is built as a landing page.
+- Image generation may not be included in Google's free tier. If it fails, the site is still built — just without the AI image.
+- Every AI site is saved as a **draft**; the owner previews it (`/{lang}/websites/{id}/preview`) and publishes it manually.

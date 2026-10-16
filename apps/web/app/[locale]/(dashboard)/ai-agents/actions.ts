@@ -26,6 +26,8 @@ const agentSchema = z.object({
   language: z.enum(LOCALES),
   enabled: z.boolean(),
   crmLookup: z.boolean(),
+  siteBuilder: z.boolean().default(false),
+  imageGen: z.boolean().default(false),
 });
 
 const FIELDS = ["name", "instructions", "provider", "model", "temperature", "language"];
@@ -44,6 +46,8 @@ export async function saveAgentAction(_prev: ActionState, fd: FormData): Promise
     language: fd.get("language") ?? locale,
     enabled: fd.get("enabled") === "on",
     crmLookup: fd.get("crmLookup") === "on",
+    siteBuilder: fd.get("siteBuilder") === "on",
+    imageGen: fd.get("imageGen") === "on",
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error), values };
   const row = {
@@ -54,7 +58,12 @@ export async function saveAgentAction(_prev: ActionState, fd: FormData): Promise
     temperature: parsed.data.temperature,
     language: parsed.data.language,
     enabled: parsed.data.enabled,
-    allowed_tools: parsed.data.crmLookup ? ["crm_lookup", "draft_message"] : ["draft_message"],
+    allowed_tools: [
+      ...(parsed.data.crmLookup ? ["crm_lookup"] : []),
+      "draft_message",
+      ...(parsed.data.siteBuilder ? ["site_builder"] : []),
+      ...(parsed.data.imageGen ? ["image_gen"] : []),
+    ],
   };
   const supabase = await createClient();
   const id = uuidSchema.safeParse(fd.get("id"));

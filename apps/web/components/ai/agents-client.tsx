@@ -94,6 +94,14 @@ export function AgentDialog({ agent, defaults }: { agent?: AgentRow; defaults: {
           {t("ai.toolCrm")}
         </label>
         <label className="flex items-center gap-2.5 text-sm text-muted">
+          <input type="checkbox" name="siteBuilder" defaultChecked={agent ? agent.allowed_tools.includes("site_builder") : true} className="h-4 w-4 accent-[var(--accent)]" />
+          {t("ai.toolSiteBuilder")}
+        </label>
+        <label className="flex items-center gap-2.5 text-sm text-muted">
+          <input type="checkbox" name="imageGen" defaultChecked={agent ? agent.allowed_tools.includes("image_gen") : true} className="h-4 w-4 accent-[var(--accent)]" />
+          {t("ai.toolImages")}
+        </label>
+        <label className="flex items-center gap-2.5 text-sm text-muted">
           <input type="checkbox" name="enabled" defaultChecked={agent?.enabled ?? true} className="h-4 w-4 accent-[var(--accent)]" />
           {t("ai.enabled")}
         </label>

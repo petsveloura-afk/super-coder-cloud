@@ -373,7 +373,10 @@
       "white_label": "White-label branding",
       "api_access": "API access",
       "sso": "SSO login",
-      "dedicated_support": "Dedicated account manager"
+      "dedicated_support": "Dedicated account manager",
+      "ai_site_landing": "AI landing pages",
+      "ai_site_full": "AI full websites",
+      "ai_images": "AI images"
     },
     "statuses": {
       "trialing": "Trial",
@@ -424,7 +427,28 @@
     "empty": "No agents yet",
     "emptyBody": "Create your first agent — e.g. a sales rep that answers questions and qualifies leads",
     "saved": "Agent saved",
-    "busy": "The AI service is busy right now (we also tried fallback models). Please try again in a minute."
+    "busy": "The AI service is busy right now (we also tried fallback models). Please try again in a minute.",
+    "newChat": "New chat",
+    "conversations": "Conversations",
+    "untitled": "Untitled chat",
+    "deleteChatConfirm": "Delete this chat?",
+    "capFullSite": "Builds full websites",
+    "capLanding": "Builds landing pages",
+    "capImages": "AI images",
+    "capUpgrade": "Full sites & images — paid plans",
+    "suggest1": "What can you do?",
+    "suggest2": "Build me a landing page for my business",
+    "suggest3": "Draft a follow-up message to a customer",
+    "typing": "The agent is typing…",
+    "siteBuilt": "Site built and saved as a draft",
+    "siteFull": "Full website",
+    "siteLanding": "Landing page",
+    "siteDraftHint": "Saved as a draft in Websites — review, edit and publish in one click.",
+    "siteDowngraded": "A landing page was built — full websites and AI images are in paid plans.",
+    "sitePreview": "Preview",
+    "siteEdit": "Edit & publish",
+    "toolSiteBuilder": "Build landing pages and websites from the chat",
+    "toolImages": "Generate AI images (paid plans)"
   },
   "deals": {
     "pageTitle": "Deals & pipelines",
@@ -1512,7 +1536,23 @@
       "whatsapp": "WhatsApp",
       "email": "E-mail",
       "address": "Address"
-    }
+    },
+    "previewTitle": "Preview",
+    "aiTitle": "Build with AI",
+    "aiHint": "Describe the business — AI builds a professional, designed site ready to edit and publish",
+    "aiBrief": "About the business",
+    "aiBriefHint": "Name, what you offer, for whom, how to reach you and the style you like",
+    "aiBriefPlaceholder": "e.g. \"PetLine\" — a pet grooming salon and shop in Tel Aviv, dogs and cats, home delivery. Phone 03-1234567. Warm, family style.",
+    "aiFull": "Full website (paid plans)",
+    "aiWithImage": "Includes an AI hero image",
+    "aiImagesPaid": "AI images — paid plans",
+    "aiBuilding": "Building…",
+    "aiBuild": "Build my site",
+    "aiBriefShort": "Tell us a bit more about the business (at least a sentence)",
+    "aiImage": "AI image",
+    "aiImageReady": "Image created and added",
+    "aiInvalid": "The AI returned an invalid result — please try again",
+    "aiImageFailed": "Image generation failed — please try again"
   },
   "admin": {
     "title": "Platform admin",

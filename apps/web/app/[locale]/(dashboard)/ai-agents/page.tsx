@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Bot, KeyRound } from "lucide-react";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/primitives";
-import { AgentChat, AgentDialog, AgentStatus, DeleteAgentButton, type AgentRow } from "@/components/ai/agents-client";
+import { AgentDialog, AgentStatus, DeleteAgentButton, type AgentRow } from "@/components/ai/agents-client";
+import { StudioChat } from "@/components/ai/studio-chat";
+import { aiSiteCaps } from "@/lib/ai/site-builder";
 import { UsageMeter } from "@/components/billing/usage-meter";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
@@ -36,6 +38,7 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
   const creditLimit = e?.limits?.ai_credits_monthly ?? null;
   const used = Number(e?.ai_credits_used ?? 0);
   const provider = pickProvider();
+  const siteCaps = await aiSiteCaps(ctx.org.id);
   const canManage = ctx.can("ai.manage");
   const defaults = { openai: DEFAULT_MODELS.openai, anthropic: DEFAULT_MODELS.anthropic, gemini: DEFAULT_MODELS.gemini, provider: provider ?? "anthropic" };
 
@@ -52,7 +55,7 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
         <div className="mb-4 rounded-xl border border-gold/30 bg-gold-soft px-4 py-3 text-sm text-gold">{t("ai.demoBlocked")}</div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.8fr)_1.6fr]">
         <div className="space-y-4">
           <Card className="p-5">
             <UsageMeter
@@ -101,7 +104,7 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
         <Card>
           <CardHeader title={t("ai.testChat")} description={t("ai.testChatHint")} />
           <div className="p-5">
-            <AgentChat agents={agents} />
+            <StudioChat agents={agents} caps={{ ...siteCaps, canBuild: ctx.can("websites.manage") }} />
           </div>
         </Card>
       </div>

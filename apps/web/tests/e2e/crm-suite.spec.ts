@@ -45,8 +45,11 @@ test("companies, deals board, won deal, tasks and analytics — end to end", asy
   const proposalCol = page.locator('section[data-stage-id]').filter({ has: page.getByRole("heading", { name: "הצעת מחיר", exact: true }) });
   await expect(newCol.locator("li[data-deal-id]")).toHaveCount(1);
   const proposalId = await proposalCol.getAttribute("data-stage-id");
+  // wait for the server action to finish saving before reloading (the board updates optimistically)
+  const moved = page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/pipelines"), { timeout: 20_000 });
   await card.locator("select").selectOption(proposalId!);
   await expect(proposalCol.locator("li[data-deal-id]")).toHaveCount(1);
+  await moved;
   await page.reload();
   await expect(page.locator('section[data-stage-id]').filter({ has: page.getByRole("heading", { name: "הצעת מחיר", exact: true }) }).locator("li[data-deal-id]")).toHaveCount(1);
   await shot(page, "w1-01-board");
@@ -54,7 +57,7 @@ test("companies, deals board, won deal, tasks and analytics — end to end", asy
   // Mark as won → leaves the board, appears under "won"
   await page.locator("li[data-deal-id]").filter({ hasText: "רישיון שנתי" }).getByRole("button").first().click();
   await page.getByRole("dialog").getByRole("button", { name: "זכייה" }).click();
-  await expect(page.locator("li[data-deal-id]")).toHaveCount(0);
+  await expect(page.locator("li[data-deal-id]")).toHaveCount(0, { timeout: 20_000 });
   await page.getByRole("tab", { name: "זכיות" }).click();
   await expect(page.getByText("רישיון שנתי")).toBeVisible();
 

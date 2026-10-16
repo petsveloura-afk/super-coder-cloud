@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, ExternalLink, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ExternalLink, ImageIcon, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SITE_BLOCK_TYPES, type SiteBlockType } from "@scc/shared/engagement";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Card, Field, Input, Select, Textarea } from "@/components/ui/primitives";
-import { saveSiteAction } from "@/app/[locale]/(dashboard)/websites/actions";
+import { heroImageAIAction, saveSiteAction } from "@/app/[locale]/(dashboard)/websites/actions";
 import { cn } from "@/lib/utils";
 
 type Item = Record<string, string>;
@@ -55,12 +55,15 @@ export function SiteBuilder({
   forms,
   bookings,
   publicBase,
+  aiImages = false,
 }: {
   id?: string;
   initial: SiteValue;
   forms: { slug: string; name: string }[];
   bookings: { slug: string; name: string }[];
   publicBase: string;
+  /** paid plans: generate the hero image with AI */
+  aiImages?: boolean;
 }) {
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -68,6 +71,18 @@ export function SiteBuilder({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState<SiteBlockType>("hero");
   const [saving, start] = useTransition();
+  const [imaging, startImage] = useTransition();
+  function aiImage(i: number) {
+    const b = v.blocks[i];
+    if (!b || b.type !== "hero") return;
+    const prompt = [b.data.title, b.data.subtitle, v.name].filter(Boolean).join(". ");
+    startImage(async () => {
+      const r = await heroImageAIAction({ locale, prompt: String(prompt) });
+      if (r.error || !r.data) return void toast.error(t(r.error ?? "common.error"));
+      setBlock(i, { ...b.data, image_url: r.data.url });
+      toast.success(t("websites.aiImageReady"));
+    });
+  }
   const set = (patch: Partial<SiteValue>) => setV((x) => ({ ...x, ...patch }));
   const setBlock = (i: number, data: BlockValue["data"]) => setV((x) => ({ ...x, blocks: x.blocks.map((b, j) => (j === i ? { ...b, data } : b)) }));
   const move = (i: number, d: -1 | 1) =>
@@ -165,6 +180,13 @@ export function SiteBuilder({
                           </Select>
                         ) : f.multiline ? (
                           <Textarea id={fid} rows={f.key === "body" ? 6 : 2} value={value} onChange={(e) => onChange(e.target.value)} />
+                        ) : b.type === "hero" && f.key === "image_url" && aiImages ? (
+                          <div className="flex gap-2">
+                            <Input id={fid} dir="ltr" value={value} onChange={(e) => onChange(e.target.value)} />
+                            <Button variant="secondary" size="sm" className="h-10 shrink-0" loading={imaging} onClick={() => aiImage(i)}>
+                              <ImageIcon className="h-4 w-4" /> {t("websites.aiImage")}
+                            </Button>
+                          </div>
                         ) : (
                           <Input id={fid} dir={f.ltr ? "ltr" : undefined} value={value} onChange={(e) => onChange(e.target.value)} />
                         )}

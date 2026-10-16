@@ -19,6 +19,8 @@ export interface AIRequest {
   messages: AIMessage[];
   temperature: number;
   maxTokens: number;
+  /** ask the model for a single JSON object (site builder) */
+  json?: boolean;
 }
 
 export interface AIResult {
@@ -70,6 +72,7 @@ async function openai(req: AIRequest): Promise<AIResult> {
       temperature: req.temperature,
       max_tokens: req.maxTokens,
       messages: [{ role: "system", content: req.system }, ...req.messages],
+      ...(req.json ? { response_format: { type: "json_object" } } : {}),
     }),
     signal: AbortSignal.timeout(45_000),
     cache: "no-store",
@@ -137,6 +140,7 @@ async function geminiOnce(req: AIRequest, key: string): Promise<AIResult> {
       // empty; Flash models allow turning thinking off, others get extra room for it.
       maxOutputTokens: /2\.5-flash/.test(req.model) ? req.maxTokens : req.maxTokens + 2048,
       ...(/2\.5-flash/.test(req.model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+      ...(req.json ? { responseMimeType: "application/json" } : {}),
     },
   });
   const call = (withHeader: boolean) =>

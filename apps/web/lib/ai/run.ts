@@ -3,7 +3,7 @@ import { limitErrorKey } from "@scc/shared/billing";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_MODELS, generate, pickProvider, type AIMessage, type AIProviderName } from "./providers";
 
-export type AIFeature = "contact_summary" | "followup_draft" | "agent_chat";
+export type AIFeature = "contact_summary" | "followup_draft" | "agent_chat" | "site_builder";
 
 export type AIOutcome =
   | { ok: true; text: string; provider: AIProviderName; model: string; credits: number }
@@ -25,6 +25,8 @@ export async function runAI(input: {
   messages: AIMessage[];
   temperature?: number;
   maxTokens?: number;
+  /** ask for a single JSON object (site builder) */
+  json?: boolean;
 }): Promise<AIOutcome> {
   const provider = pickProvider(input.provider);
   if (!provider) return { ok: false, error: "ai.notConfigured" };
@@ -48,6 +50,7 @@ export async function runAI(input: {
       messages: input.messages,
       temperature: input.temperature ?? 0.3,
       maxTokens: input.maxTokens ?? 700,
+      json: input.json,
     });
     await supabase.rpc("finalize_ai_usage", {
       p_usage_id: usageId,

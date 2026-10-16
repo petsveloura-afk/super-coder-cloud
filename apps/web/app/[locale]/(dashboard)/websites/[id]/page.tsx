@@ -11,6 +11,7 @@ import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { siteEmbedOptions, sitePublicBase } from "@/lib/websites";
+import { aiSiteCaps } from "@/lib/ai/site-builder";
 import { formatNumber } from "@/lib/format";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -35,6 +36,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
   const { data: s } = await supabase.from("sites").select("*").eq("id", id).eq("organization_id", ctx.org.id).maybeSingle();
   if (!s) notFound();
   const embeds = await siteEmbedOptions(ctx.org.id);
+  const caps = await aiSiteCaps(ctx.org.id);
   const Back = locale === "en" ? ArrowLeft : ArrowRight;
   const theme = (s.theme ?? {}) as { accent?: string; mode?: "dark" | "light" };
   const seo = (s.seo ?? {}) as { title?: string; description?: string };
@@ -51,6 +53,9 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             <span className="inline-flex items-center gap-1 text-[13px] text-muted">
               <Eye className="h-4 w-4" /> {t("websites.visits", { count: formatNumber(locale, Number(s.visits)) })}
             </span>
+            <Link href={`/${locale}/websites/${id}/preview`} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line px-3 text-sm hover:bg-surface-hover">
+              <Eye className="h-4 w-4" /> {t("ai.sitePreview")}
+            </Link>
             <ConfirmDeleteSite id={id} redirectTo={`/${locale}/websites`} />
           </div>
         }
@@ -60,6 +65,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
         forms={embeds.forms}
         bookings={embeds.bookings}
         publicBase={sitePublicBase(locale)}
+        aiImages={caps.images && ctx.can("ai.use")}
         initial={{
           name: s.name as string,
           slug: s.slug as string,

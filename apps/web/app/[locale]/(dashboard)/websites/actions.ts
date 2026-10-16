@@ -55,3 +55,29 @@ export async function deleteSiteAction(fd: FormData): Promise<ActionState> {
   revalidatePath(`/${locale}/websites`);
   return { ok: true, message: "websites.deleted" };
 }
+
+/* ------------------------------------------------- AI site builder (v5) */
+export async function buildSiteWithAIAction(input: { locale: string; brief: string; full: boolean }): Promise<ActionState<{ id: string; downgraded: boolean }>> {
+  const locale = loc(input.locale);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("websites.manage") || !ctx.can("ai.use")) return { error: "errors.forbidden" };
+  const brief = String(input.brief ?? "").trim();
+  if (brief.length < 10) return { error: "websites.aiBriefShort" };
+  const { buildSiteWithAI } = await import("@/lib/ai/site-builder");
+  const r = await buildSiteWithAI({ orgId: ctx.org.id, userId: ctx.userId, locale, brief: brief.slice(0, 3000), wantFull: Boolean(input.full) });
+  if (!r.ok) return { error: r.error };
+  revalidatePath(`/${locale}/websites`);
+  return { ok: true, message: "ai.siteBuilt", data: { id: r.site.id, downgraded: r.site.downgraded } };
+}
+
+export async function heroImageAIAction(input: { locale: string; prompt: string }): Promise<ActionState<{ url: string }>> {
+  const locale = loc(input.locale);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("websites.manage") || !ctx.can("ai.use")) return { error: "errors.forbidden" };
+  const prompt = String(input.prompt ?? "").trim();
+  if (prompt.length < 3) return { error: "websites.aiBriefShort" };
+  const { aiHeroImage } = await import("@/lib/ai/site-builder");
+  const r = await aiHeroImage(ctx.org.id, prompt);
+  if (!r.ok) return { error: r.error };
+  return { ok: true, data: { url: r.url } };
+}
