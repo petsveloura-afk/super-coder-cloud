@@ -115,7 +115,7 @@ async function anthropic(req: AIRequest): Promise<AIResult> {
 }
 
 /** Google Gemini (generateContent). AI_GEMINI_BASE_URL overrides the endpoint (tests / gateways). */
-async function gemini(req: AIRequest): Promise<AIResult> {
+async function geminiOnce(req: AIRequest): Promise<AIResult> {
   const base = (process.env.AI_GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
   // keys pasted into dashboards often carry a stray space/newline/quote
   const key = (process.env.GEMINI_API_KEY ?? "").trim().replace(/^["']|["']$/g, "");
@@ -163,6 +163,36 @@ async function gemini(req: AIRequest): Promise<AIResult> {
     model: json.modelVersion ?? req.model,
     provider: "gemini",
   };
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Overload/rate-limit answers that are worth retrying (free tier often returns 503 "high demand"). */
+const transient = (e: unknown) => /^gemini_(429|500|502|503|504)\b/.test((e as Error).message ?? "");
+
+/**
+ * Gemini with resilience: short retries on transient errors, then fall back to other
+ * (lighter) models — AI_GEMINI_FALLBACK_MODELS, comma-separated, overrides the default list.
+ */
+async function gemini(req: AIRequest): Promise<AIResult> {
+  const fallbacks = (process.env.AI_GEMINI_FALLBACK_MODELS || "gemini-2.5-flash,gemini-2.5-flash-lite,gemini-flash-lite-latest")
+    .split(",")
+    .map((m) => m.trim())
+    .filter((m) => m && m !== req.model);
+  const models = [req.model, ...fallbacks].slice(0, 4);
+  let last: unknown;
+  for (const [i, model] of models.entries()) {
+    for (let attempt = 0; attempt < (i === 0 ? 2 : 1); attempt++) {
+      try {
+        return await geminiOnce({ ...req, model });
+      } catch (e) {
+        last = e;
+        if (!transient(e)) throw e;
+        console.error("gemini transient error", model, (e as Error).message.slice(0, 160));
+        if (i === 0 && attempt === 0) await sleep(800);
+      }
+    }
+  }
+  throw last;
 }
 
 export async function generate(provider: AIProviderName, req: AIRequest): Promise<AIResult> {

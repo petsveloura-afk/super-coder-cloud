@@ -73,6 +73,34 @@ describe("Gemini provider", () => {
     await expect(generate("gemini", { model: "gemini-2.5-flash", system: "", messages: [{ role: "user", content: "x" }], temperature: 0, maxTokens: 10 })).rejects.toThrow("gemini_429:RESOURCE_EXHAUSTED:quota");
   });
 
+  it("retries on 503 'high demand' and falls back to a lighter model", async () => {
+    process.env.GEMINI_API_KEY = "AQ.test-key";
+    process.env.AI_GEMINI_BASE_URL = "https://gemini.example/v1beta";
+    delete process.env.AI_GEMINI_FALLBACK_MODELS;
+    const busy = () => new Response(JSON.stringify({ error: { status: "UNAVAILABLE", message: "high demand" } }), { status: 503 });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(busy()) // gemini-flash-latest, try 1
+      .mockResolvedValueOnce(busy()) // gemini-flash-latest, try 2
+      .mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "fallback ok" }] } }], modelVersion: "gemini-2.5-flash" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await generate("gemini", { model: "gemini-flash-latest", system: "", messages: [{ role: "user", content: "x" }], temperature: 0, maxTokens: 10 });
+    expect(r.text).toBe("fallback ok");
+    expect(fetchMock.mock.calls.map((c) => String(c[0]).split("/models/")[1])).toEqual([
+      "gemini-flash-latest:generateContent",
+      "gemini-flash-latest:generateContent",
+      "gemini-2.5-flash:generateContent",
+    ]);
+  });
+
+  it("does not retry non-transient errors (e.g. bad request)", async () => {
+    process.env.GEMINI_API_KEY = "AQ.test-key";
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: { status: "INVALID_ARGUMENT" } }), { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(generate("gemini", { model: "gemini-x", system: "", messages: [{ role: "user", content: "x" }], temperature: 0, maxTokens: 10 })).rejects.toThrow("gemini_404");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores thought parts and gives non-Flash models extra room for thinking", async () => {
     process.env.GEMINI_API_KEY = "AQ.test-key";
     const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>

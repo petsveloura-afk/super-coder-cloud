@@ -423,7 +423,8 @@
     "agent": "Agent",
     "empty": "No agents yet",
     "emptyBody": "Create your first agent — e.g. a sales rep that answers questions and qualifies leads",
-    "saved": "Agent saved"
+    "saved": "Agent saved",
+    "busy": "The AI service is busy right now (we also tried fallback models). Please try again in a minute."
   },
   "deals": {
     "pageTitle": "Deals & pipelines",

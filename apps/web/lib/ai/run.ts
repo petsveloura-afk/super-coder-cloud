@@ -75,6 +75,8 @@ export async function runAI(input: {
       p_output: 0,
       p_ok: false,
     });
+    // provider overloaded / rate-limited → tell the user to retry shortly instead of a generic failure
+    if (/_(429|500|502|503|504)\b/.test((err as Error).message ?? "")) return { ok: false, error: "ai.busy" };
     return { ok: false, error: "ai.failed" };
   }
 }
