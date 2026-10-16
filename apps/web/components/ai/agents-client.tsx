@@ -8,7 +8,7 @@ import { LOCALES, LOCALE_META } from "@/lib/i18n/config";
 import { Dialog } from "@/components/ui/dialog";
 import { Badge, Button, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { FormAlert, SubmitButton, useFieldError } from "@/components/ui/form-bits";
-import { agentChatAction, deleteAgentAction, saveAgentAction } from "@/app/[locale]/(dashboard)/ai-agents/actions";
+import { agentChatAction, createQuickAgentAction, deleteAgentAction, saveAgentAction } from "@/app/[locale]/(dashboard)/ai-agents/actions";
 import type { ActionState } from "@/lib/action-state";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +22,15 @@ export interface AgentRow {
   language: string;
   enabled: boolean;
   allowed_tools: string[];
+  autopilot_channels?: string[];
+  greeting?: string;
+  handoff_rules?: string;
 }
+
+/** Channels the agent can answer on by itself (wave 6). */
+export const AUTOPILOT_CHANNEL_OPTIONS = ["web", "whatsapp", "whatsapp_qr", "telegram", "email", "sms"] as const;
+const AUTOPILOT_DEFAULT = ["web", "whatsapp", "whatsapp_qr", "telegram", "email"];
+const TEMPLATE_KEYS = ["sales", "booking", "support", "realestate", "ecommerce"] as const;
 
 export function AgentDialog({ agent, defaults }: { agent?: AgentRow; defaults: { openai: string; anthropic: string; gemini: string; provider: "openai" | "anthropic" | "gemini" } }) {
   const { t, locale } = useI18n();
@@ -39,6 +47,18 @@ export function AgentDialog({ agent, defaults }: { agent?: AgentRow; defaults: {
     }
   }, [state, t]);
   const v = (k: string, fb: string) => state.values?.[k] ?? fb;
+  const nameRef = useRef<HTMLInputElement>(null);
+  const instructionsRef = useRef<HTMLTextAreaElement>(null);
+  const greetingRef = useRef<HTMLTextAreaElement>(null);
+  const applyTemplate = (key: string) => {
+    if (!key) return;
+    if (instructionsRef.current && (!instructionsRef.current.value.trim() || window.confirm(t("ai.templates.replaceConfirm")))) {
+      instructionsRef.current.value = t(`ai.templates.${key}.instructions`);
+    }
+    if (nameRef.current && !nameRef.current.value.trim()) nameRef.current.value = t(`ai.templates.${key}.name`);
+    if (greetingRef.current && !greetingRef.current.value.trim()) greetingRef.current.value = t(`ai.templates.${key}.greeting`);
+  };
+  const channels = agent ? (agent.autopilot_channels ?? []) : AUTOPILOT_DEFAULT;
   return (
     <Dialog
       open={open}
@@ -61,12 +81,41 @@ export function AgentDialog({ agent, defaults }: { agent?: AgentRow; defaults: {
         <input type="hidden" name="locale" value={locale} />
         {agent ? <input type="hidden" name="id" value={agent.id} /> : null}
         {!state.ok ? <FormAlert state={state} /> : null}
+        <Field label={t("ai.templates.label")} htmlFor="agent-template" hint={t("ai.templates.hint")}>
+          <Select id="agent-template" defaultValue="" onChange={(e) => applyTemplate(e.target.value)}>
+            <option value="">{t("ai.templates.pick")}</option>
+            {TEMPLATE_KEYS.map((k) => (
+              <option key={k} value={k}>
+                {t(`ai.templates.${k}.label`)}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <Field label={t("ai.name")} htmlFor="agent-name" error={err("name")}>
-          <Input id="agent-name" name="name" required defaultValue={v("name", agent?.name ?? "")} aria-invalid={Boolean(err("name"))} />
+          <Input ref={nameRef} id="agent-name" name="name" required defaultValue={v("name", agent?.name ?? "")} aria-invalid={Boolean(err("name"))} />
         </Field>
         <Field label={t("ai.instructions")} htmlFor="agent-instructions" error={err("instructions")} hint={t("ai.instructionsHint")}>
-          <Textarea id="agent-instructions" name="instructions" className="min-h-32" defaultValue={v("instructions", agent?.instructions ?? "")} />
+          <Textarea ref={instructionsRef} id="agent-instructions" name="instructions" className="min-h-32" defaultValue={v("instructions", agent?.instructions ?? "")} />
         </Field>
+        <fieldset className="space-y-3 rounded-2xl border border-accent/25 bg-accent-soft/40 p-4" data-testid="autopilot-settings">
+          <input type="hidden" name="autopilotForm" value="1" />
+          <legend className="px-1 text-sm font-semibold">{t("ai.autopilot.title")}</legend>
+          <p className="text-[12.5px] text-muted">{t("ai.autopilot.hint")}</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {AUTOPILOT_CHANNEL_OPTIONS.map((c) => (
+              <label key={c} className="flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2 text-sm">
+                <input type="checkbox" name="autopilot" value={c} defaultChecked={channels.includes(c)} className="h-4 w-4 accent-[var(--accent)]" />
+                {t(`ai.autopilot.channels.${c}`)}
+              </label>
+            ))}
+          </div>
+          <Field label={t("ai.autopilot.greeting")} htmlFor="agent-greeting" hint={t("ai.autopilot.greetingHint")} error={err("greeting")}>
+            <Textarea ref={greetingRef} id="agent-greeting" name="greeting" rows={2} maxLength={500} defaultValue={v("greeting", agent?.greeting ?? "")} />
+          </Field>
+          <Field label={t("ai.autopilot.handoff")} htmlFor="agent-handoff" hint={t("ai.autopilot.handoffHint")} error={err("handoffRules")}>
+            <Textarea id="agent-handoff" name="handoffRules" rows={2} maxLength={2000} defaultValue={v("handoffRules", agent?.handoff_rules ?? "")} />
+          </Field>
+        </fieldset>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t("ai.provider")} htmlFor="agent-provider">
             <Select id="agent-provider" name="provider" value={provider} onChange={(e) => setProvider(e.target.value as "openai" | "anthropic" | "gemini")} dir="ltr">
@@ -202,4 +251,32 @@ export function AgentChat({ agents }: { agents: AgentRow[] }) {
 export function AgentStatus({ enabled }: { enabled: boolean }) {
   const { t } = useI18n();
   return <Badge tone={enabled ? "success" : "neutral"}>{t(enabled ? "ai.enabled" : "ai.disabled")}</Badge>;
+}
+
+/** One click: a ready "sales & service" agent that answers customers on every connected channel. */
+export function QuickAgentButton({ provider, model }: { provider: "openai" | "anthropic" | "gemini"; model: string }) {
+  const { t, locale } = useI18n();
+  const [pending, setPending] = useState(false);
+  return (
+    <Button
+      loading={pending}
+      data-testid="quick-agent"
+      onClick={async () => {
+        setPending(true);
+        const r = await createQuickAgentAction({
+          locale,
+          provider,
+          model,
+          name: t("ai.templates.sales.name"),
+          instructions: t("ai.templates.sales.instructions"),
+          greeting: t("ai.templates.sales.greeting"),
+        });
+        setPending(false);
+        if (r.error) toast.error(t(r.error));
+        else toast.success(t("ai.quickCreated"));
+      }}
+    >
+      <Sparkles className="h-4 w-4" /> {t("ai.quickCreate")}
+    </Button>
+  );
 }

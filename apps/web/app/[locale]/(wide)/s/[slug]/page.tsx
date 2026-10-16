@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import type { FormField, SiteBlock } from "@scc/shared/engagement";
 import { SiteRenderer } from "@/components/websites/site-renderer";
+import { ChatWidget } from "@/components/chat/chat-widget";
 import { createAnonClient } from "@/lib/supabase/anon";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { visitorHash } from "@/lib/visitor";
@@ -48,5 +49,11 @@ export default async function PublicSitePage({ params }: { params: Params }) {
       if (data) forms.set(fs, data as { name: string; fields: FormField[]; settings: Record<string, string>; org: string });
     }),
   );
-  return <SiteRenderer site={site} forms={forms} locale={locale} t={t} />;
+  return (
+    <>
+      <SiteRenderer site={site} forms={forms} locale={locale} t={t} />
+      {/* AI chat with the business — shown only when an agent answers the website chat */}
+      <ChatWidget orgSlug={site.org_slug} accent={site.theme?.accent} />
+    </>
+  );
 }

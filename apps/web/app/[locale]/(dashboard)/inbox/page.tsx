@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowLeft, ArrowRight, Inbox, MessageCircle, Plug, Send, Smartphone, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Globe, Inbox, Mail, MessageCircle, Plug, QrCode, Send, Smartphone, User } from "lucide-react";
 import { uuidSchema } from "@scc/shared/validators";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
-import { ConversationControls, LiveRefresh, MarkRead, ReplyBox } from "@/components/inbox/inbox-client";
+import { AiModeToggle, ConversationControls, LiveRefresh, MarkRead, ReplyBox } from "@/components/inbox/inbox-client";
 
 // icons resolved on the server (objects exported from client modules are only references here)
-const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone } as const;
+const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone, whatsapp_qr: QrCode, email: Mail, web: Globe } as const;
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -24,8 +24,10 @@ const FILTERS = ["open", "mine", "unassigned", "closed"] as const;
 
 interface ConvRow {
   id: string;
-  channel: "whatsapp" | "telegram" | "sms";
+  channel: "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email" | "web";
   title: string | null;
+  ai_mode?: "auto" | "human";
+  subject?: string | null;
   contact_id: string | null;
   status: string;
   assignee_id: string | null;
@@ -52,7 +54,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
 
   let q = supabase
     .from("conversations")
-    .select("id, channel, title, contact_id, status, assignee_id, unread_count, last_message_at, last_message_preview")
+    .select("id, channel, title, contact_id, status, assignee_id, unread_count, last_message_at, last_message_preview, ai_mode, subject")
     .eq("organization_id", ctx.org.id)
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .limit(200);
@@ -74,14 +76,14 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
   if (selectedId && !selected) {
     const { data } = await supabase
       .from("conversations")
-      .select("id, channel, title, contact_id, status, assignee_id, unread_count, last_message_at, last_message_preview")
+      .select("id, channel, title, contact_id, status, assignee_id, unread_count, last_message_at, last_message_preview, ai_mode, subject")
       .eq("id", selectedId)
       .eq("organization_id", ctx.org.id)
       .maybeSingle();
     selected = (data as ConvRow | null) ?? null;
   }
   const { data: msgs } = selected
-    ? await supabase.from("messages").select("id, direction, body, status, error, created_at, sent_by, media").eq("organization_id", ctx.org.id).eq("conversation_id", selected.id).order("created_at").limit(300)
+    ? await supabase.from("messages").select("id, direction, body, status, error, created_at, sent_by, media, ai_agent_id").eq("organization_id", ctx.org.id).eq("conversation_id", selected.id).order("created_at").limit(300)
     : { data: [] };
   const Back = locale === "en" ? ArrowLeft : ArrowRight;
   const href = (over: Record<string, string | undefined>) => {
@@ -132,6 +134,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                           {c.unread_count > 0 ? <span className="grid h-5 min-w-5 place-items-center rounded-full bg-accent-solid px-1.5 text-[11px] font-bold text-accent-fg">{c.unread_count}</span> : null}
                         </div>
                         <p className="truncate text-[12.5px] text-muted">{c.last_message_preview ?? ""}</p>
+                        {c.ai_mode === "human" ? <p className="text-[11px] font-medium text-warning">{t("inbox.needsHuman")}</p> : null}
                         <p className="text-[11px] text-subtle">{c.last_message_at ? formatDateTime(locale, c.last_message_at) : ""}</p>
                       </div>
                     </Link>
@@ -154,12 +157,14 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                   <h2 className="truncate font-semibold">{selected.title ?? "—"}</h2>
                   <Badge tone="neutral">{t(`campaigns.channels.${selected.channel}`)}</Badge>
                 </div>
+                {selected.subject ? <p className="truncate text-[12.5px] text-muted" dir="auto">{selected.subject}</p> : null}
                 {selected.contact_id ? (
                   <Link href={`/${locale}/crm/${selected.contact_id}`} className="inline-flex items-center gap-1 text-[12.5px] text-accent hover:underline">
                     <User className="h-3.5 w-3.5" /> {t("inbox.openContact")}
                   </Link>
                 ) : null}
               </div>
+              {ctx.can("inbox.reply") ? <AiModeToggle conversationId={selected.id} mode={selected.ai_mode ?? "auto"} /> : null}
               {ctx.can("inbox.reply") ? <ConversationControls conversationId={selected.id} status={selected.status} assigneeId={selected.assignee_id} members={members} /> : null}
             </header>
             <ol className="flex-1 space-y-2 overflow-y-auto p-4" aria-live="polite">
@@ -167,11 +172,16 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                 const out = m.direction === "out";
                 return (
                   <li key={m.id} className={cn("flex", out ? "justify-end" : "justify-start")}>
-                    <div className={cn("max-w-[80%] rounded-2xl px-3.5 py-2 text-sm", out ? "bg-accent-solid text-accent-fg" : "bg-elevated")}>
+                    <div className={cn("max-w-[80%] rounded-2xl px-3.5 py-2 text-sm", out ? (m.ai_agent_id ? "border border-gold/30 bg-gold-soft text-fg" : "bg-accent-solid text-accent-fg") : "bg-elevated")} data-ai={m.ai_agent_id ? "1" : undefined}>
+                      {out && m.ai_agent_id ? (
+                        <p className="mb-1 inline-flex items-center gap-1 text-[11px] font-semibold text-gold">
+                          <Bot className="h-3.5 w-3.5" /> {t("inbox.aiReply")}
+                        </p>
+                      ) : null}
                       <p className="whitespace-pre-wrap break-words" dir="auto">
                         {(m.body as string) || (m.media ? "📎" : "")}
                       </p>
-                      <p className={cn("mt-1 text-[10.5px]", out ? "text-accent-fg/75" : "text-subtle")}>
+                      <p className={cn("mt-1 text-[10.5px]", out && !m.ai_agent_id ? "text-accent-fg/75" : "text-subtle")}>
                         {formatDateTime(locale, m.created_at as string)}
                         {out ? ` · ${t(`inbox.status.${m.status}`)}${m.sent_by ? ` · ${memberName.get(m.sent_by as string) ?? ""}` : ""}` : ""}
                       </p>

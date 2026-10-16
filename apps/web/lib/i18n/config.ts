@@ -35,3 +35,15 @@ export function negotiateLocale(acceptLanguage: string | null | undefined): Loca
   }
   return DEFAULT_LOCALE;
 }
+
+/**
+ * Locale for a first visit (no saved choice): the product is Hebrew-first, so
+ * Hebrew is used unless the browser prefers Arabic — an English phone no longer
+ * lands on the English UI (which iOS/Chrome then "auto-translates" badly).
+ * English stays one click away in the language switcher.
+ * Set NEXT_PUBLIC_LOCALE_NEGOTIATION=browser to restore full browser negotiation.
+ */
+export function firstVisitLocale(acceptLanguage: string | null | undefined): Locale {
+  if (process.env.NEXT_PUBLIC_LOCALE_NEGOTIATION === "browser") return negotiateLocale(acceptLanguage);
+  return negotiateLocale(acceptLanguage) === "ar" ? "ar" : DEFAULT_LOCALE;
+}

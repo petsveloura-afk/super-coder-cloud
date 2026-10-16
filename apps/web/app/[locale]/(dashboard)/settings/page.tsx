@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { Bell } from "lucide-react";
 import type { AuditLogRow } from "@scc/database";
@@ -25,7 +26,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
     supabase.from("organizations").select("name, timezone, currency, locale").eq("id", ctx.org.id).single(),
     supabase
       .from("notifications")
-      .select("id, title_key, params, created_at, read_at")
+      .select("id, title_key, params, created_at, read_at, link")
       .eq("organization_id", ctx.org.id)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -39,7 +40,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
       : Promise.resolve({ data: null }),
   ]);
   const org = orgRes.data ?? { name: ctx.org.name, timezone: "Asia/Jerusalem", currency: "ILS", locale: "he" };
-  const notifications = (notifRes.data ?? []) as { id: string; title_key: string; params: Record<string, string>; created_at: string; read_at: string | null }[];
+  const notifications = (notifRes.data ?? []) as { id: string; title_key: string; params: Record<string, string>; created_at: string; read_at: string | null; link?: string | null }[];
   const audit = auditRes.data as Pick<AuditLogRow, "id" | "action" | "entity_type" | "created_at">[] | null;
 
   return (
@@ -78,7 +79,13 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
               {notifications.map((n) => (
                 <li key={n.id} className="flex items-center gap-3 px-5 py-3 text-sm">
                   {!n.read_at ? <span className="h-2 w-2 rounded-full bg-accent" /> : <span className="h-2 w-2" />}
-                  <span className="flex-1">{t(n.title_key, n.params)}</span>
+                  {n.link && /^\/[a-z]/.test(n.link) ? (
+                    <Link href={`/${locale}${n.link}`} className="flex-1 hover:text-accent hover:underline">
+                      {t(n.title_key, n.params)}
+                    </Link>
+                  ) : (
+                    <span className="flex-1">{t(n.title_key, n.params)}</span>
+                  )}
                   <span className="text-[12px] text-subtle">{formatDateTime(locale, n.created_at)}</span>
                 </li>
               ))}

@@ -64,6 +64,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     text,
     externalMessageId: String(msg.message_id),
     media,
+    chatType: msg.chat.type,
+    // edits and channel posts are stored but never answered automatically
+    autoReply: Boolean(update?.message),
   });
   // Always 200 so Telegram doesn't retry forever; failures are logged.
   return NextResponse.json({ ok: true });

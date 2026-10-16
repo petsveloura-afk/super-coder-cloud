@@ -28,6 +28,10 @@ const agentSchema = z.object({
   crmLookup: z.boolean(),
   siteBuilder: z.boolean().default(false),
   imageGen: z.boolean().default(false),
+  // wave 6 — the agent answers customers automatically on these channels
+  autopilot: z.array(z.enum(["web", "telegram", "whatsapp", "whatsapp_qr", "sms", "email"])).max(6).default([]),
+  greeting: z.string().trim().max(500, "validation.tooLong").default(""),
+  handoffRules: z.string().trim().max(2000, "validation.tooLong").default(""),
 });
 
 const FIELDS = ["name", "instructions", "provider", "model", "temperature", "language"];
@@ -48,6 +52,9 @@ export async function saveAgentAction(_prev: ActionState, fd: FormData): Promise
     crmLookup: fd.get("crmLookup") === "on",
     siteBuilder: fd.get("siteBuilder") === "on",
     imageGen: fd.get("imageGen") === "on",
+    autopilot: fd.get("autopilotForm") === "1" ? [...new Set(fd.getAll("autopilot").map(String))] : undefined,
+    greeting: fd.get("greeting") ?? "",
+    handoffRules: fd.get("handoffRules") ?? "",
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error), values };
   const row = {
@@ -64,6 +71,9 @@ export async function saveAgentAction(_prev: ActionState, fd: FormData): Promise
       ...(parsed.data.siteBuilder ? ["site_builder"] : []),
       ...(parsed.data.imageGen ? ["image_gen"] : []),
     ],
+    ...(fd.get("autopilotForm") === "1"
+      ? { autopilot_channels: parsed.data.autopilot, greeting: parsed.data.greeting, handoff_rules: parsed.data.handoffRules }
+      : {}),
   };
   const supabase = await createClient();
   const id = uuidSchema.safeParse(fd.get("id"));
@@ -161,4 +171,39 @@ export async function agentChatAction(
     { role: "assistant" as const, content: out.text.slice(0, 2000) },
   ].slice(-10);
   return { ok: true, data: { reply: out.text, history: full } };
+}
+
+/** Wave 6 — one-click "sales & service" agent that answers customers on every connected channel. */
+export async function createQuickAgentAction(input: {
+  locale: string;
+  provider: "openai" | "anthropic" | "gemini";
+  model: string;
+  name: string;
+  instructions: string;
+  greeting: string;
+}): Promise<ActionState> {
+  const locale: Locale = isLocale(input.locale) ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("ai.manage")) return { error: "errors.forbidden" };
+  const provider = (["openai", "anthropic", "gemini"] as const).includes(input.provider) ? input.provider : "gemini";
+  const model = /^[A-Za-z0-9._:-]{2,80}$/.test(input.model) ? input.model : "gemini-flash-latest";
+  const supabase = await createClient();
+  const { error } = await supabase.from("ai_agents").insert({
+    organization_id: ctx.org.id,
+    created_by: ctx.userId,
+    name: input.name.trim().slice(0, 80) || "AI",
+    instructions: input.instructions.slice(0, 8000),
+    greeting: input.greeting.slice(0, 500),
+    provider,
+    model,
+    temperature: 0.4,
+    language: locale,
+    enabled: true,
+    allowed_tools: ["crm_lookup", "draft_message", "site_builder", "image_gen"],
+    autopilot_channels: ["web", "whatsapp", "whatsapp_qr", "telegram", "email"],
+  });
+  if (error) return { error: limitErrorKey(error.message) ?? dbErrorKey(error) };
+  revalidatePath(`/${locale}/ai-agents`);
+  revalidatePath(`/${locale}/integrations`);
+  return { ok: true, message: "ai.quickCreated" };
 }

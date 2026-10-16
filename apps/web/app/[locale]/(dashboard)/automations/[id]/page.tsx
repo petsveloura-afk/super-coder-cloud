@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { builderOptions } from "@/lib/automation-options";
 import { publicEnv } from "@/lib/env";
 import { formatDateTime } from "@/lib/format";
+import { stepDetailLabel } from "@/components/automations/step-detail";
 
 type Params = Promise<{ locale: string; id: string }>;
 
@@ -84,7 +85,7 @@ export default async function AutomationPage({ params }: { params: Params }) {
                         {(r.steps as { type: string; status: string; detail?: string }[]).map((s, i) => (
                           <li key={i} className={s.status === "error" ? "text-danger" : undefined}>
                             {t(`automations.actions.${s.type}`)} — {t(`automations.stepStatus.${s.status}`)}
-                            {s.detail ? <span className="text-subtle"> ({s.detail})</span> : null}
+                            {s.detail ? <span className="text-subtle"> — <bdi>{stepDetailLabel(t, s.detail)}</bdi></span> : null}
                           </li>
                         ))}
                       </ul>

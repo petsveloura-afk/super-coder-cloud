@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCheck, MessageCircle, RotateCcw, Send, Smartphone, X } from "lucide-react";
+import { Bot, CheckCheck, MessageCircle, RotateCcw, Send, Smartphone, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Select, Textarea } from "@/components/ui/primitives";
 import { Dialog } from "@/components/ui/dialog";
-import { markReadAction, replyAction, startConversationAction, updateConversationAction } from "@/app/[locale]/(dashboard)/inbox/actions";
+import { markReadAction, replyAction, setAiModeAction, startConversationAction, updateConversationAction } from "@/app/[locale]/(dashboard)/inbox/actions";
 
 export const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone } as const;
 
@@ -163,5 +163,33 @@ export function MessageContactButton({ contactId, channels }: { contactId: strin
         </div>
       </div>
     </Dialog>
+  );
+}
+
+/** Who answers this conversation: the AI agent (auto) or the team (human). A team reply switches to "human". */
+export function AiModeToggle({ conversationId, mode }: { conversationId: string; mode: "auto" | "human" }) {
+  const { t, locale } = useI18n();
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const auto = mode === "auto";
+  return (
+    <Button
+      variant={auto ? "secondary" : "primary"}
+      size="sm"
+      loading={pending}
+      data-testid="ai-mode"
+      data-mode={mode}
+      title={t(auto ? "inbox.aiModeAutoHint" : "inbox.aiModeHumanHint")}
+      onClick={() =>
+        start(async () => {
+          const res = await setAiModeAction({ locale, conversationId, mode: auto ? "human" : "auto" });
+          if (res.error) toast.error(t(res.error));
+          else toast.success(t(auto ? "inbox.aiPaused" : "inbox.aiResumed"));
+          router.refresh();
+        })
+      }
+    >
+      {auto ? <UserRound className="h-4 w-4" /> : <Bot className="h-4 w-4" />} {t(auto ? "inbox.takeOver" : "inbox.backToAi")}
+    </Button>
   );
 }

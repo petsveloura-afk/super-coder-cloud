@@ -239,3 +239,149 @@ export async function disconnectChannelAction(fd: FormData): Promise<ActionState
   revalidatePath(`/${locale}/integrations`);
   return { ok: true, message: "integrations.channels.disconnected" };
 }
+
+/* ------------------------------------- wave 6: e-mail, WhatsApp (official / QR) ---- */
+
+const mailboxSchema = z.object({
+  address: z.string().trim().toLowerCase().email({ message: "validation.email" }).max(200),
+  password: z.string().trim().min(4, { message: "integrations.mail.badPassword" }).max(300),
+  display_name: z.string().trim().max(120).optional().default(""),
+  imap_host: z.string().trim().max(200).optional().default(""),
+  imap_port: z.string().trim().max(5).optional().default(""),
+  smtp_host: z.string().trim().max(200).optional().default(""),
+  smtp_port: z.string().trim().max(5).optional().default(""),
+});
+const HOST_RE = /^[a-z0-9.-]{3,200}$/i;
+
+/** Any mailbox (Gmail, Outlook, Yahoo, iCloud, a business domain…) with an app password. */
+export async function connectMailboxAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const locale = formLocale(fd);
+  const ctx = await getOrgContext(locale);
+  const values = { address: str(fd, "address"), display_name: str(fd, "display_name"), imap_host: str(fd, "imap_host"), imap_port: str(fd, "imap_port"), smtp_host: str(fd, "smtp_host"), smtp_port: str(fd, "smtp_port") };
+  if (!ctx.can("integrations.manage")) return { error: "errors.forbidden", values };
+  const { encryptionReady } = await import("@/lib/channels/secrets");
+  if (!encryptionReady()) return { error: "integrations.channels.encryptionMissing", values };
+  const parsed = mailboxSchema.safeParse({ ...values, password: str(fd, "password").replace(/\s+/g, "") });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error), values };
+  const v = parsed.data;
+  const { detectMailServers } = await import("@/lib/channels/email-core");
+  const auto = detectMailServers(v.address);
+  const imap_host = v.imap_host || auto.imap_host;
+  const smtp_host = v.smtp_host || auto.smtp_host;
+  const imap_port = Number(v.imap_port || auto.imap_port);
+  const smtp_port = Number(v.smtp_port || auto.smtp_port);
+  if (!HOST_RE.test(imap_host) || !HOST_RE.test(smtp_host) || !(imap_port > 0 && imap_port < 65536) || !(smtp_port > 0 && smtp_port < 65536)) {
+    return { error: "integrations.mail.badServer", values };
+  }
+  const { verifyMailbox } = await import("@/lib/channels/email");
+  const cfg = { address: v.address, display_name: v.display_name || ctx.org.name, auth: "password" as const, imap_host, imap_port, smtp_host, smtp_port };
+  const check = await verifyMailbox(cfg, { password: v.password });
+  if (!check.ok) {
+    return { error: check.step === "smtp" ? "integrations.mail.smtpFailed" : "integrations.mail.imapFailed", messageParams: { detail: check.error ?? "" }, values: { ...values, imap_host, smtp_host, imap_port: String(imap_port), smtp_port: String(smtp_port) } };
+  }
+  const { saveMailbox } = await import("@/lib/channels/mailbox-save");
+  const saved = await saveMailbox({ orgId: ctx.org.id, userId: ctx.userId, config: cfg, secrets: { password: v.password }, uidValidity: check.uid_validity, lastUid: check.last_uid });
+  if (!saved.ok) return { error: "errors.generic", values };
+  revalidatePath(`/${locale}/integrations`);
+  revalidatePath(`/${locale}/inbox`);
+  return { ok: true, message: "integrations.mail.connected" };
+}
+
+/** Disconnect for the wave-6 channels (e-mail, WhatsApp QR); the original action keeps serving the others. */
+export async function disconnectChannelV2Action(fd: FormData): Promise<ActionState> {
+  const locale = formLocale(fd);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("integrations.manage")) return { error: "errors.forbidden" };
+  const kind = str(fd, "kind");
+  if (!["email", "whatsapp_qr"].includes(kind)) return { error: "validation.invalidId" };
+  const supabase = await createClient();
+  const { data: acc } = await supabase.from("channel_accounts").select("id").eq("organization_id", ctx.org.id).eq("kind", kind).maybeSingle();
+  if (kind === "whatsapp_qr" && acc) {
+    const { bridgeLogout } = await import("@/lib/channels/wa-bridge");
+    await bridgeLogout(acc.id as string).catch(() => {});
+  }
+  const { error } = await supabase.from("channel_accounts").delete().eq("organization_id", ctx.org.id).eq("kind", kind);
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}/integrations`);
+  return { ok: true, message: "integrations.channels.disconnected" };
+}
+
+const embeddedSchema = z.object({
+  code: z.string().trim().min(10).max(2000),
+  phoneNumberId: z.string().trim().regex(/^\d{5,30}$/),
+  wabaId: z.string().trim().regex(/^\d{5,30}$/),
+});
+
+/** Official WhatsApp — finishes Meta Embedded Signup (the popup returned a code + the chosen number). */
+export async function connectWhatsAppEmbeddedAction(input: { locale: string; code: string; phoneNumberId: string; wabaId: string }): Promise<ActionState> {
+  const locale = input.locale === "ar" || input.locale === "en" ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("integrations.manage")) return { error: "errors.forbidden" };
+  const parsed = embeddedSchema.safeParse(input);
+  if (!parsed.success) return { error: "integrations.whatsapp.signupIncomplete" };
+  const { encryptionReady, sealSecrets } = await import("@/lib/channels/secrets");
+  if (!encryptionReady()) return { error: "integrations.channels.encryptionMissing" };
+  const { completeEmbeddedSignup } = await import("@/lib/channels/meta");
+  const done = await completeEmbeddedSignup(parsed.data);
+  if (!done.ok || !done.accessToken || !done.config) return { error: "integrations.whatsapp.signupFailed", messageParams: { detail: `${done.step ?? ""} ${done.error ?? ""}`.trim() } };
+  const supabase = await createClient();
+  const row = {
+    config: done.config,
+    secret_enc: sealSecrets({ access_token: done.accessToken, app_secret: process.env.META_APP_SECRET ?? "" }),
+    status: "active",
+    last_error: done.warning ? `register: ${done.warning}`.slice(0, 500) : null,
+    name: done.config.verified_name || done.config.display_phone_number || "WhatsApp",
+    updated_at: new Date().toISOString(),
+  };
+  const { data: existing } = await supabase.from("channel_accounts").select("id").eq("organization_id", ctx.org.id).eq("kind", "whatsapp").maybeSingle();
+  const { error } = existing
+    ? await supabase.from("channel_accounts").update(row).eq("id", existing.id).eq("organization_id", ctx.org.id)
+    : await supabase.from("channel_accounts").insert({ ...row, organization_id: ctx.org.id, kind: "whatsapp", created_by: ctx.userId });
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}/integrations`);
+  revalidatePath(`/${locale}/inbox`);
+  return { ok: true, message: "integrations.channels.connected" };
+}
+
+export interface QrState {
+  status: "starting" | "qr" | "connected" | "logged_out" | "error" | "unknown" | "not_configured";
+  qr?: string | null;
+  phone?: string | null;
+  error?: string | null;
+}
+
+/** WhatsApp by QR — opens a session on the bridge and returns the QR to scan. */
+export async function startWhatsAppQrAction(input: { locale: string }): Promise<QrState> {
+  const locale = input.locale === "ar" || input.locale === "en" ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("integrations.manage")) return { status: "error", error: "errors.forbidden" };
+  const { bridgeConfigured, bridgeStart } = await import("@/lib/channels/wa-bridge");
+  if (!bridgeConfigured()) return { status: "not_configured" };
+  const supabase = await createClient();
+  let { data: acc } = await supabase.from("channel_accounts").select("id, webhook_token").eq("organization_id", ctx.org.id).eq("kind", "whatsapp_qr").maybeSingle();
+  if (!acc) {
+    const { data, error } = await supabase
+      .from("channel_accounts")
+      .insert({ organization_id: ctx.org.id, kind: "whatsapp_qr", name: "WhatsApp", status: "active", config: { state: "starting" }, created_by: ctx.userId })
+      .select("id, webhook_token")
+      .single();
+    if (error || !data) return { status: "error", error: error ? dbErrorKey(error) : "errors.generic" };
+    acc = data;
+  }
+  const st = await bridgeStart(acc.id as string, acc.webhook_token as string);
+  return { status: st.status, qr: st.qr ?? null, phone: st.phone ?? null, error: st.error ?? null };
+}
+
+export async function whatsAppQrStatusAction(input: { locale: string }): Promise<QrState> {
+  const locale = input.locale === "ar" || input.locale === "en" ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("integrations.manage")) return { status: "error", error: "errors.forbidden" };
+  const { bridgeConfigured, bridgeStatus } = await import("@/lib/channels/wa-bridge");
+  if (!bridgeConfigured()) return { status: "not_configured" };
+  const supabase = await createClient();
+  const { data: acc } = await supabase.from("channel_accounts").select("id, config").eq("organization_id", ctx.org.id).eq("kind", "whatsapp_qr").maybeSingle();
+  if (!acc) return { status: "unknown" };
+  const st = await bridgeStatus(acc.id as string);
+  if (st.status === "connected") revalidatePath(`/${locale}/integrations`);
+  return { status: st.status, qr: st.qr ?? null, phone: st.phone ?? null, error: st.error ?? null };
+}

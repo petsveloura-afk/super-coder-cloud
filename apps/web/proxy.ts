@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured } from "@/lib/env";
-import { LOCALE_COOKIE, isLocale, negotiateLocale } from "@/lib/i18n/config";
+import { LOCALE_COOKIE, firstVisitLocale, isLocale } from "@/lib/i18n/config";
 import { updateSession } from "@/lib/supabase/proxy-session";
 
 /** Routes reachable without a session (after the /{locale} prefix). */
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/offline", "/setup", "/f", "/book", "/c", "/s", "/q", "/help", "/t"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/offline", "/setup", "/f", "/book", "/c", "/s", "/q", "/help", "/t", "/chat"];
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
@@ -13,7 +13,7 @@ export async function proxy(request: NextRequest) {
   // 1) Ensure every page URL carries a supported locale prefix.
   if (!isLocale(first)) {
     const cookieLocale = request.cookies.get(LOCALE_COOKIE)?.value;
-    const locale = isLocale(cookieLocale) ? cookieLocale : negotiateLocale(request.headers.get("accept-language"));
+    const locale = isLocale(cookieLocale) ? cookieLocale : firstVisitLocale(request.headers.get("accept-language"));
     const url = request.nextUrl.clone();
     url.pathname = `/${locale}${pathname === "/" ? "" : pathname}`;
     url.search = search;

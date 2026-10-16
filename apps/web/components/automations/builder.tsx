@@ -10,6 +10,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { stageLabel, pipelineLabel, triggerLabel } from "@/lib/labels";
 import { Button, Card, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { saveAutomationAction, testAutomationAction } from "@/app/[locale]/(dashboard)/automations/actions";
+import { stepDetailLabel } from "@/components/automations/step-detail";
 
 export interface BuilderAction {
   type: ActionType;
@@ -353,7 +354,7 @@ export function AutomationBuilder({ id, initial, options, inboundUrl }: { id?: s
             {testResult.map((s, i) => (
               <li key={i} className={s.status === "error" ? "text-danger" : s.status === "skipped" ? "text-muted" : "text-success"}>
                 {i + 1}. {t(`automations.actions.${s.type}`)} — {t(`automations.stepStatus.${s.status}`)}
-                {s.detail ? <span className="text-subtle"> ({s.detail})</span> : null}
+                {s.detail ? <span className="text-subtle"> — <bdi>{stepDetailLabel(t, s.detail)}</bdi></span> : null}
               </li>
             ))}
           </ul>

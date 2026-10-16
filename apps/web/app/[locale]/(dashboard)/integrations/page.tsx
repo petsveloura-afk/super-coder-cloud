@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Bot, CheckCircle2, CircleDashed, CreditCard, Mail, Plug, Timer, Zap } from "lucide-react";
@@ -5,6 +6,12 @@ import { integrationAvailability } from "@scc/shared/env";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { ApiDocs, ApiKeys, Webhooks, type ApiKeyRow, type WebhookRow } from "@/components/integrations/developer";
 import { ChannelsSection } from "@/components/integrations/channels-section";
+import { ConnectHub, type HubProps } from "@/components/integrations/connect-hub";
+import { IntegrationsNotice } from "@/components/integrations/integrations-notice";
+import { metaPublicConfig } from "@/lib/channels/meta";
+import { bridgeConfigured } from "@/lib/channels/wa-bridge";
+import { mailOAuthConfigured } from "@/lib/channels/oauth-mail";
+import { encryptionReady } from "@/lib/channels/secrets";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -45,10 +52,44 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
   ];
   const baseUrl = publicEnv.appUrl.replace(/\/$/, "");
 
+  // wave 6 — simple connection hub
+  const [{ data: chRows }, { data: agentRows }] = await Promise.all([
+    supabase.from("channel_accounts").select("kind, name, status, config, last_error").eq("organization_id", ctx.org.id),
+    supabase.from("ai_agents").select("name, enabled, autopilot_channels").eq("organization_id", ctx.org.id).order("created_at"),
+  ]);
+  const ch = (k: string) => ((chRows ?? []) as { kind: string; name: string; status: string; config: Record<string, string>; last_error: string | null }[]).find((r) => r.kind === k);
+  const pilot = ((agentRows ?? []) as { name: string; enabled: boolean; autopilot_channels: string[] | null }[]).find((a) => a.enabled && (a.autopilot_channels ?? []).length > 0);
+  const wa = ch("whatsapp");
+  const qr = ch("whatsapp_qr");
+  const tg = ch("telegram");
+  const mail = ch("email");
+  const hub: HubProps = {
+    orgSlug: ctx.org.slug,
+    appUrl: baseUrl,
+    agent: { exists: Boolean(pilot), name: pilot?.name ?? null, channels: pilot?.autopilot_channels ?? [] },
+    channels: {
+      web: { connected: Boolean(pilot?.autopilot_channels?.includes("web")) },
+      whatsapp: { connected: Boolean(wa && wa.status !== "disabled"), label: wa ? `${wa.config.display_phone_number ?? ""} ${wa.config.verified_name ? `· ${wa.config.verified_name}` : ""}`.trim() : null, error: wa?.status === "error" ? wa.last_error : null, mode: wa?.config.mode ?? null },
+      whatsapp_qr: { connected: qr?.config.state === "connected", label: qr?.config.phone ? `+${qr.config.phone}` : null, error: qr?.status === "error" ? qr.last_error : null },
+      telegram: { connected: Boolean(tg && tg.status !== "disabled"), label: tg?.config.username ? `@${tg.config.username}` : null, error: tg?.status === "error" ? tg.last_error : null },
+      email: { connected: Boolean(mail && mail.status !== "disabled"), address: mail?.config.address ?? null, auth: mail?.config.auth ?? null, error: mail?.status === "error" ? mail.last_error : null },
+    },
+    meta: metaPublicConfig(),
+    bridge: bridgeConfigured(),
+    oauth: { google: mailOAuthConfigured("google"), microsoft: mailOAuthConfigured("microsoft") },
+    encryption: encryptionReady(),
+    canManage: canChannels,
+  };
+
   return (
     <>
-      <PageHeader title={t("integrations.title")} description={t("integrations.subtitle")} />
+      <PageHeader title={t("integrations.title")} description={t("integrations.hubSubtitle")} />
+      <Suspense fallback={null}>
+        <IntegrationsNotice />
+      </Suspense>
+      {canChannels ? <ConnectHub {...hub} /> : null}
 
+      {ctx.isPlatformAdmin ? (
       <Card className="mb-4">
         <CardHeader title={t("integrations.platformTitle")} description={t("integrations.platformHint")} />
         <ul className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -66,7 +107,17 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
           ))}
         </ul>
       </Card>
+      ) : null}
 
+      <details className="group mb-4 rounded-2xl border border-line bg-surface" data-testid="advanced-integrations">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-4">
+          <span>
+            <span className="block font-semibold">{t("integrations.advancedTitle")}</span>
+            <span className="block text-[12.5px] text-muted">{t("integrations.advancedHint")}</span>
+          </span>
+          <span className="text-[12.5px] font-medium text-accent group-open:hidden">{t("integrations.advancedOpen")}</span>
+        </summary>
+        <div className="space-y-4 border-t border-line p-4">
       {canChannels ? <ChannelsSection orgId={ctx.org.id} locale={locale} /> : null}
 
       {canApi ? (
@@ -112,6 +163,8 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
           </Card>
         </div>
       ) : null}
+        </div>
+      </details>
     </>
   );
 }

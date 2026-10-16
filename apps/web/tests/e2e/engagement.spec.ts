@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { PASSWORD, createOrg, shot, signUp, uniqueEmail } from "./helpers";
+import { PASSWORD, createOrg, openAdvanced, shot, signUp, uniqueEmail } from "./helpers";
 
 /** Wave 3: public forms, booking pages + appointments, campaigns with unsubscribe, omnichannel inbox. */
 const mocked = process.env.E2E_PROVIDERS_MOCKED === "true";
@@ -150,6 +150,7 @@ test("inbox: inbound Telegram message appears, agent replies from the inbox", as
   await page.goto("/he/inbox");
   await expect(page.getByText(/עוד לא חיברתם ערוץ הודעות/)).toBeVisible();
   await page.goto("/he/integrations");
+  await openAdvanced(page);
   await page.locator('[data-channel="telegram"]').getByRole("button", { name: "חיבור" }).click();
   await page.getByRole("dialog").locator("#ch-telegram-bot_token").fill("987654321:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw9");
   await page.getByRole("dialog").locator('button[type="submit"]').click();

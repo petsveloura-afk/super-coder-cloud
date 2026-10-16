@@ -51,3 +51,9 @@ export async function shot(page: Page, name: string) {
 export async function expectNotFound(page: Page) {
   await expect(page.getByText("404", { exact: true })).toBeVisible();
 }
+
+/** Integrations: the developer / manual-connection tools live in a collapsed "Advanced" section. */
+export async function openAdvanced(page: Page) {
+  const box = page.getByTestId("advanced-integrations");
+  if (!(await box.evaluate((el) => (el as HTMLDetailsElement).open))) await box.locator("summary").click();
+}

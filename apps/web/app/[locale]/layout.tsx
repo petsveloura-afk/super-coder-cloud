@@ -52,7 +52,10 @@ export default async function LocaleLayout({
   const { dir } = LOCALE_META[locale];
 
   return (
-    <html lang={locale} dir={dir} data-theme={theme} suppressHydrationWarning>
+    <html lang={locale} dir={dir} data-theme={theme} translate="no" className="notranslate" suppressHydrationWarning>
+      <head>
+        <meta name="google" content="notranslate" />
+      </head>
       <body className="app-backdrop">
         <I18nProvider locale={locale} dict={dict}>
           {children}

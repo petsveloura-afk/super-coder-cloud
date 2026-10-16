@@ -35,6 +35,8 @@ export async function replyAction(input: { locale: string; conversationId: strin
   await supabase.from("conversations").update({ unread_count: 0 }).eq("id", id.data);
   // first responder takes ownership of an unassigned conversation
   await supabase.from("conversations").update({ assignee_id: ctx.userId }).eq("id", id.data).is("assignee_id", null);
+  // a person answered → the AI agent steps back in this conversation (can be switched back from the inbox)
+  if (r.ok) await supabase.from("conversations").update({ ai_mode: "human" }).eq("id", id.data).eq("ai_mode", "auto");
   revalidatePath(`/${locale}/inbox`);
   return r.ok ? { ok: true, message: "inbox.sent" } : { error: sendError(r.error), messageParams: { detail: r.error ?? "" } };
 }
@@ -89,4 +91,22 @@ export async function updateConversationAction(input: { locale: string; conversa
   if (error) return { error: dbErrorKey(error) };
   revalidatePath(`/${locale}/inbox`);
   return { ok: true, message: input.status === "closed" ? "inbox.closed" : input.status === "open" ? "inbox.reopened" : "inbox.assigned" };
+}
+
+/** Wave 6 — switch a conversation between the AI agent (auto) and the team (human). */
+export async function setAiModeAction(input: { locale: string; conversationId: string; mode: "auto" | "human" }): Promise<ActionState> {
+  const locale = loc(input.locale);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("inbox.reply")) return { error: "errors.forbidden" };
+  const id = uuidSchema.safeParse(input.conversationId);
+  if (!id.success || !["auto", "human"].includes(input.mode)) return { error: "validation.invalidId" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("conversations")
+    .update({ ai_mode: input.mode, ...(input.mode === "auto" ? { handoff_at: null } : {}) })
+    .eq("id", id.data)
+    .eq("organization_id", ctx.org.id);
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}/inbox`);
+  return { ok: true, message: input.mode === "auto" ? "inbox.aiResumed" : "inbox.aiPaused" };
 }

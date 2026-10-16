@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createOrg, shot, signUp, uniqueEmail } from "./helpers";
+import { createOrg, openAdvanced, shot, signUp, uniqueEmail } from "./helpers";
 
 /**
  * Wave 2: automations (builder + engine), public API keys, inbound webhooks,
@@ -55,6 +55,7 @@ test("API key → public REST API (create contact, me, events) with scopes enfor
   await page.locator('form button[type="submit"]').last().click();
   await page.waitForURL(/overview/);
   await page.goto("/he/integrations");
+  await openAdvanced(page);
   await page.getByRole("button", { name: "מפתח חדש" }).click();
   const d = page.getByRole("dialog");
   await d.locator("#key-name").fill("Zapier");
@@ -98,6 +99,7 @@ test("API key → public REST API (create contact, me, events) with scopes enfor
   // revoke → 401
   page.once("dialog", (dl) => dl.accept());
   await page.goto("/he/integrations");
+  await openAdvanced(page);
   await page.getByRole("button", { name: "ביטול" }).first().click();
   await expect(page.getByText("בוטל", { exact: true })).toBeVisible();
   expect((await request.get("/api/public/v1/me", { headers: auth })).status()).toBe(401);
@@ -171,6 +173,7 @@ test("Telegram channel: connect, inbound message creates a contact, automation r
   await page.waitForURL(/\/he\/automations\/[0-9a-f-]{36}$/);
 
   await page.goto("/he/integrations");
+  await openAdvanced(page);
   const card = page.locator('[data-channel="telegram"]');
   await card.getByRole("button", { name: "חיבור" }).click();
   const d = page.getByRole("dialog");

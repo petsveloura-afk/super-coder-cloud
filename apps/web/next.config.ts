@@ -46,8 +46,17 @@ const embeddableHeaders = [{ key: "Content-Security-Policy", value: embeddableCs
 const siteCsp = csp.replace("img-src 'self'", "img-src 'self' https:");
 const siteHeaders = [{ key: "Content-Security-Policy", value: siteCsp }];
 
+// Integrations: Meta "Connect WhatsApp" popup (Facebook JS SDK) is allowed on this page only.
+const integrationsCsp = csp
+  .replace("script-src 'self' 'unsafe-inline'", "script-src 'self' 'unsafe-inline' https://connect.facebook.net")
+  .replace(/connect-src ([^;]*)/, "connect-src $1 https://graph.facebook.com https://www.facebook.com")
+  .concat("; frame-src https://www.facebook.com https://web.facebook.com https://business.facebook.com");
+const integrationsHeaders = [{ key: "Content-Security-Policy", value: integrationsCsp }];
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // node-only mail libraries (IMAP / SMTP / MIME) stay external to the server bundle
+  serverExternalPackages: ["imapflow", "nodemailer", "mailparser"],
   poweredByHeader: false,
   transpilePackages: ["@scc/shared", "@scc/database"],
   async headers() {
@@ -56,6 +65,10 @@ const nextConfig: NextConfig = {
       { source: "/:locale(he|ar|en)/f/:slug*", headers: embeddableHeaders },
       { source: "/:locale(he|ar|en)/book/:slug*", headers: embeddableHeaders },
       { source: "/:locale(he|ar|en)/s/:slug*", headers: siteHeaders },
+      // embeddable website chat (iframe from /widget.js on customers' sites)
+      { source: "/:locale(he|ar|en)/chat/:org*", headers: embeddableHeaders },
+      { source: "/:locale(he|ar|en)/integrations", headers: integrationsHeaders },
+      { source: "/widget.js", headers: [{ key: "Cache-Control", value: "public, max-age=3600" }, { key: "Access-Control-Allow-Origin", value: "*" }] },
       {
         source: "/sw.js",
         headers: [

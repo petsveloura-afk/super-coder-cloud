@@ -79,3 +79,19 @@ Add extra keys in Vercel → Environment Variables as `GEMINI_API_KEY_2`, `GEMIN
 - Plan gating (table `plans.features`): `ai_site_landing` on every plan; `ai_site_full` and `ai_images` on pro / business / enterprise only. A full-site request on the free plan is built as a landing page.
 - Image generation may not be included in Google's free tier. If it fails, the site is still built — just without the AI image.
 - Every AI site is saved as a **draft**; the owner previews it (`/{lang}/websites/{id}/preview`) and publishes it manually.
+
+## v6 — AI autopilot: the agent answers customers on every channel
+| Variable | Required | Where | Purpose |
+|---|---|---|---|
+| `META_APP_ID`, `META_APP_SECRET`, `META_WA_CONFIG_ID` | no | server | "Connect WhatsApp" in one click (Meta Embedded Signup). Without them the official card says "coming soon" and the manual connection (Advanced) keeps working |
+| `META_WEBHOOK_VERIFY_TOKEN` | with Meta | server | verify token of the app-level webhook `/api/channels/meta/whatsapp` (any random string, ≥ 8 chars) |
+| `META_GRAPH_VERSION` | no | server | Graph API version for the new code (default `v25.0`) |
+| `WA_BRIDGE_URL`, `WA_BRIDGE_SECRET` | no | server | WhatsApp by QR code through `services/wa-bridge` (always-on, e.g. Railway). Secret ≥ 24 chars, same value on both sides |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | server | "Sign in with Google" for the e-mail channel (redirect `https://<app>/api/oauth/google/callback`) |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | no | server | "Sign in with Microsoft" (redirect `https://<app>/api/oauth/microsoft/callback`) |
+| `NEXT_PUBLIC_LOCALE_NEGOTIATION` | no | both | empty = Hebrew on a first visit (Arabic browsers get Arabic); `browser` = follow the browser language |
+
+- Website chat: no variables. Shown on every published site and the help portal whenever an enabled agent has "website chat" ticked; embeddable anywhere with `/widget.js`.
+- E-mail with an app password works without any variable. Mailboxes are read every 5 minutes by the GitHub "jobs" workflow (`/api/channels/email/poll`), or every minute when the QR bridge runs with `CRON_SECRET`.
+- Automatic replies use the workspace's AI credits (feature `autopilot`), at most 30 replies per conversation per hour. A team reply from the inbox switches the conversation to the team; the "Back to AI" button switches it back.
+- Full step-by-step setup (Hebrew): `docs/CONNECT_CHANNELS_HE.md`.

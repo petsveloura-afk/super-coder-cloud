@@ -12,11 +12,19 @@ export interface SendOutcome {
   permanent?: boolean;
 }
 
-async function providerSend(kind: Kind, orgId: string, externalId: string, text: string): Promise<ProviderResult & { accountId?: string }> {
+async function providerSend(kind: Kind | "web", orgId: string, externalId: string, text: string, conversationId?: string): Promise<ProviderResult & { accountId?: string }> {
+  // website chat: the visitor's browser reads the message from the conversation — nothing to deliver
+  if (kind === "web") return { ok: true };
   const acc = await loadAccount(orgId, kind);
   if (!acc) return { ok: false, error: "channel_not_connected", permanent: true };
   let r: ProviderResult;
-  if (kind === "telegram") {
+  if (kind === "email") {
+    const { sendEmailReply } = await import("./email");
+    r = await sendEmailReply(acc, externalId, text, conversationId);
+  } else if (kind === "whatsapp_qr") {
+    const { bridgeSend } = await import("./wa-bridge");
+    r = await bridgeSend(acc, externalId, text);
+  } else if (kind === "telegram") {
     r = await telegramCall(acc.secrets.bot_token ?? "", "sendMessage", { chat_id: externalId, text });
   } else if (kind === "whatsapp") {
     r = await whatsappSendText(acc.secrets.access_token ?? "", acc.config.phone_number_id ?? "", `+${externalId.replace(/^\+/, "")}`, text);
@@ -31,18 +39,27 @@ async function providerSend(kind: Kind, orgId: string, externalId: string, text:
  * Sends a text into an existing conversation: stores the outgoing message
  * (queued → sent/failed) and updates the conversation preview.
  */
-export async function sendToConversation(orgId: string, conversationId: string, text: string, sentBy?: string): Promise<SendOutcome> {
+export async function sendToConversation(orgId: string, conversationId: string, text: string, sentBy?: string, opts?: { aiAgentId?: string | null; meta?: Record<string, unknown> }): Promise<SendOutcome> {
   const admin = createAdminClient();
   const { data: conv } = await admin.from("conversations").select("id, channel, external_id").eq("id", conversationId).eq("organization_id", orgId).maybeSingle();
   if (!conv) return { ok: false, error: "not_found", permanent: true };
   const body = text.slice(0, 4000);
   const { data: msg, error } = await admin
     .from("messages")
-    .insert({ organization_id: orgId, conversation_id: conv.id, direction: "out", body, status: "queued", sent_by: sentBy ?? null })
+    .insert({
+      organization_id: orgId,
+      conversation_id: conv.id,
+      direction: "out",
+      body,
+      status: "queued",
+      sent_by: sentBy ?? null,
+      ...(opts?.aiAgentId ? { ai_agent_id: opts.aiAgentId } : {}),
+      ...(opts?.meta ? { meta: opts.meta } : {}),
+    })
     .select("id")
     .single();
   if (error || !msg) return { ok: false, error: "store_failed" };
-  const r = await providerSend(conv.channel as Kind, orgId, conv.external_id as string, body);
+  const r = await providerSend(conv.channel as Kind | "web", orgId, conv.external_id as string, body, conv.id as string);
   await admin
     .from("messages")
     .update({ status: r.ok ? "sent" : "failed", external_id: r.externalId ?? null, error: r.ok ? null : (r.error ?? "send_failed").slice(0, 500) })
@@ -68,15 +85,16 @@ export async function sendToContact(kind: Kind, orgId: string, contactId: string
     .maybeSingle();
   if (existing) return sendToConversation(orgId, existing.id as string, text);
 
-  const { data: contact } = await admin.from("contacts").select("id, first_name, last_name, phone, custom_fields").eq("id", contactId).eq("organization_id", orgId).maybeSingle();
+  const { data: contact } = await admin.from("contacts").select("id, first_name, last_name, phone, email, custom_fields").eq("id", contactId).eq("organization_id", orgId).maybeSingle();
   if (!contact) return { ok: false, error: "contact_not_found", permanent: true };
   let externalId: string | null = null;
   if (kind === "telegram") externalId = ((contact.custom_fields as Record<string, string> | null)?.telegram_id as string | undefined) ?? null;
+  else if (kind === "email") externalId = ((contact.email as string | null) ?? "").toLowerCase() || null;
   else {
     const e164 = toE164(contact.phone as string | null);
-    externalId = e164 ? (kind === "whatsapp" ? e164.slice(1) : e164) : null;
+    externalId = e164 ? (kind === "whatsapp" || kind === "whatsapp_qr" ? e164.slice(1) : e164) : null;
   }
-  if (!externalId) return { ok: false, error: kind === "telegram" ? "contact_has_no_telegram_chat" : "contact_has_no_phone", permanent: true };
+  if (!externalId) return { ok: false, error: kind === "telegram" ? "contact_has_no_telegram_chat" : kind === "email" ? "contact_has_no_email" : "contact_has_no_phone", permanent: true };
   const { data: conv, error } = await admin
     .from("conversations")
     .upsert(

@@ -448,7 +448,79 @@
     "sitePreview": "Preview",
     "siteEdit": "Edit & publish",
     "toolSiteBuilder": "Build landing pages and websites from the chat",
-    "toolImages": "Generate AI images (paid plans)"
+    "toolImages": "Generate AI images (paid plans)",
+    "quickCreate": "Create a ready agent in one click",
+    "quickCreated": "The agent was created and is answering customers",
+    "autopilot": {
+      "title": "Answers customers automatically",
+      "hint": "The agent replies to customers by itself on the channels you tick, 24/7, and hands off to your team when needed.",
+      "greeting": "Welcome message",
+      "greetingHint": "Sent when a customer presses Start on Telegram and shown in the website chat.",
+      "handoff": "When to hand off to a person",
+      "handoffHint": "E.g. discount requests, complaints, orders over $300. It also hands off whenever a customer asks for a person.",
+      "channels": {
+        "web": "Website chat",
+        "whatsapp": "WhatsApp",
+        "whatsapp_qr": "WhatsApp (QR)",
+        "telegram": "Telegram",
+        "email": "E-mail",
+        "sms": "SMS"
+      }
+    },
+    "templates": {
+      "label": "Ready-made template",
+      "hint": "Pick a template and adapt it to your business: prices, hours, services.",
+      "pick": "Choose a template…",
+      "replaceConfirm": "Replace the current instructions with the template?",
+      "sales": {
+        "label": "Sales & service rep",
+        "name": "Sales & service rep",
+        "greeting": "Hi! 👋 I'm the business's digital assistant. Happy to help with services, prices and booking. How can I help?",
+        "instructions": "You are the business's sales and service representative.\n\nAbout the business (edit):\n• Business name and what it does:\n• Services and prices:\n• Opening hours:\n• Address / service area:\n• Call-back phone:\n\nHow to work:\n1. Reply warmly, briefly and professionally.\n2. Understand the need and ask one focused question at a time.\n3. Recommend the right service and explain the benefit.\n4. Offer a next step: booking, a quote or a call back.\n5. Ask for name and phone so the team can follow up.\n6. Never invent prices or commitments that aren't written here."
+      },
+      "booking": {
+        "label": "Appointments & booking",
+        "name": "Booking assistant",
+        "greeting": "Hi! 👋 You can book an appointment right here. Which service and which day suits you?",
+        "instructions": "You are the business's booking assistant.\n\nInfo (edit):\n• Services and duration:\n• Opening hours:\n• Cancellation policy:\n\nHow to work:\n1. Ask which service and when suits the customer.\n2. Send the booking link and help pick a time.\n3. Confirm the details and ask for name and phone.\n4. If no time fits or there's a special request, hand off."
+      },
+      "support": {
+        "label": "Customer support",
+        "name": "Customer support",
+        "greeting": "Hi! 👋 I'm here to help. Tell me what happened and I'll take care of it.",
+        "instructions": "You are the business's customer support representative.\n\nInfo (edit):\n• FAQs and answers:\n• Returns / warranty policy:\n• Handling times:\n\nHow to work:\n1. Listen, show understanding and answer clearly.\n2. Give step-by-step solutions when possible.\n3. For complaints, refunds or complex issues, hand off to a person."
+      },
+      "realestate": {
+        "label": "Real estate",
+        "name": "Real estate advisor",
+        "greeting": "Hi! 👋 Looking to buy or rent? Tell me what matters to you and I'll find matches.",
+        "instructions": "You are the agency's digital real-estate advisor.\n\nInfo (edit):\n• Areas:\n• Property types:\n• Viewing hours:\n\nHow to work:\n1. Clarify: buy or rent, area, budget, rooms and move-in date.\n2. Summarise the needs and offer a viewing or a call with an agent.\n3. Ask for name and phone to arrange it."
+      },
+      "ecommerce": {
+        "label": "Online store",
+        "name": "Shopping assistant",
+        "greeting": "Hi! 👋 Happy to help you find the right product or check an order.",
+        "instructions": "You are the store's shopping assistant.\n\nInfo (edit):\n• Product categories and prices:\n• Shipping times and costs:\n• Returns and exchanges:\n\nHow to work:\n1. Help choose a product by need and budget.\n2. Answer shipping and returns questions.\n3. For existing-order questions or payment problems, hand off."
+      }
+    },
+    "explain": {
+      "title": "What the AI agent does for you",
+      "subtitle": "Like a sales & service rep working 24/7: it answers customers on WhatsApp, Telegram, e-mail and your website, following your instructions.",
+      "active": "The agent is live and answering customers",
+      "answersTitle": "Answers instantly",
+      "answersBody": "Every message gets an answer within seconds, day and night, based on what you told the agent.",
+      "leadsTitle": "Captures leads",
+      "leadsBody": "Name, phone and e-mail are saved to contacts automatically; every conversation lands in the inbox.",
+      "bookTitle": "Books meetings",
+      "bookBody": "Sends your booking page or form and moves the customer to the next step.",
+      "handoffTitle": "Hands off to people",
+      "handoffBody": "When a customer asks for a person, is upset, or the agent doesn't know, your team takes over with a notification.",
+      "sitesTitle": "Builds websites",
+      "sitesBody": "In this chat it builds landing pages and full websites from the conversation.",
+      "how": "Getting started: 1. create an agent (or pick a template) 2. connect a channel 3. done, the agent answers.",
+      "connect": "Connect channels →",
+      "inbox": "Conversations in the inbox →"
+    }
   },
   "deals": {
     "pageTitle": "Deals & pipelines",
@@ -846,7 +918,24 @@
     "testDone": "Test run completed",
     "invalid": "Some fields are missing or invalid",
     "needAction": "Add at least one action",
-    "notification": "{text}"
+    "notification": "{text}",
+    "stepDetail": {
+      "automation_disabled": "the automation is off",
+      "bad_url": "invalid URL",
+      "empty": "the message is empty",
+      "no_consent": "the contact didn't opt in to marketing",
+      "no_contact": "no contact. When testing, pick a contact above; in a real run this works automatically",
+      "no_deal": "no linked deal. When testing, pick a contact that has a deal",
+      "no_email": "the contact has no e-mail address",
+      "no_record": "record not found",
+      "no_tag": "no tag selected",
+      "not_a_member": "the selected user is not a team member",
+      "channel_not_connected": "channel not connected. Connect it in Integrations",
+      "contact_has_no_phone": "the contact has no phone number",
+      "contact_has_no_telegram_chat": "the contact hasn't messaged your Telegram bot yet",
+      "contact_has_no_email": "the contact has no e-mail address",
+      "delayed": "scheduled for later"
+    }
   },
   "integrations": {
     "title": "Integrations",
@@ -965,6 +1054,89 @@
         "body": "Send and receive SMS through Twilio",
         "howto": "In the Twilio Console copy the Account SID and Auth token and pick a sender number. After connecting, paste the Callback URL on the number → Messaging → A message comes in (HTTP POST)."
       }
+    },
+    "hubSubtitle": "Connect your channels in one click; the AI agent answers customers there",
+    "advancedTitle": "Advanced: developers & manual connections",
+    "advancedHint": "API keys, webhooks, API docs and manual WhatsApp Cloud API / SMS setup",
+    "advancedOpen": "Show",
+    "hub": {
+      "title": "Your channels",
+      "subtitle": "For every connected channel, messages land in the inbox and the agent answers automatically.",
+      "aiOn": "The agent answers here automatically",
+      "aiOff": "The agent doesn't answer here (turn it on in the agent settings)",
+      "noAgent": "There's no AI agent answering customers yet. Create one in a minute and it will answer on every channel you connect.",
+      "createAgent": "Create an agent →",
+      "agentReady": "\"{name}\" is answering customers on your connected channels",
+      "agentSettings": "Agent settings",
+      "noSetup": "No setup",
+      "webTitle": "Website chat",
+      "webBody": "A chat bubble with your agent is already on every website and landing page you build here. For any other site, paste the code.",
+      "webCode": "Code to paste on your site (before </body>)",
+      "webTry": "Try the chat",
+      "waTitle": "WhatsApp Business (official)",
+      "waBody": "Official Meta connection in one click: sign in with Facebook and pick your business WhatsApp number.",
+      "waConnect": "Connect WhatsApp",
+      "waSoon": "One-click connection will be enabled once the platform owner completes Meta approval. Meanwhile: QR connection or manual setup (Advanced).",
+      "qrTitle": "WhatsApp by QR code",
+      "qrBody": "Scan a QR code from your phone, just like WhatsApp Web, and you're done.",
+      "tgTitle": "Telegram bot",
+      "tgBody": "Create a free bot in a minute and paste its code here. Everyone who messages the bot gets an answer.",
+      "tgConnect": "Connect Telegram",
+      "mailTitle": "E-mail",
+      "mailBody": "Connect your business mailbox: incoming e-mails land in the inbox and replies go out from your own address.",
+      "linkTitle": "WhatsApp link for customers",
+      "linkBody": "A wa.me link for your site, Instagram and ads. One tap opens a chat with you.",
+      "linkPhone": "Business WhatsApp number",
+      "linkText": "Pre-filled message (optional)",
+      "linkReady": "Your link"
+    },
+    "whatsapp": {
+      "cancelled": "Connection cancelled",
+      "sdkFailed": "Couldn't open the Facebook window. Allow pop-ups and try again.",
+      "signupIncomplete": "The Facebook flow wasn't finished. Try again and pick a number.",
+      "signupFailed": "WhatsApp connection failed: {detail}"
+    },
+    "qr": {
+      "title": "Connect WhatsApp by QR",
+      "scan": "Scan QR",
+      "step1": "Open WhatsApp on the business phone",
+      "step2": "Settings → Linked devices → Link a device",
+      "step3": "Point the camera at the code here",
+      "waiting": "Waiting for the scan… this window closes automatically once connected.",
+      "connected": "WhatsApp connected!",
+      "notConfigured": "The QR service hasn't been enabled on the platform yet.",
+      "failed": "Couldn't create a code. Try again in a moment.",
+      "warning": "Unofficial connection: WhatsApp may block numbers that use it, especially for bulk messages. For important numbers prefer the official connection."
+    },
+    "tg": {
+      "step1": "In Telegram, open",
+      "step2": "Send /newbot and choose a name and a username (ending in bot)",
+      "step3": "BotFather sends you a token. Copy it",
+      "step4": "Paste it here and click Connect. That's it, the bot answers customers"
+    },
+    "mail": {
+      "title": "Connect a mailbox",
+      "connect": "Connect e-mail",
+      "other": "Other provider / app password",
+      "google": "Sign in with Google",
+      "microsoft": "Sign in with Microsoft",
+      "step1": "Turn on 2-step verification for the mailbox (if it isn't on yet)",
+      "step2": "Create an \"app password\":",
+      "step3": "Paste the address and the app password here; the servers are detected automatically",
+      "address": "E-mail address",
+      "password": "App password",
+      "passwordHint": "The 16 characters from your mailbox security settings, not your normal password",
+      "displayName": "Sender name (optional)",
+      "advanced": "Manual server settings (custom domain)",
+      "port": "Port",
+      "badPassword": "Paste the app password",
+      "badServer": "Invalid server address or port",
+      "imapFailed": "Couldn't connect to receive e-mails (IMAP): {detail}",
+      "smtpFailed": "Couldn't connect to send e-mails (SMTP): {detail}",
+      "connected": "E-mail connected! New e-mails will land in the inbox",
+      "cancelled": "Sign-in cancelled",
+      "oauthNotConfigured": "Account sign-in isn't enabled on the platform yet. Use an app password.",
+      "oauthFailed": "E-mail connection failed {detail}"
     }
   },
   "public": {
@@ -1139,7 +1311,9 @@
       "email": "E-mail",
       "whatsapp": "WhatsApp",
       "sms": "SMS",
-      "telegram": "Telegram"
+      "telegram": "Telegram",
+      "web": "Website chat",
+      "whatsapp_qr": "WhatsApp (QR)"
     },
     "notConnected": "Not connected",
     "message": "Message",
@@ -1224,7 +1398,16 @@
       "delivered": "Delivered",
       "read": "Read",
       "failed": "Failed"
-    }
+    },
+    "aiReply": "AI reply",
+    "needsHuman": "Waiting for an agent",
+    "aiModeAutoHint": "The AI agent answers this conversation. Click to take over.",
+    "aiModeHumanHint": "Your team answers this conversation. Click to let the agent answer again.",
+    "aiPaused": "The AI paused in this conversation; you're answering",
+    "aiResumed": "The AI agent is answering this conversation again",
+    "takeOver": "I'll answer",
+    "backToAi": "Back to AI",
+    "handoffNotification": "{name} is waiting for an agent (click to open)"
   },
   "support": {
     "title": "Customer support",
@@ -1587,5 +1770,24 @@
     "noFlags": "No flags defined",
     "flagSaved": "Flag saved",
     "badFlagKey": "Invalid key (a-z, 0-9, _ . -)"
+  },
+  "chat": {
+    "title": "Chat",
+    "open": "Open chat",
+    "unavailable": "Chat is not available right now.",
+    "slowDown": "One moment 🙂 you sent a lot of messages. Please try again in a minute.",
+    "failed": "The message wasn't sent. Please try again.",
+    "defaultGreeting": "Hi! 👋 Welcome to {org}. How can I help?",
+    "online": "Online now · instant replies",
+    "teamOnline": "A team member is with you",
+    "team": "Agent",
+    "name": "Name",
+    "phone": "Phone",
+    "detailsMessage": "My details: {name} {phone}",
+    "add": "Add",
+    "placeholder": "Type a message…",
+    "send": "Send",
+    "leaveDetails": "Leave your details for a call back",
+    "poweredBy": "Powered by"
   }
 }

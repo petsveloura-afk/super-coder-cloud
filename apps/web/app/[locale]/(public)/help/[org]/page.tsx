@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { NewTicketForm } from "@/components/public/support-portal";
 import { createAnonClient } from "@/lib/supabase/anon";
 import { getT, resolveLocale } from "@/lib/i18n/server";
+import { ChatWidget } from "@/components/chat/chat-widget";
 
 type Params = Promise<{ locale: string; org: string }>;
 
@@ -18,5 +19,10 @@ export default async function HelpPage({ params }: { params: Params }) {
   // Organization name for the header (public, non-sensitive); unknown slugs 404.
   const { data } = await createAnonClient().rpc("public_org_name", { p_slug: org });
   if (!data) notFound();
-  return <NewTicketForm org={org} orgName={data as string} />;
+  return (
+    <>
+      <NewTicketForm org={org} orgName={data as string} />
+      <ChatWidget orgSlug={org} />
+    </>
+  );
 }

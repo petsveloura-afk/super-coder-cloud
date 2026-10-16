@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Bot, KeyRound } from "lucide-react";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/primitives";
-import { AgentDialog, AgentStatus, DeleteAgentButton, type AgentRow } from "@/components/ai/agents-client";
+import { AgentDialog, AgentStatus, DeleteAgentButton, QuickAgentButton, type AgentRow } from "@/components/ai/agents-client";
+import { AutopilotExplainer } from "@/components/ai/autopilot-explainer";
 import { StudioChat } from "@/components/ai/studio-chat";
 import { aiSiteCaps } from "@/lib/ai/site-builder";
 import { UsageMeter } from "@/components/billing/usage-meter";
@@ -28,7 +29,7 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
   const [{ data: agentsData }, { data: ent }] = await Promise.all([
     supabase
       .from("ai_agents")
-      .select("id, name, instructions, provider, model, temperature, language, enabled, allowed_tools")
+      .select("id, name, instructions, provider, model, temperature, language, enabled, allowed_tools, autopilot_channels, greeting, handoff_rules")
       .eq("organization_id", ctx.org.id)
       .order("created_at", { ascending: true }),
     supabase.rpc("org_entitlements", { org: ctx.org.id }),
@@ -54,6 +55,12 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
       {ctx.org.is_demo ? (
         <div className="mb-4 rounded-xl border border-gold/30 bg-gold-soft px-4 py-3 text-sm text-gold">{t("ai.demoBlocked")}</div>
       ) : null}
+
+      <AutopilotExplainer
+        locale={locale}
+        active={agents.some((a) => a.enabled && (a.autopilot_channels ?? []).length > 0)}
+        action={canManage && !agents.some((a) => a.enabled && (a.autopilot_channels ?? []).length > 0) ? <QuickAgentButton provider={defaults.provider} model={defaults[defaults.provider]} /> : null}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.8fr)_1.6fr]">
         <div className="space-y-4">
@@ -86,6 +93,15 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
                       <div className="truncate text-[12px] text-subtle" dir="ltr">
                         {a.provider} · {a.model}
                       </div>
+                      {a.enabled && (a.autopilot_channels ?? []).length ? (
+                        <div className="mt-1 flex flex-wrap gap-1" data-testid="autopilot-badges">
+                          {(a.autopilot_channels ?? []).map((c) => (
+                            <span key={c} className="rounded-md bg-success-soft px-1.5 py-0.5 text-[10.5px] font-medium text-success">
+                              {t(`ai.autopilot.channels.${c}`)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                     <AgentStatus enabled={a.enabled} />
                     {canManage ? (
