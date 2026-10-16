@@ -124,3 +124,34 @@ export function verifyTwilioSignature(url: string, params: Record<string, string
   const given = Buffer.from(header);
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
+
+/* ------------------------------------------- wave 7: rich messages ---- */
+
+/** WhatsApp Cloud API: text with up to 3 quick-reply buttons (interactive message). */
+export async function whatsappSendButtons(token: string, phoneNumberId: string, toE164: string, text: string, buttons: string[]): Promise<ProviderResult> {
+  try {
+    const res = await fetch(`${waBase()}/${encodeURIComponent(phoneNumberId)}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: toE164.replace(/^\+/, ""),
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: { text: text.slice(0, 1024) },
+          action: { buttons: buttons.slice(0, 3).map((b, i) => ({ type: "reply", reply: { id: `b${i + 1}`, title: b.slice(0, 20) } })) },
+        },
+      }),
+      signal: AbortSignal.timeout(TIMEOUT),
+      cache: "no-store",
+    });
+    const j = (await res.json().catch(() => ({}))) as { messages?: { id: string }[]; error?: { message?: string } };
+    return res.ok
+      ? { ok: true, status: res.status, externalId: j.messages?.[0]?.id }
+      : { ok: false, status: res.status, error: j.error?.message ?? `HTTP ${res.status}`, permanent: permanent(res.status) };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}

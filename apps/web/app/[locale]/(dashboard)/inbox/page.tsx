@@ -28,6 +28,9 @@ interface ConvRow {
   title: string | null;
   ai_mode?: "auto" | "human";
   subject?: string | null;
+  lead_score?: "hot" | "warm" | "cold" | null;
+  summary?: string | null;
+  deal_id?: string | null;
   contact_id: string | null;
   status: string;
   assignee_id: string | null;
@@ -54,7 +57,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
 
   let q = supabase
     .from("conversations")
-    .select("id, channel, title, contact_id, status, assignee_id, unread_count, last_message_at, last_message_preview, ai_mode, subject")
+    .select("id, channel, title, contact_id, status, assignee_id, unread_count, last_message_at, last_message_preview, ai_mode, subject, lead_score, summary, deal_id")
     .eq("organization_id", ctx.org.id)
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .limit(200);
@@ -76,7 +79,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
   if (selectedId && !selected) {
     const { data } = await supabase
       .from("conversations")
-      .select("id, channel, title, contact_id, status, assignee_id, unread_count, last_message_at, last_message_preview, ai_mode, subject")
+      .select("id, channel, title, contact_id, status, assignee_id, unread_count, last_message_at, last_message_preview, ai_mode, subject, lead_score, summary, deal_id")
       .eq("id", selectedId)
       .eq("organization_id", ctx.org.id)
       .maybeSingle();
@@ -135,6 +138,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                         </div>
                         <p className="truncate text-[12.5px] text-muted">{c.last_message_preview ?? ""}</p>
                         {c.ai_mode === "human" ? <p className="text-[11px] font-medium text-warning">{t("inbox.needsHuman")}</p> : null}
+                        {c.lead_score ? <p className={cn("text-[11px] font-medium", c.lead_score === "hot" ? "text-danger" : c.lead_score === "warm" ? "text-gold" : "text-subtle")}>{t(`inbox.lead.${c.lead_score}`)}</p> : null}
                         <p className="text-[11px] text-subtle">{c.last_message_at ? formatDateTime(locale, c.last_message_at) : ""}</p>
                       </div>
                     </Link>
@@ -158,6 +162,17 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                   <Badge tone="neutral">{t(`campaigns.channels.${selected.channel}`)}</Badge>
                 </div>
                 {selected.subject ? <p className="truncate text-[12.5px] text-muted" dir="auto">{selected.subject}</p> : null}
+                {selected.lead_score ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5" data-testid="lead-info">
+                    <Badge tone={selected.lead_score === "hot" ? "danger" : selected.lead_score === "warm" ? "gold" : "neutral"}>{t(`inbox.lead.${selected.lead_score}`)}</Badge>
+                    {selected.deal_id ? (
+                      <Link href={`/${locale}/pipelines`} className="text-[12px] font-medium text-accent hover:underline">
+                        {t("inbox.lead.deal")}
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
+                {selected.summary ? <p className="mt-1 line-clamp-2 text-[12px] text-muted" dir="auto">🤖 {selected.summary}</p> : null}
                 {selected.contact_id ? (
                   <Link href={`/${locale}/crm/${selected.contact_id}`} className="inline-flex items-center gap-1 text-[12.5px] text-accent hover:underline">
                     <User className="h-3.5 w-3.5" /> {t("inbox.openContact")}

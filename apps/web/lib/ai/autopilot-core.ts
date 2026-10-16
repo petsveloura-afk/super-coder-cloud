@@ -195,3 +195,174 @@ export function formatForChannel(text: string, channel: AutopilotChannel): strin
   if (channel === "sms") t = t.slice(0, 640);
   return t.slice(0, 4000);
 }
+
+/* ======================================================================
+ * Wave 7 — sales agent tools. The model writes control lines that the
+ * server executes and strips before the customer sees anything:
+ *   [[LEAD: name=…; phone=…; email=…; need=…; budget=…; score=hot|warm|cold; summary=…]]
+ *   [[BUTTONS: option 1 | option 2 | option 3]]   quick-reply buttons
+ *   [[ASK_PHONE]]                                  "share my phone" button (Telegram) / details form (web)
+ *   [[HANDOFF]] / [[HANDOFF: reason]]              team takes over
+ * ==================================================================== */
+
+export interface LeadData {
+  name?: string;
+  phone?: string;
+  email?: string;
+  need?: string;
+  budget?: string;
+  score?: "hot" | "warm" | "cold";
+  summary?: string;
+}
+
+export interface AgentTools {
+  text: string;
+  handoff: boolean;
+  reason: string | null;
+  lead: LeadData | null;
+  buttons: string[];
+  askPhone: boolean;
+}
+
+const LEAD_RE = /\[\[\s*lead\s*:([^\]]{0,2000})\]\]/i;
+const BUTTONS_RE = /\[\[\s*buttons\s*:([^\]]{0,400})\]\]/i;
+const ASK_PHONE_RE = /\[\[\s*ask_phone\s*\]\]/i;
+const ANY_MARKER_RE = /\[\[\s*(?:lead|buttons|ask_phone|handoff|build_site)\b[^\]]*\]\]/gi;
+const LEAD_KEYS = new Set(["name", "phone", "email", "need", "budget", "score", "summary"]);
+
+export function parseLeadFields(raw: string): LeadData | null {
+  const out: Record<string, string> = {};
+  for (const part of raw.split(";")) {
+    const i = part.indexOf("=");
+    if (i < 0) continue;
+    const k = part.slice(0, i).trim().toLowerCase();
+    const v = part.slice(i + 1).trim().replace(/^["']|["']$/g, "").slice(0, k === "summary" ? 2000 : 200);
+    if (LEAD_KEYS.has(k) && v && !/^(?:-|n\/a|none|unknown|null|לא ידוע)$/i.test(v)) out[k] = v;
+  }
+  if (out.score && !["hot", "warm", "cold"].includes(out.score.toLowerCase())) delete out.score;
+  else if (out.score) out.score = out.score.toLowerCase();
+  if (out.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(out.email)) delete out.email;
+  if (out.phone) {
+    const info = extractContactInfo(out.phone);
+    if (info.phone) out.phone = info.phone;
+    else delete out.phone;
+  }
+  return Object.keys(out).length ? (out as LeadData) : null;
+}
+
+/** Extracts every tool call from the model's reply and returns the clean customer text. */
+export function parseAgentTools(raw: string): AgentTools {
+  const handoff = raw.match(/\[\[\s*handoff\s*(?::\s*([^\]]{0,120}))?\]\]/i);
+  const lead = raw.match(LEAD_RE);
+  const buttons = raw.match(BUTTONS_RE);
+  const text = raw
+    .replace(ANY_MARKER_RE, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return {
+    text,
+    handoff: Boolean(handoff),
+    reason: handoff?.[1]?.trim() || null,
+    lead: lead ? parseLeadFields(lead[1] ?? "") : null,
+    buttons: buttons
+      ? [...new Set((buttons[1] ?? "").split("|").map((b) => b.trim().replace(/\s+/g, " ").slice(0, 40)).filter(Boolean))].slice(0, 3)
+      : [],
+    askPhone: ASK_PHONE_RE.test(raw),
+  };
+}
+
+export interface AgentProfile {
+  business?: string;
+  services?: string;
+  hours?: string;
+  location?: string;
+  phone?: string;
+  website?: string;
+  faq?: string;
+  tone?: "friendly" | "professional" | "luxury" | "casual";
+}
+
+const TONES: Record<string, string> = {
+  friendly: "warm, friendly and positive, like a helpful person from the business",
+  professional: "professional, precise and polite",
+  luxury: "elegant, premium and attentive (high-end service)",
+  casual: "casual, light and short, with a bit of humour",
+};
+
+const GOALS: Record<string, string> = {
+  lead: "Qualify the customer and capture the lead: understand the need, the timing and the budget, and get a name + phone (or e-mail) so the team can close the deal.",
+  booking: "Book an appointment: find the right service and time, send the booking link, and confirm the details (name + phone).",
+  sale: "Sell: recommend the right product/service, explain the value, handle objections with empathy and close — collect the details needed for the order.",
+  support: "Resolve the customer's issue quickly and kindly; collect the details the team needs when something must be checked.",
+};
+
+/** Extra system-prompt sections for the sales agent (profile, goal, sales method, tools). */
+export function salesAgentInstructions(input: {
+  profile?: AgentProfile | null;
+  goal?: string | null;
+  channel: AutopilotChannel;
+  leadKnown?: { score?: string | null } | null;
+}): string {
+  const p = input.profile ?? {};
+  const facts = [
+    p.business ? `- About the business: ${p.business}` : "",
+    p.services ? `- Services / products and prices:\n${p.services}` : "",
+    p.hours ? `- Opening hours: ${p.hours}` : "",
+    p.location ? `- Address / service area: ${p.location}` : "",
+    p.phone ? `- Business phone: ${p.phone}` : "",
+    p.website ? `- Website: ${p.website}` : "",
+    p.faq ? `- Frequently asked questions:\n${p.faq}` : "",
+  ].filter(Boolean);
+  const buttonsOk = input.channel !== "email" && input.channel !== "sms";
+  return [
+    facts.length ? `Business profile (facts you may use):\n${facts.join("\n")}` : "",
+    `Your goal: ${GOALS[input.goal ?? "lead"] ?? GOALS.lead}`,
+    `Tone: ${TONES[p.tone ?? "friendly"] ?? TONES.friendly}.`,
+    [
+      "Conversation method (like the best salesperson):",
+      "1. Greet and find out what the customer needs (one focused question at a time).",
+      "2. Qualify: need, timing/urgency, budget or quantity — naturally, not as an interrogation.",
+      "3. Recommend the best option and its concrete benefit for this customer.",
+      "4. Handle hesitation with empathy and facts; never pressure or invent discounts.",
+      "5. Close: propose ONE clear next step (book / order / call back) and ask for name + phone.",
+      "6. Confirm what happens next and thank the customer.",
+    ].join("\n"),
+    [
+      "Tools — add these control lines at the very END of your reply when relevant (the customer never sees them):",
+      "- [[LEAD: name=…; phone=…; email=…; need=…; budget=…; score=hot|warm|cold; summary=…]]",
+      "  Use it as soon as you know what the customer wants and at least one of name / phone / e-mail, and again whenever new details arrive.",
+      "  score: hot = ready to buy/book now and gave contact details; warm = interested; cold = just browsing.",
+      "  summary: 1–3 sentences for the team (need, budget, timing, objections, agreed next step). Omit unknown fields.",
+      buttonsOk ? "- [[BUTTONS: option 1 | option 2 | option 3]] — up to 3 short quick replies (max 20 characters each) when the customer should choose." : "",
+      input.channel === "telegram" || input.channel === "web" ? "- [[ASK_PHONE]] — when you ask for the phone number (shows a one-tap 'share my number' button)." : "",
+      input.leadKnown?.score ? `(This customer is already saved as a ${input.leadKnown.score} lead — update with [[LEAD: …]] only when something new is learned.)` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/** Text fallback for channels without native buttons (WhatsApp by QR, SMS). */
+export function buttonsAsText(text: string, buttons: string[]): string {
+  if (!buttons.length) return text;
+  return `${text}\n\n${buttons.map((b, i) => `${i + 1}. ${b}`).join("\n")}`;
+}
+
+/** Polite fallback when the AI can't answer right now (no credits / provider down). */
+export function fallbackMessage(locale: string): string {
+  if (locale === "en") return "Thanks for your message! 🙏 A team member will get back to you here very soon.";
+  if (locale === "ar") return "شكراً على رسالتك! 🙏 سيعود إليك أحد أعضاء فريقنا هنا قريباً جداً.";
+  return "תודה על ההודעה! 🙏 נציג מהצוות יחזור אליכם כאן בהקדם.";
+}
+
+/** Escapes text for Telegram parse_mode=HTML and keeps **bold** as <b>. */
+export function telegramHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+}

@@ -520,6 +520,56 @@
       "how": "Getting started: 1. create an agent (or pick a template) 2. connect a channel 3. done, the agent answers.",
       "connect": "Connect channels →",
       "inbox": "Conversations in the inbox →"
+    },
+    "sales": {
+      "goal": "Agent goal",
+      "goals": {
+        "lead": "Capture the lead (name + phone)",
+        "booking": "Book an appointment",
+        "sale": "Sell and close the order",
+        "support": "Customer support"
+      },
+      "tone": "Tone",
+      "tones": {
+        "friendly": "Warm & friendly",
+        "professional": "Professional",
+        "luxury": "Premium",
+        "casual": "Casual"
+      },
+      "followup": "Automatic follow-up",
+      "followupHint": "When a customer stops answering, the agent sends one personal reminder.",
+      "followupOff": "Off",
+      "followupAfter": "After {h} hours",
+      "profileTitle": "About the business: who the agent is and what it sells",
+      "profileHint": "The more you fill in, the more precisely the agent answers and sells. It only uses what you write here and in the instructions.",
+      "fields": {
+        "business": "What the business does",
+        "services": "Services / products and prices",
+        "hours": "Opening hours",
+        "location": "Address / service area",
+        "phone": "Business phone",
+        "website": "Website",
+        "faq": "FAQ"
+      },
+      "placeholders": {
+        "business": "E.g. dog grooming salon in Tel Aviv, 10 years of experience, pick-up and drop-off",
+        "services": "Small dog grooming: $45\nLarge dog grooming: $65\nBath: $25",
+        "hours": "Sun–Thu 9:00–19:00, Fri 9:00–13:00",
+        "location": "100 Main St.",
+        "phone": "+1 555 0100",
+        "website": "https://…",
+        "faq": "Q: Is there parking? A: Yes, free parking next door"
+      }
+    },
+    "stats": {
+      "title": "Agent performance",
+      "period": "Last 30 days",
+      "conversations": "Conversations handled",
+      "replies": "Replies sent",
+      "leads": "Leads captured",
+      "hot": "Hot leads 🔥",
+      "deals": "Deals opened",
+      "handoffs": "Handed to the team"
     }
   },
   "deals": {
@@ -1407,7 +1457,14 @@
     "aiResumed": "The AI agent is answering this conversation again",
     "takeOver": "I'll answer",
     "backToAi": "Back to AI",
-    "handoffNotification": "{name} is waiting for an agent (click to open)"
+    "handoffNotification": "{name} is waiting for an agent (click to open)",
+    "lead": {
+      "hot": "🔥 Hot lead",
+      "warm": "⭐ Warm lead",
+      "cold": "❄️ Cold lead",
+      "deal": "Deal opened →"
+    },
+    "leadNotification": "New lead from the agent: {name} ({score}) {need}"
   },
   "support": {
     "title": "Customer support",

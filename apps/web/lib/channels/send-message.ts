@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadAccount, markAccountError, type Kind } from "./accounts";
-import { telegramCall, twilioSendSms, whatsappSendText, type ProviderResult } from "./providers";
+import { telegramCall, twilioSendSms, whatsappSendButtons, whatsappSendText, type ProviderResult } from "./providers";
 import { toE164 } from "./secrets";
 
 export interface SendOutcome {
@@ -12,7 +12,15 @@ export interface SendOutcome {
   permanent?: boolean;
 }
 
-async function providerSend(kind: Kind | "web", orgId: string, externalId: string, text: string, conversationId?: string): Promise<ProviderResult & { accountId?: string }> {
+/** Optional rich parts of a message (AI agent replies): quick-reply buttons, "share phone", HTML formatting. */
+export interface RichMessage {
+  buttons?: string[];
+  askPhone?: boolean;
+  askPhoneLabel?: string;
+  html?: boolean;
+}
+
+async function providerSend(kind: Kind | "web", orgId: string, externalId: string, text: string, conversationId?: string, rich?: RichMessage): Promise<ProviderResult & { accountId?: string }> {
   // website chat: the visitor's browser reads the message from the conversation — nothing to deliver
   if (kind === "web") return { ok: true };
   const acc = await loadAccount(orgId, kind);
@@ -23,13 +31,29 @@ async function providerSend(kind: Kind | "web", orgId: string, externalId: strin
     r = await sendEmailReply(acc, externalId, text, conversationId);
   } else if (kind === "whatsapp_qr") {
     const { bridgeSend } = await import("./wa-bridge");
-    r = await bridgeSend(acc, externalId, text);
+    const { buttonsAsText } = await import("@/lib/ai/autopilot-core");
+    r = await bridgeSend(acc, externalId, rich?.buttons?.length ? buttonsAsText(text, rich.buttons) : text);
   } else if (kind === "telegram") {
-    r = await telegramCall(acc.secrets.bot_token ?? "", "sendMessage", { chat_id: externalId, text });
+    if (rich) {
+      const { telegramHtml } = await import("@/lib/ai/autopilot-core");
+      const reply_markup = rich.askPhone
+        ? { keyboard: [[{ text: rich.askPhoneLabel || "📱", request_contact: true }]], resize_keyboard: true, one_time_keyboard: true }
+        : rich.buttons?.length
+          ? { keyboard: rich.buttons.map((b) => [{ text: b }]), resize_keyboard: true, one_time_keyboard: true }
+          : { remove_keyboard: true };
+      r = await telegramCall(acc.secrets.bot_token ?? "", "sendMessage", { chat_id: externalId, text: rich.html ? telegramHtml(text) : text, ...(rich.html ? { parse_mode: "HTML" } : {}), reply_markup, link_preview_options: { is_disabled: false } });
+      // formatting rejected (should not happen): send plain text instead of failing
+      if (!r.ok && rich.html && /parse|entit/i.test(r.error ?? "")) r = await telegramCall(acc.secrets.bot_token ?? "", "sendMessage", { chat_id: externalId, text, reply_markup });
+    } else {
+      r = await telegramCall(acc.secrets.bot_token ?? "", "sendMessage", { chat_id: externalId, text });
+    }
   } else if (kind === "whatsapp") {
-    r = await whatsappSendText(acc.secrets.access_token ?? "", acc.config.phone_number_id ?? "", `+${externalId.replace(/^\+/, "")}`, text);
+    r = rich?.buttons?.length
+      ? await whatsappSendButtons(acc.secrets.access_token ?? "", acc.config.phone_number_id ?? "", `+${externalId.replace(/^\+/, "")}`, text, rich.buttons)
+      : await whatsappSendText(acc.secrets.access_token ?? "", acc.config.phone_number_id ?? "", `+${externalId.replace(/^\+/, "")}`, text);
   } else {
-    r = await twilioSendSms(acc.config.account_sid ?? "", acc.secrets.auth_token ?? "", acc.config.from_number ?? "", externalId, text);
+    const { buttonsAsText } = await import("@/lib/ai/autopilot-core");
+    r = await twilioSendSms(acc.config.account_sid ?? "", acc.secrets.auth_token ?? "", acc.config.from_number ?? "", externalId, rich?.buttons?.length ? buttonsAsText(text, rich.buttons) : text);
   }
   if (!r.ok && (r.status === 401 || r.status === 403)) await markAccountError(acc.id, r.error ?? "unauthorized");
   return { ...r, accountId: acc.id };
@@ -39,7 +63,7 @@ async function providerSend(kind: Kind | "web", orgId: string, externalId: strin
  * Sends a text into an existing conversation: stores the outgoing message
  * (queued → sent/failed) and updates the conversation preview.
  */
-export async function sendToConversation(orgId: string, conversationId: string, text: string, sentBy?: string, opts?: { aiAgentId?: string | null; meta?: Record<string, unknown> }): Promise<SendOutcome> {
+export async function sendToConversation(orgId: string, conversationId: string, text: string, sentBy?: string, opts?: { aiAgentId?: string | null; meta?: Record<string, unknown>; rich?: RichMessage }): Promise<SendOutcome> {
   const admin = createAdminClient();
   const { data: conv } = await admin.from("conversations").select("id, channel, external_id").eq("id", conversationId).eq("organization_id", orgId).maybeSingle();
   if (!conv) return { ok: false, error: "not_found", permanent: true };
@@ -59,7 +83,7 @@ export async function sendToConversation(orgId: string, conversationId: string, 
     .select("id")
     .single();
   if (error || !msg) return { ok: false, error: "store_failed" };
-  const r = await providerSend(conv.channel as Kind | "web", orgId, conv.external_id as string, body, conv.id as string);
+  const r = await providerSend(conv.channel as Kind | "web", orgId, conv.external_id as string, body, conv.id as string, opts?.rich);
   await admin
     .from("messages")
     .update({ status: r.ok ? "sent" : "failed", external_id: r.externalId ?? null, error: r.ok ? null : (r.error ?? "send_failed").slice(0, 500) })

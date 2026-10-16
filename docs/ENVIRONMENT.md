@@ -95,3 +95,6 @@ Add extra keys in Vercel → Environment Variables as `GEMINI_API_KEY_2`, `GEMIN
 - E-mail with an app password works without any variable. Mailboxes are read every 5 minutes by the GitHub "jobs" workflow (`/api/channels/email/poll`), or every minute when the QR bridge runs with `CRON_SECRET`.
 - Automatic replies use the workspace's AI credits (feature `autopilot`), at most 30 replies per conversation per hour. A team reply from the inbox switches the conversation to the team; the "Back to AI" button switches it back.
 - Full step-by-step setup (Hebrew): `docs/CONNECT_CHANNELS_HE.md`.
+
+## v7 — sales agent
+No new variables. `/api/ai/followups` (Bearer `CRON_SECRET`) sends the agent's automatic follow-ups; the GitHub "jobs" workflow calls it every 5 minutes (the QR bridge every minute when it runs with `CRON_SECRET`). New-lead e-mails to the owners use the existing e-mail settings (`EMAIL_PROVIDER_API_KEY`, `EMAIL_FROM_ADDRESS`).

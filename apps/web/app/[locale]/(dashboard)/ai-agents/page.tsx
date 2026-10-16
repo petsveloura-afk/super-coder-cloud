@@ -5,6 +5,7 @@ import { Bot, KeyRound } from "lucide-react";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { AgentDialog, AgentStatus, DeleteAgentButton, QuickAgentButton, type AgentRow } from "@/components/ai/agents-client";
 import { AutopilotExplainer } from "@/components/ai/autopilot-explainer";
+import { AgentStats } from "@/components/ai/agent-stats";
 import { StudioChat } from "@/components/ai/studio-chat";
 import { aiSiteCaps } from "@/lib/ai/site-builder";
 import { UsageMeter } from "@/components/billing/usage-meter";
@@ -29,7 +30,7 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
   const [{ data: agentsData }, { data: ent }] = await Promise.all([
     supabase
       .from("ai_agents")
-      .select("id, name, instructions, provider, model, temperature, language, enabled, allowed_tools, autopilot_channels, greeting, handoff_rules")
+      .select("id, name, instructions, provider, model, temperature, language, enabled, allowed_tools, autopilot_channels, greeting, handoff_rules, profile, lead_goal, followup_hours")
       .eq("organization_id", ctx.org.id)
       .order("created_at", { ascending: true }),
     supabase.rpc("org_entitlements", { org: ctx.org.id }),
@@ -61,6 +62,8 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
         active={agents.some((a) => a.enabled && (a.autopilot_channels ?? []).length > 0)}
         action={canManage && !agents.some((a) => a.enabled && (a.autopilot_channels ?? []).length > 0) ? <QuickAgentButton provider={defaults.provider} model={defaults[defaults.provider]} /> : null}
       />
+
+      {ctx.can("inbox.read") ? <AgentStats orgId={ctx.org.id} locale={locale} /> : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.8fr)_1.6fr]">
         <div className="space-y-4">

@@ -25,6 +25,8 @@ interface ChatMsg {
   from: "me" | "agent" | "team";
   text: string;
   at: string;
+  buttons?: string[];
+  askPhone?: boolean;
 }
 
 async function state(org: string, visitor: string | null) {
@@ -41,13 +43,20 @@ async function state(org: string, visitor: string | null) {
         mode = conv.ai_mode as string;
         const { data: rows } = await admin
           .from("messages")
-          .select("id, direction, body, created_at, ai_agent_id, sent_by")
+          .select("id, direction, body, created_at, ai_agent_id, sent_by, meta")
           .eq("conversation_id", conv.id)
           .order("created_at", { ascending: false })
           .limit(60);
-        messages = ((rows ?? []) as { id: string; direction: string; body: string; created_at: string; ai_agent_id: string | null; sent_by: string | null }[])
+        messages = ((rows ?? []) as { id: string; direction: string; body: string; created_at: string; ai_agent_id: string | null; sent_by: string | null; meta: { buttons?: string[]; ask_phone?: boolean } | null }[])
           .reverse()
-          .map((m) => ({ id: m.id, from: m.direction === "in" ? "me" : m.ai_agent_id ? "agent" : "team", text: m.body, at: m.created_at }));
+          .map((m) => ({
+            id: m.id,
+            from: m.direction === "in" ? "me" : m.ai_agent_id ? "agent" : "team",
+            text: m.body,
+            at: m.created_at,
+            ...(m.direction === "out" && m.meta?.buttons?.length ? { buttons: m.meta.buttons.slice(0, 3) } : {}),
+            ...(m.direction === "out" && m.meta?.ask_phone ? { askPhone: true } : {}),
+          }));
       }
     }
   }

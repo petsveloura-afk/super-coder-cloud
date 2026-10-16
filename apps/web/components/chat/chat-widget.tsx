@@ -17,6 +17,8 @@ interface ChatMsg {
   text: string;
   at: string;
   pending?: boolean;
+  buttons?: string[];
+  askPhone?: boolean;
 }
 
 interface ChatState {
@@ -76,6 +78,7 @@ export function ChatWidget({ orgSlug, accent, embedded = false, defaultOpen = fa
   const [showDetails, setShowDetails] = useState(false);
   const [details, setDetails] = useState({ name: "", phone: "" });
   const vid = useRef<string>("");
+  const queued = useRef<{ extra?: { name?: string; phone?: string }; override?: string } | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const color = /^#[0-9a-f]{6}$/i.test(accent ?? "") ? accent! : "#3366E6";
 
@@ -106,16 +109,31 @@ export function ChatWidget({ orgSlug, accent, embedded = false, defaultOpen = fa
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
   }, [state?.messages.length, busy, open]);
 
+  useEffect(() => {
+    if (!busy && queued.current) {
+      const q = queued.current;
+      queued.current = null;
+      void send(q.extra, q.override);
+    }
+    // flush once when the previous reply finished (send is recreated every render on purpose)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy]);
+
   if (!state?.enabled) {
     return embedded ? <p className="p-6 text-center text-sm text-muted">{t("chat.unavailable")}</p> : null;
   }
 
-  async function send(extra?: { name?: string; phone?: string }) {
-    const body = text.trim();
-    if (!body || busy) return;
+  async function send(extra?: { name?: string; phone?: string }, override?: string) {
+    const body = (override ?? text).trim();
+    if (!body) return;
+    // typed while the agent is still answering → sent automatically right after
+    if (busy) {
+      queued.current = { extra, override };
+      return;
+    }
     setBusy(true);
     setError(null);
-    setText("");
+    if (override === undefined) setText("");
     const optimistic: ChatMsg = { id: `tmp-${new Date().getTime()}`, from: "me", text: body, at: new Date().toISOString(), pending: true };
     setState((s) => (s ? { ...s, messages: [...s.messages, optimistic] } : s));
     try {
@@ -137,6 +155,8 @@ export function ChatWidget({ orgSlug, accent, embedded = false, defaultOpen = fa
   }
 
   const greeting = state.greeting || t("chat.defaultGreeting", { org: state.org });
+  const last = state.messages[state.messages.length - 1];
+  const wantPhone = Boolean(last?.from === "agent" && last.askPhone);
   const panel = (
     <section
       className={cn(
@@ -173,6 +193,23 @@ export function ChatWidget({ orgSlug, accent, embedded = false, defaultOpen = fa
             <Linkified text={m.text} />
           </Bubble>
         ))}
+        {!busy && last?.from === "agent" && last.buttons?.length ? (
+          <div className="flex flex-wrap justify-start gap-2" data-testid="chat-quick-replies">
+            {last.buttons.map((b) => (
+              <button
+                key={b}
+                type="button"
+                onClick={() => void send(undefined, b)}
+                className="rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition hover:text-white"
+                style={{ borderColor: color, color }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = color)}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                {b}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {busy ? (
           <div className="flex justify-start" data-testid="chat-typing">
             <div className="flex gap-1 rounded-2xl rounded-ss-md bg-surface px-4 py-3 shadow-sm">
@@ -184,14 +221,17 @@ export function ChatWidget({ orgSlug, accent, embedded = false, defaultOpen = fa
         ) : null}
       </div>
 
-      {showDetails ? (
+      {showDetails || wantPhone ? (
         <form
           className="grid gap-2 border-t border-line bg-surface p-3 sm:grid-cols-[1fr_1fr_auto]"
           onSubmit={(e) => {
             e.preventDefault();
             if (!details.name.trim() && !details.phone.trim()) return;
-            setText((x) => x || t("chat.detailsMessage", { name: details.name, phone: details.phone }));
+            const msg = t("chat.detailsMessage", { name: details.name, phone: details.phone });
             setShowDetails(false);
+            // the agent asked for the phone → send the details right away
+            if (wantPhone) void send(details, msg);
+            else setText((x) => x || msg);
           }}
         >
           <input aria-label={t("chat.name")} placeholder={t("chat.name")} value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })} className="h-9 rounded-xl border border-line bg-elevated px-3 text-sm outline-none focus:border-accent" />

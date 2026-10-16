@@ -87,7 +87,7 @@ async function main() {
   const cron = process.env.CRON_SECRET ?? "";
   if (appUrl && cron) {
     const tick = async () => {
-      for (const p of ["/api/channels/email/poll", "/api/jobs/dispatch"]) {
+      for (const p of ["/api/channels/email/poll", "/api/jobs/dispatch", "/api/ai/followups"]) {
         try {
           await fetch(`${appUrl}${p}`, { method: "POST", headers: { Authorization: `Bearer ${cron}` }, signal: AbortSignal.timeout(55_000) });
         } catch {

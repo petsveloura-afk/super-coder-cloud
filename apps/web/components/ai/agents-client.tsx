@@ -25,7 +25,20 @@ export interface AgentRow {
   autopilot_channels?: string[];
   greeting?: string;
   handoff_rules?: string;
+  profile?: Record<string, string> | null;
+  lead_goal?: string | null;
+  followup_hours?: number | null;
 }
+
+const PROFILE_FIELDS = [
+  { key: "business", rows: 2 },
+  { key: "services", rows: 4 },
+  { key: "hours", rows: 1 },
+  { key: "location", rows: 1 },
+  { key: "phone", rows: 1 },
+  { key: "website", rows: 1 },
+  { key: "faq", rows: 3 },
+] as const;
 
 /** Channels the agent can answer on by itself (wave 6). */
 export const AUTOPILOT_CHANNEL_OPTIONS = ["web", "whatsapp", "whatsapp_qr", "telegram", "email", "sms"] as const;
@@ -115,6 +128,48 @@ export function AgentDialog({ agent, defaults }: { agent?: AgentRow; defaults: {
           <Field label={t("ai.autopilot.handoff")} htmlFor="agent-handoff" hint={t("ai.autopilot.handoffHint")} error={err("handoffRules")}>
             <Textarea id="agent-handoff" name="handoffRules" rows={2} maxLength={2000} defaultValue={v("handoffRules", agent?.handoff_rules ?? "")} />
           </Field>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label={t("ai.sales.goal")} htmlFor="agent-goal">
+              <Select id="agent-goal" name="leadGoal" defaultValue={agent?.lead_goal ?? "lead"}>
+                {(["lead", "booking", "sale", "support"] as const).map((g) => (
+                  <option key={g} value={g}>
+                    {t(`ai.sales.goals.${g}`)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={t("ai.sales.tone")} htmlFor="agent-tone">
+              <Select id="agent-tone" name="profile_tone" defaultValue={agent?.profile?.tone ?? "friendly"}>
+                {(["friendly", "professional", "luxury", "casual"] as const).map((g) => (
+                  <option key={g} value={g}>
+                    {t(`ai.sales.tones.${g}`)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={t("ai.sales.followup")} htmlFor="agent-followup" hint={t("ai.sales.followupHint")}>
+              <Select id="agent-followup" name="followupHours" defaultValue={String(agent?.followup_hours ?? (agent ? 0 : 3))}>
+                {[0, 1, 3, 6, 12, 24, 48].map((h) => (
+                  <option key={h} value={h}>
+                    {h === 0 ? t("ai.sales.followupOff") : t("ai.sales.followupAfter", { h })}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        </fieldset>
+        <fieldset className="space-y-3 rounded-2xl border border-line p-4" data-testid="agent-profile">
+          <legend className="px-1 text-sm font-semibold">{t("ai.sales.profileTitle")}</legend>
+          <p className="text-[12.5px] text-muted">{t("ai.sales.profileHint")}</p>
+          {PROFILE_FIELDS.map((f) => (
+            <Field key={f.key} label={t(`ai.sales.fields.${f.key}`)} htmlFor={`agent-p-${f.key}`}>
+              {f.rows > 1 ? (
+                <Textarea id={`agent-p-${f.key}`} name={`profile_${f.key}`} rows={f.rows} maxLength={3000} placeholder={t(`ai.sales.placeholders.${f.key}`)} defaultValue={agent?.profile?.[f.key] ?? ""} />
+              ) : (
+                <Input id={`agent-p-${f.key}`} name={`profile_${f.key}`} maxLength={300} placeholder={t(`ai.sales.placeholders.${f.key}`)} defaultValue={agent?.profile?.[f.key] ?? ""} dir={f.key === "phone" || f.key === "website" ? "ltr" : undefined} />
+              )}
+            </Field>
+          ))}
         </fieldset>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t("ai.provider")} htmlFor="agent-provider">

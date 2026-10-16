@@ -136,3 +136,123 @@ test("Telegram: the bot answers Start and questions by itself and hands off on a
   await new Promise((r) => setTimeout(r, 4000));
   expect((await calls(request)).some((c) => c.method === "sendMessage" && String(c.body?.chat_id) === group)).toBe(false);
 });
+
+type RichCall = Call & { body?: Call["body"] & { parse_mode?: string; reply_markup?: { keyboard?: { text: string; request_contact?: boolean }[][]; remove_keyboard?: boolean } } };
+
+test("the agent closes the lead: share-phone button → contact, hot tag, deal, task, summary, alert, then a follow-up", async ({ page, request }) => {
+  test.skip(!mocked, "needs the provider mock");
+  test.setTimeout(240_000);
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  await signUp(page, { name: "Closer Owner", email: uniqueEmail("closer") });
+  await createOrg(page, "Closer Co", `closer-${Date.now()}`);
+  await page.goto("/he/ai-agents");
+  await page.getByTestId("quick-agent").click();
+  await expect(page.getByText("הסוכן פעיל ועונה ללקוחות")).toBeVisible();
+  await expect(page.getByTestId("agent-stats")).toBeVisible();
+
+  // the business profile is part of the agent settings
+  await page.getByRole("button", { name: "עריכה" }).first().click();
+  const dlg = page.getByRole("dialog");
+  await expect(dlg.getByTestId("agent-profile")).toBeVisible();
+  await dlg.locator("#agent-p-services").fill("תספורת כלב קטן: 150 ₪\nאמבטיה: 90 ₪");
+  await dlg.locator("#agent-p-hours").fill("א׳-ה׳ 9:00-19:00");
+  await expect(dlg.locator("#agent-followup")).toHaveValue("3");
+  await dlg.locator('button[type="submit"]').click();
+  await expect(dlg).toBeHidden();
+
+  await page.goto("/he/integrations");
+  await page.getByTestId("tg-connect").click();
+  await page.getByRole("dialog").locator("#hub-tg-token").fill("444555666:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw6");
+  await page.getByRole("dialog").locator('button[type="submit"]').click();
+  await expect(page.getByRole("dialog")).toBeHidden({ timeout: 20_000 });
+  await page.reload();
+  await expect(page.locator('[data-hub="telegram"]')).toContainText("@scc_test_bot");
+  await expect(page.locator('[data-hub="telegram"]')).toContainText("הסוכן עונה כאן אוטומטית");
+  const token = (await calls(request)).filter((c) => c.method === "setWebhook").pop()!.body!.secret_token!;
+  const chat = String(30_000_000 + (Date.now() % 69_999_999));
+  const post = (id: number, message: Record<string, unknown>) =>
+    request.post(`/api/channels/telegram/${token}`, {
+      headers: { "X-Telegram-Bot-Api-Secret-Token": token },
+      data: { update_id: id, message: { message_id: id, chat: { id: Number(chat), type: "private" }, from: { id: Number(chat), first_name: "רון" }, ...message } },
+    });
+
+  // 1. the agent sees the system prompt with the profile and asks for the phone with a one-tap button
+  await post(1, { text: "כמה עולה תספורת?" });
+  const ask = (await waitForTelegram(request, chat, /150 ₪/)) as RichCall;
+  expect(ask.body?.parse_mode).toBe("HTML");
+  expect(ask.body?.reply_markup?.keyboard?.[0]?.[0]?.request_contact).toBe(true);
+  expect(ask.body?.text).not.toContain("ASK_PHONE");
+  expect((await calls(request)).some((c) => c.method === "sendChatAction")).toBe(true);
+
+  // 2. the customer taps "share my phone" → the lead is closed
+  await post(2, { contact: { phone_number: "+972541112233", first_name: "רון" } });
+  const done = (await waitForTelegram(request, chat, /רשמתי/)) as RichCall;
+  expect(done.body?.text).not.toContain("LEAD");
+
+  await page.goto("/he/inbox");
+  await page.locator("[data-conversation]").first().click();
+  await expect(page.getByTestId("lead-info")).toContainText("ליד חם");
+  await expect(page.getByText(/רוצה תספורת לכלב מחר בבוקר/).first()).toBeVisible();
+  await page.goto("/he/crm?q=541112233");
+  await expect(page.getByText(/רון/).first()).toBeVisible();
+  await expect(page.getByText("מוסמך").first()).toBeVisible();
+  await page.goto("/he/pipelines");
+  await expect(page.getByText("תספורת לכלב · AI").first()).toBeVisible();
+  await page.goto("/he/tasks");
+  await expect(page.getByText(/Follow up: רון/).first()).toBeVisible();
+  await page.goto("/he/settings");
+  await expect(page.getByText(/ליד חדש מהסוכן: רון/).first()).toBeVisible();
+  await page.goto("/he/ai-agents");
+  await expect(page.getByTestId("agent-stats")).toContainText("1");
+
+  // 3. silence → one automatic follow-up (cron)
+  test.skip(!service || !supabaseUrl, "needs the service role");
+  const headers = { apikey: service!, Authorization: `Bearer ${service}`, "Content-Type": "application/json", Prefer: "return=minimal" };
+  const old = new Date(Date.now() - 5 * 3600_000).toISOString();
+  const patched = await request.patch(`${supabaseUrl}/rest/v1/conversations?channel=eq.telegram&external_id=eq.${chat}`, { headers, data: { last_message_at: old } });
+  expect(patched.ok()).toBe(true);
+  const fu = await request.post("/api/ai/followups", { headers: { Authorization: `Bearer ${process.env.CRON_SECRET ?? "e2e-cron-secret-123456"}` } });
+  expect(fu.ok()).toBe(true);
+  expect(((await fu.json()) as { sent: number }).sent).toBeGreaterThanOrEqual(1);
+  await waitForTelegram(request, chat, /רק מזכיר/);
+  // never twice
+  await request.patch(`${supabaseUrl}/rest/v1/conversations?channel=eq.telegram&external_id=eq.${chat}`, { headers, data: { last_message_at: old } });
+  const again = await request.post("/api/ai/followups", { headers: { Authorization: `Bearer ${process.env.CRON_SECRET ?? "e2e-cron-secret-123456"}` } });
+  expect(((await again.json()) as { sent: number }).sent).toBe(0);
+});
+
+test("website chat: quick-reply buttons and the details form when the agent asks for the phone", async ({ page, browser }) => {
+  test.skip(!mocked, "needs the provider mock");
+  test.setTimeout(150_000);
+  const slug = `chips-${Date.now()}`;
+  await signUp(page, { name: "Chips Owner", email: uniqueEmail("chips") });
+  await createOrg(page, "Chips Co", slug);
+  await page.goto("/he/ai-agents");
+  await page.getByTestId("quick-agent").click();
+  await expect(page.getByText("הסוכן פעיל ועונה ללקוחות")).toBeVisible();
+
+  const visitor = await browser.newContext();
+  const v = await visitor.newPage();
+  await v.goto(`/he/chat/${slug}`);
+  const panel = v.getByTestId("chat-panel");
+  await panel.getByRole("textbox").fill("מה יש לכם?");
+  await panel.getByRole("textbox").press("Enter");
+  const chips = v.getByTestId("chat-quick-replies");
+  await expect(chips).toBeVisible({ timeout: 30_000 });
+  await expect(chips.getByRole("button")).toHaveCount(3);
+  await expect(v.getByTestId("chat-log-public")).not.toContainText("BUTTONS");
+  await chips.getByRole("button", { name: "אמבטיה" }).click();
+  await expect(v.getByTestId("chat-log-public").locator('[data-from="me"]').last()).toContainText("אמבטיה");
+  await panel.getByRole("textbox").fill("כמה עולה?");
+  await panel.getByRole("textbox").press("Enter");
+  await expect(v.getByPlaceholder("טלפון")).toBeVisible({ timeout: 30_000 });
+  await v.getByPlaceholder("שם").fill("דנה");
+  await v.getByPlaceholder("טלפון").fill("0529998877");
+  await v.getByRole("button", { name: "הוספה" }).click();
+  await expect(v.getByTestId("chat-log-public")).toContainText("רשמתי", { timeout: 30_000 });
+  await shot(v, "p5-chat-chips");
+  await visitor.close();
+  await page.goto("/he/crm");
+  await expect(page.getByText("0529998877").first()).toBeVisible();
+});

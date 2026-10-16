@@ -72,7 +72,7 @@ export async function saveAgentAction(_prev: ActionState, fd: FormData): Promise
       ...(parsed.data.imageGen ? ["image_gen"] : []),
     ],
     ...(fd.get("autopilotForm") === "1"
-      ? { autopilot_channels: parsed.data.autopilot, greeting: parsed.data.greeting, handoff_rules: parsed.data.handoffRules }
+      ? { autopilot_channels: parsed.data.autopilot, greeting: parsed.data.greeting, handoff_rules: parsed.data.handoffRules, ...salesFields(fd) }
       : {}),
   };
   const supabase = await createClient();
@@ -201,9 +201,30 @@ export async function createQuickAgentAction(input: {
     enabled: true,
     allowed_tools: ["crm_lookup", "draft_message", "site_builder", "image_gen"],
     autopilot_channels: ["web", "whatsapp", "whatsapp_qr", "telegram", "email"],
+    lead_goal: "lead",
+    followup_hours: 3,
   });
   if (error) return { error: limitErrorKey(error.message) ?? dbErrorKey(error) };
   revalidatePath(`/${locale}/ai-agents`);
   revalidatePath(`/${locale}/integrations`);
   return { ok: true, message: "ai.quickCreated" };
+}
+
+/** Wave 7 — business profile, goal and follow-up delay from the agent form. */
+const PROFILE_KEYS = ["business", "services", "hours", "location", "phone", "website", "faq"] as const;
+function salesFields(fd: FormData) {
+  const profile: Record<string, string> = {};
+  for (const k of PROFILE_KEYS) {
+    const v = String(fd.get(`profile_${k}`) ?? "").trim().slice(0, k === "services" || k === "faq" || k === "business" ? 3000 : 300);
+    if (v) profile[k] = v;
+  }
+  const tone = String(fd.get("profile_tone") ?? "");
+  if (["friendly", "professional", "luxury", "casual"].includes(tone)) profile.tone = tone;
+  const goal = String(fd.get("leadGoal") ?? "lead");
+  const hours = Number(fd.get("followupHours") ?? 0);
+  return {
+    profile,
+    lead_goal: ["lead", "booking", "sale", "support"].includes(goal) ? goal : "lead",
+    followup_hours: Number.isFinite(hours) ? Math.max(0, Math.min(168, Math.round(hours))) : 0,
+  };
 }
