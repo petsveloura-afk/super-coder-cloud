@@ -100,3 +100,26 @@ test("mobile (iPhone viewport): wave 13 — website editor tabs and a published 
   await page.goto(`${url}/privacy`);
   await noSideScroll("m11-legal-mobile");
 });
+
+test("mobile (iPhone viewport): wave 14 — plan cards show real feature names, card checkout opens on its own page and pays", async ({ page }) => {
+  test.skip(process.env.E2E_PROVIDERS_MOCKED !== "true", "needs the provider mock");
+  test.setTimeout(150_000);
+  await signUp(page, { name: "קונה נייד", email: uniqueEmail("mpay") });
+  await createOrg(page, "קונה נייד", `mpay-${Date.now()}`);
+  await page.goto("/he/billing");
+  const main = page.locator("main");
+  await expect(main).not.toContainText("billing.features."); // every feature has a name
+  const pro = page.getByTestId("pay-pro").locator("xpath=ancestor::*[contains(@class,'flex-col')][1]");
+  await expect(main.getByText("אתרים מלאים ב-AI").first()).toBeVisible();
+  await expect(main.getByText(/אתרים מלאים ב-AI\s*\(בקרוב\)/)).toHaveCount(0); // works today — not "coming soon"
+  void pro;
+  await page.getByTestId("pay-pro").locator('[data-method="card_inline"]').click();
+  await page.waitForURL(/\/he\/billing\/checkout\?plan=pro/);
+  await expect(page.getByTestId("checkout-summary")).toContainText("149");
+  await expect(page.getByTestId("card-checkout").getByTestId("mock-card-form")).toBeVisible({ timeout: 20_000 });
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(over).toBeLessThanOrEqual(1);
+  await shot(page, "m12-checkout-mobile");
+  await page.getByTestId("mock-card-pay").click();
+  await expect(page).toHaveURL(/\/he\/billing\?checkout=success/, { timeout: 30_000 });
+});

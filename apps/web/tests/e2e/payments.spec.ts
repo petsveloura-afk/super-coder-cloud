@@ -66,13 +66,16 @@ test("card without a PayPal account: PayPal's card form (guest checkout) → cap
   const card = pro.locator('[data-method="card_inline"]');
   await expect(card).toContainText("כרטיס אשראי");
   await card.click();
+  // wave 14: the checkout opens on its own page with the order summary
+  await page.waitForURL(/\/he\/billing\/checkout\?plan=pro&interval=month/);
   const dlg = page.getByTestId("card-checkout");
-  await expect(dlg).toContainText("Pro");
-  await expect(dlg).toContainText("149");
+  await expect(page.getByTestId("checkout-summary")).toContainText("Pro");
+  await expect(page.getByTestId("checkout-summary")).toContainText("149");
   await expect(dlg.getByTestId("mock-card-form")).toBeVisible({ timeout: 20_000 });
   const sdk = (await calls(request)).filter((c) => c.provider === "paypal" && c.kind === "sdk").pop() as unknown as { query: string };
   expect(sdk.query).toContain("currency=ILS");
   expect(sdk.query).toContain("enable-funding=card");
+  expect(sdk.query).toContain("components=buttons,card-fields");
   expect(sdk.query).toContain("locale=he_IL");
   await shot(page, "b3-card-inline");
   await dlg.getByTestId("mock-card-pay").click();

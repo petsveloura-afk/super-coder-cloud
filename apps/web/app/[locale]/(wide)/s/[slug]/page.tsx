@@ -53,7 +53,7 @@ export default async function PublicSitePage({ params }: { params: Params }) {
     <>
       <SiteRenderer site={{ ...site, slug }} forms={forms} locale={locale} t={t} basePath={await siteBasePath(locale, slug)} branding={site.branding !== false} />
       {/* AI chat with the business — shown only when an agent answers the website chat */}
-      <ChatWidget orgSlug={site.org_slug} accent={site.theme?.accent} />
+      <ChatWidget orgSlug={site.org_slug} accent={site.theme?.accent} branding={site.branding !== false} />
     </>
   );
 }

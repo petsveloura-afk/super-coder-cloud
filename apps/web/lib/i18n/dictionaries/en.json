@@ -379,7 +379,10 @@
       "dedicated_support": "Dedicated account manager",
       "ai_site_landing": "AI landing pages",
       "ai_site_full": "AI full websites",
-      "ai_images": "AI images"
+      "ai_images": "AI images",
+      "site_pro_templates": "All website design templates",
+      "site_ai_editor": "Edit your site with the agent",
+      "site_custom_domain": "Your own domain for the site"
     },
     "statuses": {
       "trialing": "Trial",
@@ -433,7 +436,8 @@
         "paypal_request": "PayPal rejected the request — details are in the server log (Vercel → Logs → checkout failed).",
         "paypal_down": "PayPal is not available right now — try again in a few minutes.",
         "no_price": "This plan has no price set.",
-        "capture_failed": "The payment wasn't completed. If the card was charged, the plan activates automatically within minutes; otherwise try again."
+        "capture_failed": "The payment wasn't completed. If the card was charged, the plan activates automatically within minutes; otherwise try again.",
+        "cardCheck": "Check the card details and try again"
       },
       "cardTitle": "Pay by card — {plan}",
       "cardDesc": "Enter your card details right here — no PayPal account needed.",
@@ -448,7 +452,23 @@
       "tabCard": "Credit card",
       "tabCrypto": "Crypto",
       "cryptoTabHint": "Pay with USDT, Bitcoin, Ether and more via NOWPayments. Once the network confirms, the plan turns on automatically and you get a receipt.",
-      "cryptoContinue": "Continue to crypto payment"
+      "cryptoContinue": "Continue to crypto payment",
+      "checkoutTitle": "Secure checkout",
+      "checkoutHint": "Review the plan, enter your card and the plan is active right away.",
+      "payment": "Payment details",
+      "period": "Period",
+      "yearSaving": "You save {amount} compared to paying monthly",
+      "prepaidNote": "Paid in advance for one {period}. No automatic charge; you get a reminder before it ends.",
+      "periodMonth": "month",
+      "periodYear": "year",
+      "receiptNote": "A receipt is sent automatically and appears in your payment history.",
+      "cardName": "Cardholder name",
+      "cardNumber": "Card number",
+      "cardExpiry": "Expiry",
+      "payNow": "Pay now",
+      "trouble": "Can't pay here? Pay on PayPal's secure page",
+      "byPaying": "Want another plan?",
+      "changePlan": "Back to plans"
     }
   },
   "ai": {

@@ -25,8 +25,8 @@ async function guard(locale: string, siteId: string) {
   const supabase = await createClient();
   const { data: site } = await supabase.from("sites").select("id, slug, status, custom_domain").eq("id", id.data).eq("organization_id", ctx.org.id).maybeSingle();
   if (!site) return { error: "errors.notFound" as const };
-  const { data: allowed } = await supabase.rpc("public_rate_limit", { p_bucket: `domains:${ctx.org.id}`, p_limit: 60, p_window_seconds: 3600 });
-  if (allowed === false) return { error: "errors.rateLimited" as const };
+  const { data: allowed } = await supabase.rpc("check_rate_limit", { p_key: "domains", p_limit: 60, p_window_seconds: 3600 });
+  if (allowed !== true) return { error: "errors.rateLimited" as const };
   return { ctx, site: site as { id: string; slug: string; status: string; custom_domain: string | null } };
 }
 

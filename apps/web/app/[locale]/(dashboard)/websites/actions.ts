@@ -118,8 +118,8 @@ export async function uploadSiteImageAction(fd: FormData): Promise<ActionState<{
   if (file.size > 8 * 1024 * 1024) return { error: "ai.setup.tooBig" };
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "inbox.serverKeyMissing" };
   const supabase = await createClient();
-  const { data: allowed } = await supabase.rpc("public_rate_limit", { p_bucket: `site-upload:${ctx.org.id}`, p_limit: 120, p_window_seconds: 3600 });
-  if (allowed === false) return { error: "errors.rateLimited" };
+  const { data: allowed } = await supabase.rpc("check_rate_limit", { p_key: "site-upload", p_limit: 120, p_window_seconds: 3600 });
+  if (allowed !== true) return { error: "errors.rateLimited" };
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const admin = createAdminClient();
   const path = `${ctx.org.id}/sites/${crypto.randomUUID()}.${ext}`;
@@ -137,6 +137,9 @@ export async function aiEditSiteAction(input: { locale: string; instruction: str
   if (!(await orgHasFeature(ctx.org.id, "site_ai_editor"))) return { error: "plans.locked.site_ai_editor.title" };
   const instruction = String(input.instruction ?? "").trim();
   if (instruction.length < 3) return { error: "websites.aiBriefShort" };
+  // wave 14: at most 40 AI edits per organization per hour
+  const { data: allowedEdit } = await (await createClient()).rpc("check_rate_limit", { p_key: "site-ai-edit", p_limit: 40, p_window_seconds: 3600 });
+  if (allowedEdit !== true) return { error: "errors.rateLimited" };
   const parsed = siteSchema.safeParse(input.site);
   if (!parsed.success) return { error: "websites.invalid", fieldErrors: fieldErrors(parsed.error) };
   const proTemplates = await orgHasFeature(ctx.org.id, "site_pro_templates");

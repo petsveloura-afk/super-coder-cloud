@@ -4,7 +4,6 @@ import { startPaymentAction } from "@/app/[locale]/(dashboard)/billing/actions";
 import { getT } from "@/lib/i18n/server";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Locale } from "@/lib/i18n/config";
-import { CardCheckout } from "./card-checkout";
 
 /** Pay buttons for a plan: PayPal (PayPal or card), Lemon Squeezy (card / Apple Pay / PayPal), crypto. */
 export async function PaymentMethods({
@@ -34,7 +33,21 @@ export async function PaymentMethods({
   return (
     <div className="mt-2 space-y-2" data-testid={`pay-${plan}`}>
       {withDivider ? <div className="text-center text-[11px] text-subtle">{t("billing.pay.or")}</div> : null}
-      {inlineCard ? <CardCheckout plan={plan} planName={inlineCard.planName} interval={interval} priceLabel={inlineCard.priceLabel} currency={inlineCard.currency} clientId={inlineCard.clientId} sdkUrl={inlineCard.sdkUrl} crypto={methods.includes("crypto")} /> : null}
+      {inlineCard ? (
+        // wave 14: the card form opens on its own checkout page (full page load), not in a pop-up sheet —
+        // a modal blocks PayPal's card verification windows. The dialog (CardCheckout) stays available.
+        <a
+          href={`/${locale}/billing/checkout?plan=${plan}&interval=${interval}`}
+          data-method="card_inline"
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0f172a] px-3 py-2 text-sm font-semibold text-white ring-1 ring-white/10 transition hover:brightness-125"
+        >
+          <CreditCard className="h-4 w-4 shrink-0" />
+          <span className="flex flex-col items-center leading-tight">
+            <span>{t("billing.pay.paypalCard")}</span>
+            <span className="text-[10.5px] font-normal opacity-80">{methods.includes("crypto") ? t("billing.pay.cardOrCryptoSub") : t("billing.pay.cardInlineSub")}</span>
+          </span>
+        </a>
+      ) : null}
       {methods.map((m) => {
         const M = meta[m];
         return (

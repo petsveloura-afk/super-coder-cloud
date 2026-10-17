@@ -40,6 +40,8 @@ const csp = [
   `connect-src 'self' ${supabaseOrigin} ${supabaseWs} ${paypalGlobal}`.trim(),
   "worker-src 'self'",
   "manifest-src 'self'",
+  // wave 14: in production (https) every sub-request is forced to https
+  ...((process.env.NEXT_PUBLIC_APP_URL ?? "").startsWith("https://") ? ["upgrade-insecure-requests"] : []),
 ].join("; ");
 
 const securityHeaders = [
@@ -50,6 +52,10 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  // wave 14: extra hardening
+  { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
+  { key: "Origin-Agent-Cluster", value: "?1" },
+  { key: "X-DNS-Prefetch-Control", value: "off" },
 ];
 
 // Public forms and booking pages may be embedded (iframe) on customers' websites.
@@ -108,6 +114,8 @@ const nextConfig: NextConfig = {
       { source: "/:locale(he|ar|en)/chat/:org*", headers: embeddableHeaders },
       { source: "/:locale(he|ar|en)/integrations", headers: integrationsHeaders },
       { source: "/:locale(he|ar|en)/billing", headers: billingHeaders },
+      // wave 14: the checkout page (card form + 3-D Secure pop-ups)
+      { source: "/:locale(he|ar|en)/billing/:path*", headers: billingHeaders },
       // wave 13: buying a domain for a website — the same in-page card form
       { source: "/:locale(he|ar|en)/websites/:id", headers: billingHeaders },
       { source: "/widget.js", headers: [{ key: "Cache-Control", value: "public, max-age=3600" }, { key: "Access-Control-Allow-Origin", value: "*" }] },

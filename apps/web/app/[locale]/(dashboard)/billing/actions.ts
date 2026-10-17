@@ -208,6 +208,17 @@ export async function captureCardOrderAction(input: { locale: string; orderId: s
   if (!ctx.can("billing.manage")) return { error: "forbidden" };
   if (!/^[A-Z0-9]{8,40}$/.test(input.orderId ?? "")) return { error: "invalid" };
   const { capturePayPalCardOrder } = await import("@/lib/billing/paypal");
+  // wave 14: only this organization's own order is captured here (checked before capturing)
+  try {
+    const { paypalGetOrder } = await import("@/lib/billing/paypal");
+    const { parseOrderRef } = await import("@/lib/billing/payments-core");
+    const pre = await paypalGetOrder(input.orderId);
+    const ref = parseOrderRef(pre?.customId);
+    if (!pre || !ref || ref.org !== ctx.org.id) return { error: "invalid" };
+  } catch (e) {
+    console.error("card order lookup failed", (e as Error).message);
+    return { error: "capture_failed" };
+  }
   try {
     const r = await capturePayPalCardOrder(input.orderId);
     if (!r.ok) return { error: "capture_failed" };

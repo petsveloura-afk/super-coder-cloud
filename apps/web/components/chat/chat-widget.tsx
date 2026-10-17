@@ -70,7 +70,7 @@ function Linkified({ text }: { text: string }) {
   );
 }
 
-export function ChatWidget({ orgSlug, accent, embedded = false, defaultOpen = false }: { orgSlug: string; accent?: string; embedded?: boolean; defaultOpen?: boolean }) {
+export function ChatWidget({ orgSlug, accent, embedded = false, defaultOpen = false, branding = true }: { orgSlug: string; accent?: string; embedded?: boolean; defaultOpen?: boolean; /** wave 14: white-label plans hide "powered by" */ branding?: boolean }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(defaultOpen || embedded);
   const [state, setState] = useState<ChatState | null>(null);
@@ -293,9 +293,11 @@ export function ChatWidget({ orgSlug, accent, embedded = false, defaultOpen = fa
           <button type="button" className="inline-flex items-center gap-1 hover:text-fg" onClick={() => setShowDetails((x) => !x)}>
             <UserRound className="h-3.5 w-3.5" /> {t("chat.leaveDetails")}
           </button>
-          <span>
-            {t("chat.poweredBy")} <span dir="ltr">Super Coder</span>
-          </span>
+          {branding ? (
+            <span>
+              {t("chat.poweredBy")} <span dir="ltr">Super Coder</span>
+            </span>
+          ) : null}
         </div>
       </div>
     </section>
