@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { runFollowups } from "@/lib/ai/followups";
 import { runPendingReplies } from "@/lib/ai/autopilot";
+import { runStuckWatchdog } from "@/lib/ai/watchdog";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -21,9 +22,11 @@ async function handle(request: NextRequest) {
   // first the safety net (unanswered customer messages), then follow-ups
   const pending = await runPendingReplies(25_000);
   const summary = await runFollowups(25_000);
+  // wave 15: nobody is left in silence — stuck chats are retried, then handed to the team
+  const watchdog = await runStuckWatchdog(15_000).catch(() => ({ checked: 0, retried: 0, escalated: 0 }));
   // wave 10: bots connected before the Telegram Business update get the full update list
   const healed = await import("@/lib/channels/telegram-setup").then((m) => m.healTelegramWebhooks(5)).catch(() => 0);
-  return NextResponse.json({ ok: true, ...summary, pending, healed }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, ...summary, pending, watchdog, healed }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export const GET = handle;

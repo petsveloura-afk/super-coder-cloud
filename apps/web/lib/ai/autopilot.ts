@@ -24,6 +24,17 @@ import {
   type LeadData,
   type StoredMessage,
 } from "./autopilot-core";
+import {
+  analyzeMessage,
+  checkReply,
+  correctionPrompt,
+  criticalHandoffMessage,
+  dropUnsupportedSentences,
+  extractState,
+  factsText,
+  situationBrief,
+  stopMessage,
+} from "./intelligence";
 
 /**
  * AI autopilot — the business's AI agent answers customers automatically on
@@ -254,6 +265,25 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     return { replied: true, handoff: true, text };
   }
 
+  // wave 15 — understand the message first (language, mood, intent); cheap, no AI call
+  const analysis = analyzeMessage(lastLine);
+  const state = extractState(history);
+  const replyLocale = analysis.lang ?? locale;
+  // the customer asks to stop: confirm once, never message again (follow-ups are switched off)
+  if (analysis.intents.includes("unsubscribe")) {
+    const text = formatForChannel(stopMessage(replyLocale), ch);
+    await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string });
+    await admin.from("conversations").update({ followup_count: 9 }).eq("id", conv.id).then(() => undefined, () => undefined);
+    return { replied: true, handoff: false, reason: "customer_stop", text };
+  }
+  // legal threats / threats of harm: a person takes over immediately, no AI improvisation
+  if (analysis.critical) {
+    const text = formatForChannel(criticalHandoffMessage(replyLocale), ch);
+    await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string });
+    await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "critical:legal_or_threat" });
+    return { replied: true, handoff: true, reason: "critical:legal_or_threat", text };
+  }
+
   // customer details — and fill in a phone / e-mail the customer just typed
   let customer: { name?: string | null; phone?: string | null; email?: string | null } = { name: (conv.title as string | null) ?? null };
   if (conv.contact_id) {
@@ -298,7 +328,7 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     channel: ch,
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
     locale,
-  })}`;
+  })}\n\n${situationBrief({ analysis, state })}`;
   await typingIndicator(orgId, ch, conv.external_id as string);
 
   const out = await runAISystem({
@@ -344,8 +374,45 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     }
     return { replied: !recentHold, handoff: false, reason: out.error, text: recentHold ? undefined : hold };
   }
-  const tools = parseAgentTools(out.text);
+  // wave 15 — the agent checks its own answer (invented prices, repetition, leaks, empty text)
+  // and gets exactly one chance to fix it; whatever is still wrong is removed or handed to a person
+  let answer = out.text;
+  let unsupportedLeft: string[] = [];
+  {
+    const facts = factsText({ instructions: agent.instructions as string, profile: profile as Record<string, unknown> });
+    const previous = history.filter((m) => m.role === "assistant").map((m) => m.content);
+    const first = parseAgentTools(answer);
+    const check = checkReply({ reply: first.text, facts, previousAssistant: previous, allowEmpty: first.handoff });
+    if (!check.ok) {
+      const fixed = await runAISystem({
+        orgId,
+        feature: "autopilot",
+        agentId: agent.id as string,
+        provider: agent.provider as "openai" | "anthropic" | "gemini",
+        model: agent.model as string,
+        system,
+        messages: [...history, { role: "assistant", content: answer.trim() || "(no answer)" }, { role: "user", content: correctionPrompt(check) }],
+        temperature: Math.min(0.5, Number(agent.temperature ?? 0.4) + 0.1),
+        maxTokens: ch === "email" ? 1200 : 600,
+      });
+      if (fixed.ok) {
+        const again = checkReply({ reply: parseAgentTools(fixed.text).text, facts, previousAssistant: previous, allowEmpty: parseAgentTools(fixed.text).handoff });
+        if (again.ok || again.issues.length < check.issues.length) answer = fixed.text;
+      }
+    }
+    const last = parseAgentTools(answer);
+    const finalCheck = checkReply({ reply: last.text, facts, previousAssistant: previous, allowEmpty: last.handoff });
+    unsupportedLeft = finalCheck.unsupported;
+  }
+  const tools = parseAgentTools(answer);
+  if (unsupportedLeft.length) tools.text = dropUnsupportedSentences(tools.text, unsupportedLeft);
   void parseAutopilotReply; // (wave 6 parser kept for compatibility; the tools parser is a superset)
+  // an empty answer must never be sent as "I passed you to the team" without really doing it
+  if (!tools.text && !tools.handoff) {
+    tools.text = fallbackMessage(replyLocale);
+    tools.handoff = true;
+    tools.reason = "empty_answer";
+  }
   const text = formatForChannel(tools.text || handoffMessage(locale), ch);
   await sendToConversation(orgId, conv.id as string, text, undefined, {
     aiAgentId: agent.id as string,
@@ -353,8 +420,10 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     rich: { buttons: tools.buttons, askPhone: tools.askPhone, askPhoneLabel: sharePhoneLabel(locale), html: true },
   });
   await admin.from("conversations").update({ last_ai_at: new Date().toISOString() }).eq("id", conv.id);
+  // wave 15: remember the customer's mood and main intent for the inbox (ignored until the migration ran)
+  await admin.from("conversations").update({ sentiment: analysis.mood, last_intent: analysis.intents[0] ?? null }).eq("id", conv.id).then(() => undefined, () => undefined);
   // examples / portfolio images the agent chose to show
-  for (const item of pickMedia(out.text, profile.media)) {
+  for (const item of pickMedia(answer, profile.media)) {
     await sendMediaToConversation(orgId, conv.id as string, item, { aiAgentId: agent.id as string });
   }
   let lead: LeadCaptureResult | null = null;

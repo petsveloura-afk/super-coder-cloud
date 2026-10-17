@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { anthropicCall, geminiCall, openaiCall, openaiCompatibleCall, type AIMessage } from "./providers";
 import { buildCandidates, classifyError, isResting, restKey, soonestReady, type RouteCandidate, type RouteProvider } from "./router-core";
+import { capRest, probeOrder, restKeysOf, withDeadline } from "./resilience-core";
 
 /**
  * AI router — one smart entry point for every AI call:
@@ -32,6 +33,8 @@ export interface RouteAttempt {
 }
 
 const memoryRests = new Map<string, number>();
+/** wave 15: when a resting candidate was last probed — at most once a minute per instance (no probe storms) */
+const probedAt = new Map<string, number>();
 let lastLoad = 0;
 
 function adminOrNull() {
@@ -83,7 +86,20 @@ export async function clearRests() {
   if (admin) await admin.from("ai_provider_rests").delete().neq("id", "");
 }
 
+/** wave 15: a candidate that just answered is healthy — forget every rest that mentions it. */
+function clearRestsOf(c: RouteCandidate) {
+  const keys = restKeysOf(c);
+  for (const k of keys) memoryRests.delete(k);
+  const admin = adminOrNull();
+  if (admin) void admin.from("ai_provider_rests").delete().in("id", keys).then(() => undefined, () => undefined);
+}
+
 async function callOne(c: RouteCandidate, req: { system: string; messages: AIMessage[]; temperature: number; maxTokens: number; json?: boolean }, timeoutMs: number): Promise<Omit<RoutedResult, "provider">> {
+  // wave 15: a hung connection can never block the conversation — hard deadline on every call
+  return withDeadline(callOneRaw(c, req, timeoutMs), Math.max(4000, Math.min(timeoutMs, 28_000)) + 2000, `${c.provider}/${c.model}`);
+}
+
+async function callOneRaw(c: RouteCandidate, req: { system: string; messages: AIMessage[]; temperature: number; maxTokens: number; json?: boolean }, timeoutMs: number): Promise<Omit<RoutedResult, "provider">> {
   const base = { model: c.model, system: req.system, messages: req.messages, temperature: req.temperature, maxTokens: req.maxTokens, json: req.json };
   if (c.provider === "gemini") {
     const r = await geminiCall(base, c.key);
@@ -162,6 +178,7 @@ export async function generateRouted(input: {
         continue;
       }
       attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: true, ms: Date.now() - t0 });
+      clearRestsOf(c);
       return { ...r, provider: c.provider, attempts };
     } catch (e) {
       const msg = (e as Error).message ?? String(e);
@@ -171,7 +188,35 @@ export async function generateRouted(input: {
       if (cl.kind === "model") triedModelGone.add(`${c.provider}|${c.model}`);
       failedBy.set(c.provider, (failedBy.get(c.provider) ?? 0) + 1);
       if (cl.kind !== "rate" && cl.kind !== "daily" && cl.kind !== "server") onlyBusy = false;
-      await rest(restKey(c, cl.scope), cl.restMs, `${cl.kind}: ${cl.reason}`);
+      await rest(restKey(c, cl.scope), capRest(cl, process.env), `${cl.kind}: ${cl.reason}`);
+    }
+  }
+  // wave 15 — LAST RESORT: when nothing could answer (everything resting or failed), probe the
+  // candidates that expire soonest anyway. A rest is a guess about the future; a probe is a fact.
+  // A success clears that rest, so the platform heals itself without anyone pressing "reset".
+  if (!attempts.some((a) => a.ok)) {
+    const probes = probeOrder(cands, await loadRests(), Date.now(), 3, 1).filter((c) => !attempts.some((a) => a.keyId === c.keyId && a.model === c.model) && Date.now() - (probedAt.get(`${c.keyId}|${c.model}`) ?? 0) > 60_000);
+    for (const c of probes) {
+      probedAt.set(`${c.keyId}|${c.model}`, Date.now());
+      const left = budget - (Date.now() - started);
+      if (left < 3000 && attempts.length > 0) break;
+      const t0 = Date.now();
+      try {
+        const r = await callOne(c, { system: input.system, messages: input.messages, temperature: input.temperature ?? 0.4, maxTokens: input.maxTokens ?? 600, json: input.json }, Math.max(4000, Math.min(20_000, left)));
+        if (!r.text) {
+          attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, reason: "empty answer (probe)" });
+          continue;
+        }
+        attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: true, ms: Date.now() - t0 });
+        clearRestsOf(c);
+        return { ...r, provider: c.provider, attempts };
+      } catch (e) {
+        const msg = (e as Error).message ?? String(e);
+        const cl = classifyError(msg);
+        attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, reason: `${cl.reason} (probe)` });
+        if (cl.kind !== "rate" && cl.kind !== "daily" && cl.kind !== "server") onlyBusy = false;
+        await rest(restKey(c, cl.scope), capRest(cl, process.env), `${cl.kind}: ${cl.reason}`);
+      }
     }
   }
   const retryIn = soonestReady(cands, await loadRests());
