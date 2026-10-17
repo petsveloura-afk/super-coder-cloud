@@ -59,7 +59,19 @@ export async function openAdvanced(page: Page) {
 }
 
 /** wave 13 — puts the signed-in org on a paid plan through the (mocked) crypto checkout + signed IPN. */
-export async function upgradeByCrypto(page: Page, plan: "pro" | "business" = "business") {
+export async function upgradeByCrypto(page: Page, plan: "pro" | "business" = "business", orgSlug?: string) {
+  // CI (no provider mock): set the plan server-side with the local stack's service key
+  if (process.env.E2E_PROVIDERS_MOCKED !== "true") {
+    const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+    if (!base || !key || !orgSlug) throw new Error("upgrade needs the provider mock or SUPABASE_SERVICE_ROLE_KEY + org slug");
+    const h = { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
+    const org = ((await (await page.request.get(`${base}/rest/v1/organizations?select=id&slug=eq.${orgSlug}`, { headers: h })).json()) as { id: string }[])[0];
+    if (!org) throw new Error(`org ${orgSlug} not found`);
+    const r = await page.request.post(`${base}/rest/v1/rpc/apply_subscription`, { headers: h, data: { p_org: org.id, p_plan: plan, p_status: "active", p_provider: "manual" } });
+    if (!r.ok()) throw new Error(`upgrade failed: ${r.status()} ${await r.text()}`);
+    return;
+  }
   const { createHmac } = await import("node:crypto");
   const MOCK = process.env.E2E_MOCK_URL ?? "http://127.0.0.1:4010";
   const sortKeys = (v: unknown): unknown =>

@@ -11,6 +11,7 @@ const MOCK = process.env.E2E_MOCK_BASE ?? "http://127.0.0.1:4010";
 test.describe.configure({ mode: "serial" });
 
 const owner = { name: "Automation Owner", email: uniqueEmail("auto") };
+const orgSlug = `auto-${Date.now()}`;
 
 async function newContact(page: Page, first: string, email: string) {
   await page.goto("/he/crm?new=1");
@@ -24,7 +25,7 @@ async function newContact(page: Page, first: string, email: string) {
 test("template automation runs instantly when a contact is created", async ({ page }) => {
   test.setTimeout(150_000);
   await signUp(page, owner);
-  await createOrg(page, "Auto Co", `auto-${Date.now()}`);
+  await createOrg(page, "Auto Co", orgSlug);
   await page.goto("/he/automations");
   await expect(page.getByRole("heading", { name: "אוטומציות", exact: true })).toBeVisible();
   await page.getByRole("link", { name: /ליד חדש → משימת שיחה/ }).click();
@@ -58,7 +59,7 @@ test("API key → public REST API (create contact, me, events) with scopes enfor
   await page.goto("/he/integrations");
   await openAdvanced(page);
   await expect(page.getByTestId("upgrade-api_access")).toBeVisible();
-  await upgradeByCrypto(page, "business");
+  await upgradeByCrypto(page, "business", orgSlug);
   await page.goto("/he/integrations");
   await openAdvanced(page);
   await expect(page.getByTestId("upgrade-api_access")).toHaveCount(0);
