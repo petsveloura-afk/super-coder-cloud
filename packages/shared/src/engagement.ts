@@ -272,7 +272,7 @@ export const financeSettingsSchema = z.object({
 });
 
 /* ---------------------------------------------------------------- websites */
-export const SITE_BLOCK_TYPES = ["hero", "features", "text", "form", "booking", "cta", "faq", "contact"] as const;
+export const SITE_BLOCK_TYPES = ["hero", "features", "text", "form", "booking", "cta", "faq", "contact", "about", "gallery", "testimonials", "stats", "pricing", "steps", "team", "logos", "video"] as const;
 export type SiteBlockType = (typeof SITE_BLOCK_TYPES)[number];
 
 const shortText = (max: number) => z.string().trim().max(max, { message: "validation.tooLong" }).optional().default("");
@@ -293,14 +293,71 @@ export const siteBlockSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("cta"), data: z.object({ title: shortText(160), text: shortText(500), label: shortText(60), href: httpsOrPath }) }),
   z.object({ type: z.literal("faq"), data: z.object({ title: shortText(160), items: z.array(z.object({ q: shortText(300), a: shortText(2000) })).max(30).default([]) }) }),
   z.object({ type: z.literal("contact"), data: z.object({ title: shortText(160), phone: shortText(40), whatsapp: shortText(40), email: shortText(254), address: shortText(300) }) }),
+  // wave 13 — richer sections
+  z.object({ type: z.literal("about"), data: z.object({ title: shortText(160), body: shortText(5000), image_url: httpsOrPath }) }),
+  z.object({ type: z.literal("gallery"), data: z.object({ title: shortText(160), items: z.array(z.object({ url: httpsOrPath, caption: shortText(200) })).max(24).default([]) }) }),
+  z.object({ type: z.literal("testimonials"), data: z.object({ title: shortText(160), items: z.array(z.object({ name: shortText(80), role: shortText(80), quote: shortText(600), rating: z.string().trim().regex(/^[1-5]?$/).optional().default("5") })).max(12).default([]) }) }),
+  z.object({ type: z.literal("stats"), data: z.object({ title: shortText(160), items: z.array(z.object({ value: shortText(20), label: shortText(80) })).max(8).default([]) }) }),
+  z.object({ type: z.literal("pricing"), data: z.object({ title: shortText(160), items: z.array(z.object({ name: shortText(80), price: shortText(30), period: shortText(30), features: shortText(1200), highlight: z.string().trim().regex(/^(yes|)$/).optional().default(""), cta_label: shortText(40), cta_href: httpsOrPath })).max(6).default([]) }) }),
+  z.object({ type: z.literal("steps"), data: z.object({ title: shortText(160), items: z.array(z.object({ title: shortText(120), text: shortText(400) })).max(8).default([]) }) }),
+  z.object({ type: z.literal("team"), data: z.object({ title: shortText(160), items: z.array(z.object({ name: shortText(80), role: shortText(80), image_url: httpsOrPath })).max(16).default([]) }) }),
+  z.object({ type: z.literal("logos"), data: z.object({ title: shortText(160), items: z.array(z.object({ name: shortText(60) })).max(20).default([]) }) }),
+  z.object({ type: z.literal("video"), data: z.object({ title: shortText(160), url: z.string().trim().max(500).regex(/^(https:\/\/(www\.)?(youtube\.com|youtu\.be|player\.vimeo\.com|vimeo\.com)\/\S+)?$/, { message: "validation.httpsUrl" }).optional().default(""), text: shortText(500) }) }),
 ]);
+
+/* wave 13 — design templates, site settings (business details for the footer and legal pages) */
+export const SITE_FONTS = ["rubik", "heebo", "assistant", "frank", "inter", "playfair", "secular", "varela", "suez", "karantina", "noto-serif"] as const;
+export const SITE_TEMPLATE_KEYS = ["classic", "minimal", "fresh", "aurora", "luxe", "bold", "corporate", "pastel", "neon", "nature"] as const;
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, { message: "validation.color" });
+export const siteSettingsSchema = z
+  .object({
+    legal_name: shortText(160),
+    business_id: shortText(40),
+    email: shortText(254),
+    phone: shortText(40),
+    address: shortText(300),
+    instagram: httpsOrPath,
+    facebook: httpsOrPath,
+    tiktok: httpsOrPath,
+    linkedin: httpsOrPath,
+    a11y_contact: shortText(160),
+    cookie_banner: z.boolean().optional().default(true),
+    a11y_widget: z.boolean().optional().default(true),
+    whatsapp_button: shortText(40),
+    // site language (custom domains / subdomains render in it), logo and footer line
+    lang: z.enum(["he", "en", "ar"]).optional(),
+    logo_url: httpsOrPath,
+    tagline: shortText(300),
+    youtube: httpsOrPath,
+  })
+  .partial()
+  .default({});
+export const LEGAL_PAGES = ["privacy", "terms", "accessibility", "cookies"] as const;
+export const sitePagesSchema = z
+  .object({ privacy: shortText(20000), terms: shortText(20000), accessibility: shortText(20000), cookies: shortText(20000) })
+  .partial()
+  .default({});
 export type SiteBlock = z.infer<typeof siteBlockSchema>;
 
 export const siteSchema = z.object({
   name: z.string().trim().min(1, { message: "validation.required" }).max(120),
   slug,
   status: z.enum(["draft", "published"]).default("draft"),
-  theme: z.object({ accent: z.string().regex(/^#[0-9a-fA-F]{6}$/, { message: "validation.color" }).default("#3366E6"), mode: z.enum(["dark", "light"]).default("dark") }).default({ accent: "#3366E6", mode: "dark" }),
+  theme: z
+    .object({
+      accent: z.string().regex(/^#[0-9a-fA-F]{6}$/, { message: "validation.color" }).default("#3366E6"),
+      mode: z.enum(["dark", "light"]).default("dark"),
+      // wave 13
+      template: z.enum(SITE_TEMPLATE_KEYS).optional(),
+      accent2: hexColor.optional(),
+      font: z.enum(SITE_FONTS).optional(),
+      radius: z.enum(["sharp", "soft", "round"]).optional(),
+      animations: z.boolean().optional(),
+    })
+    .default({ accent: "#3366E6", mode: "dark" }),
   seo: z.object({ title: shortText(70), description: shortText(160) }).default({ title: "", description: "" }),
   blocks: z.array(siteBlockSchema).min(1, { message: "websites.needBlock" }).max(40, { message: "validation.tooMany" }),
+  // wave 13 (optional — older clients keep working)
+  settings: siteSettingsSchema.optional(),
+  pages: sitePagesSchema.optional(),
 });

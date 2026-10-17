@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createOrg, openAdvanced, shot, signUp, uniqueEmail } from "./helpers";
+import { createOrg, openAdvanced, shot, signUp, uniqueEmail, upgradeByCrypto } from "./helpers";
 
 /**
  * Wave 2: automations (builder + engine), public API keys, inbound webhooks,
@@ -54,8 +54,14 @@ test("API key → public REST API (create contact, me, events) with scopes enfor
   await page.locator("#password").fill((await import("./helpers")).PASSWORD);
   await page.locator('form button[type="submit"]').last().click();
   await page.waitForURL(/overview/);
+  // wave 13: the REST API is part of the Business plan — a free workspace sees the upgrade note
   await page.goto("/he/integrations");
   await openAdvanced(page);
+  await expect(page.getByTestId("upgrade-api_access")).toBeVisible();
+  await upgradeByCrypto(page, "business");
+  await page.goto("/he/integrations");
+  await openAdvanced(page);
+  await expect(page.getByTestId("upgrade-api_access")).toHaveCount(0);
   await page.getByRole("button", { name: "מפתח חדש" }).click();
   const d = page.getByRole("dialog");
   await d.locator("#key-name").fill("Zapier");

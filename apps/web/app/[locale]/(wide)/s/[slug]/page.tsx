@@ -1,33 +1,33 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import type { FormField, SiteBlock } from "@scc/shared/engagement";
+import type { FormField } from "@scc/shared/engagement";
 import { SiteRenderer } from "@/components/websites/site-renderer";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { createAnonClient } from "@/lib/supabase/anon";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { visitorHash } from "@/lib/visitor";
+import { loadPublicSite, siteBasePath } from "@/lib/site/public";
 
 type Params = Promise<{ locale: string; slug: string }>;
 
-interface PublicSite {
-  name: string;
-  theme: { accent?: string; mode?: "dark" | "light" };
-  seo: { title?: string; description?: string };
-  blocks: SiteBlock[];
-  org: string;
-  org_slug: string;
-}
-
-async function load(slug: string): Promise<PublicSite | null> {
-  if (!/^[a-z0-9][a-z0-9-]{2,60}$/.test(slug)) return null;
-  const { data } = await createAnonClient().rpc("get_public_site", { p_slug: slug });
-  return (data as PublicSite | null) ?? null;
-}
+const load = loadPublicSite;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const s = await load((await params).slug);
+  const { slug, locale } = await params;
+  const s = await load(slug);
   if (!s) return { title: "404" };
-  return { title: s.seo?.title || s.name, description: s.seo?.description || undefined };
+  const title = s.seo?.title || s.name;
+  const description = s.seo?.description || undefined;
+  const hero = s.blocks.find((b) => b.type === "hero");
+  const image = hero?.type === "hero" && /^https:\/\//.test(hero.data.image_url ?? "") ? hero.data.image_url : undefined;
+  const canonical = s.custom_domain ? `https://${s.custom_domain}/` : undefined;
+  return {
+    title: { absolute: title },
+    description,
+    alternates: canonical ? { canonical } : undefined,
+    openGraph: { title, description, type: "website", siteName: s.name, locale: locale === "en" ? "en_US" : locale === "ar" ? "ar_AR" : "he_IL", images: image ? [{ url: image }] : undefined, url: canonical },
+    twitter: { card: image ? "summary_large_image" : "summary", title, description, images: image ? [image] : undefined },
+  };
 }
 
 
@@ -51,7 +51,7 @@ export default async function PublicSitePage({ params }: { params: Params }) {
   );
   return (
     <>
-      <SiteRenderer site={site} forms={forms} locale={locale} t={t} />
+      <SiteRenderer site={{ ...site, slug }} forms={forms} locale={locale} t={t} basePath={await siteBasePath(locale, slug)} branding={site.branding !== false} />
       {/* AI chat with the business — shown only when an agent answers the website chat */}
       <ChatWidget orgSlug={site.org_slug} accent={site.theme?.accent} />
     </>

@@ -57,3 +57,20 @@ export async function openAdvanced(page: Page) {
   const box = page.getByTestId("advanced-integrations");
   if (!(await box.evaluate((el) => (el as HTMLDetailsElement).open))) await box.locator("summary").click();
 }
+
+/** wave 13 — puts the signed-in org on a paid plan through the (mocked) crypto checkout + signed IPN. */
+export async function upgradeByCrypto(page: Page, plan: "pro" | "business" = "business") {
+  const { createHmac } = await import("node:crypto");
+  const MOCK = process.env.E2E_MOCK_URL ?? "http://127.0.0.1:4010";
+  const sortKeys = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(sortKeys) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys((v as Record<string, unknown>)[k])])) : v;
+  await page.goto("/he/billing");
+  await page.getByTestId(`pay-${plan}`).locator('[data-method="crypto"]').click();
+  await page.waitForURL(/checkout=pending/, { timeout: 30_000 });
+  const calls = (await (await page.request.get(`${MOCK}/_calls`)).json()) as { provider: string; order_id?: string; price_amount?: number }[];
+  const inv = calls.filter((c) => c.provider === "nowpayments").pop()!;
+  const ipn = { payment_id: Date.now(), payment_status: "finished", order_id: inv.order_id, price_amount: inv.price_amount, price_currency: "usd", pay_amount: inv.price_amount, pay_currency: "usdttrc20", actually_paid: inv.price_amount };
+  const sig = createHmac("sha512", process.env.NOWPAYMENTS_IPN_SECRET ?? "np-ipn-secret-123").update(JSON.stringify(sortKeys(ipn))).digest("hex");
+  const r = await page.request.post("/api/webhooks/nowpayments", { headers: { "x-nowpayments-sig": sig, "content-type": "application/json" }, data: JSON.stringify(ipn) });
+  if (!r.ok()) throw new Error(`upgrade failed: ${r.status()}`);
+}

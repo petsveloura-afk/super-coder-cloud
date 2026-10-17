@@ -35,12 +35,14 @@ export default async function NewSitePage({ params }: { params: Promise<{ locale
         <Back className="h-4 w-4" /> {t("websites.title")}
       </Link>
       <PageHeader title={t("websites.new")} description={t("websites.newHint")} />
-      {ctx.can("ai.use") ? <AiSiteCard caps={{ full: caps.full, images: caps.images }} /> : null}
+      {ctx.can("ai.use") ? <AiSiteCard caps={{ full: caps.full, images: caps.images, proTemplates: Boolean(caps.proTemplates) }} /> : null}
       <SiteBuilder
         forms={embeds.forms}
         bookings={embeds.bookings}
         publicBase={sitePublicBase(locale)}
         aiImages={caps.images && ctx.can("ai.use")}
+        proTemplates={Boolean(caps.proTemplates)}
+        aiEditor={Boolean(caps.aiEditor) && ctx.can("ai.use")}
         initial={{
           name: ctx.org.name,
           slug,

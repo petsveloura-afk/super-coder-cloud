@@ -5,15 +5,17 @@ import { useRouter } from "next/navigation";
 import { ImageIcon, Lock, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
-import { Button, Card, Field, Textarea } from "@/components/ui/primitives";
+import { Button, Card, Field, Select, Textarea } from "@/components/ui/primitives";
+import { TEMPLATES } from "@/lib/site/templates";
 import { buildSiteWithAIAction } from "@/app/[locale]/(dashboard)/websites/actions";
 
 /** "Describe your business → get a professional site" (draft). Full sites + AI images on paid plans. */
-export function AiSiteCard({ caps }: { caps: { full: boolean; images: boolean } }) {
+export function AiSiteCard({ caps }: { caps: { full: boolean; images: boolean; proTemplates?: boolean } }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [brief, setBrief] = useState("");
   const [full, setFull] = useState(caps.full);
+  const [template, setTemplate] = useState("");
   const [pending, start] = useTransition();
   return (
     <Card className="mb-4 overflow-hidden border-accent/30" data-testid="ai-site-card">
@@ -30,6 +32,17 @@ export function AiSiteCard({ caps }: { caps: { full: boolean; images: boolean } 
         <Field label={t("websites.aiBrief")} htmlFor="ai-brief" hint={t("websites.aiBriefHint")}>
           <Textarea id="ai-brief" rows={4} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder={t("websites.aiBriefPlaceholder")} />
         </Field>
+        <Field label={t("websites.design.pickForAi")} htmlFor="ai-template">
+          <Select id="ai-template" value={template} onChange={(e) => setTemplate(e.target.value)} data-testid="ai-template">
+            <option value="">{t("websites.design.aiChooses")}</option>
+            {TEMPLATES.map((x) => (
+              <option key={x.key} value={x.key} disabled={x.pro && !caps.proTemplates}>
+                {(locale === "he" ? x.he : x.en).name}
+                {x.pro && !caps.proTemplates ? " · Pro" : ""}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <div className="flex flex-wrap items-center gap-3 text-[13px]">
           <label className={`flex items-center gap-2 ${caps.full ? "" : "opacity-60"}`}>
             <input type="checkbox" checked={full && caps.full} disabled={!caps.full} onChange={(e) => setFull(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
@@ -45,7 +58,7 @@ export function AiSiteCard({ caps }: { caps: { full: boolean; images: boolean } 
             disabled={brief.trim().length < 10}
             onClick={() =>
               start(async () => {
-                const r = await buildSiteWithAIAction({ locale, brief, full });
+                const r = await buildSiteWithAIAction({ locale, brief, full, template: template || undefined });
                 if (r.error || !r.data) return void toast.error(t(r.error ?? "common.error"));
                 toast.success(t("ai.siteBuilt"));
                 router.push(`/${locale}/websites/${r.data.id}/preview`);

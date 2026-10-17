@@ -2,6 +2,8 @@ import type { CSSProperties } from "react";
 import { ArrowLeft, ArrowRight, CalendarDays, Check, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import type { FormField, SiteBlock } from "@scc/shared/engagement";
 import { PublicForm } from "@/components/public/public-form";
+import type { LegalKey } from "@/lib/site/legal";
+import { ProSite } from "./site-pro";
 
 /**
  * Renders a site (blocks + theme) — shared by the public page (/s/[slug]) and the
@@ -9,8 +11,18 @@ import { PublicForm } from "@/components/public/public-form";
  */
 export interface RenderableSite {
   name: string;
-  theme: { accent?: string; mode?: "dark" | "light" };
+  theme: { accent?: string; mode?: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: string; animations?: boolean };
   blocks: SiteBlock[];
+  // wave 13 (optional)
+  slug?: string;
+  settings?: Record<string, unknown> | null;
+  pages?: Record<string, string> | null;
+}
+
+const CLASSIC_BLOCKS = new Set(["hero", "features", "text", "form", "booking", "cta", "faq", "contact"]);
+/** wave 13: sites with a design template, settings or the new sections use the professional renderer */
+export function usesProRenderer(site: RenderableSite): boolean {
+  return Boolean(site.theme?.template) || Boolean(site.settings && Object.keys(site.settings).length) || site.blocks.some((b) => !CLASSIC_BLOCKS.has(b.type));
 }
 export type FormsMap = Map<string, { name: string; fields: FormField[]; settings: Record<string, string>; org: string }>;
 
@@ -18,7 +30,29 @@ const safeHref = (h: string | undefined) => (h && /^(https:\/\/|\/|#|mailto:|tel
 const digits = (s: string) => s.replace(/[^\d+]/g, "");
 const anchorFor = (b: SiteBlock, i: number) => (b.type === "contact" ? "contact" : b.type === "form" ? "form" : b.type === "faq" ? "faq" : `s${i}`);
 
-export function SiteRenderer({ site, forms, locale, t, banner }: { site: RenderableSite; forms: FormsMap; locale: string; t: (k: string) => string; banner?: React.ReactNode }) {
+export function SiteRenderer({
+  site,
+  forms,
+  locale,
+  t,
+  banner,
+  basePath,
+  branding = false,
+  legal,
+}: {
+  site: RenderableSite;
+  forms: FormsMap;
+  locale: string;
+  t: (k: string, p?: Record<string, string | number>) => string;
+  banner?: React.ReactNode;
+  /** wave 13 */
+  basePath?: string;
+  branding?: boolean;
+  legal?: LegalKey;
+}) {
+  if (legal || usesProRenderer(site)) {
+    return <ProSite site={{ ...site, slug: site.slug ?? "site" }} forms={forms} locale={locale} t={t} banner={banner} basePath={basePath ?? ""} branding={branding} legal={legal} />;
+  }
   const accent = /^#[0-9a-fA-F]{6}$/.test(site.theme?.accent ?? "") ? site.theme.accent! : "#3366E6";
   const dark = site.theme?.mode !== "light";
   const style = {

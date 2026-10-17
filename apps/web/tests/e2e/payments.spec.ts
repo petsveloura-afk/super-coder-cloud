@@ -141,6 +141,24 @@ test("a card order paid for less than the plan's price never activates the plan 
   await expect(page.getByTestId("payment-history")).not.toContainText("Business");
 });
 
+test("card + crypto in one checkout window: the crypto tab starts a crypto payment (wave 13)", async ({ page }) => {
+  test.skip(!mocked, "needs the provider mock");
+  test.setTimeout(120_000);
+  await signUp(page, { name: "Tabs Owner", email: uniqueEmail("tabs") });
+  await createOrg(page, "Tabs Co", `tabs-${Date.now()}`);
+  await page.goto("/he/billing");
+  const btn = page.getByTestId("pay-pro").locator('[data-method="card_inline"]');
+  await expect(btn).toContainText("מטבעות דיגיטליים");
+  await btn.click();
+  const dlg = page.getByTestId("card-checkout");
+  await expect(dlg.getByTestId("checkout-tabs")).toBeVisible();
+  await expect(dlg.getByTestId("mock-card-form")).toBeVisible({ timeout: 20_000 });
+  await dlg.locator('[data-tab="crypto"]').click();
+  await expect(dlg.getByTestId("crypto-tab")).toBeVisible();
+  await dlg.locator('[data-method="crypto_inline"]').click();
+  await expect(page).toHaveURL(/checkout=pending/, { timeout: 30_000 });
+});
+
 test("billing shows only the card option by default (PayPal subscription button is opt-in)", async ({ page }) => {
   test.skip(!mocked, "needs the provider mock");
   await signUp(page, { name: "Only Card", email: uniqueEmail("onlycard") });

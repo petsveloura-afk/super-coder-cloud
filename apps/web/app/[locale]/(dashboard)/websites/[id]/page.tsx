@@ -7,6 +7,8 @@ import type { SiteBlockType } from "@scc/shared/engagement";
 import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { SiteBuilder, type BlockValue } from "@/components/websites/site-builder";
 import { ConfirmDeleteSite } from "@/components/websites/delete-site";
+import { DomainPanel } from "@/components/websites/domain-panel";
+import type { SitePages, SiteSettings } from "@/components/websites/business-panel";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -38,7 +40,14 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
   const embeds = await siteEmbedOptions(ctx.org.id);
   const caps = await aiSiteCaps(ctx.org.id);
   const Back = locale === "en" ? ArrowLeft : ArrowRight;
-  const theme = (s.theme ?? {}) as { accent?: string; mode?: "dark" | "light" };
+  const theme = (s.theme ?? {}) as { accent?: string; mode?: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean };
+  // wave 13: domain panel data
+  const { domainsConfigured } = await import("@/lib/site/domains");
+  const { paypalSdkConfig } = await import("@/lib/billing/paypal");
+  const { data: domainOrders } = await supabase.from("domain_orders").select("id, domain, status, price, currency, created_at, error").eq("organization_id", ctx.org.id).eq("site_id", id).order("created_at", { ascending: false }).limit(10);
+  const platformUrl = `${sitePublicBase(locale)}/${s.slug as string}`;
+  const customActive = s.custom_domain && s.domain_status === "active" ? `https://${s.custom_domain as string}` : null;
+  const verification = (s.domain_verification ?? {}) as { records?: { type: string; name: string; value: string }[] };
   const seo = (s.seo ?? {}) as { title?: string; description?: string };
   return (
     <>
@@ -66,11 +75,38 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
         bookings={embeds.bookings}
         publicBase={sitePublicBase(locale)}
         aiImages={caps.images && ctx.can("ai.use")}
+        proTemplates={Boolean(caps.proTemplates)}
+        aiEditor={Boolean(caps.aiEditor) && ctx.can("ai.use")}
+        liveUrl={customActive ?? undefined}
+        domainSlot={
+          <DomainPanel
+            siteId={id}
+            published={s.status === "published"}
+            publicUrl={customActive ?? platformUrl}
+            allowed={Boolean(caps.customDomain)}
+            configured={domainsConfigured()}
+            domain={(s.custom_domain as string | null) ?? null}
+            status={(s.domain_status as "pending" | "active" | "error" | null) ?? null}
+            records={verification.records ?? []}
+            orders={((domainOrders ?? []) as { id: string; domain: string; status: string; price: number; currency: string; created_at: string; error: string | null }[]).map((o) => ({ ...o, price: Number(o.price) }))}
+            sdk={paypalSdkConfig()}
+          />
+        }
         initial={{
           name: s.name as string,
           slug: s.slug as string,
           status: s.status as "draft" | "published",
-          theme: { accent: theme.accent ?? "#3366E6", mode: theme.mode === "light" ? "light" : "dark" },
+          theme: {
+            accent: theme.accent ?? "#3366E6",
+            mode: theme.mode === "light" ? "light" : "dark",
+            ...(theme.template ? { template: theme.template } : {}),
+            ...(theme.accent2 ? { accent2: theme.accent2 } : {}),
+            ...(theme.font ? { font: theme.font } : {}),
+            ...(theme.radius ? { radius: theme.radius } : {}),
+            ...(theme.animations === false ? { animations: false } : {}),
+          },
+          settings: (s.settings ?? {}) as SiteSettings,
+          pages: (s.pages ?? {}) as SitePages,
           seo: { title: seo.title ?? "", description: seo.description ?? "" },
           blocks: ((s.blocks ?? []) as { type: SiteBlockType; data: BlockValue["data"] }[]).map((b) => ({ type: b.type, data: b.data ?? {} })),
         }}

@@ -23,6 +23,9 @@ export async function createApiKeyAction(_prev: ActionState<{ key: string }>, fd
   const locale = formLocale(fd);
   const ctx = await getOrgContext(locale);
   if (!ctx.can("api.manage")) return { error: "errors.forbidden" };
+  // wave 13: API keys are part of the Business plan and up
+  const { orgHasFeature } = await import("@/lib/billing/features");
+  if (!(await orgHasFeature(ctx.org.id, "api_access"))) return { error: "plans.locked.api_access.title" };
   const parsed = keySchema.safeParse({ name: str(fd, "name"), scopes: fd.getAll("scopes").map(String) });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error), values: { name: str(fd, "name") } };
   const k = generateApiKey();

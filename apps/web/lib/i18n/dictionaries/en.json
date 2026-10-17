@@ -70,7 +70,9 @@
     "notifications": "Notifications",
     "noNotifications": "No new notifications",
     "profile": "Profile",
-    "none": "None"
+    "none": "None",
+    "yes": "Yes",
+    "no": "No"
   },
   "auth": {
     "signIn": "Sign in",
@@ -273,7 +275,8 @@
     "generic": "An unexpected error occurred",
     "offline": "You're offline",
     "offlineBody": "Content will come back as soon as you reconnect.",
-    "goHome": "Back to home"
+    "goHome": "Back to home",
+    "rateLimited": "Too many requests. Try again in a few minutes."
   },
   "pwa": {
     "install": "Install app",
@@ -439,7 +442,13 @@
       "processing": "Confirming the payment…",
       "cardFallback": "The card form couldn't load here — continue to the secure card form:",
       "cardContinue": "Continue to card payment",
-      "cardSecure": "Encrypted secure payment processed by PayPal — we never store card details."
+      "cardSecure": "Encrypted secure payment processed by PayPal — we never store card details.",
+      "cardOrCryptoSub": "Credit card or crypto · inside the site",
+      "methodTabs": "Payment method",
+      "tabCard": "Credit card",
+      "tabCrypto": "Crypto",
+      "cryptoTabHint": "Pay with USDT, Bitcoin, Ether and more via NOWPayments. Once the network confirms, the plan turns on automatically and you get a receipt.",
+      "cryptoContinue": "Continue to crypto payment"
     }
   },
   "ai": {
@@ -1914,7 +1923,16 @@
       "booking": "Booking",
       "cta": "Call to action",
       "faq": "FAQ",
-      "contact": "Contact"
+      "contact": "Contact",
+      "about": "About",
+      "gallery": "Gallery",
+      "testimonials": "Testimonials",
+      "stats": "Numbers",
+      "pricing": "Pricing",
+      "steps": "How it works",
+      "team": "Team",
+      "logos": "Clients & partners",
+      "video": "Video"
     },
     "fields": {
       "title": "Title",
@@ -1933,7 +1951,19 @@
       "phone": "Phone",
       "whatsapp": "WhatsApp",
       "email": "E-mail",
-      "address": "Address"
+      "address": "Address",
+      "url": "Link",
+      "caption": "Caption",
+      "name": "Name",
+      "role": "Role",
+      "quote": "Testimonial",
+      "rating": "Rating",
+      "value": "Number",
+      "price": "Price",
+      "period": "Per (e.g. month)",
+      "features": "What's included (one per line)",
+      "highlight": "Highlight",
+      "statLabel": "What it counts"
     },
     "previewTitle": "Preview",
     "aiTitle": "Build with AI",
@@ -1950,7 +1980,194 @@
     "aiImage": "AI image",
     "aiImageReady": "Image created and added",
     "aiInvalid": "The AI returned an invalid result — please try again",
-    "aiImageFailed": "Image generation failed — please try again"
+    "aiImageFailed": "Image generation failed — please try again",
+    "upload": "Upload",
+    "imageUploaded": "Image uploaded",
+    "tabs": {
+      "label": "Editor sections",
+      "content": "Content & sections",
+      "design": "Design",
+      "business": "Business details & legal pages",
+      "domain": "Address & domain"
+    },
+    "design": {
+      "templates": "Design template",
+      "templatesHint": "Each template is a complete design language: colours, fonts, hero layout, cards, background and motion. Switch any time; your content stays.",
+      "lockedNote": "This template is part of a paid plan. You can preview it here and save it after upgrading.",
+      "accent2": "Second colour",
+      "font": "Font",
+      "fontTemplate": "From the template",
+      "radius": "Corners",
+      "radiusSharp": "Sharp",
+      "radiusSoft": "Slightly rounded",
+      "radiusRound": "Round",
+      "animations": "Animations and motion",
+      "pickForAi": "Design template",
+      "aiChooses": "Let the AI pick a template for the business"
+    },
+    "business": {
+      "title": "Business details",
+      "hint": "Shown in the site footer, the legal pages and the WhatsApp button.",
+      "social": "Social networks",
+      "langAuto": "Interface language",
+      "cookieBanner": "Cookie notice for visitors",
+      "a11yWidget": "Accessibility menu on the site",
+      "fields": {
+        "legal_name": "Registered business name",
+        "business_id": "Registration no.",
+        "phone": "Phone",
+        "email": "E-mail",
+        "address": "Address",
+        "whatsapp_button": "Number for a floating WhatsApp button",
+        "a11y_contact": "Accessibility coordinator (name and phone)",
+        "logo_url": "Logo (image link)",
+        "tagline": "Short line about the business (footer)",
+        "lang": "Site language",
+        "instagram": "Instagram",
+        "facebook": "Facebook",
+        "tiktok": "TikTok",
+        "linkedin": "LinkedIn",
+        "youtube": "YouTube"
+      }
+    },
+    "legal": {
+      "title": "Legal pages",
+      "hint": "Privacy policy, terms of use, accessibility statement and cookie policy are generated from your business details and linked from the footer. You can edit each one.",
+      "auto": "Generated automatically",
+      "custom": "Edited",
+      "edit": "Edit",
+      "generate": "Fill from template",
+      "useAuto": "Back to the automatic version",
+      "disclaimer": "These texts are a general template, not legal advice. Have a lawyer review them for your business."
+    },
+    "aiEdit": {
+      "title": "Edit with the agent",
+      "hint": "Write what to change and the agent updates the site: texts, sections, design and language.",
+      "placeholder": "e.g. Add a pricing section with 3 packages, shorten the headline and switch to a luxury look",
+      "run": "Apply",
+      "working": "The agent is working…",
+      "undo": "Undo",
+      "applied": "Changes applied in the editor. Review them and save or update the site.",
+      "note": "Nothing is published until you save.",
+      "quickLabel": {
+        "modern": "More modern",
+        "testimonials": "Add testimonials",
+        "pricing": "Add pricing",
+        "shorter": "Shorter texts",
+        "luxury": "Luxury look",
+        "stats": "Add numbers",
+        "steps": "Add how it works",
+        "english": "Translate to English"
+      },
+      "quick": {
+        "modern": "Make the site more modern and impressive: a stronger headline, sharper copy and a current design template that fits the business",
+        "testimonials": "Add a testimonials section before the FAQ. Use only testimonials found in the content; if there are none, add the section with a title and three empty testimonials to fill in",
+        "pricing": "Add a pricing section with 3 packages before the call to action. If there are no prices in the content, leave the price empty",
+        "shorter": "Shorten all texts by about a third and keep the message",
+        "luxury": "Switch to a luxurious, elegant design (the luxe template if available) and adapt the copy to a premium tone",
+        "stats": "Add a numbers section after the hero, only with numbers found in the content",
+        "steps": "Add a 'how it works' section with 3–4 clear steps",
+        "english": "Translate every text on the site to English"
+      }
+    },
+    "site": {
+      "skip": "Skip to content",
+      "menu": "Menu",
+      "contact": "Contact",
+      "info": "Information",
+      "rights": "All rights reserved.",
+      "madeWith": "Built with Super Coder",
+      "popular": "Most popular",
+      "stars": "{n} stars",
+      "backHome": "Back to the home page",
+      "cookieText": "This website uses cookies to work properly and improve your experience.",
+      "cookieOk": "Got it",
+      "a11y": {
+        "title": "Accessibility",
+        "big": "Larger text",
+        "contrast": "High contrast",
+        "links": "Highlight links",
+        "still": "Stop animations"
+      }
+    },
+    "domain": {
+      "publicTitle": "The site's public link",
+      "publicHint": "Share this link. It works right away, for free, also after you connect a domain.",
+      "publishFirst": "Publish the site so the link opens for visitors.",
+      "tab": {
+        "buy": "Buy a new domain",
+        "connect": "I have a domain"
+      },
+      "buyHint": "Search for a name, pick an available domain and pay by card. We register it and connect it to the site automatically, including SSL.",
+      "search": "Search",
+      "searchPlaceholder": "Business name or domain, e.g. pet-line",
+      "available": "Available",
+      "taken": "Taken",
+      "premium": "Premium domain, not available for automatic purchase",
+      "year": "year",
+      "choose": "Choose",
+      "contactTitle": "Domain owner details: {domain}",
+      "contactHint": "The registrar requires the real details of the domain owner. They are kept only until registration is done.",
+      "contact": {
+        "firstName": "First name",
+        "lastName": "Last name",
+        "email": "E-mail",
+        "phone": "Phone",
+        "address1": "Address",
+        "city": "City",
+        "state": "State / region",
+        "zip": "Postal code",
+        "country": "Country",
+        "companyName": "Company (optional)"
+      },
+      "noteYear": "One-year registration. Estimated renewal next year: {renewal}. Renewal is not automatic.",
+      "noteRefund": "If registration fails, the payment is refunded to your card automatically.",
+      "payNow": "Pay {price}",
+      "payTitle": "Payment for {domain}",
+      "registering": "Registering the domain and connecting it…",
+      "bought": "Domain bought and connected to the site",
+      "processing": "Payment received, the domain is being registered",
+      "connectHint": "Enter your domain, then add the DNS records shown here at your domain provider. We verify automatically.",
+      "yourDomain": "Your domain",
+      "connect": "Connect",
+      "added": "Domain added. Now update the DNS records from the table.",
+      "active": "The domain is active and the site is live on it",
+      "stillPending": "Still waiting for the DNS update. This can take up to a few hours.",
+      "check": "Check now",
+      "remove": "Disconnect domain",
+      "removeConfirm": "Disconnect the domain from the site? The site keeps working on its public link.",
+      "removed": "Domain disconnected",
+      "dnsHint": "Add these records at your domain provider (DNS settings):",
+      "dnsWait": "After updating, click \"Check now\". The change can take up to a few hours to spread.",
+      "orders": "Domain orders",
+      "status": {
+        "pending": "Waiting for connection",
+        "active": "Active",
+        "error": "Error"
+      },
+      "orderStatus": {
+        "pending_payment": "Waiting for payment",
+        "paid": "Paid",
+        "registering": "Registering",
+        "active": "Active",
+        "failed": "Failed (refunded)",
+        "canceled": "Canceled"
+      },
+      "err": {
+        "notConfigured": "Connecting and buying domains is not enabled on the platform yet. Meanwhile the site is available on its public link.",
+        "auth": "No access to the platform's domain account. The platform owner needs to check VERCEL_API_TOKEN.",
+        "inUse": "This domain is already connected to another site",
+        "invalid": "Invalid domain. Write e.g. my-business.com",
+        "busy": "The domain service is busy. Try again in a minute.",
+        "generic": "The domain action failed. Try again.",
+        "none": "This site has no connected domain",
+        "short": "Write at least 2 characters",
+        "taken": "The domain is no longer available",
+        "premium": "This is a premium domain. Choose another name.",
+        "contact": "Check the owner details: all fields are required and the phone must be valid",
+        "registerFailed": "Domain registration failed and the payment was refunded to the card"
+      }
+    }
   },
   "admin": {
     "title": "Platform admin",
@@ -2023,6 +2240,19 @@
         "noquota": "This key's Google project has no free quota for this model; the agent tries other models by itself. If none works, create a key in a new project, or keep Groq as the main engine."
       },
       "tried": "Models tried:"
+    },
+    "domains": {
+      "title": "Domains sold through the platform",
+      "on": "Domain sales active",
+      "off": "Domain sales not configured (VERCEL_API_TOKEN, VERCEL_PROJECT_ID)",
+      "summary": "{count} active domains · profit {profit} · commission {markup}% (min {min})",
+      "empty": "No domains bought yet",
+      "domain": "Domain",
+      "status": "Status",
+      "cost": "Cost",
+      "price": "Customer price",
+      "profit": "Profit",
+      "date": "Date"
     }
   },
   "chat": {
@@ -2098,6 +2328,35 @@
       "step2NoBot": "Connect a Telegram bot above first, then type its username.",
       "step3": "Allow it to manage / reply to messages and choose which chats.",
       "step4": "Done — messages appear in the inbox and the agent answers within Telegram's 24-hour window."
+    }
+  },
+  "plans": {
+    "locked": {
+      "cta": "Upgrade to {plan}",
+      "api_access": {
+        "title": "API access is part of the Business plan",
+        "body": "API keys for Zapier, Make and other systems are included in {plan} and up. Existing keys work again right after upgrading."
+      },
+      "audit_log": {
+        "title": "The audit log is part of the Pro plan",
+        "body": "A full log of every action in the workspace (who changed what and when) is included in {plan} and up."
+      },
+      "site_pro_templates": {
+        "title": "Premium designs are part of the Pro plan",
+        "body": "All design templates, AI images, full legal pages and no \"built with\" badge are included in {plan} and up."
+      },
+      "site_ai_editor": {
+        "title": "Editing the site with the agent is part of the Pro plan",
+        "body": "Tell the agent what to change and it updates texts, adds sections and restyles the site. Included in {plan} and up."
+      },
+      "site_custom_domain": {
+        "title": "Your own domain is part of the Pro plan",
+        "body": "Connecting an existing domain or buying a new one for your site is included in {plan} and up."
+      },
+      "sites_published": {
+        "title": "You reached the published-sites limit of your plan",
+        "body": "Upgrade to {plan} to publish more sites."
+      }
     }
   }
 }

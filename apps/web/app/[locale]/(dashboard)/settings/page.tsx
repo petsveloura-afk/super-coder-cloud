@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { UpgradeNote } from "@/components/billing/upgrade-note";
+import { orgHasFeature } from "@/lib/billing/features";
 import type { Metadata } from "next";
 import { Bell } from "lucide-react";
 import type { AuditLogRow } from "@scc/database";
@@ -30,7 +32,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
       .eq("organization_id", ctx.org.id)
       .order("created_at", { ascending: false })
       .limit(20),
-    ctx.can("audit.read")
+    ctx.can("audit.read") && (await orgHasFeature(ctx.org.id, "audit_log"))
       ? supabase
           .from("audit_logs")
           .select("id, action, entity_type, created_at")
@@ -108,6 +110,14 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
                 ))}
               </ul>
             )}
+          </Card>
+        ) : ctx.can("audit.read") ? (
+          <Card>
+            <CardHeader title={t("settings.auditLog")} />
+            <div className="p-4">
+              {/* wave 13: the audit log is part of the Pro plan and up */}
+              <UpgradeNote locale={locale} feature="audit_log" plan="pro" compact />
+            </div>
           </Card>
         ) : null}
       </div>

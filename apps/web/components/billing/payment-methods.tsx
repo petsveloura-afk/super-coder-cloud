@@ -34,7 +34,7 @@ export async function PaymentMethods({
   return (
     <div className="mt-2 space-y-2" data-testid={`pay-${plan}`}>
       {withDivider ? <div className="text-center text-[11px] text-subtle">{t("billing.pay.or")}</div> : null}
-      {inlineCard ? <CardCheckout plan={plan} planName={inlineCard.planName} interval={interval} priceLabel={inlineCard.priceLabel} currency={inlineCard.currency} clientId={inlineCard.clientId} sdkUrl={inlineCard.sdkUrl} /> : null}
+      {inlineCard ? <CardCheckout plan={plan} planName={inlineCard.planName} interval={interval} priceLabel={inlineCard.priceLabel} currency={inlineCard.currency} clientId={inlineCard.clientId} sdkUrl={inlineCard.sdkUrl} crypto={methods.includes("crypto")} /> : null}
       {methods.map((m) => {
         const M = meta[m];
         return (

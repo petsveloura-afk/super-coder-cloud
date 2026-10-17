@@ -39,7 +39,12 @@ export async function POST(request: NextRequest) {
       // wave 11: card payments (one-time order) — captured even if the customer closed the page before returning
       const orderId = type === "CHECKOUT.ORDER.APPROVED" ? String(r.id ?? "") : String(((r.supplementary_data as { related_ids?: { order_id?: string } } | undefined)?.related_ids?.order_id) ?? "");
       const { capturePayPalCardOrder } = await import("@/lib/billing/paypal");
-      if (orderId) {
+      // wave 13: a domain bought for a website (custom_id "dom:<order>")
+      const { processDomainPayment } = await import("@/lib/site/domains");
+      const dom = orderId ? await processDomainPayment(orderId) : { handled: false as const };
+      if (dom.handled) {
+        await admin.from("billing_events").update({ organization_id: dom.orgId }).eq("provider", "paypal").eq("event_id", id);
+      } else if (orderId) {
         const out = await capturePayPalCardOrder(orderId);
         if (out.orgId) await admin.from("billing_events").update({ organization_id: out.orgId }).eq("provider", "paypal").eq("event_id", id);
       }

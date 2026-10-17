@@ -365,3 +365,87 @@ export async function createPayPalSdkOrder(input: { orgId: string; plan: string;
   });
   return { id: order.id, amount: price.amount, currency: price.currency };
 }
+
+/* ------------------------------------- wave 13: generic one-time orders (domains) */
+
+/** A one-time PayPal order (card in the page via the SDK, or PayPal's guest card page). */
+export async function paypalCreateOrder(input: { customId: string; description: string; amount: number; currency: string; requestId: string; returnUrl?: string; cancelUrl?: string; locale?: string }): Promise<{ id: string; approveUrl: string | null }> {
+  const order = await pp<{ id: string; links?: { rel: string; href: string }[] }>("/v2/checkout/orders", {
+    method: "POST",
+    requestId: input.requestId,
+    body: {
+      intent: "CAPTURE",
+      purchase_units: [{ reference_id: input.customId.slice(0, 120), custom_id: input.customId.slice(0, 120), description: input.description.slice(0, 120), soft_descriptor: "SUPERCODER", amount: { currency_code: input.currency, value: moneyString(input.amount) } }],
+      ...(input.returnUrl
+        ? {
+            payment_source: {
+              paypal: {
+                experience_context: {
+                  brand_name: (process.env.BILLING_BUSINESS_NAME || "Super Coder Cloud").slice(0, 127),
+                  locale: input.locale === "en" ? "en-US" : input.locale === "ar" ? "ar-EG" : "he-IL",
+                  landing_page: "GUEST_CHECKOUT",
+                  user_action: "PAY_NOW",
+                  shipping_preference: "NO_SHIPPING",
+                  return_url: input.returnUrl,
+                  cancel_url: input.cancelUrl ?? input.returnUrl,
+                },
+              },
+            },
+          }
+        : { application_context: { brand_name: (process.env.BILLING_BUSINESS_NAME || "Super Coder Cloud").slice(0, 127), shipping_preference: "NO_SHIPPING", user_action: "PAY_NOW" } }),
+    },
+  });
+  const approveUrl = order.links?.find((l) => l.rel === "payer-action")?.href ?? order.links?.find((l) => l.rel === "approve")?.href ?? null;
+  return { id: order.id, approveUrl };
+}
+
+export interface PayPalCapturedOrder {
+  id: string;
+  status: string;
+  customId: string | null;
+  capture: { id: string; status: string; amount: number; currency: string } | null;
+  payerEmail: string | null;
+}
+
+/** Reads an order (no capture). */
+export async function paypalGetOrder(orderId: string): Promise<PayPalCapturedOrder | null> {
+  if (!/^[A-Z0-9]{8,40}$/.test(orderId)) return null;
+  const o = await pp<PayPalOrder>(`/v2/checkout/orders/${orderId}`);
+  return shapeOrder(o);
+}
+
+/** Captures an approved order (idempotent: an already captured order is read back). */
+export async function paypalCaptureOrder(orderId: string): Promise<PayPalCapturedOrder | null> {
+  if (!/^[A-Z0-9]{8,40}$/.test(orderId)) return null;
+  let o: PayPalOrder;
+  try {
+    o = await pp<PayPalOrder>(`/v2/checkout/orders/${orderId}/capture`, { method: "POST", body: {}, requestId: `scc-capture-${orderId}` });
+  } catch (e) {
+    if (!/ORDER_ALREADY_CAPTURED|422/.test((e as Error).message)) throw e;
+    o = await pp<PayPalOrder>(`/v2/checkout/orders/${orderId}`);
+  }
+  return shapeOrder(o);
+}
+
+function shapeOrder(o: PayPalOrder): PayPalCapturedOrder {
+  const pu = o.purchase_units?.[0];
+  const cap = pu?.payments?.captures?.[0];
+  return {
+    id: o.id,
+    status: o.status,
+    customId: cap?.custom_id ?? pu?.custom_id ?? null,
+    capture: cap ? { id: cap.id, status: cap.status, amount: Number(cap.amount?.value ?? 0), currency: cap.amount?.currency_code ?? "" } : null,
+    payerEmail: o.payer?.email_address ?? null,
+  };
+}
+
+/** Full refund of a capture (e.g. the domain could not be registered after payment). */
+export async function paypalRefundCapture(captureId: string, requestId: string): Promise<boolean> {
+  try {
+    await pp(`/v2/payments/captures/${captureId}/refund`, { method: "POST", body: {}, requestId });
+    return true;
+  } catch (e) {
+    console.error("paypal refund failed", (e as Error).message);
+    return false;
+  }
+}

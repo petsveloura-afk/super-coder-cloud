@@ -10,6 +10,7 @@ import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { sitePublicBase } from "@/lib/websites";
+import { orgHasFeature } from "@/lib/billing/features";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -31,7 +32,7 @@ export default async function SitePreviewPage({ params }: { params: Promise<{ lo
     );
   }
   const supabase = await createClient();
-  const { data: s } = await supabase.from("sites").select("id, name, slug, status, theme, blocks").eq("id", id).eq("organization_id", ctx.org.id).maybeSingle();
+  const { data: s } = await supabase.from("sites").select("id, name, slug, status, theme, blocks, settings, pages").eq("id", id).eq("organization_id", ctx.org.id).maybeSingle();
   if (!s) notFound();
   const blocks = (s.blocks ?? []) as SiteBlock[];
   const formSlugs = [...new Set(blocks.filter((b) => b.type === "form").map((b) => (b.type === "form" ? b.data.form_slug : "")).filter(Boolean))];
@@ -59,7 +60,14 @@ export default async function SitePreviewPage({ params }: { params: Promise<{ lo
         ) : null}
       </div>
       <div className="overflow-hidden rounded-3xl border border-line shadow-card" data-testid="site-preview">
-        <SiteRenderer site={{ name: s.name as string, theme: (s.theme ?? {}) as { accent?: string; mode?: "dark" | "light" }, blocks }} forms={forms} locale={locale} t={t} />
+        <SiteRenderer
+          site={{ name: s.name as string, slug: s.slug as string, theme: (s.theme ?? {}) as { accent?: string; mode?: "dark" | "light" }, blocks, settings: (s.settings ?? null) as Record<string, unknown> | null, pages: (s.pages ?? null) as Record<string, string> | null }}
+          forms={forms}
+          locale={locale}
+          t={t}
+          basePath={`/${locale}/s/${s.slug as string}`}
+          branding={!(await orgHasFeature(ctx.org.id, "white_label"))}
+        />
       </div>
     </>
   );

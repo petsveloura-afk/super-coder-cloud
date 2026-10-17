@@ -10,6 +10,18 @@ const supabaseOrigin = (() => {
 })();
 const supabaseWs = supabaseOrigin.replace(/^http/, "ws");
 
+// wave 13: PayPal's card form (JS SDK) is allowed on every page — after an in-app navigation
+// the browser keeps the first page's policy, so billing / the website editor must not depend
+// on their own page headers (script-src already allows inline scripts, PayPal adds no risk).
+const paypalSdkOrigin = (() => {
+  try {
+    return process.env.PAYPAL_SDK_URL ? new URL(process.env.PAYPAL_SDK_URL).origin : "";
+  } catch {
+    return "";
+  }
+})();
+const paypalGlobal = `https://www.paypal.com https://*.paypal.com https://www.paypalobjects.com https://*.paypalobjects.com https://*.braintreegateway.com ${paypalSdkOrigin}`.trim();
+
 // Strict-by-default CSP. 'unsafe-inline' for styles is required by Next/Tailwind
 // runtime style injection; scripts are limited to self (+ inline bootstrap).
 const csp = [
@@ -18,11 +30,14 @@ const csp = [
   "frame-ancestors 'none'",
   "form-action 'self'",
   "object-src 'none'",
-  `img-src 'self' data: blob: ${supabaseOrigin}`.trim(),
-  "font-src 'self' data:",
-  "style-src 'self' 'unsafe-inline'",
-  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
-  `connect-src 'self' ${supabaseOrigin} ${supabaseWs}`.trim(),
+  // wave 13: published websites (also on custom domains, where the path is "/") show
+  // https images, Google Fonts and YouTube / Vimeo videos
+  `img-src 'self' data: blob: https: ${supabaseOrigin}`.trim(),
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  `frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com ${paypalGlobal}`,
+  `script-src 'self' 'unsafe-inline' ${paypalGlobal}${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
+  `connect-src 'self' ${supabaseOrigin} ${supabaseWs} ${paypalGlobal}`.trim(),
   "worker-src 'self'",
   "manifest-src 'self'",
 ].join("; ");
@@ -50,7 +65,7 @@ const siteHeaders = [{ key: "Content-Security-Policy", value: siteCsp }];
 const integrationsCsp = csp
   .replace("script-src 'self' 'unsafe-inline'", "script-src 'self' 'unsafe-inline' https://connect.facebook.net")
   .replace(/connect-src ([^;]*)/, "connect-src $1 https://graph.facebook.com https://www.facebook.com")
-  .concat("; frame-src https://www.facebook.com https://web.facebook.com https://business.facebook.com");
+  .replace(/frame-src ([^;]*)/, "frame-src $1 https://www.facebook.com https://web.facebook.com https://business.facebook.com");
 const integrationsHeaders = [{ key: "Content-Security-Policy", value: integrationsCsp }];
 
 // Billing: PayPal's card form (JS SDK) runs inside the page — allowed on this page only.
@@ -67,7 +82,7 @@ const billingCsp = csp
   .replace(/connect-src ([^;]*)/, `connect-src $1 ${paypalHosts}`)
   .replace(/img-src ([^;]*)/, `img-src $1 ${paypalHosts}`)
   .replace("form-action 'self'", `form-action 'self' ${paypalHosts}`)
-  .concat(`; frame-src ${paypalHosts}`);
+  .replace(/frame-src ([^;]*)/, `frame-src $1 ${paypalHosts}`);
 const billingHeaders = [
   { key: "Content-Security-Policy", value: billingCsp },
   // PayPal may open a small secure window for some cards / 3-D Secure
@@ -93,6 +108,8 @@ const nextConfig: NextConfig = {
       { source: "/:locale(he|ar|en)/chat/:org*", headers: embeddableHeaders },
       { source: "/:locale(he|ar|en)/integrations", headers: integrationsHeaders },
       { source: "/:locale(he|ar|en)/billing", headers: billingHeaders },
+      // wave 13: buying a domain for a website — the same in-page card form
+      { source: "/:locale(he|ar|en)/websites/:id", headers: billingHeaders },
       { source: "/widget.js", headers: [{ key: "Cache-Control", value: "public, max-age=3600" }, { key: "Access-Control-Allow-Origin", value: "*" }] },
       {
         source: "/sw.js",

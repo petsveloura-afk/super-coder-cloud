@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatNumber } from "@/lib/format";
 import { AdminPayments } from "@/components/admin/admin-payments";
 import { AiHealth } from "@/components/admin/ai-health";
+import { AdminDomains } from "@/components/admin/admin-domains";
 import { providerKeys, ROUTE_PROVIDERS } from "@/lib/ai/router-core";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -63,6 +64,7 @@ export default async function AdminPage({ params, searchParams }: { params: Prom
       <PageHeader title={t("admin.title")} description={t("admin.subtitle")} />
       <AiHealth configured={Object.fromEntries(ROUTE_PROVIDERS.map((p) => [p, providerKeys(p, process.env).length]))} />
       <AdminPayments locale={locale} />
+      <AdminDomains locale={locale} />
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map(([k, n, Icon]) => (
           <Card key={k} className="p-4">

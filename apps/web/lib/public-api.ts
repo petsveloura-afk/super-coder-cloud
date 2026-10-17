@@ -35,6 +35,9 @@ export async function authenticate(request: NextRequest, scope: ApiScope | null)
   const { data: allowed } = await admin.rpc("hit_rate_limit", { p_bucket: `api:${row.key_id}`, p_limit: 120, p_window_seconds: 60 });
   if (allowed === false) return apiError(429, "rate_limited", "Too many requests — max 120 per minute.");
   if (scope && !row.scopes.includes(scope)) return apiError(403, "insufficient_scope", `This key lacks the "${scope}" scope.`);
+  // wave 13: the REST API is part of the Business plan and up (plans.features: api_access)
+  const { data: hasApi } = await admin.rpc("has_feature", { p_org: row.organization_id, p_feature: "api_access" });
+  if (hasApi !== true) return apiError(402, "plan_required", "API access is part of the Business plan — upgrade in Billing to use this key.");
   return { orgId: row.organization_id, keyId: row.key_id, scopes: row.scopes, admin };
 }
 

@@ -70,7 +70,9 @@
     "notifications": "الإشعارات",
     "noNotifications": "لا توجد إشعارات جديدة",
     "profile": "الملف الشخصي",
-    "none": "لا يوجد"
+    "none": "لا يوجد",
+    "yes": "نعم",
+    "no": "لا"
   },
   "auth": {
     "signIn": "تسجيل الدخول",
@@ -273,7 +275,8 @@
     "generic": "حدث خطأ غير متوقع",
     "offline": "أنت غير متصل",
     "offlineBody": "سيعود المحتوى فور استعادة الاتصال.",
-    "goHome": "العودة للرئيسية"
+    "goHome": "العودة للرئيسية",
+    "rateLimited": "طلبات كثيرة جداً. حاول مرة أخرى بعد بضع دقائق."
   },
   "pwa": {
     "install": "تثبيت التطبيق",
@@ -439,7 +442,13 @@
       "processing": "جارٍ تأكيد الدفع…",
       "cardFallback": "تعذّر تحميل نموذج البطاقة هنا — تابع إلى نموذج البطاقة الآمن:",
       "cardContinue": "متابعة الدفع بالبطاقة",
-      "cardSecure": "دفع آمن ومشفّر عبر PayPal — لا نحفظ بيانات البطاقة."
+      "cardSecure": "دفع آمن ومشفّر عبر PayPal — لا نحفظ بيانات البطاقة.",
+      "cardOrCryptoSub": "بطاقة ائتمان أو عملات رقمية · داخل الموقع",
+      "methodTabs": "طريقة الدفع",
+      "tabCard": "بطاقة ائتمان",
+      "tabCrypto": "عملات رقمية",
+      "cryptoTabHint": "ادفع بـ USDT أو بيتكوين أو إيثر وغيرها عبر NOWPayments. بعد تأكيد الشبكة تُفعَّل الباقة تلقائياً وتصلك فاتورة.",
+      "cryptoContinue": "متابعة الدفع بالعملات الرقمية"
     }
   },
   "ai": {
@@ -1914,7 +1923,16 @@
       "booking": "حجز موعد",
       "cta": "دعوة لإجراء",
       "faq": "أسئلة شائعة",
-      "contact": "تواصل"
+      "contact": "تواصل",
+      "about": "من نحن",
+      "gallery": "معرض",
+      "testimonials": "آراء العملاء",
+      "stats": "أرقام",
+      "pricing": "الأسعار",
+      "steps": "كيف يعمل",
+      "team": "الفريق",
+      "logos": "عملاء وشركاء",
+      "video": "فيديو"
     },
     "fields": {
       "title": "العنوان",
@@ -1933,7 +1951,19 @@
       "phone": "الهاتف",
       "whatsapp": "واتساب",
       "email": "البريد",
-      "address": "العنوان"
+      "address": "العنوان",
+      "url": "رابط",
+      "caption": "تعليق",
+      "name": "الاسم",
+      "role": "المنصب",
+      "quote": "التوصية",
+      "rating": "التقييم",
+      "value": "رقم",
+      "price": "السعر",
+      "period": "لكل (مثلاً شهر)",
+      "features": "ما يشمله (سطر لكل بند)",
+      "highlight": "إبراز",
+      "statLabel": "وصف الرقم"
     },
     "previewTitle": "معاينة",
     "aiTitle": "البناء بالذكاء الاصطناعي",
@@ -1950,7 +1980,194 @@
     "aiImage": "صورة AI",
     "aiImageReady": "تم إنشاء الصورة وإضافتها",
     "aiInvalid": "أعاد الذكاء الاصطناعي نتيجة غير صالحة — حاولوا مجددًا",
-    "aiImageFailed": "فشل إنشاء الصورة — حاولوا مجددًا"
+    "aiImageFailed": "فشل إنشاء الصورة — حاولوا مجددًا",
+    "upload": "رفع",
+    "imageUploaded": "تم رفع الصورة",
+    "tabs": {
+      "label": "أقسام المحرر",
+      "content": "المحتوى والأقسام",
+      "design": "التصميم",
+      "business": "بيانات العمل والصفحات القانونية",
+      "domain": "العنوان والنطاق"
+    },
+    "design": {
+      "templates": "قالب التصميم",
+      "templatesHint": "كل قالب لغة تصميم كاملة: ألوان وخطوط وتخطيط ورسوم حركة. يمكن التبديل في أي وقت دون فقدان المحتوى.",
+      "lockedNote": "هذا القالب متاح في الباقات المدفوعة. يمكنك معاينته وحفظه بعد الترقية.",
+      "accent2": "لون ثانوي",
+      "font": "الخط",
+      "fontTemplate": "حسب القالب",
+      "radius": "الزوايا",
+      "radiusSharp": "حادة",
+      "radiusSoft": "مستديرة قليلاً",
+      "radiusRound": "مستديرة",
+      "animations": "رسوم متحركة في الموقع",
+      "pickForAi": "قالب التصميم",
+      "aiChooses": "دع الذكاء الاصطناعي يختار قالباً مناسباً"
+    },
+    "business": {
+      "title": "بيانات العمل",
+      "hint": "تظهر في أسفل الموقع وفي الصفحات القانونية وزر واتساب.",
+      "social": "الشبكات الاجتماعية",
+      "langAuto": "حسب لغة الواجهة",
+      "cookieBanner": "إشعار ملفات تعريف الارتباط",
+      "a11yWidget": "قائمة إمكانية الوصول",
+      "fields": {
+        "legal_name": "Registered business name",
+        "business_id": "Registration no.",
+        "phone": "Phone",
+        "email": "E-mail",
+        "address": "Address",
+        "whatsapp_button": "Number for a floating WhatsApp button",
+        "a11y_contact": "Accessibility coordinator (name and phone)",
+        "logo_url": "Logo (image link)",
+        "tagline": "Short line about the business (footer)",
+        "lang": "Site language",
+        "instagram": "Instagram",
+        "facebook": "Facebook",
+        "tiktok": "TikTok",
+        "linkedin": "LinkedIn",
+        "youtube": "YouTube"
+      }
+    },
+    "legal": {
+      "title": "الصفحات القانونية",
+      "hint": "سياسة الخصوصية وشروط الاستخدام وبيان إمكانية الوصول وسياسة ملفات تعريف الارتباط تُنشأ تلقائياً من بيانات العمل. يمكن تعديل كل صفحة.",
+      "auto": "تلقائي",
+      "custom": "معدّل",
+      "edit": "تعديل",
+      "generate": "تعبئة من القالب",
+      "useAuto": "العودة للنسخة التلقائية",
+      "disclaimer": "هذه النصوص قالب عام وليست استشارة قانونية."
+    },
+    "aiEdit": {
+      "title": "التعديل مع الوكيل",
+      "hint": "اكتب ما تريد تغييره وسيحدّث الوكيل الموقع.",
+      "placeholder": "مثلاً: أضف قسم أسعار بثلاث باقات واجعل التصميم فاخراً",
+      "run": "تنفيذ",
+      "working": "الوكيل يعمل…",
+      "undo": "تراجع",
+      "applied": "تم تطبيق التغييرات في المحرر. راجعها ثم احفظ.",
+      "note": "لا يُنشر شيء قبل الحفظ.",
+      "quickLabel": {
+        "modern": "More modern",
+        "testimonials": "Add testimonials",
+        "pricing": "Add pricing",
+        "shorter": "Shorter texts",
+        "luxury": "Luxury look",
+        "stats": "Add numbers",
+        "steps": "Add how it works",
+        "english": "Translate to English"
+      },
+      "quick": {
+        "modern": "Make the site more modern and impressive: a stronger headline, sharper copy and a current design template that fits the business",
+        "testimonials": "Add a testimonials section before the FAQ. Use only testimonials found in the content; if there are none, add the section with a title and three empty testimonials to fill in",
+        "pricing": "Add a pricing section with 3 packages before the call to action. If there are no prices in the content, leave the price empty",
+        "shorter": "Shorten all texts by about a third and keep the message",
+        "luxury": "Switch to a luxurious, elegant design (the luxe template if available) and adapt the copy to a premium tone",
+        "stats": "Add a numbers section after the hero, only with numbers found in the content",
+        "steps": "Add a 'how it works' section with 3–4 clear steps",
+        "english": "Translate every text on the site to English"
+      }
+    },
+    "site": {
+      "skip": "تخطي إلى المحتوى",
+      "menu": "القائمة",
+      "contact": "تواصل",
+      "info": "معلومات",
+      "rights": "جميع الحقوق محفوظة.",
+      "madeWith": "صُنع بواسطة Super Coder",
+      "popular": "الأكثر شعبية",
+      "stars": "{n} نجوم",
+      "backHome": "العودة للصفحة الرئيسية",
+      "cookieText": "يستخدم هذا الموقع ملفات تعريف الارتباط ليعمل بشكل صحيح.",
+      "cookieOk": "فهمت",
+      "a11y": {
+        "title": "إمكانية الوصول",
+        "big": "تكبير النص",
+        "contrast": "تباين عالٍ",
+        "links": "إبراز الروابط",
+        "still": "إيقاف الحركة"
+      }
+    },
+    "domain": {
+      "publicTitle": "الرابط العام للموقع",
+      "publicHint": "شارك هذا الرابط. يعمل فوراً ومجاناً.",
+      "publishFirst": "انشر الموقع ليُفتح الرابط للزوار.",
+      "tab": {
+        "buy": "شراء نطاق جديد",
+        "connect": "لدي نطاق"
+      },
+      "buyHint": "Search for a name, pick an available domain and pay by card. We register it and connect it to the site automatically, including SSL.",
+      "search": "بحث",
+      "searchPlaceholder": "Business name or domain, e.g. pet-line",
+      "available": "متاح",
+      "taken": "محجوز",
+      "premium": "Premium domain, not available for automatic purchase",
+      "year": "سنة",
+      "choose": "اختيار",
+      "contactTitle": "Domain owner details: {domain}",
+      "contactHint": "The registrar requires the real details of the domain owner. They are kept only until registration is done.",
+      "contact": {
+        "firstName": "First name",
+        "lastName": "Last name",
+        "email": "E-mail",
+        "phone": "Phone",
+        "address1": "Address",
+        "city": "City",
+        "state": "State / region",
+        "zip": "Postal code",
+        "country": "Country",
+        "companyName": "Company (optional)"
+      },
+      "noteYear": "One-year registration. Estimated renewal next year: {renewal}. Renewal is not automatic.",
+      "noteRefund": "If registration fails, the payment is refunded to your card automatically.",
+      "payNow": "ادفع {price}",
+      "payTitle": "Payment for {domain}",
+      "registering": "Registering the domain and connecting it…",
+      "bought": "تم شراء النطاق وربطه بالموقع",
+      "processing": "Payment received, the domain is being registered",
+      "connectHint": "Enter your domain, then add the DNS records shown here at your domain provider. We verify automatically.",
+      "yourDomain": "Your domain",
+      "connect": "ربط",
+      "added": "Domain added. Now update the DNS records from the table.",
+      "active": "النطاق فعّال والموقع يعمل عليه",
+      "stillPending": "Still waiting for the DNS update. This can take up to a few hours.",
+      "check": "تحقق الآن",
+      "remove": "فصل النطاق",
+      "removeConfirm": "Disconnect the domain from the site? The site keeps working on its public link.",
+      "removed": "تم فصل النطاق",
+      "dnsHint": "Add these records at your domain provider (DNS settings):",
+      "dnsWait": "After updating, click \"Check now\". The change can take up to a few hours to spread.",
+      "orders": "طلبات النطاقات",
+      "status": {
+        "pending": "Waiting for connection",
+        "active": "Active",
+        "error": "Error"
+      },
+      "orderStatus": {
+        "pending_payment": "Waiting for payment",
+        "paid": "Paid",
+        "registering": "Registering",
+        "active": "Active",
+        "failed": "Failed (refunded)",
+        "canceled": "Canceled"
+      },
+      "err": {
+        "notConfigured": "Connecting and buying domains is not enabled on the platform yet. Meanwhile the site is available on its public link.",
+        "auth": "No access to the platform's domain account. The platform owner needs to check VERCEL_API_TOKEN.",
+        "inUse": "This domain is already connected to another site",
+        "invalid": "Invalid domain. Write e.g. my-business.com",
+        "busy": "The domain service is busy. Try again in a minute.",
+        "generic": "The domain action failed. Try again.",
+        "none": "This site has no connected domain",
+        "short": "Write at least 2 characters",
+        "taken": "The domain is no longer available",
+        "premium": "This is a premium domain. Choose another name.",
+        "contact": "Check the owner details: all fields are required and the phone must be valid",
+        "registerFailed": "Domain registration failed and the payment was refunded to the card"
+      }
+    }
   },
   "admin": {
     "title": "إدارة المنصة",
@@ -2023,6 +2240,19 @@
         "noquota": "لا توجد حصة مجانية لهذا النموذج في مشروع Google الخاص بالمفتاح؛ يجرب الوكيل نماذج أخرى تلقائياً. إن لم ينجح أي نموذج، أنشئ مفتاحاً في مشروع جديد أو اعتمد Groq كمحرك رئيسي."
       },
       "tried": "النماذج التي جُربت:"
+    },
+    "domains": {
+      "title": "Domains sold through the platform",
+      "on": "Domain sales active",
+      "off": "Domain sales not configured (VERCEL_API_TOKEN, VERCEL_PROJECT_ID)",
+      "summary": "{count} active domains · profit {profit} · commission {markup}% (min {min})",
+      "empty": "No domains bought yet",
+      "domain": "Domain",
+      "status": "Status",
+      "cost": "Cost",
+      "price": "Customer price",
+      "profit": "Profit",
+      "date": "Date"
     }
   },
   "chat": {
@@ -2098,6 +2328,35 @@
       "step2NoBot": "اربط بوت تيليجرام أعلاه أولاً ثم اكتب اسم المستخدم.",
       "step3": "اسمح بإدارة الرسائل والرد عليها واختر المحادثات.",
       "step4": "تم — تظهر الرسائل في الصندوق ويرد الوكيل خلال نافذة 24 ساعة."
+    }
+  },
+  "plans": {
+    "locked": {
+      "cta": "الترقية إلى {plan}",
+      "api_access": {
+        "title": "الوصول إلى API متاح في باقة Business",
+        "body": "مفاتيح API لربط Zapier وMake وأنظمة أخرى متاحة في باقة {plan} وما فوق. تعود المفاتيح الحالية للعمل فور الترقية."
+      },
+      "audit_log": {
+        "title": "سجل التدقيق متاح في باقة Pro",
+        "body": "سجل كامل لكل الإجراءات في المؤسسة (من غيّر ماذا ومتى) متاح في باقة {plan} وما فوق."
+      },
+      "site_pro_templates": {
+        "title": "التصاميم المميزة متاحة في باقة Pro",
+        "body": "كل قوالب التصميم وصور الذكاء الاصطناعي والصفحات القانونية الكاملة وبدون شارة \"صُنع بواسطة\" متاحة في باقة {plan} وما فوق."
+      },
+      "site_ai_editor": {
+        "title": "تعديل الموقع مع الوكيل متاح في باقة Pro",
+        "body": "اكتب للوكيل ما تريد تغييره فيحدّث النصوص ويضيف أقساماً ويغيّر التصميم. متاح في باقة {plan} وما فوق."
+      },
+      "site_custom_domain": {
+        "title": "نطاق خاص بك متاح في باقة Pro",
+        "body": "ربط نطاق موجود أو شراء نطاق جديد لموقعك متاح في باقة {plan} وما فوق."
+      },
+      "sites_published": {
+        "title": "وصلت إلى حد المواقع المنشورة في باقتك",
+        "body": "قم بالترقية إلى {plan} لنشر المزيد من المواقع."
+      }
     }
   }
 }

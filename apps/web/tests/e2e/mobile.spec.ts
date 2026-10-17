@@ -68,3 +68,35 @@ test("mobile (iPhone viewport): wave 8 screens fit the phone — billing & payme
   await shot(v, "m8-chat-mobile");
   await ctx.close();
 });
+
+test("mobile (iPhone viewport): wave 13 — website editor tabs and a published site fit the phone", async ({ page }) => {
+  test.skip(process.env.E2E_PROVIDERS_MOCKED !== "true", "needs the provider mock");
+  test.setTimeout(150_000);
+  const noSideScroll = async (name: string) => {
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(over, `${name} scrolls sideways by ${over}px`).toBeLessThanOrEqual(1);
+    await shot(page, name);
+  };
+  await signUp(page, { name: "אתר נייד", email: uniqueEmail("msite") });
+  await createOrg(page, "אתר נייד", `msite-${Date.now()}`);
+  await page.goto("/he/websites/new");
+  await page.getByTestId("ai-site-card").locator("#ai-brief").fill("סטודיו ליוגה בחיפה, שיעורי בוקר וערב, אווירה רגועה");
+  await page.getByTestId("ai-site-card").getByRole("button", { name: "בנה לי אתר" }).click();
+  await page.waitForURL(/\/he\/websites\/[0-9a-f-]{36}\/preview$/, { timeout: 30_000 });
+  await noSideScroll("m8-site-preview-mobile");
+  await page.getByRole("link", { name: "עריכה ופרסום" }).first().click();
+  await page.waitForURL(/\/he\/websites\/[0-9a-f-]{36}$/);
+  for (const tab of ["content", "design", "business", "domain"]) {
+    await page.getByTestId("site-tabs").locator(`[data-tab="${tab}"]`).click();
+    await noSideScroll(`m9-site-${tab}-mobile`);
+  }
+  await page.getByRole("button", { name: "פרסום" }).click();
+  await expect(page.getByText("האתר פורסם ועודכן").first()).toBeVisible();
+  const url = (await page.getByTestId("public-link").locator("span.font-mono").textContent())!.trim();
+  await page.goto(url);
+  await expect(page.getByTestId("pro-site")).toBeVisible();
+  await noSideScroll("m10-public-site-mobile");
+  await page.goto(`${url}/privacy`);
+  await noSideScroll("m11-legal-mobile");
+});

@@ -5,6 +5,8 @@ import { Bot, CheckCircle2, CircleDashed, CreditCard, Mail, Plug, Timer, Zap } f
 import { integrationAvailability } from "@scc/shared/env";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { ApiDocs, ApiKeys, Webhooks, type ApiKeyRow, type WebhookRow } from "@/components/integrations/developer";
+import { UpgradeNote } from "@/components/billing/upgrade-note";
+import { orgHasFeature } from "@/lib/billing/features";
 import { ChannelsSection } from "@/components/integrations/channels-section";
 import { ConnectHub, type HubProps } from "@/components/integrations/connect-hub";
 import { IntegrationsNotice } from "@/components/integrations/integrations-notice";
@@ -44,6 +46,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
     ctx.can("automations.manage") ? supabase.from("automations").select("id, name, enabled").eq("organization_id", ctx.org.id).eq("trigger_type", "webhook.inbound") : Promise.resolve({ data: [] }),
   ]);
 
+  const hasApiAccess = canApi ? await orgHasFeature(ctx.org.id, "api_access") : false;
   const avail = integrationAvailability(process.env);
   const platform = [
     { icon: Bot, name: t("integrations.platform.ai"), on: avail.anthropic || avail.openai || avail.gemini, hint: t("integrations.platform.aiHint") },
@@ -136,8 +139,10 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
         <div className="grid gap-4 xl:grid-cols-2">
           <Card>
             <CardHeader title={t("integrations.apiKeys")} description={t("integrations.apiKeysHint")} />
-            <div className="p-4">
-              <ApiKeys keys={(keysRes.data ?? []) as ApiKeyRow[]} />
+            <div className="space-y-3 p-4">
+              {/* wave 13: API access is part of the Business plan */}
+              {hasApiAccess ? null : <UpgradeNote locale={locale} feature="api_access" plan="business" compact />}
+              {hasApiAccess || (keysRes.data ?? []).length ? <ApiKeys keys={(keysRes.data ?? []) as ApiKeyRow[]} /> : null}
             </div>
           </Card>
           <Card>

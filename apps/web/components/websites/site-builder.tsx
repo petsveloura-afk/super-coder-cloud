@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, ExternalLink, ImageIcon, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Briefcase, ExternalLink, Globe, ImageIcon, LayoutTemplate, ListTree, Plus, Save, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { SITE_BLOCK_TYPES, type SiteBlockType } from "@scc/shared/engagement";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Card, Field, Input, Select, Textarea } from "@/components/ui/primitives";
-import { heroImageAIAction, saveSiteAction } from "@/app/[locale]/(dashboard)/websites/actions";
+import { heroImageAIAction, saveSiteAction, uploadSiteImageAction } from "@/app/[locale]/(dashboard)/websites/actions";
+import { DesignPanel } from "./design-panel";
+import { BusinessPanel, type SitePages, type SiteSettings } from "./business-panel";
+import { AiEditPanel } from "./ai-edit-panel";
 import { cn } from "@/lib/utils";
 
 type Item = Record<string, string>;
@@ -19,9 +22,12 @@ export interface SiteValue {
   name: string;
   slug: string;
   status: "draft" | "published";
-  theme: { accent: string; mode: "dark" | "light" };
+  theme: { accent: string; mode: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean };
   seo: { title: string; description: string };
   blocks: BlockValue[];
+  // wave 13
+  settings?: SiteSettings;
+  pages?: SitePages;
 }
 
 interface FieldSpec {
@@ -29,6 +35,12 @@ interface FieldSpec {
   multiline?: boolean;
   ltr?: boolean;
   select?: "form" | "booking";
+  /** wave 13: upload an image (or paste an https link) */
+  image?: boolean;
+  /** wave 13: fixed choices */
+  options?: string[];
+  /** wave 13: a different label than websites.fields.<key> */
+  labelKey?: string;
 }
 /** Editable fields per block type (labels: websites.fields.<key>). */
 const SPEC: Record<SiteBlockType, { fields: FieldSpec[]; items?: { key: "items"; fields: FieldSpec[] } }> = {
@@ -40,6 +52,16 @@ const SPEC: Record<SiteBlockType, { fields: FieldSpec[]; items?: { key: "items";
   cta: { fields: [{ key: "title" }, { key: "text", multiline: true }, { key: "label" }, { key: "href", ltr: true }] },
   faq: { fields: [{ key: "title" }], items: { key: "items", fields: [{ key: "q" }, { key: "a", multiline: true }] } },
   contact: { fields: [{ key: "title" }, { key: "phone", ltr: true }, { key: "whatsapp", ltr: true }, { key: "email", ltr: true }, { key: "address" }] },
+  // wave 13 — richer sections
+  about: { fields: [{ key: "title" }, { key: "body", multiline: true }, { key: "image_url", ltr: true, image: true }] },
+  gallery: { fields: [{ key: "title" }], items: { key: "items", fields: [{ key: "url", ltr: true, image: true }, { key: "caption" }] } },
+  testimonials: { fields: [{ key: "title" }], items: { key: "items", fields: [{ key: "name" }, { key: "role" }, { key: "quote", multiline: true }, { key: "rating", options: ["5", "4", "3", "2", "1"] }] } },
+  stats: { fields: [{ key: "title" }], items: { key: "items", fields: [{ key: "value" }, { key: "label", labelKey: "websites.fields.statLabel" }] } },
+  pricing: { fields: [{ key: "title" }], items: { key: "items", fields: [{ key: "name" }, { key: "price" }, { key: "period" }, { key: "features", multiline: true }, { key: "highlight", options: ["", "yes"] }, { key: "cta_label" }, { key: "cta_href", ltr: true }] } },
+  steps: { fields: [{ key: "title" }], items: { key: "items", fields: [{ key: "title" }, { key: "text", multiline: true }] } },
+  team: { fields: [{ key: "title" }], items: { key: "items", fields: [{ key: "name" }, { key: "role" }, { key: "image_url", ltr: true, image: true }] } },
+  logos: { fields: [{ key: "title" }], items: { key: "items", fields: [{ key: "name" }] } },
+  video: { fields: [{ key: "title" }, { key: "url", ltr: true }, { key: "text", multiline: true }] },
 };
 
 export function newBlock(type: SiteBlockType): BlockValue {
@@ -56,6 +78,10 @@ export function SiteBuilder({
   bookings,
   publicBase,
   aiImages = false,
+  proTemplates = false,
+  aiEditor = false,
+  domainSlot,
+  liveUrl,
 }: {
   id?: string;
   initial: SiteValue;
@@ -64,6 +90,13 @@ export function SiteBuilder({
   publicBase: string;
   /** paid plans: generate the hero image with AI */
   aiImages?: boolean;
+  /** wave 13: premium templates / AI editing (paid plans) */
+  proTemplates?: boolean;
+  aiEditor?: boolean;
+  /** wave 13: the domain panel (server-rendered) */
+  domainSlot?: ReactNode;
+  /** wave 13: the site's live address (custom domain when active) */
+  liveUrl?: string;
 }) {
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -72,6 +105,16 @@ export function SiteBuilder({
   const [adding, setAdding] = useState<SiteBlockType>("hero");
   const [saving, start] = useTransition();
   const [imaging, startImage] = useTransition();
+  const [tab, setTab] = useState<"content" | "design" | "business" | "domain">("content");
+  const [uploading, setUploading] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const uploadTarget = useRef<((url: string) => void) | null>(null);
+  function pickImage(key: string, apply: (url: string) => void) {
+    uploadTarget.current = apply;
+    setUploading(null);
+    fileRef.current?.setAttribute("data-key", key);
+    fileRef.current?.click();
+  }
   function aiImage(i: number) {
     const b = v.blocks[i];
     if (!b || b.type !== "hero") return;
@@ -111,9 +154,60 @@ export function SiteBuilder({
     });
   }
 
-  const url = `${publicBase}/${v.slug}`;
+  const url = liveUrl ?? `${publicBase}/${v.slug}`;
+  const tabs = [
+    { k: "content" as const, icon: ListTree, label: t("websites.tabs.content") },
+    { k: "design" as const, icon: LayoutTemplate, label: t("websites.tabs.design") },
+    { k: "business" as const, icon: Briefcase, label: t("websites.tabs.business") },
+    ...(domainSlot ? [{ k: "domain" as const, icon: Globe, label: t("websites.tabs.domain") }] : []),
+  ];
   return (
     <div className="space-y-4">
+      {/* wave 13: image upload for image fields (sections, gallery, team, logo) */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        data-testid="site-image-file"
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (!f || !uploadTarget.current) return;
+          const key = fileRef.current?.getAttribute("data-key") ?? "";
+          setUploading(key);
+          const fd = new FormData();
+          fd.set("locale", locale);
+          fd.set("file", f);
+          const r = await uploadSiteImageAction(fd);
+          setUploading(null);
+          if (r.error || !r.data) return void toast.error(t(r.error ?? "common.error"));
+          uploadTarget.current(r.data.url);
+          toast.success(t("websites.imageUploaded"));
+        }}
+      />
+      <AiEditPanel value={v} onApply={(nv) => setV(nv)} allowed={aiEditor} proTemplates={proTemplates} />
+      <div role="tablist" aria-label={t("websites.tabs.label")} className="sticky top-14 z-10 -mx-1 flex gap-1 overflow-x-auto rounded-2xl border border-line bg-surface/95 p-1 backdrop-blur lg:top-2" data-testid="site-tabs">
+        {tabs.map((x) => (
+          <button key={x.k} type="button" role="tab" aria-selected={tab === x.k} data-tab={x.k} onClick={() => setTab(x.k)} className={cn("flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition", tab === x.k ? "bg-accent-solid text-accent-fg" : "text-muted hover:bg-surface-hover hover:text-fg")}>
+            <x.icon className="h-4 w-4" /> {x.label}
+          </button>
+        ))}
+      </div>
+      {tab === "design" ? <DesignPanel theme={v.theme} onChange={(theme) => set({ theme })} proAllowed={proTemplates} /> : null}
+      {tab === "business" ? (
+        <BusinessPanel
+          siteName={v.name}
+          settings={v.settings ?? {}}
+          pages={v.pages ?? {}}
+          onSettings={(settings) => set({ settings })}
+          onPages={(pages) => set({ pages })}
+          hasForms={v.blocks.some((b) => b.type === "form")}
+          hasBooking={v.blocks.some((b) => b.type === "booking")}
+        />
+      ) : null}
+      {tab === "domain" ? domainSlot : null}
+      <div className={tab === "content" ? "space-y-4" : "hidden"}>
       <Card className="grid gap-4 p-5 sm:grid-cols-2">
         <Field label={t("websites.name")} htmlFor="st-name" error={err("name")}>
           <Input id="st-name" value={v.name} onChange={(e) => set({ name: e.target.value })} />
@@ -168,7 +262,7 @@ export function SiteBuilder({
                     const onChange = (val: string) => setBlock(i, { ...b.data, [f.key]: val });
                     const options = f.select === "form" ? forms : f.select === "booking" ? bookings : null;
                     return (
-                      <Field key={f.key} label={t(`websites.fields.${f.key}`)} htmlFor={fid} error={err(`blocks.${i}.data.${f.key}`)} className={cn(f.multiline && "sm:col-span-2")}>
+                      <Field key={f.key} label={t(f.labelKey ?? `websites.fields.${f.key}`)} htmlFor={fid} error={err(`blocks.${i}.data.${f.key}`)} className={cn(f.multiline && "sm:col-span-2")}>
                         {options ? (
                           <Select id={fid} value={value} onChange={(e) => onChange(e.target.value)}>
                             <option value="">{t(f.select === "form" ? "websites.pickForm" : "websites.pickBooking")}</option>
@@ -180,6 +274,21 @@ export function SiteBuilder({
                           </Select>
                         ) : f.multiline ? (
                           <Textarea id={fid} rows={f.key === "body" ? 6 : 2} value={value} onChange={(e) => onChange(e.target.value)} />
+                        ) : f.options ? (
+                          <Select id={fid} value={value} onChange={(e) => onChange(e.target.value)}>
+                            {f.options.map((o) => (
+                              <option key={o} value={o}>
+                                {o === "" ? t("common.no") : o === "yes" ? t("common.yes") : o}
+                              </option>
+                            ))}
+                          </Select>
+                        ) : f.image && !(b.type === "hero" && aiImages) ? (
+                          <div className="flex gap-2">
+                            <Input id={fid} dir="ltr" value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://" />
+                            <Button variant="secondary" size="sm" className="h-10 shrink-0" loading={uploading === fid} onClick={() => pickImage(fid, (u) => setBlock(i, { ...b.data, [f.key]: u }))}>
+                              <Upload className="h-4 w-4" /> {t("websites.upload")}
+                            </Button>
+                          </div>
                         ) : b.type === "hero" && f.key === "image_url" && aiImages ? (
                           <div className="flex gap-2">
                             <Input id={fid} dir="ltr" value={value} onChange={(e) => onChange(e.target.value)} />
@@ -197,10 +306,25 @@ export function SiteBuilder({
                 {spec.items ? (
                   <div className="mt-3 space-y-2">
                     {items.map((it, k) => (
-                      <div key={k} className="grid gap-2 rounded-xl border border-line p-3 sm:grid-cols-[1fr_2fr_auto]">
+                      <div key={k} className={cn("grid gap-2 rounded-xl border border-line p-3", spec.items!.fields.length > 2 ? "sm:grid-cols-2" : "sm:grid-cols-[1fr_2fr_auto]")}>
                         {spec.items!.fields.map((f) => (
-                          <Field key={f.key} label={t(`websites.fields.${f.key}`)} htmlFor={`bl-${i}-it-${k}-${f.key}`} error={err(`blocks.${i}.data.items.${k}.${f.key}`)}>
-                            {f.multiline ? (
+                          <Field key={f.key} label={t(f.labelKey ?? `websites.fields.${f.key}`)} htmlFor={`bl-${i}-it-${k}-${f.key}`} error={err(`blocks.${i}.data.items.${k}.${f.key}`)} className={cn(f.multiline && spec.items!.fields.length > 2 && "sm:col-span-2")}>
+                            {f.options ? (
+                              <Select id={`bl-${i}-it-${k}-${f.key}`} value={it[f.key] ?? ""} onChange={(e) => setBlock(i, { ...b.data, items: items.map((x, m) => (m === k ? { ...x, [f.key]: e.target.value } : x)) })}>
+                                {f.options.map((o) => (
+                                  <option key={o} value={o}>
+                                    {o === "" ? t("common.no") : o === "yes" ? t("common.yes") : o === "5" ? "★★★★★" : o}
+                                  </option>
+                                ))}
+                              </Select>
+                            ) : f.image ? (
+                              <div className="flex gap-2">
+                                <Input id={`bl-${i}-it-${k}-${f.key}`} dir="ltr" placeholder="https://" value={it[f.key] ?? ""} onChange={(e) => setBlock(i, { ...b.data, items: items.map((x, m) => (m === k ? { ...x, [f.key]: e.target.value } : x)) })} />
+                                <Button variant="secondary" size="sm" className="h-10 shrink-0" aria-label={t("websites.upload")} loading={uploading === `bl-${i}-it-${k}-${f.key}`} onClick={() => pickImage(`bl-${i}-it-${k}-${f.key}`, (u) => setV((x) => ({ ...x, blocks: x.blocks.map((bb, j) => (j === i ? { ...bb, data: { ...bb.data, items: ((bb.data.items as Item[]) ?? []).map((y, m) => (m === k ? { ...y, [f.key]: u } : y)) } } : bb)) })))}>
+                                  <Upload className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : f.multiline ? (
                               <Textarea id={`bl-${i}-it-${k}-${f.key}`} rows={2} value={it[f.key] ?? ""} onChange={(e) => setBlock(i, { ...b.data, items: items.map((x, m) => (m === k ? { ...x, [f.key]: e.target.value } : x)) })} />
                             ) : (
                               <Input id={`bl-${i}-it-${k}-${f.key}`} value={it[f.key] ?? ""} onChange={(e) => setBlock(i, { ...b.data, items: items.map((x, m) => (m === k ? { ...x, [f.key]: e.target.value } : x)) })} />
@@ -241,6 +365,7 @@ export function SiteBuilder({
         ) : null}
       </Card>
 
+      </div>
       <div className="flex flex-wrap items-center justify-end gap-2">
         {id && v.status === "published" ? (
           <a href={url} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl border border-line px-4 text-sm hover:bg-surface-hover">

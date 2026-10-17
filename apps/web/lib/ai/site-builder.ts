@@ -4,16 +4,18 @@ import { createClient } from "@/lib/supabase/server";
 import type { Locale } from "@/lib/i18n/config";
 import { runAI } from "./run";
 import { generateAndStoreImage, imagesConfigured } from "./images";
-import { extractJson, normalizeAiSite, siteJsonInstructions, siteSlug, type SiteMode } from "./site-json";
+import { extractJson, normalizeAiSite, siteJsonInstructionsPro, siteSlug, type SiteMode } from "./site-json";
+import { FREE_TEMPLATES, TEMPLATES } from "@/lib/site/templates";
 import type { AIMessage, AIProviderName } from "./providers";
 
 /** What the organization's plan allows: every plan builds landing pages; paid plans full sites + AI images. */
-export async function aiSiteCaps(orgId: string): Promise<{ full: boolean; images: boolean; plan: string }> {
+export async function aiSiteCaps(orgId: string): Promise<{ full: boolean; images: boolean; plan: string; proTemplates?: boolean; aiEditor?: boolean; customDomain?: boolean }> {
   const supabase = await createClient();
   const { data } = await supabase.rpc("org_entitlements", { org: orgId });
   const row = ((data ?? []) as { plan_key: string; features: string[] | null }[])[0];
   const f = row?.features ?? [];
-  return { full: f.includes("ai_site_full"), images: f.includes("ai_images") && imagesConfigured(), plan: row?.plan_key ?? "free" };
+  // wave 13: premium templates, AI editing and custom domains
+  return { full: f.includes("ai_site_full"), images: f.includes("ai_images") && imagesConfigured(), plan: row?.plan_key ?? "free", proTemplates: f.includes("site_pro_templates"), aiEditor: f.includes("site_ai_editor"), customDomain: f.includes("site_custom_domain") };
 }
 
 export interface BuiltSite {
@@ -41,6 +43,8 @@ export async function buildSiteWithAI(input: {
   conversation?: AIMessage[];
   provider?: AIProviderName;
   agentId?: string | null;
+  /** wave 13: a design template the business picked (else the AI chooses) */
+  template?: string;
 }): Promise<BuildSiteResult> {
   const supabase = await createClient();
   const caps = await aiSiteCaps(input.orgId);
@@ -65,14 +69,14 @@ export async function buildSiteWithAI(input: {
     feature: "site_builder",
     agentId: input.agentId ?? null,
     provider: input.provider,
-    system: siteJsonInstructions(mode, input.locale, ctx),
+    system: siteJsonInstructionsPro(mode, input.locale, ctx, caps.proTemplates ? TEMPLATES.map((t) => t.key) : FREE_TEMPLATES),
     messages: [{ role: "user", content: userPrompt }],
     temperature: 0.6,
     maxTokens: mode === "full" ? 6000 : 3500,
     json: true,
   });
   if (!out.ok) return { ok: false, error: out.error };
-  const site = normalizeAiSite(extractJson(out.text), mode, ctx, input.brief.split(/[.,\n]/)[0] ?? "");
+  const site = normalizeAiSite(extractJson(out.text), mode, ctx, input.brief.split(/[.,\n]/)[0] ?? "", { templates: caps.proTemplates ? TEMPLATES.map((t) => t.key) : FREE_TEMPLATES });
   if (!site) {
     console.error("ai site json unusable", out.text.slice(0, 300));
     return { ok: false, error: "websites.aiInvalid" };
@@ -96,6 +100,11 @@ export async function buildSiteWithAI(input: {
     }
   }
 
+  // wave 13: the template the business picked wins (when the plan allows it)
+  if (input.template) {
+    const tpl = TEMPLATES.find((x) => x.key === input.template);
+    if (tpl && (!tpl.pro || caps.proTemplates)) site.theme = { ...site.theme, template: tpl.key, accent2: site.theme.accent2 ?? tpl.accent2, mode: tpl.mode };
+  }
   const slug = siteSlug(site.name, randomBytes(4).toString("hex"));
   const { data: row, error } = await supabase
     .from("sites")

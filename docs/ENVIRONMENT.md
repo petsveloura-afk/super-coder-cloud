@@ -146,3 +146,19 @@ No new variables. The Telegram webhook now subscribes to `message, edited_messag
 - Billing page loads the PayPal JS SDK (`https://www.paypal.com/sdk/js`, card funding) inside a dialog; orders are created/captured by server actions (`createCardOrderAction`, `captureCardOrderAction`). CSP for `/:locale/billing` allows PayPal hosts (script/frame/connect/img) and `Cross-Origin-Opener-Policy: same-origin-allow-popups`.
 - `PAYPAL_SHOW_SUBSCRIPTION=true` also shows the PayPal recurring-subscription button (hidden by default).
 - `PAYPAL_SDK_URL` overrides the SDK URL (tests only).
+
+## Wave 13 — websites, domains, plan features (all optional)
+| Variable | Where | What |
+|---|---|---|
+| `VERCEL_API_TOKEN` | server | Vercel token (Account → Tokens) used to buy domains and attach them to this project. Create a NEW token — never reuse one that was exposed. |
+| `VERCEL_PROJECT_ID` | server | This project's id or name (Project → Settings → General). |
+| `VERCEL_TEAM_ID` | server | Only when the project belongs to a team. |
+| `DOMAIN_MARKUP_PERCENT` | server | Commission on top of the registrar price (default 30). |
+| `DOMAIN_MIN_FEE_USD` | server | Minimum commission (default 5). |
+| `DOMAIN_MAX_COST_USD` | server | Highest registrar price bought automatically (default 60; premium domains are refused). |
+| `DOMAIN_AUTO_RENEW` | server | `true` = renew bought domains automatically on the platform's Vercel account (default off). |
+| `SITES_ROOT_DOMAIN` | server | e.g. `sites.example.com` with a wildcard domain on the project → every site at `{slug}.sites.example.com`. |
+| `SITES_DEFAULT_LANG` | server | Language for wildcard subdomains (default `he`). |
+| `VERCEL_API_BASE` | tests | Mock base URL. |
+
+The global CSP now allows Google Fonts, https images, YouTube/Vimeo embeds and the PayPal JS SDK (needed after in-app navigation).
