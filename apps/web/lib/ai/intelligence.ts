@@ -54,7 +54,7 @@ const INTENT_PATTERNS: [Intent, RegExp][] = [
   ["greeting", /^(?:היי|הי|שלום|בוקר טוב|ערב טוב|אהלן|הלו|hi|hello|hey|good (?:morning|evening)|مرحبا|أهلا|اهلا|السلام عليكم)[\s!.,😊👋]*$/i],
   ["hours", /שעות\s*(?:פעילות|פתיחה|עבודה)|עד\s*מתי\s*(?:פתוח|פתוחים)|פתוחים|\b(?:opening hours|open (?:now|today|until)|what time do you)\b|ساعات\s*(?:العمل|الدوام)|متى\s*تفتح/i],
   ["location", /איפה\s*(?:אתם|נמצאים|המקום)|כתובת|איך\s*מגיעים|\b(?:where are you|address|location|directions)\b|عنوان|أين\s*(?:تقعون|موقعكم)/i],
-  ["legal", /תביעה|עורך\s*דין|עו"ד|משטרה|הגנת\s*הצרכן|דיווח\s*לרשות|\b(?:lawyer|attorney|sue|lawsuit|police|legal action|consumer protection|report you)\b|محامي|قضية|شرطة/i],
+  ["legal", /אתבע|אתבעו|אגיש\s*(?:נגדכם\s*)?תביעה|תביעה\s*(?:נגד|משפטית)|(?:אפנה|לפנות|פונה|מפנה)\s*(?:ל|אל\s*)(?:עורך\s*דין|עו"ד|משטרה|הגנת\s*הצרכן|רשות)|אתלונן\s*(?:במשטרה|ב|ל)|\b(?:i(?:'ll| will| am going to)? sue|sue you|take legal action|my lawyer will|call(?:ing)? my lawyer|contact(?:ing)? my lawyer|report you to|going to the police|file a (?:lawsuit|complaint))\b|سأقاضي|سأرفع\s*دعوى|سأتصل\s*بالمحامي|سأبلغ\s*الشرطة/i],
   ["unsubscribe", /הסירו\s*אותי|תפסיקו\s*לשלוח|הסרה\s*מהרשימה|\b(?:stop (?:messaging|texting|sending)|remove me|opt.?out|leave me alone)\b|توقفوا\s*عن|احذفوني/i],
 ];
 
@@ -207,14 +207,15 @@ export function similarity(a: string, b: string): number {
   return inter / (A.size + B.size - inter);
 }
 
-export function checkReply(input: { reply: string; facts: string; previousAssistant: string[]; allowEmpty?: boolean }): ReplyCheck {
+export function checkReply(input: { reply: string; facts: string; previousAssistant: string[]; allowEmpty?: boolean; customerText?: string }): ReplyCheck {
   const issues: ReplyIssue[] = [];
   const reply = (input.reply ?? "").trim();
   if (!reply && !input.allowEmpty) issues.push("empty");
   if (reply && (reply.length < 2 || /\[\[[^\]]*$/.test(reply) || /^[\s.,;:!?-]+$/.test(reply))) issues.push("broken");
   if (LEAK_RE.test(reply)) issues.push("leak");
   if (reply.length > 25 && input.previousAssistant.slice(-3).some((p) => similarity(reply, p) >= 0.85)) issues.push("repeat");
-  const unsupported = reply ? unsupportedPrices(reply, input.facts) : [];
+  // numbers the customer wrote themselves (their budget, a price they saw) are not "invented" by the agent
+  const unsupported = reply ? unsupportedPrices(reply, `${input.facts}\n${input.customerText ?? ""}`) : [];
   if (unsupported.length) issues.push("unsupported_price");
   return { ok: issues.length === 0, issues, unsupported };
 }

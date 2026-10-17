@@ -382,7 +382,7 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     const facts = factsText({ instructions: agent.instructions as string, profile: profile as Record<string, unknown> });
     const previous = history.filter((m) => m.role === "assistant").map((m) => m.content);
     const first = parseAgentTools(answer);
-    const check = checkReply({ reply: first.text, facts, previousAssistant: previous, allowEmpty: first.handoff });
+    const check = checkReply({ reply: first.text, facts, previousAssistant: previous, allowEmpty: first.handoff, customerText: lastIn });
     if (!check.ok) {
       const fixed = await runAISystem({
         orgId,
@@ -396,12 +396,12 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
         maxTokens: ch === "email" ? 1200 : 600,
       });
       if (fixed.ok) {
-        const again = checkReply({ reply: parseAgentTools(fixed.text).text, facts, previousAssistant: previous, allowEmpty: parseAgentTools(fixed.text).handoff });
+        const again = checkReply({ reply: parseAgentTools(fixed.text).text, facts, previousAssistant: previous, allowEmpty: parseAgentTools(fixed.text).handoff, customerText: lastIn });
         if (again.ok || again.issues.length < check.issues.length) answer = fixed.text;
       }
     }
     const last = parseAgentTools(answer);
-    const finalCheck = checkReply({ reply: last.text, facts, previousAssistant: previous, allowEmpty: last.handoff });
+    const finalCheck = checkReply({ reply: last.text, facts, previousAssistant: previous, allowEmpty: last.handoff, customerText: lastIn });
     unsupportedLeft = finalCheck.unsupported;
   }
   const tools = parseAgentTools(answer);

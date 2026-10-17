@@ -42,6 +42,13 @@ describe("wave 15 · understanding the customer", () => {
     expect(analyzeMessage("I will sue you").critical).toBe(true);
     expect(analyzeMessage("אני רוצה להזמין תור").critical).toBe(false);
   });
+  it("a lawyer asking for a service is NOT a legal threat; a real threat still is", () => {
+    expect(analyzeMessage("אני עורך דין ומחפש שירות הנהלת חשבונות").critical).toBe(false);
+    expect(analyzeMessage("I'm a lawyer looking for office space").critical).toBe(false);
+    expect(analyzeMessage("אני אתבע אתכם").critical).toBe(true);
+    expect(analyzeMessage("אפנה לעורך דין אם לא תחזירו לי כסף").critical).toBe(true);
+    expect(analyzeMessage("I will take legal action").critical).toBe(true);
+  });
   it("recognises a request to stop messaging", () => {
     expect(wantsStop("תפסיקו לשלוח לי הודעות")).toBe(true);
     expect(wantsStop("please stop messaging me")).toBe(true);
@@ -91,6 +98,11 @@ describe("wave 15 · the agent checks its own answer", () => {
     expect(checkReply({ ...base, reply: "הצבע עולה 999 ₪" }).issues).toContain("unsupported_price");
     expect(checkReply({ ...base, reply: "תספורת עולה 80 ₪, מתי נוח לך?" }).ok).toBe(true);
     expect(checkReply({ ...base, reply: "", allowEmpty: true }).ok).toBe(true);
+  });
+  it("a number the customer wrote is not an invented price", () => {
+    const base = { facts, previousAssistant: [] as string[] };
+    expect(checkReply({ ...base, reply: "בתקציב של 500 ₪ אפשר לעשות תספורת וגם זקן", customerText: "התקציב שלי 500 ₪" }).ok).toBe(true);
+    expect(checkReply({ ...base, reply: "בתקציב של 500 ₪ אפשר לעשות תספורת וגם זקן" }).issues).toContain("unsupported_price");
   });
   it("correction prompt names the problem", () => {
     const c = checkReply({ facts, previousAssistant: [], reply: "הצבע עולה 999 ₪" });
