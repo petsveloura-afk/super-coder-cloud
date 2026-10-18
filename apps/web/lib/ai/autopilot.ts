@@ -35,6 +35,7 @@ import {
   situationBrief,
   stopMessage,
 } from "./intelligence";
+import { normalizeSchedule, nextOpenText, scheduleStatus } from "./schedule";
 
 /**
  * AI autopilot — the business's AI agent answers customers automatically on
@@ -265,6 +266,9 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     return { replied: true, handoff: true, text };
   }
 
+  // wave 15 — is the business open right now? (drives the "closed → deliveries / reservation" wording)
+  const sched = normalizeSchedule(profile.schedule ?? null);
+  const hoursContext = sched ? (() => { const st = scheduleStatus(sched); return { open: st.open, afterHours: sched.after_hours, nextOpen: st.open ? undefined : nextOpenText(st, locale) }; })() : null;
   // wave 15 — understand the message first (language, mood, intent); cheap, no AI call
   const analysis = analyzeMessage(lastLine);
   const state = extractState(history);
@@ -328,7 +332,7 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     channel: ch,
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
     locale,
-  })}\n\n${situationBrief({ analysis, state })}`;
+  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}`;
   await typingIndicator(orgId, ch, conv.external_id as string);
 
   const out = await runAISystem({

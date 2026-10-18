@@ -86,6 +86,8 @@ export function wantsStop(text: string): boolean {
 
 export interface ConversationState {
   name?: string;
+  /** Telegram @username the customer shared (without the @) */
+  username?: string;
   phone?: string;
   email?: string;
   intents: Intent[];
@@ -107,6 +109,8 @@ export function extractState(history: { role: "user" | "assistant"; content: str
       const info = extractContactInfo(m.content);
       if (info.phone) state.phone = info.phone;
       if (info.email) state.email = info.email;
+      const handle = /(?:^|[\s(,:])@([A-Za-z][A-Za-z0-9_]{4,31})\b(?!\.[A-Za-z])/.exec(m.content)?.[1] ?? /t\.me\/([A-Za-z][A-Za-z0-9_]{4,31})\b/.exec(m.content)?.[1];
+      if (handle) state.username = handle;
       const nm = NAME_RE.exec(m.content);
       const name = (nm?.[1] ?? nm?.[2] ?? nm?.[3])?.trim();
       if (name && !NOT_NAMES.test(name.split(/\s+/)[0] ?? "")) state.name = name;
@@ -145,7 +149,15 @@ const INTENT_GUIDE: Partial<Record<Intent, string>> = {
  * Extra system-prompt section built from the customer's latest message and what is known so far.
  * It never contains customer text (no prompt-injection surface) — only our own guidance.
  */
-export function situationBrief(input: { analysis: MessageAnalysis; state: ConversationState; replyLang?: Lang | null }): string {
+export interface HoursContext {
+  open: boolean;
+  /** how the business wants to behave when closed (schedule.after_hours) */
+  afterHours?: "book_next" | "closed_message" | "answer_normally";
+  /** e.g. "tomorrow at 09:00" */
+  nextOpen?: string;
+}
+
+export function situationBrief(input: { analysis: MessageAnalysis; state: ConversationState; replyLang?: Lang | null; hours?: HoursContext | null; channel?: string }): string {
   const { analysis, state } = input;
   const lang = input.replyLang ?? analysis.lang;
   const lines: string[] = ["SITUATION RIGHT NOW (written by the system, follow it):"];
@@ -153,11 +165,28 @@ export function situationBrief(input: { analysis: MessageAnalysis; state: Conver
   lines.push(`- ${MOOD_GUIDE[analysis.mood]}`);
   if (analysis.urgent && analysis.mood !== "angry") lines.push("- The customer is in a hurry: answer first, in the first sentence, then add details.");
   for (const i of analysis.intents) if (INTENT_GUIDE[i]) lines.push(`- The customer ${INTENT_GUIDE[i]}.`);
-  const known = [state.name ? `name "${state.name}"` : "", state.phone ? "phone number" : "", state.email ? "e-mail" : ""].filter(Boolean);
+  const known = [state.name ? `name "${state.name}"` : "", state.phone ? "phone number" : "", state.email ? "e-mail" : "", state.username ? "Telegram username" : ""].filter(Boolean);
   if (known.length) lines.push(`- Already known (never ask again): ${known.join(", ")}.`);
   if (state.lastQuestion) lines.push(`- Your previous question was already asked — do not repeat it; if the customer ignored it, ask it in a different, lighter way or move on.`);
   if (state.customerTurns >= 2) lines.push("- This is an ongoing conversation: no greeting, no re-introduction.");
   if (state.customerTurns >= 6 && !state.phone && !state.email) lines.push("- The conversation is well advanced and no contact details were shared yet: ask for a phone or e-mail once, naturally, so the team can follow up.");
+  // how to reach the customer: ask for the Telegram @username too (in Telegram it is already known)
+  if (input.channel !== "telegram" && !state.username && (analysis.intents.some((i) => ["buy", "booking", "price"].includes(i)) || state.customerTurns >= 3))
+    lines.push("- When you collect contact details, also ask for the customer's Telegram @username (one short ask, together with the phone) so the team can reach them where they prefer. Put it in the LEAD summary.");
+  // understanding words precisely
+  lines.push(
+    "- Understand words precisely: use the exact product / service names from the business information; if a word can mean two different things here (two similar products, a nickname, slang, a size or a variant), ask ONE short question to confirm which one before giving a price or promising anything. Mirror the customer's own wording back so they feel understood. Never merge two different items into one answer.",
+  );
+  // opening hours: deliveries / reservations
+  if (input.hours && !input.hours.open) {
+    const next = input.hours.nextOpen ? ` It opens ${input.hours.nextOpen}.` : "";
+    lines.push(`- The business is CLOSED right now: say clearly and kindly that it is not active at the moment for deliveries / service and do NOT promise anything for now.${next}`);
+    if (input.hours.afterHours === "book_next") lines.push("- Offer to reserve a spot / schedule a delivery or appointment for the next opening, collect name + phone (+ Telegram @username) and record the LEAD so the team confirms when it opens.");
+    else if (input.hours.afterHours === "closed_message") lines.push("- Do not schedule anything. Offer to leave name + phone (+ Telegram @username) and what they need so the team replies first thing when it opens; record the LEAD.");
+    else lines.push("- You may still answer questions, but do not confirm deliveries or appointments outside the opening hours.");
+  } else if (input.hours?.open) {
+    lines.push("- The business is OPEN now: you can offer delivery / service / appointments within today's remaining opening hours.");
+  }
   return lines.join("\n");
 }
 

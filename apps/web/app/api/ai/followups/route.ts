@@ -25,8 +25,10 @@ async function handle(request: NextRequest) {
   // wave 15: nobody is left in silence — stuck chats are retried, then handed to the team
   const watchdog = await runStuckWatchdog(15_000).catch(() => ({ checked: 0, retried: 0, escalated: 0 }));
   // wave 10: bots connected before the Telegram Business update get the full update list
+  // wave 15: Telegram Business connections are checked against Telegram itself — never silent when one is lost
+  const bizHealth = await import("@/lib/channels/telegram-business-health").then((m) => m.checkTelegramBusinessHealth(10)).catch(() => ({ checked: 0, changed: 0 }));
   const healed = await import("@/lib/channels/telegram-setup").then((m) => m.healTelegramWebhooks(5)).catch(() => 0);
-  return NextResponse.json({ ok: true, ...summary, pending, watchdog, healed }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, ...summary, pending, watchdog, bizHealth, healed }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export const GET = handle;
