@@ -58,3 +58,25 @@ export function MonthlyChart({ data, label, currency }: { data: { month: string;
     </div>
   );
 }
+
+/** Wave 18 — revenue forecast: run rate + weighted open deals per month (stacked). */
+export function ForecastChart({ data, currency, labels }: { data: { month: string; run_rate: number; pipeline: number }[]; currency: string; labels: { runRate: string; pipeline: string; title: string } }) {
+  const { dir, intl } = useI18n();
+  const money = new Intl.NumberFormat(intl, { style: "currency", currency, maximumFractionDigits: 0, notation: "compact" });
+  const monthFmt = new Intl.DateTimeFormat(intl, { month: "short", year: "2-digit" });
+  const rows = data.map((d) => ({ ...d, label: monthFmt.format(new Date(`${d.month}-01T12:00:00Z`)) }));
+  return (
+    <div className="h-56 w-full" dir="ltr" role="img" aria-label={labels.title}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 6" />
+          <XAxis dataKey="label" reversed={dir === "rtl"} tick={{ fill: "var(--text-subtle)", fontSize: 11 }} tickLine={false} axisLine={false} />
+          <YAxis orientation={dir === "rtl" ? "right" : "left"} tickFormatter={(v) => money.format(Number(v))} tick={{ fill: "var(--text-subtle)", fontSize: 11 }} tickLine={false} axisLine={false} width={60} />
+          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--surface-hover)" }} formatter={(v, name) => [money.format(Number(v)), name === "run_rate" ? labels.runRate : labels.pipeline]} />
+          <Bar dataKey="run_rate" stackId="f" fill="var(--teal)" barSize={30} />
+          <Bar dataKey="pipeline" stackId="f" fill="var(--gold)" radius={[6, 6, 0, 0]} barSize={30} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

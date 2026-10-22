@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, CreditCard, ExternalLink, Printer } from "lucide-react";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Field, Input } from "@/components/ui/primitives";
-import { acceptPublicQuote, startDocumentPayment } from "@/app/[locale]/(public)/actions";
+import { acceptPublicQuote, startDocumentPayPal, startDocumentPayment } from "@/app/[locale]/(public)/actions";
 
 export function PrintButton() {
   const { t } = useI18n();
@@ -25,6 +25,7 @@ export function DocumentPublicActions({
   online,
   paymentUrl,
   balanceLabel,
+  paypal = false,
 }: {
   token: string;
   kind: "quote" | "invoice";
@@ -33,6 +34,8 @@ export function DocumentPublicActions({
   online: boolean;
   paymentUrl: string | null;
   balanceLabel: string;
+  /** wave 15: the business connected its own PayPal (card without an account, or PayPal) */
+  paypal?: boolean;
 }) {
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -63,12 +66,30 @@ export function DocumentPublicActions({
       </form>
     );
   }
-  if (kind === "invoice" && canPay && (online || paymentUrl)) {
+  if (kind === "invoice" && canPay && (online || paymentUrl || paypal)) {
     return (
       <div className="flex flex-wrap items-center gap-3">
+        {paypal ? (
+          <Button
+            size="lg"
+            loading={pending}
+            data-testid="pay-paypal"
+            onClick={() =>
+              start(async () => {
+                setError(null);
+                const r = await startDocumentPayPal({ token, locale });
+                if (r.ok && r.redirect) window.location.href = r.redirect;
+                else setError(r.error ?? "errors.generic");
+              })
+            }
+          >
+            <CreditCard className="h-4 w-4" /> {t("finance.payCardPayPal", { amount: balanceLabel })}
+          </Button>
+        ) : null}
         {online ? (
           <Button
             size="lg"
+            variant={paypal ? "secondary" : "primary"}
             loading={pending}
             onClick={() =>
               start(async () => {

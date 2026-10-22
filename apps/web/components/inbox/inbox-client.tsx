@@ -40,6 +40,15 @@ export function ReplyBox({ conversationId, disabled }: { conversationId: string;
   const router = useRouter();
   const [text, setText] = useState("");
   const [pending, start] = useTransition();
+  // wave 16: the AI co-pilot puts a suggested reply into the box (the agent edits and sends it)
+  useEffect(() => {
+    const onFill = (e: Event) => {
+      const d = (e as CustomEvent<{ conversationId: string; text: string }>).detail;
+      if (d?.conversationId === conversationId && typeof d.text === "string") setText(d.text);
+    };
+    window.addEventListener("scc:fill-reply", onFill);
+    return () => window.removeEventListener("scc:fill-reply", onFill);
+  }, [conversationId]);
   function send() {
     if (!text.trim()) return;
     start(async () => {

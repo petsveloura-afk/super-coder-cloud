@@ -3,8 +3,9 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, ArrowRight, MessagesSquare } from "lucide-react";
 import { uuidSchema } from "@scc/shared/validators";
-import { PageHeader } from "@/components/ui/primitives";
 import { AgentSetup, type SetupAgent } from "@/components/ai/agent-setup";
+import { FlowsEditor, GuardrailsCard, type FlowView, type RailsValue } from "@/components/ai/agent-plus";
+import { Card, CardHeader, PageHeader } from "@/components/ui/primitives";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -28,6 +29,17 @@ export default async function AgentSetupPage({ params }: { params: Params }) {
   const { data: agent } = await supabase.from("ai_agents").select("id, name, lead_goal, profile").eq("id", id).eq("organization_id", ctx.org.id).maybeSingle();
   if (!agent) notFound();
   const Back = locale === "en" ? ArrowLeft : ArrowRight;
+  const [{ data: railsRow }, { data: flowRows }, flowsOn] = await Promise.all([
+    supabase.from("ai_agents").select("guardrails").eq("id", id).maybeSingle(),
+    supabase.from("agent_flows").select("id, name, enabled, trigger_keywords, on_first_message, nodes, runs, completions").eq("organization_id", ctx.org.id).eq("agent_id", id).order("created_at"),
+    import("@/lib/billing/features").then((m) => m.orgHasFeature(ctx.org.id, "flow_builder")),
+  ]);
+  const { normalizeGuardrails } = await import("@/lib/ai/guardrails");
+  const rails = normalizeGuardrails((railsRow as { guardrails?: unknown } | null)?.guardrails) as RailsValue;
+  const { validFlowNodes } = await import("@/lib/ai/flows-core");
+  const flows = ((flowRows ?? []) as (Omit<FlowView, "nodes"> & { nodes: unknown })[]).map((f) => ({ ...f, nodes: validFlowNodes(f.nodes) }));
+  const { ttsConfigured } = await import("@/lib/ai/tts");
+  const ttsReady = ttsConfigured();
   return (
     <>
       <Link href={`/${locale}/ai-agents`} className="mb-2 inline-flex items-center gap-1 text-[13px] text-muted hover:text-fg">
@@ -43,6 +55,17 @@ export default async function AgentSetupPage({ params }: { params: Params }) {
         }
       />
       <AgentSetup agent={agent as SetupAgent} />
+      {/* wave 16: guardrails + conversation flows */}
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <Card id="guardrails">
+          <CardHeader title={t("rails.title")} description={t("rails.subtitle")} />
+          <GuardrailsCard agentId={agent.id as string} value={rails} ttsReady={ttsReady} />
+        </Card>
+        <Card id="flows">
+          <CardHeader title={t("flows.title")} description={t("flows.subtitle")} />
+          <FlowsEditor agentId={agent.id as string} flows={flows} locked={!flowsOn} />
+        </Card>
+      </div>
     </>
   );
 }

@@ -18,7 +18,7 @@ export function cryptoConfigured(): boolean {
 const base = () => (process.env.NOWPAYMENTS_API_BASE || "https://api.nowpayments.io").replace(/\/$/, "");
 
 export async function createCryptoInvoice(input: { orgId: string; plan: string; interval: "month" | "year"; ipnUrl: string; successUrl: string; cancelUrl: string }): Promise<string> {
-  const price = await planPrice(input.plan, input.interval, true);
+  const price = await planPrice(input.plan, input.interval, true, input.orgId);
   if (!price) throw new Error("no_price");
   const res = await fetch(`${base()}/v1/invoice`, {
     method: "POST",
@@ -28,6 +28,30 @@ export async function createCryptoInvoice(input: { orgId: string; plan: string; 
       price_currency: "usd",
       order_id: buildOrderRef(input.orgId, input.plan, input.interval, randomBytes(6).toString("hex")),
       order_description: `Super Coder Cloud ${input.plan} (${input.interval})`,
+      ipn_callback_url: input.ipnUrl,
+      success_url: input.successUrl,
+      cancel_url: input.cancelUrl,
+      is_fixed_rate: true,
+      is_fee_paid_by_user: false,
+    }),
+    signal: AbortSignal.timeout(20_000),
+    cache: "no-store",
+  });
+  const j = (await res.json().catch(() => ({}))) as { invoice_url?: string; message?: string };
+  if (!res.ok || !j.invoice_url) throw new Error(`nowpayments_${res.status}:${j.message ?? ""}`);
+  return j.invoice_url;
+}
+
+/** Wave 18 — a crypto invoice for an AI credit pack (one-time, USD). */
+export async function createCryptoPackInvoice(input: { orderRef: string; amountUsd: number; description: string; ipnUrl: string; successUrl: string; cancelUrl: string }): Promise<string> {
+  const res = await fetch(`${base()}/v1/invoice`, {
+    method: "POST",
+    headers: { "x-api-key": process.env.NOWPAYMENTS_API_KEY!, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      price_amount: Number(moneyString(input.amountUsd)),
+      price_currency: "usd",
+      order_id: input.orderRef,
+      order_description: input.description.slice(0, 120),
       ipn_callback_url: input.ipnUrl,
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,

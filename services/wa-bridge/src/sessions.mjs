@@ -2,7 +2,7 @@
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import QRCode from "qrcode";
-import { RecentIds, jidFromPhone, newMessageId, phoneFromJid, sign, toInboundEvent, toOwnerEvent, validSessionId } from "./util.mjs";
+import { RecentIds, attachMediaData, jidFromPhone, messageMime, newMessageId, phoneFromJid, sign, toInboundEvent, toOwnerEvent, validSessionId, wantsMediaData } from "./util.mjs";
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -103,7 +103,11 @@ export class SessionManager {
       if (type !== "notify") return;
       for (const m of messages ?? []) {
         const ev = toInboundEvent(m);
-        if (ev) this.post(id, ev).catch(() => {});
+        if (!ev) continue;
+        // wave 16: voice notes and images are downloaded (≤ 6 MB) so the agent can understand them
+        this.withMedia(m, ev)
+          .then((full) => this.post(id, full))
+          .catch(() => this.post(id, ev).catch(() => {}));
       }
     });
     return session;
@@ -178,6 +182,18 @@ export class SessionManager {
       this.sessions.delete(id);
     }
     await rm(this.dir(id), { recursive: true, force: true }).catch(() => {});
+  }
+
+  /** wave 16 — base64 media for voice notes / images; the plain event when not possible. */
+  async withMedia(m, ev) {
+    const download = this.baileys?.downloadMediaMessage;
+    if (!ev?.media || !wantsMediaData(ev.media.type, messageMime(m.message), ev.media.name) || typeof download !== "function") return ev;
+    try {
+      const buffer = await download(m, "buffer", {});
+      return attachMediaData(ev, buffer, messageMime(m.message));
+    } catch {
+      return ev;
+    }
   }
 
   async post(id, payload) {

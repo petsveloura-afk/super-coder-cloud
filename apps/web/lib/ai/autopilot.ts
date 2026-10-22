@@ -24,18 +24,6 @@ import {
   type LeadData,
   type StoredMessage,
 } from "./autopilot-core";
-import {
-  analyzeMessage,
-  checkReply,
-  correctionPrompt,
-  criticalHandoffMessage,
-  dropUnsupportedSentences,
-  extractState,
-  factsText,
-  situationBrief,
-  stopMessage,
-} from "./intelligence";
-import { normalizeSchedule, nextOpenText, scheduleStatus } from "./schedule";
 
 /**
  * AI autopilot — the business's AI agent answers customers automatically on
@@ -180,6 +168,12 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
   const channel = conv.channel as string;
   if (!isAutopilotChannel(channel)) return { replied: false, handoff: false, reason: "channel" };
   const orgId = conv.organization_id as string;
+  // conversation guard (one state for all channels): opted out, a person owns it / already answered
+  {
+    const { checkGuard } = await import("@/lib/conversations/guard");
+    const g = await checkGuard(conv.id as string, "ai_reply");
+    if (!g.allowed) return { replied: false, handoff: false, reason: `guard:${g.reason}` };
+  }
 
   const { data: agent } = await admin
     .from("ai_agents")
@@ -266,26 +260,29 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     return { replied: true, handoff: true, text };
   }
 
-  // wave 15 — is the business open right now? (drives the "closed → deliveries / reservation" wording)
-  const sched = normalizeSchedule(profile.schedule ?? null);
-  const hoursContext = sched ? (() => { const st = scheduleStatus(sched); return { open: st.open, afterHours: sched.after_hours, nextOpen: st.open ? undefined : nextOpenText(st, locale) }; })() : null;
-  // wave 15 — understand the message first (language, mood, intent); cheap, no AI call
-  const analysis = analyzeMessage(lastLine);
-  const state = extractState(history);
-  const replyLocale = analysis.lang ?? locale;
-  // the customer asks to stop: confirm once, never message again (follow-ups are switched off)
-  if (analysis.intents.includes("unsubscribe")) {
-    const text = formatForChannel(stopMessage(replyLocale), ch);
-    await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string });
-    await admin.from("conversations").update({ followup_count: 9 }).eq("id", conv.id).then(() => undefined, () => undefined);
-    return { replied: true, handoff: false, reason: "customer_stop", text };
+  // wave 16: guardrails (angry customer, budget per conversation), flows, knowledge base
+  const { data: gRow } = await admin.from("ai_agents").select("guardrails").eq("id", agent.id).maybeSingle();
+  const { normalizeGuardrails, isAngry, guardrailHandoffText } = await import("./guardrails");
+  const rails = normalizeGuardrails((gRow as { guardrails?: unknown } | null)?.guardrails);
+  if (rails.angry_handoff && isAngry(lastLine)) {
+    const text = formatForChannel(guardrailHandoffText(locale, "angry"), ch);
+    await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string, meta: { system: "guardrail" } });
+    await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "angry_customer" });
+    return { replied: true, handoff: true, reason: "angry_customer", text };
   }
-  // legal threats / threats of harm: a person takes over immediately, no AI improvisation
-  if (analysis.critical) {
-    const text = formatForChannel(criticalHandoffMessage(replyLocale), ch);
-    await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string });
-    await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "critical:legal_or_threat" });
-    return { replied: true, handoff: true, reason: "critical:legal_or_threat", text };
+  if (rails.max_replies_per_day > 0) {
+    const { data: used } = await admin.rpc("ai_replies_today", { p_conversation: conv.id });
+    if (Number(used ?? 0) >= rails.max_replies_per_day) {
+      const text = formatForChannel(guardrailHandoffText(locale, "budget"), ch);
+      await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string, meta: { system: "guardrail" } });
+      await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "ai_budget" });
+      return { replied: true, handoff: true, reason: "ai_budget", text };
+    }
+  }
+  {
+    const { runConversationFlow } = await import("./flows");
+    const flowRes = await runConversationFlow({ orgId, conversationId: conv.id as string, agentId: agent.id as string, contactId: (conv.contact_id as string | null) ?? null, channel: ch, text: lastLine, locale });
+    if (flowRes.handled) return { replied: true, handoff: flowRes.handoff, reason: flowRes.handoff ? "flow_handoff" : undefined, text: flowRes.text };
   }
 
   // customer details — and fill in a phone / e-mail the customer just typed
@@ -332,8 +329,15 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     channel: ch,
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
     locale,
-  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}`;
+  })}`;
   await typingIndicator(orgId, ch, conv.external_id as string);
+  // wave 16: help-center answers (knowledge base) for this question
+  let kb = "";
+  if (rails.kb) {
+    const { data: hits } = await admin.rpc("kb_search", { p_org: orgId, p_query: lastLine.slice(0, 300), p_limit: 3 });
+    const { kbBlock } = await import("./guardrails");
+    kb = kbBlock(((hits ?? []) as { title: string; body: string }[]) ?? []);
+  }
 
   const out = await runAISystem({
     orgId,
@@ -341,7 +345,7 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     agentId: agent.id as string,
     provider: agent.provider as "openai" | "anthropic" | "gemini",
     model: agent.model as string,
-    system,
+    system: kb ? `${system}\n\n${kb}` : system,
     messages: history,
     temperature: Number(agent.temperature ?? 0.4),
     maxTokens: ch === "email" ? 1200 : 600,
@@ -378,44 +382,20 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     }
     return { replied: !recentHold, handoff: false, reason: out.error, text: recentHold ? undefined : hold };
   }
-  // wave 15 — the agent checks its own answer (invented prices, repetition, leaks, empty text)
-  // and gets exactly one chance to fix it; whatever is still wrong is removed or handed to a person
-  let answer = out.text;
-  let unsupportedLeft: string[] = [];
-  {
-    const facts = factsText({ instructions: agent.instructions as string, profile: profile as Record<string, unknown> });
-    const previous = history.filter((m) => m.role === "assistant").map((m) => m.content);
-    const first = parseAgentTools(answer);
-    const check = checkReply({ reply: first.text, facts, previousAssistant: previous, allowEmpty: first.handoff, customerText: lastIn });
-    if (!check.ok) {
-      const fixed = await runAISystem({
-        orgId,
-        feature: "autopilot",
-        agentId: agent.id as string,
-        provider: agent.provider as "openai" | "anthropic" | "gemini",
-        model: agent.model as string,
-        system,
-        messages: [...history, { role: "assistant", content: answer.trim() || "(no answer)" }, { role: "user", content: correctionPrompt(check) }],
-        temperature: Math.min(0.5, Number(agent.temperature ?? 0.4) + 0.1),
-        maxTokens: ch === "email" ? 1200 : 600,
-      });
-      if (fixed.ok) {
-        const again = checkReply({ reply: parseAgentTools(fixed.text).text, facts, previousAssistant: previous, allowEmpty: parseAgentTools(fixed.text).handoff, customerText: lastIn });
-        if (again.ok || again.issues.length < check.issues.length) answer = fixed.text;
-      }
-    }
-    const last = parseAgentTools(answer);
-    const finalCheck = checkReply({ reply: last.text, facts, previousAssistant: previous, allowEmpty: last.handoff, customerText: lastIn });
-    unsupportedLeft = finalCheck.unsupported;
-  }
-  const tools = parseAgentTools(answer);
-  if (unsupportedLeft.length) tools.text = dropUnsupportedSentences(tools.text, unsupportedLeft);
+  const tools = parseAgentTools(out.text);
   void parseAutopilotReply; // (wave 6 parser kept for compatibility; the tools parser is a superset)
-  // an empty answer must never be sent as "I passed you to the team" without really doing it
-  if (!tools.text && !tools.handoff) {
-    tools.text = fallbackMessage(replyLocale);
-    tools.handoff = true;
-    tools.reason = "empty_answer";
+  // wave 16: never send a forbidden phrase or a price that is not in the business data
+  {
+    const { bannedHit, unknownPrices } = await import("./guardrails");
+    const known = [JSON.stringify(agent.profile ?? {}), String(agent.instructions ?? ""), kb].join("\n");
+    const hit = bannedHit(tools.text, rails.banned);
+    const badPrices = rails.price_guard ? unknownPrices(tools.text, known) : [];
+    if (hit || badPrices.length) {
+      const safe = formatForChannel(guardrailHandoffText(locale, "check"), ch);
+      await sendToConversation(orgId, conv.id as string, safe, undefined, { aiAgentId: agent.id as string, meta: { system: "guardrail", blocked: hit ? "banned" : "price", draft: tools.text.slice(0, 1500) } });
+      await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: hit ? "guardrail_banned" : "guardrail_price" });
+      return { replied: true, handoff: true, reason: hit ? "guardrail_banned" : "guardrail_price", text: safe };
+    }
   }
   const text = formatForChannel(tools.text || handoffMessage(locale), ch);
   await sendToConversation(orgId, conv.id as string, text, undefined, {
@@ -424,10 +404,19 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     rich: { buttons: tools.buttons, askPhone: tools.askPhone, askPhoneLabel: sharePhoneLabel(locale), html: true },
   });
   await admin.from("conversations").update({ last_ai_at: new Date().toISOString() }).eq("id", conv.id);
-  // wave 15: remember the customer's mood and main intent for the inbox (ignored until the migration ran)
-  await admin.from("conversations").update({ sentiment: analysis.mood, last_intent: analysis.intents[0] ?? null }).eq("id", conv.id).then(() => undefined, () => undefined);
+  // wave 16: the customer sent a voice note → also answer with a voice note (when enabled)
+  if (rails.voice_replies && (ch === "telegram" || ch === "whatsapp")) {
+    const { data: lastMsg } = await admin.from("messages").select("meta").eq("conversation_id", conv.id).eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (typeof (lastMsg?.meta as { transcript?: string } | null)?.transcript === "string") {
+      const { synthesizeSpeech, sendVoiceNote, ttsConfigured } = await import("./tts");
+      if (ttsConfigured()) {
+        const mp3 = await synthesizeSpeech(tools.text, locale);
+        if (mp3) await sendVoiceNote(orgId, ch, conv.external_id as string, mp3).catch(() => false);
+      }
+    }
+  }
   // examples / portfolio images the agent chose to show
-  for (const item of pickMedia(answer, profile.media)) {
+  for (const item of pickMedia(out.text, profile.media)) {
     await sendMediaToConversation(orgId, conv.id as string, item, { aiAgentId: agent.id as string });
   }
   let lead: LeadCaptureResult | null = null;
@@ -508,6 +497,19 @@ export async function forwardAfterAutopilot(conversationId: string, res: Autopil
     if (res.replied && res.text) await forwardToTeam(orgId, "messages", { ...base, agentText: res.text });
     if (res.leadData && (res.leadData.name || res.leadData.phone || res.leadData.email)) await forwardToTeam(orgId, "leads", { ...base, lead: res.leadData });
     if (res.handoff) await forwardToTeam(orgId, "handoff", { ...base, reason: res.reason ?? null });
+    // wave 16: urgent phone call to the on-duty team member — hot lead / angry customer / asked for a person
+    if (res.handoff) {
+      const { data: hot } = await admin.from("conversations").select("lead_score").eq("id", conversationId).maybeSingle();
+      const urgent = hot?.lead_score === "hot" || ["angry_customer", "customer_asked", "phone_human"].includes(res.reason ?? "customer_asked");
+      if (urgent) {
+        const { data: callers } = await admin.from("notify_recipients").select("id").eq("organization_id", orgId).eq("kind", "call").eq("enabled", true).contains("events", ["escalation"]).limit(1);
+        if (callers?.length) {
+          await admin.from("jobs").insert({ organization_id: orgId, kind: "call", payload: { customer: base.customer, reason: res.reason ?? "handoff", conversation_id: conversationId } });
+          const { kickJobs } = await import("@/lib/jobs/kick");
+          kickJobs();
+        }
+      }
+    }
   } catch (e) {
     console.error("team update failed", (e as Error).message);
   }

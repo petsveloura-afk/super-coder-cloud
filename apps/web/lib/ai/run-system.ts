@@ -13,7 +13,8 @@ import type { AIOutcome } from "./run";
  */
 export async function runAISystem(input: {
   orgId: string;
-  feature: "autopilot";
+  /** waves 15-18: background insights, voice/vision understanding, KB answers, phone agent */
+  feature: "autopilot" | "insights" | "vision" | "transcribe" | "voice" | "kb";
   agentId?: string | null;
   provider?: AIProviderName;
   model?: string;

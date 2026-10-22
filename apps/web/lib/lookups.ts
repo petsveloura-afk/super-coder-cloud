@@ -47,6 +47,9 @@ export interface StageInfo {
   position: number;
   probability: number;
   pipeline_id: string;
+  /** wave 15: business events that move deals into this stage automatically */
+  auto_on?: string[];
+  marks_won?: boolean;
 }
 export interface PipelineInfo {
   id: string;
@@ -57,10 +60,14 @@ export interface PipelineInfo {
 
 export const pipelinesWithStages = cache(async (orgId: string): Promise<PipelineInfo[]> => {
   const supabase = await createClient();
-  const [{ data: pipes }, { data: stages }] = await Promise.all([
+  const [{ data: pipes }, stageRes] = await Promise.all([
     supabase.from("pipelines").select("id, name, is_default").eq("organization_id", orgId).order("created_at"),
-    supabase.from("pipeline_stages").select("id, name, position, probability, pipeline_id").eq("organization_id", orgId).order("position"),
+    supabase.from("pipeline_stages").select("id, name, position, probability, pipeline_id, auto_on, marks_won").eq("organization_id", orgId).order("position"),
   ]);
+  // before the wave-15 migration the new columns do not exist yet — read the classic ones
+  const stages = stageRes.error
+    ? (await supabase.from("pipeline_stages").select("id, name, position, probability, pipeline_id").eq("organization_id", orgId).order("position")).data
+    : stageRes.data;
   return (pipes ?? [])
     .map((p) => ({
       id: p.id as string,

@@ -109,6 +109,8 @@ async function main() {
     DisconnectReason: baileysMod.DisconnectReason,
     Browsers: baileysMod.Browsers,
     fetchLatestBaileysVersion: baileysMod.fetchLatestBaileysVersion,
+    // wave 16: voice notes / images for the agent
+    downloadMediaMessage: baileysMod.downloadMediaMessage,
     logger: pino({ level: process.env.LOG_LEVEL ?? "warn" }),
   };
   const manager = new SessionManager({ dataDir: process.env.DATA_DIR ?? "/data", secret, baileys });

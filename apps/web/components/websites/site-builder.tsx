@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { SITE_BLOCK_TYPES, type SiteBlockType } from "@scc/shared/engagement";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Card, Field, Input, Select, Textarea } from "@/components/ui/primitives";
+import { ImproveCopyButton } from "./growth-tools";
 import { heroImageAIAction, saveSiteAction, uploadSiteImageAction } from "@/app/[locale]/(dashboard)/websites/actions";
 import { DesignPanel } from "./design-panel";
 import { BusinessPanel, type SitePages, type SiteSettings } from "./business-panel";
@@ -82,6 +83,7 @@ export function SiteBuilder({
   aiEditor = false,
   domainSlot,
   liveUrl,
+  aiCopy = false,
 }: {
   id?: string;
   initial: SiteValue;
@@ -97,6 +99,8 @@ export function SiteBuilder({
   domainSlot?: ReactNode;
   /** wave 13: the site's live address (custom domain when active) */
   liveUrl?: string;
+  /** wave 17: "improve this text" with AI next to text fields */
+  aiCopy?: boolean;
 }) {
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -273,7 +277,10 @@ export function SiteBuilder({
                             ))}
                           </Select>
                         ) : f.multiline ? (
-                          <Textarea id={fid} rows={f.key === "body" ? 6 : 2} value={value} onChange={(e) => onChange(e.target.value)} />
+                          <>
+                            <Textarea id={fid} rows={f.key === "body" ? 6 : 2} value={value} onChange={(e) => onChange(e.target.value)} />
+                            {aiCopy && value.trim().length > 1 ? <ImproveCopyButton value={value} field={f.key} onChange={onChange} /> : null}
+                          </>
                         ) : f.options ? (
                           <Select id={fid} value={value} onChange={(e) => onChange(e.target.value)}>
                             {f.options.map((o) => (
@@ -297,7 +304,10 @@ export function SiteBuilder({
                             </Button>
                           </div>
                         ) : (
-                          <Input id={fid} dir={f.ltr ? "ltr" : undefined} value={value} onChange={(e) => onChange(e.target.value)} />
+                          <>
+                            <Input id={fid} dir={f.ltr ? "ltr" : undefined} value={value} onChange={(e) => onChange(e.target.value)} />
+                            {aiCopy && !f.ltr && (f.key === "title" || f.key === "cta_label" || f.key === "label") && value.trim().length > 1 ? <ImproveCopyButton value={value} field={f.key} onChange={onChange} /> : null}
+                          </>
                         )}
                       </Field>
                     );

@@ -105,7 +105,7 @@ export function SiteRenderer({
                       <h1 className="text-4xl font-extrabold leading-tight tracking-tight md:text-6xl">{b.data.title}</h1>
                       {b.data.subtitle ? <p className="mt-5 whitespace-pre-wrap text-lg leading-8" style={{ color: "var(--site-muted)" }}>{b.data.subtitle}</p> : null}
                       {b.data.cta_label ? (
-                        <a href={safeHref(b.data.cta_href) ?? "#contact"} className={`${btn} mt-8`} style={{ background: accent }}>
+                        <a data-site-cta="" href={safeHref(b.data.cta_href) ?? "#contact"} className={`${btn} mt-8`} style={{ background: accent }}>
                           {b.data.cta_label} <Arrow className="h-4 w-4" />
                         </a>
                       ) : null}

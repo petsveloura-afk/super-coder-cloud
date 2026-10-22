@@ -21,8 +21,33 @@ export const formFieldSchema = z.object({
   required: z.boolean().default(false),
   placeholder: z.string().trim().max(200).optional(),
   options: z.array(z.string().trim().min(1).max(100)).max(50).optional(),
+  // wave 17: multi-step forms + conditional fields
+  step: z.coerce.number().int().min(1).max(10).optional(),
+  show_if: z
+    .object({
+      field: z.string().trim().regex(/^[a-z][a-z0-9_]{0,39}$/, { message: "forms.badKey" }),
+      op: z.enum(["eq", "neq", "not_empty"]).default("eq"),
+      value: z.string().trim().max(100).optional().default(""),
+    })
+    .optional(),
 });
 export type FormField = z.infer<typeof formFieldSchema>;
+
+/** Same rule as public.form_field_visible() in the database (a hidden field is neither required nor stored). */
+export function isFormFieldVisible(field: Pick<FormField, "show_if">, data: Record<string, unknown>): boolean {
+  const c = field.show_if;
+  if (!c || !c.field) return true;
+  const raw = data[c.field];
+  const v = (typeof raw === "boolean" ? (raw ? "true" : "") : raw == null ? "" : String(raw)).trim();
+  if (c.op === "not_empty") return v !== "";
+  const eq = v.toLowerCase() === String(c.value ?? "").trim().toLowerCase();
+  return c.op === "neq" ? !eq : eq;
+}
+
+/** The form's steps (1..n) in order; a form without steps is one step. */
+export function formSteps(fields: Pick<FormField, "step">[]): number[] {
+  return [...new Set(fields.map((f) => f.step ?? 1))].sort((a, b) => a - b);
+}
 
 export const formSchema = z
   .object({
@@ -49,7 +74,9 @@ export const formSchema = z
   })
   .refine((f) => new Set(f.fields.map((x) => x.key)).size === f.fields.length, { message: "forms.duplicateKey", path: ["fields"] })
   .refine((f) => f.fields.some((x) => x.key === "email" || x.key === "phone"), { message: "forms.needContactField", path: ["fields"] })
-  .refine((f) => f.fields.every((x) => x.type !== "select" || (x.options?.length ?? 0) > 0), { message: "forms.selectNeedsOptions", path: ["fields"] });
+  .refine((f) => f.fields.every((x) => x.type !== "select" || (x.options?.length ?? 0) > 0), { message: "forms.selectNeedsOptions", path: ["fields"] })
+  // wave 17: a condition must point to another field of the form
+  .refine((f) => f.fields.every((x) => !x.show_if || (x.show_if.field !== x.key && f.fields.some((o) => o.key === x.show_if?.field))), { message: "forms.badCondition", path: ["fields"] });
 export type FormInput = z.infer<typeof formSchema>;
 
 /* ---------------------------------------------------------------- booking */
@@ -140,8 +167,25 @@ export const campaignSchema = z
         status: z.enum(CONTACT_STATUSES).optional(),
         source: z.string().trim().max(40).optional(),
         tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+        // wave 17: smart audience (AI insights + activity + purchases)
+        min_score: z.coerce.number().int().min(0).max(100).optional(),
+        max_score: z.coerce.number().int().min(0).max(100).optional(),
+        sentiment: z.enum(["positive", "neutral", "negative"]).optional(),
+        stage: z.enum(["new", "interested", "considering", "ready", "customer", "lost"]).optional(),
+        active_days: z.coerce.number().int().min(1).max(3650).optional(),
+        inactive_days: z.coerce.number().int().min(1).max(3650).optional(),
+        purchases_min: z.coerce.number().min(0).max(999_999_999).optional(),
       })
       .default({}),
+    // wave 17: approved WhatsApp template (official API) — variables may use {{contact.first_name}}
+    wa_template: z
+      .object({
+        name: z.string().trim().regex(/^[a-z0-9_]{1,512}$/, { message: "campaigns.badTemplateName" }),
+        language: z.string().trim().regex(/^[a-z]{2,3}(_[A-Z]{2})?$/, { message: "campaigns.badTemplateLang" }).default("he"),
+        params: z.array(z.string().trim().max(500)).max(10).default([]),
+      })
+      .nullable()
+      .optional(),
     scheduled_at: z
       .string()
       .optional()
@@ -203,6 +247,9 @@ export const documentSchema = z.object({
     .optional()
     .default(""),
   lines: z.array(documentLineSchema).min(1, { message: "finance.needLine" }).max(100, { message: "validation.tooMany" }),
+  // wave 15: a quote can be a contract — terms + the customer signs with a finger / mouse
+  require_signature: z.boolean().optional().default(false),
+  contract_terms: z.string().trim().max(20000, { message: "validation.tooLong" }).optional().default(""),
 });
 export type DocumentInput = z.infer<typeof documentSchema>;
 
@@ -222,6 +269,8 @@ export function documentTotals(lines: { quantity: number; unit_price: number; di
 }
 
 export const PAYMENT_METHODS = ["transfer", "cash", "card", "check", "bit", "paybox", "other"] as const;
+/** wave 15: methods recorded automatically by online payments (not offered in the manual form) */
+export const ONLINE_PAYMENT_METHODS = ["stripe", "paypal"] as const;
 export const paymentSchema = z.object({
   amount: z.coerce.number({ message: "validation.number" }).gt(0, { message: "validation.number" }).max(999_999_999),
   method: z.enum(PAYMENT_METHODS),
@@ -329,6 +378,8 @@ export const siteSettingsSchema = z
     logo_url: httpsOrPath,
     tagline: shortText(300),
     youtube: httpsOrPath,
+    // wave 17: visitors from the EU — adds GDPR rights / lawful basis to the privacy & cookie pages
+    gdpr: z.boolean().optional(),
   })
   .partial()
   .default({});

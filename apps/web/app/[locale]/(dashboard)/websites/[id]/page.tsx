@@ -8,6 +8,8 @@ import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { SiteBuilder, type BlockValue } from "@/components/websites/site-builder";
 import { ConfirmDeleteSite } from "@/components/websites/delete-site";
 import { DomainPanel } from "@/components/websites/domain-panel";
+import { AbTestCard } from "@/components/websites/growth-tools";
+import type { AbStats, SiteAb } from "@/lib/site/ab-core";
 import type { SitePages, SiteSettings } from "@/components/websites/business-panel";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
@@ -49,6 +51,13 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
   const customActive = s.custom_domain && s.domain_status === "active" ? `https://${s.custom_domain as string}` : null;
   const verification = (s.domain_verification ?? {}) as { records?: { type: string; name: string; value: string }[] };
   const seo = (s.seo ?? {}) as { title?: string; description?: string };
+  // wave 17: A/B test of the hero
+  const { orgHasFeature } = await import("@/lib/billing/features");
+  const abAllowed = await orgHasFeature(ctx.org.id, "ab_testing");
+  const ab = (s.ab ?? null) as SiteAb | null;
+  const abStats = ab?.started_at ? (((await supabase.rpc("site_ab_stats", { p_site: id })).data ?? null) as AbStats | null) : null;
+  const heroBlock = ((s.blocks ?? []) as { type: string; data: Record<string, string> }[]).find((b) => b.type === "hero");
+  const hero = heroBlock ? { title: heroBlock.data.title ?? "", subtitle: heroBlock.data.subtitle ?? "", cta_label: heroBlock.data.cta_label ?? "" } : null;
   return (
     <>
       <Link href={`/${locale}/websites`} className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg">
@@ -78,6 +87,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
         proTemplates={Boolean(caps.proTemplates)}
         aiEditor={Boolean(caps.aiEditor) && ctx.can("ai.use")}
         liveUrl={customActive ?? undefined}
+        aiCopy={ctx.can("ai.use")}
         domainSlot={
           <DomainPanel
             siteId={id}
@@ -111,6 +121,9 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           blocks: ((s.blocks ?? []) as { type: SiteBlockType; data: BlockValue["data"] }[]).map((b) => ({ type: b.type, data: b.data ?? {} })),
         }}
       />
+      <div className="mt-4">
+        <AbTestCard siteId={id} ab={ab} stats={abStats} hero={hero} allowed={abAllowed} aiAllowed={ctx.can("ai.use")} />
+      </div>
     </>
   );
 }

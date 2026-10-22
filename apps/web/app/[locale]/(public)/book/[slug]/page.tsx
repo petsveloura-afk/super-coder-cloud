@@ -9,7 +9,11 @@ type Params = Promise<{ locale: string; slug: string }>;
 
 async function load(slug: string) {
   if (!/^[a-z0-9][a-z0-9-]{2,60}$/.test(slug)) return null;
-  const { data } = await createAnonClient().rpc("get_public_booking", { p_slug: slug });
+  // wave 16: v2 adds busy times from the host's connected calendar
+  const anon = createAnonClient();
+  const v2 = await anon.rpc("get_public_booking_v2", { p_slug: slug });
+  if (!v2.error) return v2.data as PublicBooking | null;
+  const { data } = await anon.rpc("get_public_booking", { p_slug: slug });
   return data as PublicBooking | null;
 }
 

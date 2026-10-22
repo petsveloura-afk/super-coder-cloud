@@ -210,14 +210,15 @@ test("the agent closes the lead: share-phone button → contact, hot tag, deal, 
   test.skip(!service || !supabaseUrl, "needs the service role");
   const headers = { apikey: service!, Authorization: `Bearer ${service}`, "Content-Type": "application/json", Prefer: "return=minimal" };
   const old = new Date(Date.now() - 5 * 3600_000).toISOString();
-  const patched = await request.patch(`${supabaseUrl}/rest/v1/conversations?channel=eq.telegram&external_id=eq.${chat}`, { headers, data: { last_message_at: old } });
+  // waves 15-18: the conversation guard reads the real "last automated / last customer" times, so the silence is simulated on them too
+  const patched = await request.patch(`${supabaseUrl}/rest/v1/conversations?channel=eq.telegram&external_id=eq.${chat}`, { headers, data: { last_message_at: old, last_auto_at: old, last_customer_at: old } });
   expect(patched.ok()).toBe(true);
   const fu = await request.post("/api/ai/followups", { headers: { Authorization: `Bearer ${process.env.CRON_SECRET ?? "e2e-cron-secret-123456"}` } });
   expect(fu.ok()).toBe(true);
   expect(((await fu.json()) as { sent: number }).sent).toBeGreaterThanOrEqual(1);
   await waitForTelegram(request, chat, /רק מזכיר/);
   // never twice
-  await request.patch(`${supabaseUrl}/rest/v1/conversations?channel=eq.telegram&external_id=eq.${chat}`, { headers, data: { last_message_at: old } });
+  await request.patch(`${supabaseUrl}/rest/v1/conversations?channel=eq.telegram&external_id=eq.${chat}`, { headers, data: { last_message_at: old, last_auto_at: old, last_customer_at: old } });
   const again = await request.post("/api/ai/followups", { headers: { Authorization: `Bearer ${process.env.CRON_SECRET ?? "e2e-cron-secret-123456"}` } });
   expect(((await again.json()) as { sent: number }).sent).toBe(0);
 });

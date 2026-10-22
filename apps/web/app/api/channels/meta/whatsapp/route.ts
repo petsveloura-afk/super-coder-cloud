@@ -38,8 +38,9 @@ interface WaValue {
     text?: { body: string };
     button?: { text: string };
     interactive?: { button_reply?: { title: string }; list_reply?: { title: string } };
-    image?: { caption?: string };
-    document?: { filename?: string; caption?: string };
+    image?: { caption?: string; id?: string; mime_type?: string };
+    audio?: { id?: string; mime_type?: string };
+    document?: { filename?: string; caption?: string; id?: string; mime_type?: string };
     location?: { latitude: number; longitude: number };
   }[];
   statuses?: { id: string; status: "sent" | "delivered" | "read" | "failed"; errors?: { title?: string }[] }[];
@@ -83,7 +84,17 @@ export async function POST(request: NextRequest) {
           phone: `+${m.from}`,
           text,
           externalMessageId: m.id,
-          media: ["image", "document", "audio", "video", "sticker"].includes(m.type) ? { type: m.type, name: m.document?.filename } : null,
+          media: ["image", "document", "audio", "video", "sticker"].includes(m.type)
+            ? {
+                type: m.type,
+                name: m.document?.filename,
+                // wave 16: media id → the agent transcribes voice notes / reads pictures
+                ...(m.type === "audio" && m.audio?.id ? { media_id: m.audio.id, mime: m.audio.mime_type } : {}),
+                ...(m.type === "image" && m.image?.id ? { media_id: m.image.id, mime: m.image.mime_type } : {}),
+                // wave 16: documents (PDF) → the agent reads them
+                ...(m.type === "document" && m.document?.id ? { media_id: m.document.id, mime: m.document.mime_type } : {}),
+              }
+            : null,
         });
       }
       for (const s of v.statuses ?? []) {

@@ -85,6 +85,12 @@ export function CookieBanner({ text, accept, more, href }: { text: string; accep
         onClick={() => {
           store.set("scc-cookies", "1");
           setShow(false);
+          // wave 17: statistics that wait for consent (GDPR mode) start now
+          try {
+            window.dispatchEvent(new Event("scc:cookies-accepted"));
+          } catch {
+            /* ignore */
+          }
         }}
       >
         {accept}

@@ -131,3 +131,23 @@ export function newMessageId() {
   const hex = Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join("").toUpperCase();
   return `3EB0${hex}`;
 }
+
+/** Wave 16 — media the web app can understand (voice notes → text, images → description). */
+export const MEDIA_MAX_BYTES = 6 * 1024 * 1024;
+export function wantsMediaData(type, mime, name) {
+  if (type === "audio" || type === "image" || type === "voice" || type === "photo") return true;
+  // wave 16: PDF / text documents are read by the agent
+  return type === "document" && (/^application\/pdf|^text\/plain/.test(mime ?? "") || /\.(pdf|txt)$/i.test(name ?? ""));
+}
+/** MIME type of a Baileys message's media part (null when unknown). */
+export function messageMime(message) {
+  if (!message || typeof message !== "object") return null;
+  const m = message.ephemeralMessage?.message ?? message.viewOnceMessage?.message ?? message.viewOnceMessageV2?.message ?? message;
+  for (const t of ["audioMessage", "imageMessage", "documentMessage"]) if (m[t]) return m[t].mimetype ?? null;
+  return null;
+}
+/** Adds base64 data + mime to an event when the buffer is small enough (never throws). */
+export function attachMediaData(ev, buffer, mime) {
+  if (!ev?.media || !buffer || !buffer.length || buffer.length > MEDIA_MAX_BYTES) return ev;
+  return { ...ev, media: { ...ev.media, data: Buffer.from(buffer).toString("base64"), mime: mime ?? (ev.media.type === "image" || ev.media.type === "photo" ? "image/jpeg" : "audio/ogg") } };
+}

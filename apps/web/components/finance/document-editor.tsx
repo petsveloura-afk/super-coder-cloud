@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { PenLine, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { documentTotals } from "@scc/shared/engagement";
 import { CURRENCIES } from "@scc/shared/validators";
@@ -30,6 +30,9 @@ export interface DocumentValue {
   notes: string;
   payment_url: string;
   lines: LineValue[];
+  /** wave 15: contract (quotes) */
+  require_signature?: boolean;
+  contract_terms?: string;
 }
 interface Option {
   id: string;
@@ -225,6 +228,23 @@ export function DocumentEditor({
           <Input id="doc-payurl" dir="ltr" value={v.payment_url} onChange={(e) => set({ payment_url: e.target.value })} placeholder="https://" />
         </Field>
       </Card>
+
+      {v.kind === "quote" ? (
+        <Card className="grid gap-3 p-5" data-testid="contract-card">
+          <label className="flex min-h-11 cursor-pointer items-center gap-3">
+            <input type="checkbox" checked={Boolean(v.require_signature)} onChange={(e) => set({ require_signature: e.target.checked })} className="h-5 w-5 accent-[var(--brand)]" data-testid="require-signature" />
+            <span className="flex items-center gap-2 font-semibold">
+              <PenLine className="h-4 w-4 text-accent" /> {t("contract.require")}
+            </span>
+          </label>
+          <p className="text-[12.5px] text-muted">{t("contract.requireHint")}</p>
+          {v.require_signature ? (
+            <Field label={t("contract.terms")} htmlFor="doc-terms" error={err("contract_terms")} hint={t("contract.termsHint")}>
+              <Textarea id="doc-terms" rows={8} value={v.contract_terms ?? ""} onChange={(e) => set({ contract_terms: e.target.value })} placeholder={t("contract.termsPlaceholder")} />
+            </Field>
+          ) : null}
+        </Card>
+      ) : null}
 
       <div className="flex justify-end">
         <Button onClick={save} loading={saving}>

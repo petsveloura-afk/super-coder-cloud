@@ -6,6 +6,7 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react
 import * as DM from "@radix-ui/react-dropdown-menu";
 import { Bell, Check, ChevronDown, ChevronsLeft, ChevronsRight, LogOut, Menu, Plus, Search, ShieldCheck } from "lucide-react";
 import type { Permission } from "@scc/shared/permissions";
+import { matchCommands } from "@/lib/command-actions";
 import { MOBILE_PRIMARY, NAV_ITEMS, type NavItem, type NavSection } from "@/lib/navigation";
 import { useI18n } from "@/lib/i18n/client";
 import { cn, initials } from "@/lib/utils";
@@ -188,10 +189,15 @@ function UserMenu({ user, role, isPlatformAdmin }: { user: ShellProps["user"]; r
   );
 }
 
-function GlobalSearch({ className }: { className?: string }) {
+function GlobalSearch({ className, permissions = [] }: { className?: string; permissions?: readonly string[] }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [q, setQ] = useState("");
+  // wave 17: Ctrl+K quick actions
+  const [focused, setFocused] = useState(false);
+  const [active, setActive] = useState(0);
+  const actions = focused ? matchCommands(q, (k) => t(`cmd.${k}`), (p) => permissions.includes(p)) : [];
+  const listId = `${className ? "gs-d" : "gs-m"}-actions`;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -208,6 +214,12 @@ function GlobalSearch({ className }: { className?: string }) {
       className={cn("relative", className)}
       onSubmit={(e) => {
         e.preventDefault();
+        const pick = actions[active];
+        if (pick && active >= 0 && actions.length) {
+          setQ("");
+          router.push(`/${locale}${pick.href}`);
+          return;
+        }
         router.push(`/${locale}/crm?q=${encodeURIComponent(q.trim())}`);
       }}
     >
@@ -215,7 +227,27 @@ function GlobalSearch({ className }: { className?: string }) {
       <input
         id="global-search"
         value={q}
-        onChange={(e) => setQ(e.target.value)}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setActive(-1);
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => window.setTimeout(() => setFocused(false), 150)}
+        onKeyDown={(e) => {
+          if (!actions.length) return;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActive((i) => (i + 1) % actions.length);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActive((i) => (i <= 0 ? actions.length - 1 : i - 1));
+          } else if (e.key === "Escape") setFocused(false);
+        }}
+        role="combobox"
+        aria-expanded={actions.length > 0}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={actions.length && active >= 0 ? `${listId}-${active}` : undefined}
         placeholder={t("common.searchPlaceholder")}
         aria-label={t("common.search")}
         className="h-10 w-full rounded-xl border border-line bg-elevated ps-9 pe-14 text-[14px] text-fg placeholder:text-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-ring"
@@ -223,6 +255,28 @@ function GlobalSearch({ className }: { className?: string }) {
       <kbd className="pointer-events-none absolute end-2.5 top-1/2 hidden -translate-y-1/2 rounded-md border border-line px-1.5 text-[11px] text-subtle sm:block">
         <span dir="ltr">⌘K</span>
       </kbd>
+      {actions.length ? (
+        <ul id={listId} role="listbox" aria-label={t("cmd.title")} className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
+          {actions.map((a, i) => (
+            <li
+              key={a.key}
+              id={`${listId}-${i}`}
+              role="option"
+              aria-selected={i === active}
+              className={cn("cursor-pointer rounded-lg px-3 py-2 text-[13.5px]", i === active ? "bg-accent-soft text-accent" : "hover:bg-surface-hover")}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setQ("");
+                setFocused(false);
+                router.push(`/${locale}${a.href}`);
+              }}
+            >
+              {t(`cmd.${a.key}`)}
+            </li>
+          ))}
+          <li className="px-3 py-1.5 text-[12px] text-subtle">{t("cmd.searchContacts", { q: q.trim() })}</li>
+        </ul>
+      ) : null}
     </form>
   );
 }
@@ -313,7 +367,7 @@ export function AppShell(props: ShellProps) {
             <div className="lg:hidden">
               <BrandMark className="h-8 w-8" />
             </div>
-            <GlobalSearch className="hidden max-w-md flex-1 md:block" />
+            <GlobalSearch className="hidden max-w-md flex-1 md:block" permissions={props.permissions} />
             <div className="ms-auto flex items-center gap-1">
               <ThemeToggle />
               <NotificationBell count={props.unreadNotifications} />
@@ -368,7 +422,7 @@ export function AppShell(props: ShellProps) {
             }
           >
             <div className="space-y-5">
-              <GlobalSearch />
+              <GlobalSearch permissions={props.permissions} />
               <WorkspaceSwitcher org={props.org} workspaces={props.workspaces} />
               <NavList permissions={props.permissions} onNavigate={() => setMoreOpen(false)} isPlatformAdmin={props.isPlatformAdmin} />
             </div>
