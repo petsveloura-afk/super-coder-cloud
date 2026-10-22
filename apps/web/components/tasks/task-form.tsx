@@ -26,16 +26,6 @@ export interface TaskRecord {
   assignee_id: string | null;
   contact_id: string | null;
   deal_id: string | null;
-  /** wave 15 */
-  remind_at?: string | null;
-}
-
-/** wave 15: minutes before the due time a reminder is sent ("" = none) */
-const REMIND_OPTIONS = ["", "0", "15", "60", "1440"] as const;
-function remindOffset(task?: TaskRecord): string {
-  if (!task?.remind_at || !task.due_at) return "";
-  const m = Math.round((new Date(task.due_at).getTime() - new Date(task.remind_at).getTime()) / 60_000);
-  return (REMIND_OPTIONS as readonly string[]).includes(String(m)) ? String(m) : "15";
 }
 
 /** ISO → value for <input type="datetime-local"> in the viewer's timezone. */
@@ -77,15 +67,6 @@ function TaskFields({ state, task, members, contacts, defaults }: { state: Actio
       </Field>
       <Field label={t("tasks.due")} htmlFor="task-due" error={err("dueAt")}>
         <DueInput initialIso={state.values?.dueAt || task?.due_at || defaults?.due_at || ""} />
-      </Field>
-      <Field label={t("taskRemind.label")} htmlFor="task-remind" hint={t("taskRemind.hint")}>
-        <Select id="task-remind" name="remind" defaultValue={state.values?.remind ?? remindOffset(task)} data-testid="task-remind">
-          {REMIND_OPTIONS.map((o) => (
-            <option key={o || "none"} value={o}>
-              {t(`taskRemind.options.${o || "none"}`)}
-            </option>
-          ))}
-        </Select>
       </Field>
       <Field label={t("tasks.status")} htmlFor="task-status">
         <Select id="task-status" name="status" defaultValue={v("status", task?.status ?? "open")}>

@@ -37,14 +37,7 @@ export async function saveDocumentAction(input: { locale: string; id?: string; d
     currency: d.currency,
     notes: d.notes || null,
     payment_url: d.payment_url || null,
-    // wave 15: contract terms + signature (quotes only)
-    require_signature: d.kind === "quote" ? Boolean(d.require_signature) : false,
-    contract_terms: d.kind === "quote" && d.contract_terms ? d.contract_terms : null,
   };
-  if (row.require_signature) {
-    const { orgHasFeature } = await import("@/lib/billing/features");
-    if (!(await orgHasFeature(ctx.org.id, "contracts"))) return { error: "plans.locked.contracts.title" };
-  }
   const supabase = await createClient();
   let id = input.id;
   if (id) {

@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { CreditPacksCard } from "@/components/billing/credit-packs";
-import { creditPacks } from "@/lib/billing/packs-core";
 import type { Metadata } from "next";
 import { Check, Clock, CreditCard, Crown, ShieldCheck, Sparkles } from "lucide-react";
 import { LIVE_FEATURES, type PlanLimits } from "@scc/shared/billing";
@@ -68,7 +66,7 @@ export default async function BillingPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ interval?: string; checkout?: string; error?: string; pack?: string }>;
+  searchParams: Promise<{ interval?: string; checkout?: string; error?: string }>;
 }) {
   const locale = await resolveLocale(params);
   const ctx = await getOrgContext(locale);
@@ -102,20 +100,7 @@ export default async function BillingPage({
   const payments = stripeConfigured();
   const salesEmail = process.env.NEXT_PUBLIC_SALES_EMAIL;
   const n = (v: unknown) => Number(v ?? 0);
-  // wave 18: limits after the platform admin's overrides + AI credit packs + custom prices
-  const [effRes, balRes, ovRes] = await Promise.all([
-    supabase.rpc("effective_limits", { org: ctx.org.id }),
-    supabase.rpc("org_credit_balance", { org: ctx.org.id }),
-    supabase.from("organizations").select("price_overrides").eq("id", ctx.org.id).maybeSingle(),
-  ]);
-  const effective = !effRes.error && effRes.data ? (effRes.data as Record<string, number | null>) : null;
-  const packBalance = !balRes.error ? Number(balRes.data ?? 0) : null;
-  const priceOverrides = !ovRes.error ? ((ovRes.data?.price_overrides ?? {}) as Record<string, Record<string, number>>) : {};
   const lim = (k: keyof PlanLimits) => {
-    if (effective && k in effective) {
-      const ev = effective[k];
-      return ev === null || ev === undefined ? null : Number(ev);
-    }
     const v = ent?.limits?.[k];
     return v === null || v === undefined ? null : Number(v);
   };
@@ -213,19 +198,6 @@ export default async function BillingPage({
         </Card>
       </div>
 
-      {/* wave 18: AI credit packs */}
-      {packBalance !== null ? (
-        <div className="mt-4">
-          <CreditPacksCard
-            balance={packBalance}
-            packs={creditPacks()}
-            canBuy={canManage && !ctx.org.is_demo}
-            methods={{ paypal: paypalConfigured(), crypto: cryptoConfigured() }}
-            status={typeof sp.pack === "string" ? sp.pack : null}
-          />
-        </div>
-      ) : null}
-
       {!payments && !anyExtra ? (
         <div className="mt-4 flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning">
           <Clock className="mt-0.5 h-4 w-4 shrink-0" /> {t("billing.notConfigured")}
@@ -253,10 +225,7 @@ export default async function BillingPage({
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {plans.map((p) => {
           const isCurrent = p.key === current;
-          const listPrice = interval === "year" ? Number(p.price_yearly) : Number(p.price_monthly);
-          // wave 18: a custom price agreed for this organization
-          const custom = Number(priceOverrides[p.key]?.[interval]);
-          const price = Number.isFinite(custom) && custom > 0 ? custom : listPrice;
+          const price = interval === "year" ? Number(p.price_yearly) : Number(p.price_monthly);
           const purchasable = (p.key === "pro" || p.key === "business") && canManage && payments && !ctx.org.is_demo && Boolean(priceIdFor(p.key, interval));
           return (
             <Card key={p.key} className={cn("flex flex-col p-5", p.key === "pro" && "ring-2 ring-brand/60")}>
@@ -278,7 +247,6 @@ export default async function BillingPage({
                   <>
                     <span className="text-3xl font-black tracking-tight" dir="ltr">{formatCurrency(locale, price, p.currency)}</span>
                     <span className="ms-1 text-sm text-muted">{t(interval === "year" ? "billing.perYear" : "billing.perMonth")}</span>
-                    {price !== listPrice ? <span className="ms-2 rounded-full bg-success/15 px-2 py-0.5 text-[11px] text-success">{t("billing.customPrice")}</span> : null}
                   </>
                 )}
               </div>

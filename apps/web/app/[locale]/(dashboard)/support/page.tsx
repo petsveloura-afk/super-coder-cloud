@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { AlarmClock, BookOpen, LifeBuoy } from "lucide-react";
+import { AlarmClock, LifeBuoy } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { NewTicketButton } from "@/components/support/support-client";
 import { ShareBox } from "@/components/forms/share-box";
@@ -56,19 +56,7 @@ export default async function SupportPage({ params, searchParams }: { params: Pr
 
   return (
     <>
-      <PageHeader
-        title={t("support.title")}
-        description={t("support.subtitle")}
-        actions={
-          <>
-            {/* wave 16: knowledge base */}
-            <Link href={`/${locale}/support/kb`} className="inline-flex h-10 items-center gap-2 rounded-xl border border-line px-4 text-sm hover:bg-surface-hover" data-testid="kb-link">
-              <BookOpen className="h-4 w-4" /> {t("kb.title")}
-            </Link>
-            {ctx.can("tickets.write") ? <NewTicketButton contacts={contacts} members={members} /> : null}
-          </>
-        }
-      />
+      <PageHeader title={t("support.title")} description={t("support.subtitle")} actions={ctx.can("tickets.write") ? <NewTicketButton contacts={contacts} members={members} /> : null} />
       <Card className="mb-4 p-4">
         <p className="mb-2 text-[13px] text-muted">{t("support.portalHint")}</p>
         <ShareBox url={portalUrl} height={760} />

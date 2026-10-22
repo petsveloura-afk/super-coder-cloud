@@ -6,7 +6,6 @@ import { uuidSchema } from "@scc/shared/validators";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { DocumentEditor } from "@/components/finance/document-editor";
 import { DeletePaymentButton, DocumentActions } from "@/components/finance/finance-client";
-import { IssueTaxDocButton } from "@/components/finance/finance-plus";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -38,7 +37,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ local
   if (!d) notFound();
   const [{ data: lines }, { data: payments }, { data: source }, { data: derived }] = await Promise.all([
     supabase.from("document_lines").select("description, quantity, unit_price, discount_pct, tax_rate, line_total").eq("document_id", id).order("position"),
-    supabase.from("payments").select("id, amount, method, reference, paid_at, external_id, invoice_ref").eq("document_id", id).order("paid_at"),
+    supabase.from("payments").select("id, amount, method, reference, paid_at, external_id").eq("document_id", id).order("paid_at"),
     d.source_document_id ? supabase.from("documents").select("id, kind, number").eq("id", d.source_document_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("documents").select("id, kind, number").eq("source_document_id", id).limit(5),
   ]);
@@ -50,9 +49,6 @@ export default async function DocumentPage({ params }: { params: Promise<{ local
   const balance = Math.round((Number(d.total) - Number(d.amount_paid)) * 100) / 100;
   const publicUrl = `${publicEnv.appUrl.replace(/\/$/, "")}/${locale}/q/${d.public_token}`;
   const editor = editable ? await financeEditorData(ctx.org.id) : null;
-  // wave 15: is an invoicing service (Morning / iCount) connected? → "issue tax document" per payment
-  const { data: invoicing } = kind === "invoice" ? await supabase.from("integrations").select("provider, status").eq("organization_id", ctx.org.id).in("provider", ["morning", "icount"]).eq("status", "active").limit(1) : { data: [] };
-  const invoicingProvider = ((invoicing ?? [])[0]?.provider as string | undefined) ?? null;
 
   return (
     <>
@@ -99,8 +95,6 @@ export default async function DocumentPage({ params }: { params: Promise<{ local
             currency: d.currency as string,
             notes: (d.notes as string | null) ?? "",
             payment_url: (d.payment_url as string | null) ?? "",
-            require_signature: Boolean(d.require_signature),
-            contract_terms: (d.contract_terms as string | null) ?? "",
             lines: (lines ?? []).map((l) => ({ description: l.description as string, quantity: String(l.quantity), unit_price: String(l.unit_price), discount_pct: String(l.discount_pct), tax_rate: String(l.tax_rate) })),
           }}
         />
@@ -160,28 +154,6 @@ export default async function DocumentPage({ params }: { params: Promise<{ local
               ) : null}
             </dl>
             {d.notes ? <p className="mt-4 whitespace-pre-wrap text-[13px] text-muted">{d.notes as string}</p> : null}
-            {d.contract_terms ? (
-              <div className="mt-5 rounded-xl border border-line p-4" data-testid="contract-terms">
-                <h3 className="mb-2 text-sm font-semibold">{t("contract.terms")}</h3>
-                <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{d.contract_terms as string}</p>
-              </div>
-            ) : null}
-            {d.signed_at ? (
-              <div className="mt-4 rounded-xl border border-success/30 bg-success-soft p-4" data-testid="signature-block">
-                <p className="text-sm font-semibold text-success">{t("contract.signedBy", { name: (d.accepted_by_name as string | null) ?? "—", date: formatDateTime(locale, d.signed_at as string) })}</p>
-                {d.signature_data ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={d.signature_data as string} alt={t("contract.signatureAlt")} className="mt-2 h-20 max-w-full rounded-lg bg-white p-1" />
-                ) : null}
-                {d.content_hash ? (
-                  <p className="mt-2 break-all text-[11px] text-muted">
-                    {t("contract.hash")}: <bdi dir="ltr" className="font-mono">{d.content_hash as string}</bdi>
-                  </p>
-                ) : null}
-              </div>
-            ) : d.require_signature ? (
-              <p className="mt-4 text-[13px] text-muted">✍️ {t("contract.awaiting")}</p>
-            ) : null}
           </Card>
           <div className="space-y-4">
             <Card className="space-y-2 p-4 text-[13px]">
@@ -200,14 +172,6 @@ export default async function DocumentPage({ params }: { params: Promise<{ local
                   <span className="text-muted">{t("finance.sentAt")}: </span>
                   {formatDateTime(locale, d.sent_at as string)}
                 </p>
-              ) : null}
-              {Number(d.view_count ?? 0) > 0 ? (
-                <p data-testid="doc-views">
-                  <span className="text-muted">{t("contract.views")}: </span>
-                  {Number(d.view_count)} · {t("contract.firstView")} {d.viewed_at ? formatDateTime(locale, d.viewed_at as string) : "—"}
-                </p>
-              ) : d.status !== "draft" ? (
-                <p className="text-subtle">{t("contract.notViewed")}</p>
               ) : null}
               {d.accepted_at ? (
                 <p>
@@ -236,15 +200,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ local
                             {t(`finance.methods.${p.method}`)} · {formatDate(locale, p.paid_at as string)}
                             {p.reference ? ` · ${p.reference}` : ""}
                           </p>
-                          {(p.invoice_ref as { number?: string; url?: string; error?: string } | null)?.number ? (
-                            <a href={(p.invoice_ref as { url?: string }).url ?? "#"} target="_blank" rel="noopener noreferrer" className="text-[12px] text-accent hover:underline" data-testid="tax-doc-link">
-                              {t("invoicing.issued", { number: String((p.invoice_ref as { number?: string }).number) })}
-                            </a>
-                          ) : (p.invoice_ref as { error?: string } | null)?.error ? (
-                            <p className="text-[12px] text-danger">{t("invoicing.failed")}</p>
-                          ) : null}
                         </div>
-                        {canWrite && invoicingProvider && !(p.invoice_ref as { number?: string } | null)?.number ? <IssueTaxDocButton paymentId={p.id as string} provider={invoicingProvider} /> : null}
                         {canWrite && !p.external_id ? <DeletePaymentButton id={p.id as string} /> : null}
                       </li>
                     ))}

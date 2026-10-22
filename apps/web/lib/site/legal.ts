@@ -22,8 +22,6 @@ export interface LegalInput {
   hasForms?: boolean;
   hasBooking?: boolean;
   hasChat?: boolean;
-  /** wave 17: EU visitors — GDPR section in the privacy & cookie pages */
-  gdpr?: boolean;
 }
 
 const clean = (s: string | undefined) => (s ?? "").replace(/\s+/g, " ").trim();
@@ -49,62 +47,7 @@ export const LEGAL_TITLES: Record<"he" | "en" | "ar", Record<LegalKey, string>> 
   ar: { privacy: "سياسة الخصوصية", terms: "شروط الاستخدام", accessibility: "بيان إمكانية الوصول", cookies: "سياسة ملفات تعريف الارتباط" },
 };
 
-/** The legal page text; with `gdpr` the privacy / cookie pages get the GDPR additions (wave 17). */
 export function legalText(key: LegalKey, locale: string, i: LegalInput): string {
-  const base = legalTextBase(key, locale, i);
-  if (!i.gdpr) return base;
-  const extra = gdprSection(key, locale, i);
-  return extra ? `${base}\n\n${extra}` : base;
-}
-
-/** Wave 17 — GDPR (EU 2016/679) additions. General template, not legal advice. */
-export function gdprSection(key: LegalKey, locale: string, i: LegalInput): string {
-  const he = locale === "he";
-  const ar = locale === "ar";
-  if (key === "privacy") {
-    if (he)
-      return [
-        "## מבקרים מהאיחוד האירופי (GDPR)",
-        "אם את/ה נמצא/ת באיחוד האירופי או במרחב הכלכלי האירופי, חלה עלינו גם תקנת הגנת המידע הכללית (GDPR).",
-        "- בסיס חוקי: ביצוע השירות שביקשת, הסכמתך (לדיוור ולסטטיסטיקה), ואינטרס לגיטימי לשיפור השירות ולאבטחתו",
-        "- הזכויות שלך: עיון, תיקון, מחיקה (״הזכות להישכח״), הגבלת עיבוד, ניידות מידע, התנגדות לעיבוד וחזרה מהסכמה בכל עת",
-        "- העברה מחוץ לאיחוד: ישראל מוכרת על ידי האיחוד האירופי כמדינה עם רמת הגנה נאותה; ספקי שירות אחרים פועלים לפי סעיפים חוזיים תקניים (SCC)",
-        "- שמירת מידע: רק כל עוד נדרש למתן השירות או לפי דין, ולאחר מכן נמחק",
-        "- ניתן להגיש תלונה לרשות הפיקוח על הגנת המידע במדינתך",
-        "לפניות בנושא:",
-        contactLines(i, true),
-      ].join("\n\n");
-    if (ar)
-      return [
-        "## زوار من الاتحاد الأوروبي (GDPR)",
-        "إذا كنت في الاتحاد الأوروبي أو المنطقة الاقتصادية الأوروبية، تنطبق علينا أيضاً اللائحة العامة لحماية البيانات (GDPR).",
-        "- الأساس القانوني: تقديم الخدمة التي طلبتها، موافقتك (للنشرات والإحصاءات)، والمصلحة المشروعة لتحسين الخدمة وأمانها",
-        "- حقوقك: الاطلاع، التصحيح، الحذف، تقييد المعالجة، نقل البيانات، الاعتراض وسحب الموافقة في أي وقت",
-        "- النقل خارج الاتحاد: إسرائيل معترف بها من الاتحاد الأوروبي كدولة ذات حماية كافية؛ ويعمل مزودو الخدمة الآخرون وفق البنود التعاقدية القياسية (SCC)",
-        "- الاحتفاظ بالبيانات: فقط طالما كان ذلك لازماً لتقديم الخدمة أو وفق القانون",
-        "- يمكنك تقديم شكوى إلى سلطة حماية البيانات في بلدك",
-        contactLines(i, false),
-      ].join("\n\n");
-    return [
-      "## Visitors from the EU (GDPR)",
-      "If you are in the European Union / EEA, the General Data Protection Regulation (GDPR) also applies.",
-      "- Lawful basis: performing the service you asked for, your consent (newsletters, statistics) and legitimate interest in improving and securing the service",
-      "- Your rights: access, rectification, erasure (\"right to be forgotten\"), restriction, data portability, objection and withdrawing consent at any time",
-      "- Transfers outside the EU: Israel is recognised by the EU as providing adequate protection; other service providers operate under Standard Contractual Clauses (SCC)",
-      "- Retention: only as long as needed for the service or required by law, then deleted",
-      "- You may lodge a complaint with your local data protection authority",
-      contactLines(i, false),
-    ].join("\n\n");
-  }
-  if (key === "cookies") {
-    if (he) return "## הסכמה לעוגיות (GDPR)\n\nעוגיות שאינן הכרחיות (סטטיסטיקה) מופעלות רק לאחר הסכמתך בבאנר העוגיות, וניתן לחזור מההסכמה בכל עת. מזהה המבקר אקראי, ללא כתובת IP, ואנו מכבדים את הגדרת ״Do Not Track״ בדפדפן.";
-    if (ar) return "## الموافقة على ملفات تعريف الارتباط (GDPR)\n\nلا تُفعَّل الملفات غير الضرورية (الإحصاءات) إلا بعد موافقتك في شريط ملفات تعريف الارتباط، ويمكنك سحبها في أي وقت. معرّف الزائر عشوائي دون عنوان IP، ونحترم إعداد «Do Not Track» في المتصفح.";
-    return "## Cookie consent (GDPR)\n\nNon-essential cookies (statistics) are used only after you accept them in the cookie banner, and you can withdraw consent at any time. The visitor id is random, no IP address is stored, and we honour the browser's \"Do Not Track\" setting.";
-  }
-  return "";
-}
-
-function legalTextBase(key: LegalKey, locale: string, i: LegalInput): string {
   const he = locale === "he";
   const date = i.updated ?? new Date().toISOString().slice(0, 10);
   const owner = who(i, he);

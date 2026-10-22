@@ -250,26 +250,6 @@ export async function updateStageAction(_prev: ActionState, fd: FormData): Promi
   return { ok: true, message: "common.saved" };
 }
 
-/** Wave 15 — stage automation: events that move deals into this stage by themselves. */
-export async function updateStageAutomationAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const locale = formLocale(fd);
-  const ctx = await getOrgContext(locale);
-  if (!ctx.can("settings.manage")) return { error: "errors.forbidden" };
-  const id = uuidSchema.safeParse(str(fd, "id"));
-  if (!id.success) return { error: "validation.invalidId" };
-  const { isStageEvent } = await import("@/lib/crm/stage-events");
-  const events = fd.getAll("auto_on").map(String).filter(isStageEvent);
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("pipeline_stages")
-    .update({ auto_on: [...new Set(events)], marks_won: fd.get("marks_won") === "on" })
-    .eq("id", id.data)
-    .eq("organization_id", ctx.org.id);
-  if (error) return { error: dbErrorKey(error) };
-  revalidatePath(`/${locale}/pipelines`);
-  return { ok: true, message: "stageAuto.saved" };
-}
-
 /** Swap a stage with its neighbour (direction -1 = earlier, +1 = later). */
 export async function moveStageAction(fd: FormData): Promise<ActionState> {
   const locale = formLocale(fd);

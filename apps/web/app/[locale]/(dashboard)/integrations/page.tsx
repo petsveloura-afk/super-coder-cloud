@@ -9,7 +9,6 @@ import { UpgradeNote } from "@/components/billing/upgrade-note";
 import { orgHasFeature } from "@/lib/billing/features";
 import { ChannelsSection } from "@/components/integrations/channels-section";
 import { ConnectHub, type HubProps } from "@/components/integrations/connect-hub";
-import { ConversionsCard, type ConversionConn } from "@/components/integrations/conversions-card";
 import { IntegrationsNotice } from "@/components/integrations/integrations-notice";
 import { TeamUpdates, type BusinessView, type RecipientView } from "@/components/integrations/team-updates";
 import { metaPublicConfig } from "@/lib/channels/meta";
@@ -91,33 +90,10 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
   // wave 10 — team updates + Telegram Business
   const [{ data: recRows }, { data: bizRows }] = canChannels
     ? await Promise.all([
-        // wave 15: members' personal channels (user_id) are managed in Settings → "My channels"
-        supabase.from("notify_recipients").select("id, kind, target, label, events, enabled, invite_code, last_sent_at, last_error, sent_count").eq("organization_id", ctx.org.id).is("user_id", null).order("created_at"),
+        supabase.from("notify_recipients").select("id, kind, target, label, events, enabled, invite_code, last_sent_at, last_error, sent_count").eq("organization_id", ctx.org.id).order("created_at"),
         supabase.from("telegram_business_connections").select("id, owner_name, owner_username, can_reply, is_enabled, messages_in, messages_out, last_message_at").eq("organization_id", ctx.org.id).order("updated_at", { ascending: false }),
       ])
     : [{ data: [] }, { data: [] }];
-
-  // wave 16: the AI voice agent answers calls on the Twilio number (Voice webhook)
-  let voiceUrl: string | null = null;
-  let voiceOn = false;
-  if (canChannels && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const { createAdminClient } = await import("@/lib/supabase/admin");
-    const { data: smsAcc } = await createAdminClient().from("channel_accounts").select("webhook_token").eq("organization_id", ctx.org.id).eq("kind", "sms").maybeSingle();
-    if (smsAcc?.webhook_token) {
-      const { voiceWebhookUrl } = await import("@/lib/voice/agent");
-      voiceUrl = voiceWebhookUrl(smsAcc.webhook_token as string);
-      voiceOn = await import("@/lib/billing/features").then((m) => m.orgHasFeature(ctx.org.id, "voice_ai"));
-    }
-  }
-
-  // wave 17
-  let conversionConns: Partial<Record<"meta_capi" | "ga4" | "tiktok", ConversionConn>> = {};
-  let conversionsOn = false;
-  if (canChannels && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const { listIntegrations } = await import("@/lib/integrations/store");
-    conversionConns = await listIntegrations(ctx.org.id, ["meta_capi", "ga4", "tiktok"]);
-    conversionsOn = await orgHasFeature(ctx.org.id, "conversion_api");
-  }
 
   return (
     <>
@@ -127,21 +103,6 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
       </Suspense>
       {canChannels ? <ConnectHub {...hub} /> : null}
       {canChannels ? <TeamUpdates recipients={(recRows ?? []) as RecipientView[]} business={(bizRows ?? []) as BusinessView[]} botUsername={tg?.config.username || null} /> : null}
-      {canChannels && voiceUrl ? (
-        <Card className="mb-4" data-testid="voice-card">
-          <CardHeader title={t("voice.title")} description={t("voice.subtitle")} />
-          <div className="space-y-2 p-5 text-[13px]">
-            <p className="text-muted">{t("voice.webhookHint")}</p>
-            <bdi dir="ltr" className="block break-all rounded-xl border border-line bg-elevated p-2.5 font-mono text-[12px]">
-              {voiceUrl}
-            </bdi>
-            <p className="text-subtle">{t(voiceOn ? "voice.ready" : "plans.locked.voice_ai.title")}</p>
-          </div>
-        </Card>
-      ) : null}
-
-      {/* wave 17: ad conversions (Meta CAPI / GA4 / TikTok) */}
-      {canChannels ? <ConversionsCard conns={conversionConns} locked={!conversionsOn} /> : null}
 
       {ctx.isPlatformAdmin ? (
       <Card className="mb-4">

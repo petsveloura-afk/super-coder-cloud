@@ -20,10 +20,9 @@ interface TgMessage {
   text?: string;
   caption?: string;
   contact?: { phone_number?: string };
-  photo?: { file_id?: string; file_size?: number }[];
-  document?: { file_name?: string; file_id?: string; mime_type?: string; file_size?: number };
-  voice?: { file_id?: string; mime_type?: string };
-  audio?: { file_id?: string; mime_type?: string };
+  photo?: unknown[];
+  document?: { file_name?: string };
+  voice?: unknown;
   location?: { latitude: number; longitude: number };
 }
 
@@ -51,14 +50,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     business_message?: TgBusinessMessage;
     edited_business_message?: TgBusinessMessage;
     deleted_business_messages?: unknown;
-    callback_query?: { id: string; data?: string; from: { id: number }; message?: { chat: { id: number }; message_id: number } };
+    callback_query?: { id: string };
   } | null;
-  // wave 15: "done" / "snooze" buttons of task reminders sent to team members
-  if (update?.callback_query?.data?.startsWith("tk:")) {
-    const { handleTaskCallback } = await import("@/lib/tasks/reminders");
-    await handleTaskCallback(token, update.callback_query).catch((e) => console.error("task callback failed", (e as Error).message));
-    return NextResponse.json({ ok: true });
-  }
   // wave 10: Telegram Business (the bot runs a personal account's chats) — separate update types
   if (update?.business_connection || update?.business_message || update?.edited_business_message || update?.deleted_business_messages) {
     await handleTelegramBusiness(token, update).catch((e) => console.error("telegram business update failed", (e as Error).message));
@@ -74,11 +67,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   let text = msg.text ?? msg.caption ?? "";
   let media: Record<string, unknown> | null = null;
   if (!text && msg.contact?.phone_number) text = `📞 ${msg.contact.phone_number}`;
-  // wave 16: file ids so the agent can transcribe voice notes / read pictures
-  if (msg.photo) media = { type: "photo", ...(msg.photo[msg.photo.length - 1]?.file_id ? { file_id: msg.photo[msg.photo.length - 1]!.file_id } : {}) };
-  else if (msg.document) media = { type: "document", name: msg.document.file_name, ...(msg.document.file_id ? { file_id: msg.document.file_id, mime: msg.document.mime_type ?? "application/octet-stream" } : {}) };
-  else if (msg.voice) media = { type: "voice", ...(msg.voice.file_id ? { file_id: msg.voice.file_id, mime: msg.voice.mime_type ?? "audio/ogg" } : {}) };
-  else if (msg.audio) media = { type: "audio", ...(msg.audio.file_id ? { file_id: msg.audio.file_id, mime: msg.audio.mime_type ?? "audio/mpeg" } : {}) };
+  if (msg.photo) media = { type: "photo" };
+  else if (msg.document) media = { type: "document", name: msg.document.file_name };
+  else if (msg.voice) media = { type: "voice" };
   else if (msg.location) {
     media = { type: "location", lat: msg.location.latitude, lng: msg.location.longitude };
     text ||= `📍 ${msg.location.latitude},${msg.location.longitude}`;

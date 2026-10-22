@@ -21,9 +21,6 @@ import { EditDealDialog, NewDealButton, type DealPickers, type DealRecord } from
 import { NewTaskButton, TaskCheckbox } from "@/components/tasks/task-form";
 import { companyOptions, contactOptions, memberOptions, pipelinesWithStages } from "@/lib/lookups";
 import { MessageContactButton } from "@/components/inbox/inbox-client";
-import { InsightsCard, type InsightsData } from "@/components/crm/insights-card";
-import { AgentCallButton } from "@/components/crm/agent-call-button";
-import { UnifiedTimeline, type TimelineItem } from "@/components/crm/unified-timeline";
 
 type Params = Promise<{ locale: string; id: string }>;
 
@@ -32,7 +29,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return { title: t("crm.details") };
 }
 
-export default async function ContactDetailPage({ params, searchParams }: { params: Params; searchParams?: Promise<{ before?: string }> }) {
+export default async function ContactDetailPage({ params }: { params: Params }) {
   const locale = await resolveLocale(params);
   const { id: rawId } = await params;
   const id = uuidSchema.safeParse(rawId);
@@ -115,25 +112,6 @@ export default async function ContactDetailPage({ params, searchParams }: { para
   const { data: channelRows } = ctx.can("inbox.reply") ? await supabase.from("channel_accounts").select("kind, status").eq("organization_id", ctx.org.id) : { data: [] };
   const connectedChannels = (channelRows ?? []).filter((r) => r.status !== "disabled").map((r) => r.kind as string);
 
-  // wave 15: insights (score / sentiment / next action), identities and the unified timeline
-  const sp = (await searchParams) ?? {};
-  const before = sp.before && !Number.isNaN(Date.parse(sp.before)) ? new Date(sp.before).toISOString() : null;
-  const [insRes, idRes, tlRes, aiInsights] = await Promise.all([
-    supabase.from("contact_insights").select("lead_score, breakdown, sentiment, stage, ai, scored_at, analyzed_at").eq("contact_id", contact.id).eq("organization_id", ctx.org.id).maybeSingle(),
-    supabase.from("contact_identities").select("kind, value, source").eq("contact_id", contact.id).eq("organization_id", ctx.org.id).order("created_at").limit(20),
-    supabase.rpc("contact_timeline", { p_org: ctx.org.id, p_contact: contact.id, p_limit: 60, p_before: before }),
-    ctx.can("ai.use") ? import("@/lib/billing/features").then((m) => m.orgHasFeature(ctx.org.id, "ai_insights")) : Promise.resolve(false),
-  ]);
-  let insights = (insRes.data ?? null) as InsightsData | null;
-  if (!insights?.scored_at) {
-    // first visit: compute the rule-based score once (cheap, no AI)
-    const { data: fresh } = await supabase.rpc("refresh_contact_score", { p_org: ctx.org.id, p_contact: contact.id });
-    if (fresh) insights = { ...(insights ?? {}), ...(fresh as InsightsData) };
-  }
-  const identities = (idRes.data ?? []) as { kind: string; value: string; source: string | null }[];
-  const timeline = ((tlRes.data ?? []) as TimelineItem[]);
-  const moreBefore = timeline.length >= 60 ? timeline[timeline.length - 1]!.at : null;
-
   const notes = (notesRes.data ?? []) as Pick<NoteRow, "id" | "body" | "created_at" | "created_by">[];
   const audit = (auditRes.data ?? []) as Pick<AuditLogRow, "id" | "action" | "metadata" | "created_at">[];
 
@@ -176,7 +154,6 @@ export default async function ContactDetailPage({ params, searchParams }: { para
           </div>
           <div className="flex gap-2">
             {ctx.can("inbox.reply") && connectedChannels.length ? <MessageContactButton contactId={contact.id} channels={connectedChannels} /> : null}
-            {ctx.can("inbox.reply") && ctx.can("contacts.write") && contact.phone && connectedChannels.includes("sms") ? <AgentCallButton contactId={contact.id} /> : null}
             {ctx.can("contacts.write") ? <ContactDialog contact={contact} /> : null}
             {ctx.can("contacts.delete") ? <DeleteContactButton id={contact.id} /> : null}
           </div>
@@ -207,26 +184,10 @@ export default async function ContactDetailPage({ params, searchParams }: { para
                 </>
               )}
             </div>
-            {identities.length ? (
-              <div className="px-5 py-3" data-testid="contact-identities">
-                <p className="mb-1.5 text-[12px] font-medium text-muted">{t("timeline.identities")}</p>
-                <ul className="flex flex-wrap gap-1.5">
-                  {identities.map((i) => (
-                    <li key={`${i.kind}:${i.value}`} className="rounded-full border border-line bg-elevated px-2 py-0.5 text-[12px]">
-                      {t(`timeline.identityKinds.${i.kind}`)} · <bdi dir="ltr">{i.kind === "web" ? i.value.slice(0, 8) : i.value}</bdi>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
           </dl>
         </Card>
 
         <div className="space-y-4">
-        <Card>
-          <CardHeader title={t("insights.title")} description={t("insights.subtitle")} />
-          <InsightsCard contactId={contact.id} data={insights} canAnalyze={ctx.can("ai.use")} aiLocked={!aiInsights} />
-        </Card>
         {duplicates.length > 0 ? (
           <Card className="border-gold/40">
             <CardHeader title={t("merge.title", { count: duplicates.length })} description={t("merge.hint")} />
@@ -320,11 +281,6 @@ export default async function ContactDetailPage({ params, searchParams }: { para
               </ol>
             )}
           </div>
-        </Card>
-        <Card id="unified">
-          <CardHeader title={t("timeline.title")} description={t("timeline.subtitle")} />
-          {/* notes already have their own card above (same note never shown twice) */}
-          <UnifiedTimeline locale={locale} items={timeline.filter((x) => x.kind !== "note")} contactId={contact.id} more={moreBefore} />
         </Card>
         </div>
       </div>

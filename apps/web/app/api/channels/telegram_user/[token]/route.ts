@@ -18,7 +18,7 @@ interface TgUserEvent {
   phone?: string | null;
   username?: string | null;
   text?: string;
-  media?: { type: string; data?: string; mime?: string } | null;
+  media?: { type: string } | null;
   status?: "connected" | "logged_out";
 }
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // wave 12: the owner answered himself → recorded, the agent steps back in that chat
   if (ev.type === "owner_message" && ev.to && /^\d{3,20}$/.test(ev.to)) {
     const { ingestOwnerMessage } = await import("@/lib/channels/owner");
-    await ingestOwnerMessage({ kind: "telegram_user", token, chat: ev.to, text: ev.text ?? "", messageId: ev.id ?? null, media: ev.media ? (({ data: _d, ...rest }) => (void _d, rest))(ev.media as { data?: string; type: string }) : null });
+    await ingestOwnerMessage({ kind: "telegram_user", token, chat: ev.to, text: ev.text ?? "", messageId: ev.id ?? null, media: ev.media ?? null });
     return NextResponse.json({ ok: true });
   }
 

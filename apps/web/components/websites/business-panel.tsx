@@ -29,7 +29,6 @@ export type SiteSettings = Partial<{
   lang: "he" | "en" | "ar";
   logo_url: string;
   tagline: string;
-  gdpr: boolean;
 }>;
 export type SitePages = Partial<Record<LegalKey, string>>;
 
@@ -63,7 +62,6 @@ export function BusinessPanel({ siteName, settings, pages, onSettings, onPages, 
       hasForms,
       hasBooking,
       hasChat: true,
-      gdpr: settings.gdpr === true,
     });
   return (
     <div className="space-y-4" data-testid="business-panel">
@@ -102,13 +100,7 @@ export function BusinessPanel({ siteName, settings, pages, onSettings, onPages, 
             <input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={settings.a11y_widget !== false} onChange={(e) => set("a11y_widget", e.target.checked)} />
             {t("websites.business.a11yWidget")}
           </label>
-          <label className="flex cursor-pointer items-center gap-2">
-            <input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={settings.gdpr === true} onChange={(e) => set("gdpr", e.target.checked)} />
-            {t("websites.business.gdpr")}
-          </label>
         </div>
-        {/* wave 17: transport security is automatic */}
-        <p className="mt-3 text-[12px] text-subtle">🔒 {t("websites.business.sslNote")}</p>
       </Card>
 
       <Card className="p-4 sm:p-5">

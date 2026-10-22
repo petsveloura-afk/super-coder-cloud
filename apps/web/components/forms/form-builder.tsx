@@ -132,47 +132,6 @@ export function FormBuilder({ id, initial }: { id?: string; initial: FormValue }
                   onChange={(e) => setF(i, { options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
                 />
               ) : null}
-              {/* wave 17: step of a multi-step form + "show only if" condition */}
-              <div className="flex flex-wrap items-center gap-2 text-[12.5px] sm:col-span-4">
-                <label className="flex items-center gap-1.5">
-                  <span className="text-subtle">{t("forms.step")}</span>
-                  <Select aria-label={t("forms.step")} className="h-8 w-20" value={String(f.step ?? 1)} onChange={(e) => setF(i, { step: Number(e.target.value) > 1 ? Number(e.target.value) : undefined })}>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </Select>
-                </label>
-                <span className="text-subtle">{t("forms.showIf")}</span>
-                <Select
-                  aria-label={t("forms.showIf")}
-                  className="h-8 w-40"
-                  value={f.show_if?.field ?? ""}
-                  onChange={(e) => setF(i, { show_if: e.target.value ? { field: e.target.value, op: f.show_if?.op ?? "eq", value: f.show_if?.value ?? "" } : undefined })}
-                >
-                  <option value="">{t("forms.always")}</option>
-                  {v.fields
-                    .filter((o) => o.key && o.key !== f.key)
-                    .map((o) => (
-                      <option key={o.key} value={o.key}>
-                        {o.label || o.key}
-                      </option>
-                    ))}
-                </Select>
-                {f.show_if ? (
-                  <>
-                    <Select aria-label={t("forms.condOp")} className="h-8 w-32" value={f.show_if.op} onChange={(e) => setF(i, { show_if: { ...f.show_if!, op: e.target.value as "eq" | "neq" | "not_empty" } })}>
-                      <option value="eq">{t("forms.ops.eq")}</option>
-                      <option value="neq">{t("forms.ops.neq")}</option>
-                      <option value="not_empty">{t("forms.ops.not_empty")}</option>
-                    </Select>
-                    {f.show_if.op !== "not_empty" ? (
-                      <Input aria-label={t("forms.condValue")} className="h-8 w-40" value={f.show_if.value ?? ""} onChange={(e) => setF(i, { show_if: { ...f.show_if!, value: e.target.value.slice(0, 100) } })} placeholder={t("forms.condValue")} />
-                    ) : null}
-                  </>
-                ) : null}
-              </div>
             </li>
           ))}
         </ol>

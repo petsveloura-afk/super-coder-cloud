@@ -41,12 +41,6 @@ export default async function ContactsPage({ params, searchParams }: { params: P
     .order("created_at", { ascending: false })
     .range(from, from + query.pageSize - 1);
   if (query.status) req = req.eq("status", query.status);
-  // wave 15: "hot leads" view (lead score ≥ 70)
-  const hotOnly = sp.hot === "1";
-  if (hotOnly) {
-    const { data: hot } = await supabase.from("contact_insights").select("contact_id").eq("organization_id", ctx.org.id).gte("lead_score", 70).order("lead_score", { ascending: false }).limit(1000);
-    req = req.in("id", ((hot ?? []) as { contact_id: string }[]).map((h) => h.contact_id).concat(["00000000-0000-0000-0000-000000000000"]));
-  }
   const filter = contactSearchFilter(query.q);
   if (filter) req = req.or(filter);
   const { data, count, error } = await req;
@@ -54,19 +48,6 @@ export default async function ContactsPage({ params, searchParams }: { params: P
 
   const rows = (data ?? []) as Pick<ContactRow, "id" | "first_name" | "last_name" | "email" | "phone" | "company_name" | "status" | "source" | "created_at" | "is_demo">[];
   const total = count ?? 0;
-  // wave 15: lead score per row (separate read — the list works even before the migration ran)
-  const scoreRes = rows.length ? await supabase.from("contact_insights").select("contact_id, lead_score").eq("organization_id", ctx.org.id).in("contact_id", rows.map((r) => r.id)) : { data: [] };
-  const scores = new Map(((scoreRes.data ?? []) as { contact_id: string; lead_score: number | null }[]).map((r) => [r.contact_id, r.lead_score]));
-  const scoreChip = (id: string) => {
-    const v = scores.get(id);
-    if (v === null || v === undefined) return <span className="text-subtle">—</span>;
-    const tone = v >= 70 ? "bg-danger-soft text-danger" : v >= 40 ? "bg-warning-soft text-warning" : "bg-teal-soft text-teal";
-    return (
-      <span className={`inline-flex min-w-9 justify-center rounded-full px-2 py-0.5 text-[12px] font-semibold ${tone}`} data-testid="row-score">
-        {v}
-      </span>
-    );
-  };
   const pages = Math.max(1, Math.ceil(total / query.pageSize));
   const q = sanitizeSearch(query.q);
 
@@ -128,18 +109,6 @@ export default async function ContactsPage({ params, searchParams }: { params: P
                 {s ? t(`crm.statuses.${s}`) : t("common.all")}
               </Link>
             ))}
-            <Link
-              href={hotOnly ? href({ page: 1 }) : `${href({ page: 1 })}${href({ page: 1 }).includes("?") ? "&" : "?"}hot=1`}
-              role="tab"
-              aria-selected={hotOnly}
-              data-testid="hot-filter"
-              className={cn(
-                "flex h-10 shrink-0 items-center gap-1 rounded-xl px-3.5 text-[13px] transition-colors",
-                hotOnly ? "bg-danger-soft font-semibold text-danger" : "text-muted hover:bg-surface-hover hover:text-fg",
-              )}
-            >
-              🔥 {t("insights.hotFilter")}
-            </Link>
           </div>
         </form>
       </Card>
@@ -164,7 +133,6 @@ export default async function ContactsPage({ params, searchParams }: { params: P
                   <th scope="col" className="px-5 py-3 text-start font-medium">{t("crm.email")} / {t("crm.phone")}</th>
                   <th scope="col" className="px-5 py-3 text-start font-medium">{t("crm.company")}</th>
                   <th scope="col" className="px-5 py-3 text-start font-medium">{t("crm.status")}</th>
-                  <th scope="col" className="px-5 py-3 text-start font-medium">{t("insights.scoreShort")}</th>
                   <th scope="col" className="px-5 py-3 text-start font-medium">{t("crm.createdAt")}</th>
                 </tr>
               </thead>
@@ -185,7 +153,6 @@ export default async function ContactsPage({ params, searchParams }: { params: P
                     </td>
                     <td className="px-5 py-3 text-muted">{c.company_name ?? "—"}</td>
                     <td className="px-5 py-3"><StatusBadge status={c.status} /></td>
-                    <td className="px-5 py-3">{scoreChip(c.id)}</td>
                     <td className="px-5 py-3 text-muted">{formatDate(locale, c.created_at)}</td>
                   </tr>
                 ))}
@@ -205,10 +172,7 @@ export default async function ContactsPage({ params, searchParams }: { params: P
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate font-semibold">{c.first_name} {c.last_name}</span>
-                        <span className="flex shrink-0 items-center gap-1.5">
-                          {scores.get(c.id) !== undefined && scores.get(c.id) !== null ? scoreChip(c.id) : null}
-                          <StatusBadge status={c.status} />
-                        </span>
+                        <StatusBadge status={c.status} />
                       </div>
                       <div className="mt-1 flex items-center gap-3 text-[12.5px] text-muted">
                         {c.phone ? (

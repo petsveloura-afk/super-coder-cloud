@@ -28,8 +28,7 @@ describe("automation schema", () => {
   });
 
   it("catalogue matches the SQL CHECK list", () => {
-    // 14 (wave 9) + 5 behavior & sales triggers (wave 17, migration 0034)
-    expect(AUTOMATION_TRIGGERS).toHaveLength(19);
+    expect(AUTOMATION_TRIGGERS).toHaveLength(14);
     expect(ACTION_TYPES).toHaveLength(13);
   });
 });

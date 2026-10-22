@@ -302,9 +302,7 @@
     "invitation_revoked": "הזמנה בוטלה",
     "settings_updated": "ההגדרות עודכנו",
     "billing_plan_changed": "החבילה עודכנה",
-    "ai_agents_insert": "סוכן AI נוצר",
-    "routing_updated": "ניתוב לידים עודכן",
-    "platform_overrides": "התאמות מנהל פלטפורמה"
+    "ai_agents_insert": "סוכן AI נוצר"
   },
   "billing": {
     "title": "מנוי וחיוב",
@@ -384,17 +382,7 @@
       "ai_images": "תמונות AI",
       "site_pro_templates": "כל תבניות העיצוב לאתרים",
       "site_ai_editor": "עריכת האתר עם הסוכן",
-      "site_custom_domain": "דומיין משלך לאתר",
-      "contracts": "חוזים וחתימה דיגיטלית",
-      "lead_routing": "ניתוב לידים לצוות",
-      "invoicing_sync": "חשבוניות מס (Morning / iCount)",
-      "ai_insights": "ניתוח AI של לקוחות",
-      "voice_ai": "סוכן קולי בטלפון",
-      "calendar_sync": "סנכרון Google / Outlook",
-      "flow_builder": "תסריטי שיחה",
-      "ab_testing": "בדיקות A/B באתרים",
-      "conversion_api": "המרות ל-Meta / Google / TikTok",
-      "advanced_analytics": "ניתוח צמיחה ב-AI"
+      "site_custom_domain": "דומיין משלך לאתר"
     },
     "statuses": {
       "trialing": "תקופת ניסיון",
@@ -481,8 +469,7 @@
       "trouble": "לא מצליח לשלם כאן? לתשלום בעמוד המאובטח של PayPal",
       "byPaying": "רוצה מסלול אחר?",
       "changePlan": "חזרה לבחירת מסלול"
-    },
-    "customPrice": "מחיר מיוחד עבורכם"
+    }
   },
   "ai": {
     "title": "סוכני AI",
@@ -752,8 +739,7 @@
       "hint": "בחר את סוג העסק וקבל מיד תסריט שיחה, פרטים לאיסוף, כפתורי תפריט ודוגמת מדיניות מחירים — ואז ערוך כרצונך.",
       "confirm": "לטעון תבנית חדשה? התסריט, הפרטים והתפריט יוחלפו (המחירים נשמרים אם כבר מילאת).",
       "loaded": "נטענה תבנית: {name}. ערוך ושמור."
-    },
-    "badAnswer": "ה-AI לא החזיר תשובה תקינה. נסו שוב"
+    }
   },
   "deals": {
     "pageTitle": "עסקאות וצינורות מכירה",
@@ -895,8 +881,7 @@
     "emptyBody": "צרו משימה חדשה או החליפו סינון.",
     "overdue": "באיחור",
     "openContact": "לאיש הקשר",
-    "none": "אין משימות",
-    "reminderNotification": "⏰ תזכורת: {title}"
+    "none": "אין משימות"
   },
   "analytics": {
     "title": "ניתוח נתונים",
@@ -994,22 +979,6 @@
       "inboundLead": {
         "name": "Webhook נכנס → ליד",
         "body": "כתובת לקבלת לידים מ-Zapier / Make / טפסים חיצוניים, עם תיוג והתראה"
-      },
-      "pricingVisits": {
-        "name": "3 ביקורים בעמוד המחירים → משימה דחופה",
-        "body": "לקוח מוכר שנכנס 3 פעמים לעמוד המחירים מקבל משימת התקשרות ותגית hot-intent"
-      },
-      "quoteViewed": {
-        "name": "הצעה נפתחה → להתקשר עכשיו",
-        "body": "כשהלקוח פותח הצעת מחיר, נוצרת משימה להתקשר אליו עוד היום"
-      },
-      "hotLead": {
-        "name": "ליד חם → התראה למנהלים",
-        "body": "כשהסוכן מזהה ליד חם, המנהלים מקבלים התראה עם שם וטלפון"
-      },
-      "optedOut": {
-        "name": "הסרה → תגית",
-        "body": "לקוח שביקש הסרה מתויג opted-out, כדי שיהיה קל לסנן אותו"
       }
     },
     "empty": "אין עדיין אוטומציות",
@@ -1038,12 +1007,7 @@
       "message_received": "הודעה נכנסת (WhatsApp/Telegram/SMS)",
       "appointment_booked": "נקבעה פגישה",
       "ticket_created": "פנייה חדשה בתמיכה",
-      "invoice_paid": "חשבון שולם",
-      "site_behavior": "התנהגות באתר (ביקורים / זמן בעמוד)",
-      "quote_viewed": "הלקוח פתח הצעת מחיר",
-      "contract_signed": "חוזה נחתם",
-      "lead_hot": "ליד הפך לחם",
-      "customer_opted_out": "לקוח ביקש הסרה"
+      "invoice_paid": "חשבון שולם"
     },
     "history": "יומן הרצות",
     "jobs": "פעולות חיצוניות",
@@ -1090,11 +1054,7 @@
       "toAddress": "כתובת קבועה",
       "subject": "נושא",
       "emailBody": "תוכן המייל",
-      "marketing": "מייל שיווקי — לשלוח רק למי שהסכים לדיוור",
-      "pathContains": "כתובת העמוד מכילה",
-      "pathHint": "ריק = כל עמוד באתר. לדוגמה /pricing",
-      "minVisits": "לפחות ביקורים",
-      "minSeconds": "לפחות שניות בעמוד"
+      "marketing": "מייל שיווקי — לשלוח רק למי שהסכים לדיוור"
     },
     "inboundUrl": "כתובת ה-Webhook (POST, JSON או טופס)",
     "inboundHint": "שלחו שדות כמו name, email, phone — איש הקשר יאותר או ייווצר אוטומטית.",
@@ -1492,21 +1452,7 @@
     "latestSubmissions": "שליחות אחרונות",
     "noSubmissions": "אין עדיין שליחות",
     "confirmDelete": "למחוק את הטופס וכל השליחות שלו?",
-    "notification": "שליחה חדשה בטופס \"{form}\"",
-    "step": "שלב",
-    "showIf": "להציג רק אם",
-    "always": "תמיד",
-    "condOp": "תנאי",
-    "condValue": "ערך",
-    "ops": {
-      "eq": "שווה ל-",
-      "neq": "שונה מ-",
-      "not_empty": "מולא"
-    },
-    "badCondition": "תנאי חייב להתייחס לשדה אחר בטופס",
-    "stepOf": "שלב {step} מתוך {total}",
-    "next": "המשך",
-    "back": "חזרה"
+    "notification": "שליחה חדשה בטופס \"{form}\""
   },
   "booking": {
     "confirmed": "הפגישה נקבעה!",
@@ -1646,29 +1592,7 @@
       "sent": "נשלח",
       "failed": "נכשל",
       "skipped": "דולג"
-    },
-    "aiSegment": "תארו את הקהל במילים",
-    "aiSegmentPlaceholder": "לקוחות חמים שלא כתבו חודש",
-    "aiSegmentGo": "בניית קהל",
-    "segmentReady": "הקהל עודכן לפי התיאור. בדקו ולחצו ״ספירת נמענים״",
-    "segmentFailed": "לא הצלחנו להבין את התיאור. נסו לנסח אחרת",
-    "smartFilters": "סינון חכם (ציון, סנטימנט, פעילות, רכישות)",
-    "minScore": "ציון ליד מינימלי",
-    "maxScore": "ציון ליד מקסימלי",
-    "sentiment": "סנטימנט",
-    "buyStage": "שלב רכישה",
-    "activeDays": "כתבו לנו ב-X הימים האחרונים",
-    "inactiveDays": "לא כתבו לפחות X ימים",
-    "purchasesMin": "סך רכישות מינימלי",
-    "optOutExcluded": "לקוחות שביקשו הסרה, בכל ערוץ, לא נכללים אף פעם",
-    "waTemplate": "תבנית WhatsApp מאושרת (API רשמי)",
-    "waTemplateHint": "ב-WhatsApp הרשמי מותר לפנות ללקוח שלא כתב ב-24 השעות האחרונות רק עם תבנית שאושרה ב-Meta. ההודעה שלמעלה נשמרת בתיבת ההודעות לתיעוד.",
-    "waTemplateName": "שם התבנית",
-    "waTemplateLang": "שפה",
-    "waTemplateParams": "ערכים למשתנים {{1}}, {{2}}…",
-    "waTemplateParamsHint": "מופרדים ב-|. אפשר להשתמש ב-{{contact.first_name}}",
-    "badTemplateName": "שם תבנית: אותיות אנגליות קטנות, ספרות וקו תחתון",
-    "badTemplateLang": "קוד שפה לא תקין (למשל he, en_US)"
+    }
   },
   "inbox": {
     "title": "תיבת הודעות",
@@ -1849,8 +1773,7 @@
       "bit": "ביט",
       "paybox": "פייבוקס",
       "stripe": "תשלום מקוון (Stripe)",
-      "other": "אחר",
-      "paypal": "PayPal / כרטיס"
+      "other": "אחר"
     },
     "newQuote": "הצעת מחיר חדשה",
     "newInvoice": "חשבון עסקה חדש",
@@ -1968,10 +1891,7 @@
     "onlineFailed": "פתיחת התשלום נכשלה — נסו שוב בעוד רגע",
     "paymentProcessing": "תודה! התשלום בעיבוד ויתעדכן כאן תוך רגעים.",
     "paidNotification": "חשבון עסקה #{number} שולם במלואו ({total} {currency})",
-    "acceptedNotification": "הצעת מחיר #{number} אושרה על ידי {name}",
-    "viewedNotification": "👀 הלקוח פתח את מסמך #{number}",
-    "signedNotification": "✍️ {name} חתם/ה על הצעת מחיר #{number}",
-    "payCardPayPal": "תשלום {amount} בכרטיס / PayPal"
+    "acceptedNotification": "הצעת מחיר #{number} אושרה על ידי {name}"
   },
   "websites": {
     "title": "אתרים ודפי נחיתה",
@@ -2128,9 +2048,7 @@
         "tiktok": "טיקטוק",
         "linkedin": "לינקדאין",
         "youtube": "יוטיוב"
-      },
-      "gdpr": "מבקרים מהאיחוד האירופי (GDPR)",
-      "sslNote": "האתר מוגש תמיד ב-HTTPS עם תעודת SSL שמתחדשת אוטומטית, גם בדומיין משלכם"
+      }
     },
     "legal": {
       "title": "דפים משפטיים",
@@ -2269,11 +2187,6 @@
         "contact": "בדקו את פרטי בעל הדומיין: כל השדות חובה, באנגלית, וטלפון תקין",
         "registerFailed": "רישום הדומיין נכשל, והתשלום הוחזר לכרטיס"
       }
-    },
-    "copy": {
-      "improve": "שיפור הטקסט ב-AI",
-      "working": "משפר…",
-      "undo": "ביטול השינוי"
     }
   },
   "admin": {
@@ -2360,44 +2273,7 @@
       "price": "מחיר ללקוח",
       "profit": "רווח",
       "date": "תאריך"
-    },
-    "overridesTitle": "התאמות לעסק: מכסות, מחיר וקרדיטים",
-    "overridesHint": "מגדילים או מקטינים מכסה לעסק אחד, קובעים מחיר מיוחד (White-label / עסקה) או מעניקים קרדיטים ל-AI",
-    "orgSlugOrId": "מזהה העסק (slug או ID)",
-    "load": "טעינה",
-    "limitOverrides": "מכסות",
-    "limitOverridesHint": "ריק = לפי המסלול · ‎-1 = ללא הגבלה",
-    "fromPlan": "לפי המסלול",
-    "priceOverrides": "מחיר מיוחד",
-    "priceOverridesHint": "חל על תשלום בכרטיס, ב-PayPal (תשלום חד-פעמי) ובקריפטו. מנוי PayPal חוזר, Stripe ו-Lemon Squeezy נשארים במחיר המחירון.",
-    "priceKeys": {
-      "month": "חודשי (₪)",
-      "year": "שנתי (₪)",
-      "month_usd": "חודשי ($)",
-      "year_usd": "שנתי ($)"
-    },
-    "limits": {
-      "contacts": "אנשי קשר",
-      "members": "משתמשים",
-      "ai_credits_monthly": "קרדיטי AI לחודש",
-      "ai_agents": "סוכני AI",
-      "notify_recipients": "נמעני עדכונים"
-    },
-    "overridesSaved": "ההתאמות נשמרו",
-    "badOverride": "ערך לא תקין",
-    "grantCredits": "קרדיטים להוספה (או מינוס להורדה)",
-    "note": "הערה",
-    "grant": "הוספה",
-    "creditsGranted": "הקרדיטים עודכנו",
-    "aiUsageTitle": "שימוש ב-AI לפי עסק (30 יום)",
-    "aiUsageHint": "מי צורך הכי הרבה, כמה קריאות נכשלו, ומה היתרה בחבילות",
-    "aiCredits": "קרדיטים",
-    "aiCalls": "קריאות",
-    "aiErrors": "שגיאות",
-    "aiTokens": "טוקנים",
-    "aiLimit": "מכסה חודשית",
-    "aiPacks": "יתרת חבילות",
-    "aiTop": "שימוש עיקרי"
+    }
   },
   "chat": {
     "title": "צ׳אט",
@@ -2429,8 +2305,7 @@
       "telegram": "טלגרם",
       "email": "מייל",
       "whatsapp": "וואטסאפ",
-      "sms": "SMS",
-      "call": "שיחת טלפון"
+      "sms": "SMS"
     },
     "events": {
       "messages": "כל שיחה",
@@ -2501,785 +2376,7 @@
       "sites_published": {
         "title": "הגעת למספר האתרים המפורסמים במסלול",
         "body": "כדי לפרסם עוד אתרים צריך לשדרג ל-{plan}."
-      },
-      "ai_insights": {
-        "title": "ניתוח AI של לקוחות זמין במסלול Pro",
-        "body": "סיכום, סנטימנט, שלב רכישה, צעד הבא והצעה מתאימה לכל לקוח כלולים במסלול {plan} ומעלה. הציון הבסיסי זמין לכולם."
-      },
-      "contracts": {
-        "title": "חוזים וחתימה דיגיטלית זמינים במסלול Pro",
-        "body": "חתימה דיגיטלית על הצעות מחיר וחוזים, נעילה וטביעת אצבע. זמין במסלול {plan} ומעלה."
-      },
-      "lead_routing": {
-        "title": "ניתוב לידים זמין במסלול Pro",
-        "body": "חלוקה אוטומטית של לידים ושיחות בין אנשי הצוות. זמין במסלול {plan} ומעלה."
-      },
-      "invoicing_sync": {
-        "title": "חשבוניות מס אוטומטיות זמינות במסלול Pro",
-        "body": "חיבור ל-Morning / iCount והפקת חשבונית לכל תשלום. זמין במסלול {plan} ומעלה."
-      },
-      "voice_ai": {
-        "title": "הסוכן הקולי זמין במסלול Business",
-        "body": "הסוכן עונה ומתקשר בטלפון. זמין במסלול {plan}."
-      },
-      "calendar_sync": {
-        "title": "סנכרון יומן זמין במסלול Pro",
-        "body": "סנכרון דו-כיווני עם Google ו-Outlook. זמין במסלול {plan} ומעלה."
-      },
-      "flow_builder": {
-        "title": "תסריטי שיחה זמינים במסלול Pro",
-        "body": "תפריטים, כפתורים וסינון לידים לפני ה-AI. זמין במסלול {plan} ומעלה."
-      },
-      "ab_testing": {
-        "title": "בדיקות A/B זמינות במסלול Pro",
-        "body": "שתי גרסאות לכותרת האתר, והמנצחת נבחרת אוטומטית. זמין במסלול {plan} ומעלה."
-      },
-      "conversion_api": {
-        "title": "המרות לפלטפורמות פרסום זמינות במסלול Pro",
-        "body": "שליחת לידים ורכישות ל-Meta, Google ו-TikTok מהשרת. זמין במסלול {plan} ומעלה."
-      },
-      "advanced_analytics": {
-        "title": "ניתוח AI של הנתונים זמין במסלול Pro",
-        "body": "הסבר בשפה פשוטה: מה משתלם, מה לעצור ומה צפוי. זמין במסלול {plan} ומעלה."
       }
     }
-  },
-  "insights": {
-    "title": "תובנות על הלקוח",
-    "subtitle": "ציון ליד, סנטימנט, שלב רכישה והצעד הבא, מכל הערוצים",
-    "scored": "הציון עודכן",
-    "analyzed": "הניתוח הושלם",
-    "badAnswer": "ה-AI לא החזיר ניתוח תקין. נסו שוב",
-    "scoreAria": "ציון ליד {score} מתוך 100",
-    "band": {
-      "hot": "ליד חם",
-      "warm": "ליד חמים",
-      "cold": "ליד קר",
-      "none": "אין עדיין ציון"
-    },
-    "sentiment": {
-      "positive": "סנטימנט חיובי",
-      "neutral": "סנטימנט ניטרלי",
-      "negative": "סנטימנט שלילי"
-    },
-    "stage": {
-      "new": "שלב: חדש",
-      "interested": "שלב: מתעניין",
-      "considering": "שלב: שוקל",
-      "ready": "שלב: מוכן לקנות",
-      "customer": "שלב: לקוח",
-      "lost": "שלב: אבוד"
-    },
-    "urgency": {
-      "low": "דחיפות נמוכה",
-      "medium": "דחיפות בינונית",
-      "high": "דחוף"
-    },
-    "empty": "עוד לא נותח. לחצו על ״ניתוח AI״ כדי לקבל סיכום, צעד הבא והצעה מתאימה.",
-    "breakdown": "ממה מורכב הציון",
-    "factors": {
-      "status": "סטטוס",
-      "ai_lead": "ליד מהסוכן",
-      "engagement": "מעורבות",
-      "recency": "פעילות אחרונה",
-      "deals": "עסקאות",
-      "quotes": "הצעות מחיר",
-      "meeting": "פגישה קרובה",
-      "sentiment": "סנטימנט",
-      "details": "פרטי קשר",
-      "ai": "הערכת AI"
-    },
-    "nextAction": "הצעד הבא המומלץ",
-    "offer": "מה להציע",
-    "intent": "מה הלקוח רוצה",
-    "objections": "התנגדויות",
-    "bestChannel": "הערוץ הכי טוב לפנות בו: {channel}",
-    "channels": {
-      "whatsapp": "וואטסאפ",
-      "telegram": "טלגרם",
-      "sms": "SMS",
-      "email": "מייל",
-      "phone": "טלפון",
-      "web": "צ׳אט באתר"
-    },
-    "refresh": "רענון ציון",
-    "analyze": "ניתוח AI",
-    "scoreShort": "ציון",
-    "hotFilter": "לידים חמים"
-  },
-  "timeline": {
-    "title": "ציר זמן אחוד",
-    "subtitle": "כל ההודעות מכל הערוצים, עסקאות, הצעות מחיר, פגישות ופניות, במקום אחד",
-    "empty": "עוד אין פעילות ללקוח הזה",
-    "channels": {
-      "whatsapp": "וואטסאפ",
-      "whatsapp_qr": "וואטסאפ",
-      "telegram": "טלגרם",
-      "telegram_user": "טלגרם",
-      "sms": "SMS",
-      "email": "מייל",
-      "web": "צ׳אט באתר"
-    },
-    "fromCustomer": "מהלקוח",
-    "fromAI": "תשובת AI",
-    "fromOwnerPhone": "נשלח ממך בטלפון",
-    "fromTeam": "מהצוות",
-    "note": "הערה",
-    "appointment": "פגישה",
-    "ticket": "פנייה",
-    "form": "מילא טופס",
-    "deal": "עסקה",
-    "open": "פתיחה",
-    "more": "הצגת פעילות קודמת",
-    "identities": "דרכים שהלקוח פנה מהן",
-    "identityKinds": {
-      "phone": "טלפון",
-      "email": "מייל",
-      "telegram": "טלגרם",
-      "web": "צ׳אט באתר",
-      "other": "אחר"
-    },
-    "activity": {
-      "deal_auto_stage": "העסקה עברה אוטומטית לשלב {stage}",
-      "contact_merged": "אוחד עם איש קשר כפול ({name})",
-      "contact_analyzed": "ניתוח AI: ציון {score}",
-      "document_viewed": "הלקוח פתח את המסמך #{number}",
-      "quote_accepted": "הצעת מחיר #{number} אושרה",
-      "quote_signed": "הצעת מחיר #{number} נחתמה",
-      "task_done_from_reminder": "המשימה ״{title}״ סומנה כבוצעה מהתזכורת",
-      "task_snooze_from_reminder": "התזכורת ל״{title}״ נדחתה",
-      "contact_merged_auto": "אוחד אוטומטית",
-      "other": "פעילות במערכת",
-      "contact_opted_out": "הלקוח ביקש הסרה",
-      "contact_opted_in": "הלקוח ביקש לחזור לקבל הודעות",
-      "appointment_confirmed_by_customer": "הלקוח אישר הגעה לפגישה ״{title}״",
-      "appointment_canceled_by_customer": "הלקוח ביטל את הפגישה ״{title}״"
-    }
-  },
-  "contract": {
-    "require": "מסמך לחתימה (חוזה)",
-    "requireHint": "הלקוח יחתום בחתימה דיגיטלית לפני האישור. אחרי החתימה המסמך ננעל, ונשמרת טביעת אצבע (hash) שמוכיחה שלא שונה.",
-    "terms": "תנאי ההסכם",
-    "termsHint": "יופיעו מעל החתימה. אפשר לכתוב סעיפים בשורות נפרדות.",
-    "termsPlaceholder": "1. היקף העבודה…\n2. תנאי תשלום…\n3. ביטול…",
-    "signTitle": "חתימה דיגיטלית",
-    "drawHere": "חתמו כאן עם האצבע או העכבר",
-    "clear": "ניקוי",
-    "agree": "קראתי ואני מסכים/ה לתנאים",
-    "mustAgree": "יש לאשר את התנאים",
-    "sign": {
-      "required": "יש לחתום לפני האישור"
-    },
-    "signAndAccept": "חתימה ואישור",
-    "legal": "חתימה אלקטרונית לפי חוק חתימה אלקטרונית, התשס״א-2001. נשמרים מועד החתימה, כתובת IP מוצפנת וטביעת האצבע של המסמך.",
-    "awaiting": "ממתין לחתימת הלקוח",
-    "signedBy": "נחתם על ידי {name} · {date}",
-    "signatureAlt": "חתימת הלקוח",
-    "hash": "טביעת אצבע של המסמך",
-    "views": "צפיות",
-    "firstView": "צפייה ראשונה:",
-    "notViewed": "הלקוח עוד לא פתח את המסמך"
-  },
-  "orgPaypal": {
-    "title": "גבייה ל-PayPal של העסק",
-    "hint": "לקוחות משלמים על הצעות מחיר, חשבוניות וקישורי תשלום בכרטיס אשראי או ב-PayPal, והכסף נכנס ישירות לחשבון שלכם.",
-    "step1": "נכנסים ל-developer.paypal.com ← Apps & Credentials ← Live.",
-    "step2": "יוצרים App ומעתיקים Client ID ו-Secret.",
-    "step3": "מדביקים כאן ושומרים. הפרטים נבדקים מול PayPal ונשמרים מוצפנים.",
-    "clientId": "Client ID",
-    "secret": "Secret",
-    "mode": "סביבה",
-    "modes": {
-      "live": "אמיתי (Live)",
-      "sandbox": "בדיקות (Sandbox)"
-    },
-    "connect": "חיבור",
-    "update": "עדכון",
-    "connected": "PayPal חובר בהצלחה",
-    "connectedBadge": "מחובר · {mode}",
-    "notConnected": "לא מחובר",
-    "disconnect": "ניתוק",
-    "disconnected": "PayPal נותק",
-    "verifyFailed": "PayPal דחה את הפרטים. בדקו את ה-Client ID, ה-Secret והסביבה",
-    "badClientId": "Client ID לא תקין",
-    "badSecret": "Secret לא תקין"
-  },
-  "invoicing": {
-    "title": "חשבוניות מס אוטומטיות",
-    "hint": "חברו את Morning (חשבונית ירוקה) או iCount, וכל תשלום שנרשם יקבל חשבונית מס-קבלה רשמית שנשלחת ללקוח.",
-    "none": "לא מחובר",
-    "connectedTo": "מחובר ל-{provider}",
-    "provider": "שירות",
-    "providers": {
-      "morning": "Morning (חשבונית ירוקה)",
-      "icount": "iCount"
-    },
-    "docType": "סוג מסמך",
-    "types": {
-      "invoice_receipt": "חשבונית מס-קבלה",
-      "receipt": "קבלה"
-    },
-    "keyId": "API Key ID",
-    "keySecret": "API Key Secret",
-    "apiToken": "API Token",
-    "auto": "להפיק חשבונית אוטומטית לכל תשלום",
-    "sandbox": "סביבת בדיקות (Sandbox)",
-    "whereMorning": "את המפתחות יוצרים ב-Morning: הגדרות ← כלים למפתחים ← מפתחות API.",
-    "whereIcount": "את הטוקן יוצרים ב-iCount: הגדרות ← API ← יצירת טוקן.",
-    "connect": "חיבור",
-    "update": "עדכון",
-    "connected": "שירות החשבוניות חובר",
-    "disconnect": "ניתוק",
-    "disconnected": "שירות החשבוניות נותק",
-    "invalid": "פרטים לא תקינים",
-    "verifyFailed": "השירות דחה את הפרטים. בדקו את המפתחות",
-    "lastError": "שגיאה אחרונה: {error}",
-    "working": "עובד",
-    "issueNow": "הפקת חשבונית מס",
-    "issued": "חשבונית מס #{number}",
-    "issuedToast": "חשבונית המס הופקה ונשלחה ללקוח",
-    "failed": "הפקת החשבונית נכשלה",
-    "notConnected": "קודם מחברים שירות חשבוניות בהגדרות הכספים"
-  },
-  "payLink": {
-    "button": "קישור תשלום",
-    "title": "קישור תשלום ללקוח",
-    "subtitle": "נוצרת חשבונית עם קישור לתשלום בכרטיס, והיא נשלחת ללקוח בערוץ שלו",
-    "amount": "סכום ({currency})",
-    "description": "עבור מה",
-    "descriptionPlaceholder": "מקדמה לפרויקט",
-    "vatIncluded": "הסכום כולל מע״מ",
-    "create": "יצירה ושליחה",
-    "sent": "הקישור נשלח ללקוח",
-    "createdNotSent": "הקישור נוצר, אבל לא נשלח. העתיקו ושלחו אותו ידנית",
-    "hint": "הלקוח משלם בכרטיס או ב-PayPal. התשלום נרשם אוטומטית, והעסקה מתקדמת לשלב הבא.",
-    "invalid": "פרטים לא תקינים"
-  },
-  "stageAuto": {
-    "button": "מעבר אוטומטי",
-    "title": "מעבר אוטומטי לשלב ״{stage}״",
-    "subtitle": "העסקה של הלקוח עוברת לשלב הזה לבד כשקורה אחד מהאירועים",
-    "when": "מתי",
-    "marksWon": "שלב זה מסמן את העסקה כזכייה",
-    "hint": "עסקה אף פעם לא חוזרת אחורה אוטומטית, רק מתקדמת.",
-    "saved": "המעבר האוטומטי נשמר",
-    "events": {
-      "quote_sent": "הצעת מחיר נשלחה",
-      "quote_viewed": "הלקוח פתח את ההצעה",
-      "quote_accepted": "הצעת מחיר אושרה",
-      "contract_signed": "חוזה נחתם",
-      "deposit_paid": "שולמה מקדמה",
-      "invoice_paid": "חשבונית שולמה במלואה",
-      "appointment_booked": "נקבעה פגישה",
-      "ai_lead": "הסוכן זיהה ליד",
-      "ai_lead_hot": "הסוכן זיהה ליד חם",
-      "form_submitted": "מילא טופס"
-    }
-  },
-  "taskRemind": {
-    "label": "תזכורת",
-    "hint": "נשלחת לך ב-WhatsApp, בטלגרם, ב-SMS או במייל (״הערוצים שלי״ בהגדרות), עם כפתור ״בוצע״",
-    "options": {
-      "none": "ללא תזכורת",
-      "0": "בזמן היעד",
-      "15": "15 דקות לפני",
-      "60": "שעה לפני",
-      "1440": "יום לפני"
-    }
-  },
-  "act": {
-    "title": "אישור פעולה",
-    "invalid": "הקישור לא תקין או שפג תוקפו",
-    "apptClosed": "הפגישה כבר בוטלה או הסתיימה",
-    "apptPast": "מועד הפגישה כבר עבר",
-    "taskDone": "המשימה ״{title}״ סומנה כבוצעה ✅",
-    "taskSnoozed": "נזכיר לך שוב בעוד 15 דקות ⏰",
-    "taskClosed": "המשימה כבר נסגרה",
-    "apptConfirmed": "תודה! ההגעה אושרה ✅",
-    "apptCanceled": "הפגישה בוטלה. נשמח לקבוע מועד אחר",
-    "ask": {
-      "task_done": "לסמן את המשימה כבוצעה?",
-      "task_snooze": "לדחות את התזכורת ב-15 דקות?",
-      "appt_confirm": "לאשר שתגיע/י לפגישה?",
-      "appt_cancel": "לבטל את הפגישה?"
-    },
-    "buttons": {
-      "task_done": "✅ בוצע",
-      "task_snooze": "⏰ עוד 15 דקות",
-      "appt_confirm": "✅ מאשר/ת הגעה",
-      "appt_cancel": "ביטול הפגישה"
-    }
-  },
-  "myChannels": {
-    "title": "הערוצים שלי",
-    "subtitle": "לאן לשלוח לך תזכורות, פגישות, לידים שמנותבים אליך ושיחות דחופות",
-    "hint": "רק את/ה מקבל/ת את ההודעות האלה. אפשר להוסיף עד 6 ערוצים.",
-    "added": "הערוץ נוסף",
-    "needBot": "כדי לקבל בטלגרם, קודם מחברים בוט טלגרם בעמוד החיבורים",
-    "telegramHint": "ייווצר קישור אישי ל-{bot}. פותחים אותו ולוחצים Start",
-    "tooMany": "אפשר עד 6 ערוצים אישיים",
-    "events": {
-      "tasks": "תזכורות משימה",
-      "appointments": "פגישות",
-      "escalation": "שיחות דחופות",
-      "leads": "לידים שמנותבים אליי",
-      "handoff": "בקשה לנציג"
-    }
-  },
-  "routing": {
-    "title": "ניתוב לידים",
-    "subtitle": "כל ליד חדש מקבל אחראי מהצוות אוטומטית",
-    "hint": "סבב שווה מחלק לפי התור. ״הכי פחות עמוס״ בוחר את מי שיש לו הכי מעט לידים ושיחות פתוחים. מי שסימן ״לא זמין״ מדולג.",
-    "mode": "שיטה",
-    "modes": {
-      "off": "כבוי",
-      "round_robin": "סבב שווה (Round robin)",
-      "least_loaded": "הכי פחות עמוס"
-    },
-    "members": "מי משתתף",
-    "contacts": "אנשי קשר חדשים",
-    "conversations": "שיחות חדשות בתיבת ההודעות",
-    "saved": "הניתוב נשמר",
-    "invalid": "הגדרות לא תקינות",
-    "available": "את/ה זמין/ה ללידים חדשים",
-    "away": "את/ה לא זמין/ה ללידים חדשים",
-    "setAway": "סימון לא זמין",
-    "setAvailable": "סימון זמין",
-    "nowAvailable": "סומנת כזמין/ה",
-    "nowAway": "סומנת כלא זמין/ה",
-    "assignedNotification": "ליד חדש נותב אליך: {name}"
-  },
-  "calendar": {
-    "title": "היומן שלי (Google / Outlook)",
-    "subtitle": "פגישות שנקבעות נכנסות ליומן שלך, וזמנים תפוסים ביומן נחסמים בעמוד ההזמנה",
-    "hint": "סנכרון דו-כיווני. אפשר לחבר יומן אחד מכל סוג.",
-    "connect": "חיבור {provider}",
-    "disconnect": "ניתוק",
-    "disconnected": "היומן נותק",
-    "push": "להוסיף פגישות ליומן",
-    "block": "לחסום זמנים תפוסים בהזמנות",
-    "ok": "מסונכרן",
-    "error": "שגיאת סנכרון",
-    "lastSync": "סנכרון אחרון: {date}",
-    "neverSynced": "עוד לא סונכרן",
-    "notConfigured": "חיבור {provider} עוד לא הוגדר בשרת (מפתחות OAuth)",
-    "providers": {
-      "google": "Google Calendar",
-      "microsoft": "Outlook / Microsoft 365"
-    },
-    "status": {
-      "connected": "היומן חובר בהצלחה",
-      "failed": "חיבור היומן נכשל. נסו שוב",
-      "forbidden": "סנכרון יומן זמין במסלול Pro",
-      "not_configured": "חיבור יומן עוד לא הוגדר בשרת",
-      "cancelled": "החיבור בוטל"
-    }
-  },
-  "guard": {
-    "ownerAI": "הסוכן מטפל",
-    "ownerHuman": "נציג מטפל",
-    "humanAnswered": "נציג כבר ענה",
-    "optedOut": "ביקש/ה הסרה",
-    "consentYes": "מאשר/ת דיוור",
-    "serviceOnly": "הודעות שירות בלבד",
-    "pendingCount": "{count} הודעות מתוזמנות",
-    "inHours": "בעוד {hours} שעות",
-    "cancel": "ביטול",
-    "canceled": "ההודעה המתוזמנת בוטלה",
-    "cancelsOnReply": "תתבטל אם הלקוח יענה",
-    "cancelOnReply": "לבטל אוטומטית אם הלקוח עונה לפני כן",
-    "whyNot": "למה הודעות לא נשלחו",
-    "markOut": "סימון הסרה",
-    "markIn": "ביטול הסרה",
-    "confirmOptOut": "לסמן שהלקוח ביקש הסרה? כל ההודעות האוטומטיות והקמפיינים אליו ייעצרו בכל הערוצים.",
-    "schedule": "תזמון הודעה",
-    "scheduleTitle": "תזמון הודעה ללקוח",
-    "scheduleHint": "ההודעה תישלח במועד שבחרת, רק אם עדיין מותר: הלקוח לא ביקש הסרה, ובמידת הצורך לא ענה בינתיים.",
-    "message": "ההודעה",
-    "when": "מתי לשלוח",
-    "scheduleRules": "בשעות שקטות ההודעה תחכה לבוקר. ב-WhatsApp הרשמי אפשר לשלוח רק בתוך 24 שעות מההודעה האחרונה של הלקוח.",
-    "scheduleSubmit": "תזמון",
-    "scheduled": "ההודעה תוזמנה",
-    "badTime": "המועד חייב להיות בעתיד, ועד 60 יום קדימה",
-    "policyTitle": "כללי הודעות אוטומטיות",
-    "policySubtitle": "מצב אחד לכל הערוצים: הסכמה, בעלות על השיחה, ניסיונות ושעות שקטות",
-    "policyHint": "כל הודעה אוטומטית נבדקת לפני שליחה, בכל הערוץ: תשובת AI, מעקב, הודעה מתוזמנת, רצף, קמפיין, אוטומציה ותזכורת.",
-    "rule1": "לקוח שכתב ״הסר״ / STOP בכל ערוץ לא יקבל יותר הודעות אוטומטיות וקמפיינים בשום ערוץ.",
-    "rule2": "כשנציג עונה או לוקח שיחה, כל המעקבים האוטומטיים ללקוח מתבטלים מיד.",
-    "rule3": "תשובה של הלקוח מבטלת מיד מעקב מתוכנן, למשל ״אחרי 3 שעות בלי מענה״.",
-    "rule4": "מגבלות ניסיונות, מרווחים, מכסה יומית ושעות שקטות חלות על כל הערוצים יחד.",
-    "followupMax": "מעקבים מקסימום ללא תשובה",
-    "followupGap": "שעות בין מעקבים",
-    "minGap": "מרווח מינימלי בין הודעות אוטומטיות (דקות)",
-    "dailyCap": "מקסימום הודעות אוטומטיות ללקוח ביום",
-    "quietStart": "שעות שקטות: מ-",
-    "quietEnd": "עד",
-    "optOutReply": "לשלוח אישור קצר כשלקוח מבקש הסרה",
-    "policySaved": "הכללים נשמרו",
-    "kinds": {
-      "ai_reply": "תשובת AI",
-      "followup": "מעקב #{step}",
-      "scheduled": "הודעה מתוזמנת",
-      "sequence": "רצף, שלב {step}",
-      "campaign": "קמפיין",
-      "automation": "אוטומציה",
-      "reminder": "תזכורת",
-      "human": "נציג"
-    },
-    "reasons": {
-      "ok": "מותר",
-      "opted_out": "הלקוח ביקש הסרה",
-      "no_consent": "אין אישור דיוור",
-      "human_owns": "נציג מטפל בשיחה",
-      "human_answered": "נציג כבר ענה (בערוץ כלשהו)",
-      "customer_replied": "הלקוח כבר ענה",
-      "max_attempts": "הגענו למספר המעקבים המקסימלי",
-      "never_wrote": "הלקוח מעולם לא כתב",
-      "too_soon": "מוקדם מדי אחרי הודעה קודמת",
-      "daily_cap": "הגענו למכסה היומית",
-      "outside_24h": "מחוץ לחלון 24 השעות של WhatsApp / Telegram",
-      "quiet_hours": "שעות שקטות",
-      "not_found": "השיחה לא נמצאה",
-      "already_sent": "כבר נשלחה",
-      "already_canceled": "כבר בוטלה",
-      "already_skipped": "כבר דולגה",
-      "already_failed": "כבר נכשלה",
-      "already_processing": "כבר בשליחה",
-      "canceled_by_team": "בוטלה על ידי הצוות",
-      "replanned": "תוזמנה מחדש",
-      "guard_error": "בדיקה נכשלה, לא נשלח מטעמי בטיחות",
-      "guard_missing": "מותר"
-    },
-    "markedOut": "הלקוח סומן כמי שביקש הסרה. כל ההודעות האוטומטיות נעצרו",
-    "markedIn": "הלקוח יכול שוב לקבל הודעות",
-    "tooMany": "יותר מדי הודעות מתוזמנות לשיחה הזו"
-  },
-  "copilot": {
-    "suggest": "הצעות תשובה",
-    "suggestions": "תשובות מוצעות",
-    "clickToUse": "לחיצה מכניסה את התשובה לתיבה, ואפשר לערוך לפני שליחה",
-    "summarize": "סיכום השיחה",
-    "summaryTitle": "סיכום השיחה",
-    "nextStep": "הצעד הבא",
-    "noFields": "לא זוהו פרטים חדשים",
-    "apply": "שמירת הפרטים בכרטיס הלקוח",
-    "applied": "הפרטים נשמרו בכרטיס הלקוח",
-    "badAnswer": "ה-AI לא החזיר תשובה תקינה. נסו שוב",
-    "noMessages": "אין עדיין הודעות לסכם",
-    "fields": {
-      "first_name": "שם פרטי",
-      "last_name": "שם משפחה",
-      "phone": "טלפון",
-      "email": "מייל",
-      "company": "חברה",
-      "need": "צורך",
-      "budget": "תקציב"
-    },
-    "emailTaken": "המייל הזה כבר שייך לאיש קשר אחר"
-  },
-  "video": {
-    "button": "שיחת וידאו",
-    "sent": "קישור לשיחת וידאו נשלח ללקוח",
-    "invite": "📹 הצטרפו לשיחת וידאו: {url}",
-    "createdNotSent": "החדר נוצר, אבל הקישור לא נשלח. העתיקו ושלחו אותו ידנית"
-  },
-  "voice": {
-    "title": "סוכן קולי בטלפון (Twilio)",
-    "subtitle": "הסוכן עונה לשיחות למספר ה-Twilio שלכם, ומתקשר לצוות במקרים דחופים",
-    "webhookHint": "ב-Twilio ← Phone Numbers ← המספר שלכם ← Voice Configuration ← A call comes in, מדביקים את הכתובת הזו (HTTP POST):",
-    "ready": "פעיל",
-    "callButton": "שיחה עם הסוכן",
-    "confirmCall": "הסוכן הקולי יתקשר עכשיו ללקוח. להמשיך?",
-    "calling": "הסוכן מתקשר ללקוח…",
-    "callFailed": "השיחה לא יצאה. בדקו את חיבור Twilio",
-    "notConnected": "קודם מחברים Twilio (SMS) בעמוד החיבורים",
-    "noPhone": "ללקוח אין מספר טלפון"
-  },
-  "rails": {
-    "title": "בקרת איכות לסוכן",
-    "subtitle": "מתי להעביר לנציג, מה אסור לכתוב, וכמה תשובות ביום",
-    "angry": "לקוח כועס? להעביר לנציג",
-    "angryHint": "הסוכן מזהה תסכול, איומים או בקשה לביטול, ומעביר לנציג עם התראה",
-    "price": "לא להמציא מחירים",
-    "priceHint": "תשובה עם מחיר שלא מופיע בנתוני העסק לא תישלח, והשיחה תועבר לנציג",
-    "kb": "לענות לפי מאגר הידע",
-    "kbHint": "הסוכן משתמש במאמרים של מרכז העזרה כדי לענות מדויק",
-    "voice": "תשובות קוליות",
-    "voiceHint": "כשהלקוח שולח הקלטה, הסוכן עונה גם בהקלטה",
-    "voiceNeedsKey": "דורש מפתח ElevenLabs או OpenAI בשרת",
-    "banned": "ביטויים אסורים",
-    "bannedHint": "שורה לכל ביטוי. תשובה שמכילה אחד מהם לא תישלח",
-    "bannedPlaceholder": "הנחה מובטחת\nהחזר כספי מלא",
-    "maxReplies": "מקסימום תשובות AI לשיחה ביום",
-    "maxRepliesHint": "מעבר לזה השיחה עוברת לנציג (שומר על התקציב)",
-    "saved": "הבקרות נשמרו",
-    "invalid": "הגדרות לא תקינות",
-    "handoffText": "אני מעביר את השיחה לנציג מהצוות שיחזור אליך בהקדם 🙏"
-  },
-  "flows": {
-    "title": "תסריטי שיחה (Flow builder)",
-    "subtitle": "שאלות קבועות וכפתורים לפני שה-AI נכנס: תפריט, סינון לידים, קביעת תור",
-    "hint": "תסריט מתחיל כשהלקוח כותב מילת מפתח, או בהודעה הראשונה שלו. בסוף התסריט ה-AI ממשיך כרגיל.",
-    "empty": "תסריט חדש",
-    "newFlow": "תסריט חדש",
-    "name": "שם התסריט",
-    "enabled": "פעיל",
-    "on": "פעיל",
-    "off": "כבוי",
-    "firstMessage": "להתחיל בהודעה הראשונה של לקוח חדש",
-    "keywords": "מילות מפתח",
-    "keywordsHint": "מופרדות בפסיק. לדוגמה: תפריט, מחירים",
-    "kwMenu": "תפריט",
-    "type": "סוג שלב",
-    "field": "לשמור כ-",
-    "text": "טקסט",
-    "buttonLabel": "טקסט הכפתור",
-    "addButton": "כפתור",
-    "addStep": "הוספת שלב",
-    "then": "ואז",
-    "nextNone": "סיום",
-    "aiTakesOver": "בסוף התסריט ה-AI ממשיך את השיחה עם כל מה שנאסף",
-    "rules": "עד 30 שלבים. תשובה לא תקינה, כמו טלפון שגוי, נשאלת שוב.",
-    "stats": "{runs} התחלות · {done} סיומים",
-    "saved": "התסריט נשמר",
-    "deleted": "התסריט נמחק",
-    "invalid": "התסריט לא תקין",
-    "badLink": "שלב מפנה לשלב שלא קיים",
-    "duplicateStep": "יש שני שלבים עם אותו מזהה",
-    "needButtons": "שלב כפתורים צריך לפחות כפתור אחד",
-    "tplMenu": "תפריט ראשי",
-    "tplMenuQ": "היי! במה אפשר לעזור? 👇",
-    "tplPrices": "💰 מחירים",
-    "tplBook": "📅 קביעת תור",
-    "tplHuman": "🙋 נציג",
-    "tplQualify": "סינון ליד",
-    "welcome": "היי! אשאל כמה שאלות קצרות כדי לעזור הכי טוב 🙂",
-    "askNeed": "מה מחפשים?",
-    "askWhen": "מתי זה רלוונטי?",
-    "now": "עכשיו",
-    "thisMonth": "החודש",
-    "justChecking": "רק בודק/ת",
-    "askName": "איך קוראים לך?",
-    "askPhone": "מה מספר הטלפון לחזרה?",
-    "thanks": "תודה! קיבלנו את הפרטים ונחזור אליך בהקדם 🙏",
-    "thanksHuman": "תודה! נציג מהצוות יחזור אליך בהקדם 🙏",
-    "toHuman": "מעביר לנציג מהצוות 🙋",
-    "types": {
-      "message": "הודעה",
-      "buttons": "שאלה עם כפתורים",
-      "collect": "איסוף פרט",
-      "handoff": "העברה לנציג",
-      "ai": "מעבר ל-AI",
-      "end": "סיום"
-    },
-    "placeholders": {
-      "message": "מה לכתוב ללקוח",
-      "buttons": "השאלה שמעל הכפתורים",
-      "collect": "השאלה, למשל: מה מספר הטלפון?",
-      "handoff": "הודעה לפני ההעברה",
-      "ai": "הנחיה ל-AI (לא חובה)",
-      "end": "הודעת סיום"
-    },
-    "fields": {
-      "name": "שם",
-      "phone": "טלפון",
-      "email": "מייל",
-      "need": "צורך",
-      "budget": "תקציב",
-      "date": "תאריך",
-      "custom": "שדה חופשי"
-    }
-  },
-  "kb": {
-    "title": "מאגר ידע",
-    "subtitle": "מאמרי עזרה שהלקוחות מוצאים במרכז העזרה, והסוכן משתמש בהם כדי לענות",
-    "articles": "{count} מאמרים",
-    "aiHint": "כש״לענות לפי מאגר הידע״ פעיל בסוכן, הוא מחפש כאן לפני כל תשובה",
-    "openPublic": "מרכז העזרה הציבורי",
-    "new": "מאמר חדש",
-    "edit": "עריכת מאמר",
-    "articleTitle": "כותרת",
-    "titlePlaceholder": "איך מבטלים תור?",
-    "category": "קטגוריה",
-    "categoryPlaceholder": "תורים",
-    "body": "תוכן",
-    "bodyHint": "טקסט פשוט. שורה ריקה מתחילה פסקה חדשה",
-    "published": "מפורסם במרכז העזרה",
-    "draft": "טיוטה",
-    "saved": "המאמר נשמר",
-    "deleted": "המאמר נמחק",
-    "empty": "עוד אין מאמרים. כתבו את השאלות שהלקוחות שואלים הכי הרבה",
-    "stats": "{views} צפיות · {helpful} מצאו מועיל",
-    "publicTitle": "מרכז העזרה של {org}",
-    "searchPlaceholder": "חפשו תשובה…",
-    "noResults": "לא נמצאו מאמרים. אפשר לפתוח פנייה למטה",
-    "back": "חזרה למרכז העזרה",
-    "updated": "עודכן {date}",
-    "helpful": "זה עזר לי",
-    "thanks": "תודה על המשוב!"
-  },
-  "abtest": {
-    "title": "בדיקת A/B לכותרת האתר",
-    "hint": "חצי מהמבקרים רואים גרסה A וחצי רואים גרסה B. ההמרה נמדדת לפי מילוי טופס. כשיש מנצחת ברורה, היא נשארת באתר אוטומטית.",
-    "running": "רצה",
-    "variantA": "גרסה A (הנוכחית)",
-    "variantB": "גרסה B",
-    "aiVariant": "AI יכתוב גרסה B",
-    "minViews": "מינימום מבקרים לכל גרסה",
-    "minViewsHint": "לפני שמכריזים על מנצחת (ובוודאות של 95%)",
-    "variant": "גרסה",
-    "visitors": "מבקרים",
-    "conversions": "המרות",
-    "rate": "שיעור המרה",
-    "winner": "מנצחת",
-    "collecting": "אוספים נתונים…",
-    "leading": "גרסה {winner} מובילה (ודאות {conf}%)",
-    "decided": "הבדיקה הסתיימה. גרסה {winner} ניצחה ונשארת באתר",
-    "start": "התחלת הבדיקה",
-    "keepA": "עצירה והשארת A",
-    "keepB": "עצירה והשארת B",
-    "started": "הבדיקה התחילה",
-    "saved": "הגרסה נשמרה",
-    "stopped": "הבדיקה נעצרה",
-    "invalid": "פרטים לא תקינים",
-    "needChange": "שנו לפחות את הכותרת, הטקסט או הכפתור בגרסה B",
-    "needHero": "לבדיקת A/B צריך בלוק כותרת ראשית (Hero) באתר",
-    "decidedNotification": "🏆 בדיקת A/B באתר {site}: גרסה {winner} ניצחה"
-  },
-  "cmd": {
-    "title": "פעולות מהירות",
-    "searchContacts": "Enter: חיפוש ״{q}״ באנשי הקשר",
-    "newContact": "ליד / איש קשר חדש",
-    "newTask": "משימה חדשה",
-    "newQuote": "הצעת מחיר חדשה",
-    "newInvoice": "חשבונית חדשה",
-    "newCampaign": "קמפיין חדש",
-    "newAutomation": "אוטומציה חדשה",
-    "newForm": "טופס חדש",
-    "newSite": "אתר חדש",
-    "inbox": "תיבת ההודעות",
-    "appointments": "יומן ופגישות",
-    "pipelines": "עסקאות",
-    "analytics": "דוחות ו-ROI",
-    "aiAgents": "סוכני AI",
-    "support": "פניות שירות",
-    "kb": "מאגר ידע",
-    "integrations": "חיבורים",
-    "settings": "הגדרות",
-    "billing": "מנוי וחיוב"
-  },
-  "conversions": {
-    "title": "המרות לפלטפורמות פרסום",
-    "hint": "כל ליד, פגישה ותשלום נשלחים מהשרת ל-Meta, ל-Google Analytics 4 ול-TikTok. כך הקמפיינים מתאפטמים גם כשחוסמי פרסומות או iOS מסתירים את הפיקסל. מייל וטלפון נשלחים רק מוצפנים (SHA-256).",
-    "provider": "פלטפורמה",
-    "providers": {
-      "meta_capi": "Meta (Facebook / Instagram)",
-      "ga4": "Google Analytics 4",
-      "tiktok": "TikTok"
-    },
-    "pixelId": "Pixel ID",
-    "measurementId": "Measurement ID",
-    "pixelCode": "Pixel Code",
-    "accessToken": "Access Token",
-    "apiSecret": "API Secret",
-    "testCode": "קוד בדיקה (לא חובה)",
-    "testCodeHint": "מאפשר לראות את האירועים ב-Test Events. מוחקים אותו אחרי הבדיקה",
-    "events": "אילו אירועים לשלוח",
-    "ev": {
-      "Lead": "ליד חדש",
-      "Schedule": "פגישה נקבעה",
-      "Purchase": "תשלום / רכישה"
-    },
-    "requireConsent": "לשלוח רק עבור לקוחות שאישרו דיוור (מומלץ)",
-    "where": {
-      "meta_capi": "ב-Events Manager ← הפיקסל ← Settings ← Conversions API ← Generate access token.",
-      "ga4": "ב-GA4 ← Admin ← Data streams ← הזרם שלכם ← Measurement Protocol API secrets ← Create.",
-      "tiktok": "ב-TikTok Ads Manager ← Assets ← Events ← Web Events ← הפיקסל ← Settings ← Generate Access Token."
-    },
-    "connect": "חיבור",
-    "update": "עדכון",
-    "disconnect": "ניתוק",
-    "saved": "החיבור נשמר",
-    "disconnected": "החיבור נותק",
-    "invalid": "מזהה לא תקין. בדקו את הפורמט",
-    "badId": "מזהה לא תקין",
-    "notConnected": "קודם מחברים את הפלטפורמה",
-    "test": "שליחת אירוע בדיקה",
-    "testOk": "אירוע הבדיקה התקבל ✔",
-    "testFailed": "הפלטפורמה דחתה את האירוע: {error}",
-    "lastError": "שגיאה אחרונה: {error}",
-    "working": "עובד"
-  },
-  "push": {
-    "title": "התראות בטלפון ובמחשב",
-    "hint": "כל התראה במערכת, כמו ליד חדש, תזכורת, פגישה או בקשה לנציג, תקפוץ גם כשהאפליקציה סגורה",
-    "enable": "הפעלה במכשיר הזה",
-    "disable": "כיבוי במכשיר הזה",
-    "test": "שליחת התראת בדיקה",
-    "enabled": "ההתראות הופעלו במכשיר הזה",
-    "disabled": "ההתראות כובו במכשיר הזה",
-    "denied": "הדפדפן חוסם התראות. אפשרו אותן בהגדרות האתר",
-    "failed": "ההפעלה נכשלה. נסו שוב",
-    "unsupported": "הדפדפן הזה לא תומך בהתראות",
-    "iosNote": "ב-iPhone: קודם מוסיפים את האפליקציה למסך הבית (שיתוף ← הוסף למסך הבית), ואז מפעילים",
-    "invalid": "המנוי לא תקין",
-    "notConfigured": "התראות Push עוד לא הוגדרו בשרת (מפתחות VAPID)",
-    "noDevices": "עוד לא הפעלת התראות באף מכשיר",
-    "testBody": "✅ ההתראות עובדות במכשיר הזה",
-    "testSent": "התראת בדיקה נשלחה",
-    "testFailed": "השליחה נכשלה. נסו לכבות ולהפעיל מחדש"
-  },
-  "growth": {
-    "title": "צמיחה: ROI, עלות לקוח, ערך לקוח ותחזית",
-    "subtitle": "כמה כל מקור הביא, כמה עלה, ומה צפוי בשלושת החודשים הבאים",
-    "revenue": "הכנסות",
-    "spend": "הוצאות שיווק",
-    "roas": "החזר על פרסום (ROAS)",
-    "roiValue": "ROI {roi}",
-    "addSpend": "הוסיפו הוצאות כדי לראות ROI",
-    "cac": "עלות רכישת לקוח (CAC)",
-    "newCustomers": "{count} לקוחות משלמים חדשים",
-    "ltv": "ערך חיי לקוח (LTV)",
-    "ltvSub": "{orders} רכישות בממוצע · {months} חודשים",
-    "ltvCac": "יחס LTV ל-CAC",
-    "ltvCacGood": "מצוין: 3:1 ומעלה",
-    "ltvCacLow": "נמוך: כדאי להוזיל את רכישת הלקוחות או להגדיל את ערכם",
-    "runRate": "קצב הכנסות",
-    "perMonth": "ממוצע לחודש, 3 חודשים אחרונים",
-    "forecast3": "תחזית ל-3 חודשים",
-    "bySource": "לפי מקור",
-    "bySourceHint": "לקוח שייך למקור שממנו הגיע. הכנסות מתשלומים שנרשמו בתקופה",
-    "leads": "לידים",
-    "customers": "לקוחות",
-    "forecastTitle": "תחזית הכנסות",
-    "forecastHint": "קצב ההכנסות הנוכחי ועוד עסקאות פתוחות, משוקללות לפי הסיכוי בכל שלב ותאריך הסגירה הצפוי",
-    "weightedDeals": "עסקאות משוקללות",
-    "spendTitle": "הוצאות שיווק לפי חודש",
-    "spendHint": "הזינו כמה הוצאתם על כל מקור, כמו פייסבוק, גוגל או אינסטגרם, כדי לחשב ROI ועלות לקוח",
-    "month": "חודש",
-    "amount": "סכום",
-    "note": "הערה",
-    "noSpend": "עוד לא הוזנו הוצאות",
-    "spendSaved": "ההוצאה נשמרה",
-    "invalidSpend": "פרטים לא תקינים",
-    "aiTitle": "מה המספרים אומרים",
-    "aiRun": "הסבר ב-AI",
-    "aiHint": "AI יסביר מה משתלם, מה כדאי לעצור ומה צפוי, רק לפי הנתונים שלכם"
-  },
-  "credits": {
-    "title": "קרדיטים נוספים ל-AI",
-    "hint": "הקרדיטים לא פגים, ומשמשים רק אחרי שמכסת ה-AI החודשית של המסלול נגמרת",
-    "balance": "יתרה: {n} קרדיטים",
-    "packCredits": "{n} קרדיטים",
-    "buyCard": "כרטיס / PayPal",
-    "buyCrypto": "קריפטו",
-    "added": "הקרדיטים נוספו לחשבון ✔",
-    "processing": "התשלום בעיבוד. הקרדיטים יתווספו ברגע שיאושר",
-    "failed": "התשלום לא הושלם. לא חויבתם",
-    "unknownPack": "החבילה לא קיימת",
-    "addedNotification": "⚡ נוספו {credits} קרדיטים ל-AI"
-  },
-  "followupMood": {
-    "negativeNotification": "😟 {name} לא נשמע/ה מרוצה. המעקב האוטומטי נעצר, כדאי שמישהו מהצוות יחזור אליו/ה"
   }
 }

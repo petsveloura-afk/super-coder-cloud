@@ -4,8 +4,6 @@ import { ArrowLeft, ArrowRight, Bot, Globe, Inbox, Mail, MessageCircle, Plug, Qr
 import { uuidSchema } from "@scc/shared/validators";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { AiModeToggle, ConversationControls, LiveRefresh, MarkRead, ReplyBox } from "@/components/inbox/inbox-client";
-import { ConversationTools } from "@/components/inbox/conversation-tools";
-import { ConversationStatePanel, type ConversationStateView } from "@/components/inbox/conversation-state";
 
 // icons resolved on the server (objects exported from client modules are only references here)
 const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone, whatsapp_qr: QrCode, email: Mail, web: Globe, telegram_user: UserRound } as const;
@@ -87,8 +85,6 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
       .maybeSingle();
     selected = (data as ConvRow | null) ?? null;
   }
-  // conversation guard: one state for all channels (ownership, consent, planned items, blocked reasons)
-  const guardState = selected ? ((await supabase.rpc("conversation_state", { p_conversation: selected.id })).data as ConversationStateView | null) : null;
   const { data: msgs } = selected
     ? await supabase.from("messages").select("id, direction, body, status, error, created_at, sent_by, media, ai_agent_id, meta").eq("organization_id", ctx.org.id).eq("conversation_id", selected.id).order("created_at").limit(300)
     : { data: [] };
@@ -186,7 +182,6 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
               {ctx.can("inbox.reply") ? <AiModeToggle conversationId={selected.id} mode={selected.ai_mode ?? "auto"} /> : null}
               {ctx.can("inbox.reply") ? <ConversationControls conversationId={selected.id} status={selected.status} assigneeId={selected.assignee_id} members={members} /> : null}
             </header>
-            {guardState ? <ConversationStatePanel conversationId={selected.id} state={guardState} canReply={ctx.can("inbox.reply")} /> : null}
             <ol className="flex-1 space-y-2 overflow-y-auto p-4" aria-live="polite">
               {(msgs ?? []).map((m) => {
                 const out = m.direction === "out";
@@ -212,16 +207,6 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                       <p className="whitespace-pre-wrap break-words" dir="auto">
                         {(m.body as string) || (m.media ? "📎" : "")}
                       </p>
-                      {typeof (m.meta as { transcript?: string } | null)?.transcript === "string" && (m.meta as { transcript: string }).transcript !== m.body ? (
-                        <p className="mt-1 rounded-lg bg-surface/60 px-2 py-1 text-[12.5px] text-muted" dir="auto" data-testid="voice-transcript">
-                          🎙️ {(m.meta as { transcript: string }).transcript}
-                        </p>
-                      ) : null}
-                      {typeof (m.meta as { vision?: string } | null)?.vision === "string" ? (
-                        <p className="mt-1 rounded-lg bg-surface/60 px-2 py-1 text-[12.5px] text-muted" dir="auto" data-testid="vision-note">
-                          🖼️ {(m.meta as { vision: string }).vision}
-                        </p>
-                      ) : null}
                       <p className={cn("mt-1 text-[10.5px]", out && !m.ai_agent_id ? "text-accent-fg/75" : "text-subtle")}>
                         {formatDateTime(locale, m.created_at as string)}
                         {out ? ` · ${t(`inbox.status.${m.status}`)}${m.sent_by ? ` · ${memberName.get(m.sent_by as string) ?? ""}` : ""}` : ""}
@@ -232,9 +217,6 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                 );
               })}
             </ol>
-            {ctx.can("inbox.reply") ? (
-              <ConversationTools conversationId={selected.id} currency={ctx.org.currency || "ILS"} canAI={ctx.can("ai.use")} canFinance={ctx.can("finance.write")} canWriteContacts={ctx.can("contacts.write")} />
-            ) : null}
             {ctx.can("inbox.reply") ? <ReplyBox conversationId={selected.id} /> : null}
           </Card>
         ) : (

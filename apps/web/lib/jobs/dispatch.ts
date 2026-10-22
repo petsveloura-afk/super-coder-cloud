@@ -17,7 +17,7 @@ import "@/lib/channels/register";
 interface JobRow {
   id: number;
   organization_id: string;
-  kind: "email" | "webhook" | "http" | "whatsapp" | "telegram" | "sms" | "action" | "invoice" | "conversion" | "push" | "calendar" | "reminder" | "call";
+  kind: "email" | "webhook" | "http" | "whatsapp" | "telegram" | "sms" | "action";
   webhook_id: string | null;
   payload: Record<string, unknown>;
   attempts: number;
@@ -64,15 +64,9 @@ async function postJson(url: string, body: string, headers: Record<string, strin
 async function runCampaignJob(admin: ReturnType<typeof createAdminClient>, job: JobRow): Promise<Outcome & { skipped?: boolean }> {
   const { data, error } = await admin.rpc("campaign_message", { p_recipient: job.campaign_recipient_id });
   if (error) return { ok: false, error: error.message };
-  const m = data as { canceled?: boolean; skip?: boolean; channel: string; to: string | null; subject: string; body: string; contact_id: string; unsub_token: string; locale: string; wa_template?: { name: string; language: string; params: string[] } | null } | null;
+  const m = data as { canceled?: boolean; skip?: boolean; channel: string; to: string | null; subject: string; body: string; contact_id: string; unsub_token: string; locale: string } | null;
   if (!m || m.canceled) return { ok: false, error: "campaign_canceled", permanent: true };
   if (m.skip) return { ok: false, error: "no_consent", permanent: true, skipped: true };
-  // conversation guard: the customer opted out (STOP / הסר) on any channel
-  {
-    const { checkContact } = await import("@/lib/conversations/guard");
-    const g = await checkContact(m.contact_id, "campaign");
-    if (!g.allowed) return { ok: false, error: g.reason, permanent: true, skipped: true };
-  }
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
   const unsub = `${base}/${m.locale || "he"}/c/unsubscribe/${m.unsub_token}`;
   if (m.channel === "email") {
@@ -89,12 +83,6 @@ async function runCampaignJob(admin: ReturnType<typeof createAdminClient>, job: 
       headers: { "List-Unsubscribe": `<${base}/api/unsubscribe/${m.unsub_token}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
     });
     return r.sent ? { ok: true } : { ok: false, error: r.reason ?? "provider_error" };
-  }
-  // wave 17: WhatsApp approved template on the official API (outside the 24h window)
-  if (m.channel === "whatsapp" && m.wa_template?.name) {
-    const { sendWhatsAppTemplate } = await import("@/lib/channels/wa-template");
-    const t = await sendWhatsAppTemplate(job.organization_id, m.contact_id, m.wa_template, m.body);
-    if (t.usedTemplate) return { ok: t.ok, status: t.status, error: t.error, permanent: t.permanent };
   }
   const kind = m.channel as ChannelKind;
   const r = await sendViaChannel(kind, { organizationId: job.organization_id, contactId: m.contact_id, text: m.body });
@@ -138,28 +126,12 @@ async function runJob(admin: ReturnType<typeof createAdminClient>, job: JobRow):
     case "telegram":
     case "sms": {
       const p = job.payload as { contact_id: string; text: string };
-      // conversation guard: automations never message a customer who opted out
-      {
-        const { checkContact } = await import("@/lib/conversations/guard");
-        const g = await checkContact(p.contact_id, "automation");
-        if (!g.allowed) return { ok: false, error: g.reason, permanent: true };
-      }
       const r = await sendViaChannel(job.kind as ChannelKind, { organizationId: job.organization_id, contactId: p.contact_id, text: p.text });
       return { ok: r.ok, status: r.status, error: r.error, permanent: r.permanent };
     }
     case "action": {
       const { error } = await admin.rpc("run_delayed_action", { p_job: job.id });
       return error ? { ok: false, error: error.message } : { ok: true };
-    }
-    // waves 15-18: tax documents, conversion APIs, push notifications, calendars, reminders, phone calls
-    case "invoice":
-    case "conversion":
-    case "push":
-    case "calendar":
-    case "reminder":
-    case "call": {
-      const { runGrowthJob } = await import("./growth-jobs");
-      return runGrowthJob(job.kind, job.organization_id, job.payload);
     }
     default:
       return { ok: false, error: "unknown_kind", permanent: true };

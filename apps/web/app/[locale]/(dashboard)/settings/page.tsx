@@ -12,18 +12,13 @@ import { auditLabel } from "@/lib/i18n/translate";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateTime } from "@/lib/format";
 import { markNotificationsReadAction } from "./actions";
-import { ConversationPolicyCard, LeadRoutingCard, MyChannelsCard, type MyChannel } from "@/components/settings/team-plus";
-import { memberOptions } from "@/lib/lookups";
-import { CalendarCard, type CalendarConn } from "@/components/settings/calendar-card";
-import { PushCard } from "@/components/settings/push-card";
-import { vapidReady } from "@/lib/push/webpush-core";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
   return { title: t("settings.title") };
 }
 
-export default async function SettingsPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams?: Promise<{ calendar?: string }> }) {
+export default async function SettingsPage({ params }: { params: Promise<{ locale: string }> }) {
   const locale = await resolveLocale(params);
   const ctx = await getOrgContext(locale);
   const { t } = await getT(locale);
@@ -46,32 +41,6 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           .limit(30)
       : Promise.resolve({ data: null }),
   ]);
-  // wave 15 + conversation guard: my channels, availability, lead routing, automated-message rules
-  const { createAdminClient } = await import("@/lib/supabase/admin");
-  const admin = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : null;
-  const [myRes, botRes, meRes, orgPlusRes, membersAll, availRes, routingOn] = await Promise.all([
-    supabase.from("notify_recipients").select("id, kind, target, events, enabled, invite_code, last_error").eq("organization_id", ctx.org.id).eq("user_id", ctx.userId).order("created_at"),
-    admin ? admin.from("channel_accounts").select("config").eq("organization_id", ctx.org.id).eq("kind", "telegram").maybeSingle() : Promise.resolve({ data: null }),
-    admin ? admin.from("organization_members").select("available").eq("organization_id", ctx.org.id).eq("user_id", ctx.userId).maybeSingle() : Promise.resolve({ data: null }),
-    admin ? admin.from("organizations").select("lead_routing, conversation_policy").eq("id", ctx.org.id).maybeSingle() : Promise.resolve({ data: null }),
-    ctx.can("settings.manage") ? memberOptions(ctx.org.id) : Promise.resolve([]),
-    admin && ctx.can("settings.manage") ? admin.from("organization_members").select("user_id, available").eq("organization_id", ctx.org.id) : Promise.resolve({ data: [] }),
-    orgHasFeature(ctx.org.id, "lead_routing"),
-  ]);
-  const myChannels = (myRes.error ? [] : (myRes.data ?? [])) as MyChannel[];
-  // wave 16: my calendar connections (two-way sync)
-  const [calRes, calOn] = await Promise.all([
-    supabase.from("calendar_connections").select("id, provider, account_email, push_events, block_busy, status, last_sync_at, last_error").eq("organization_id", ctx.org.id).eq("user_id", ctx.userId),
-    orgHasFeature(ctx.org.id, "calendar_sync"),
-  ]);
-  const { calendarConfigured } = await import("@/lib/calendar/sync");
-  const calStatus = (await searchParams)?.calendar ?? null;
-  const botUsername = ((botRes.data?.config as { username?: string } | null)?.username as string | undefined) ?? null;
-  const iAmAvailable = (meRes.data as { available?: boolean } | null)?.available !== false;
-  const availability = new Map(((availRes.data ?? []) as { user_id: string; available: boolean | null }[]).map((r) => [r.user_id, r.available !== false]));
-  const routing = ((orgPlusRes.data as { lead_routing?: Record<string, unknown> } | null)?.lead_routing ?? {}) as { mode?: string; members?: string[]; contacts?: boolean; conversations?: boolean };
-  const policy = ((orgPlusRes.data as { conversation_policy?: Record<string, unknown> } | null)?.conversation_policy ?? {}) as Record<string, unknown>;
-
   const org = orgRes.data ?? { name: ctx.org.name, timezone: "Asia/Jerusalem", currency: "ILS", locale: "he" };
   const notifications = (notifRes.data ?? []) as { id: string; title_key: string; params: Record<string, string>; created_at: string; read_at: string | null; link?: string | null }[];
   const audit = auditRes.data as Pick<AuditLogRow, "id" | "action" | "entity_type" | "created_at">[] | null;
@@ -92,34 +61,6 @@ export default async function SettingsPage({ params, searchParams }: { params: P
             <ProfileForm fullName={ctx.profile?.full_name ?? ""} preferredLocale={ctx.profile?.locale ?? locale} />
           </div>
         </Card>
-
-        <Card id="my-channels" className="scroll-mt-24">
-          <CardHeader title={t("myChannels.title")} description={t("myChannels.subtitle")} />
-          <MyChannelsCard channels={myChannels} botUsername={botUsername} available={iAmAvailable} />
-        </Card>
-        {/* wave 17: notifications on this phone / computer */}
-        <PushCard vapidKey={vapidReady() ? (process.env.VAPID_PUBLIC_KEY ?? null) : null} />
-        <Card id="calendar" className="scroll-mt-24">
-          <CardHeader title={t("calendar.title")} description={t("calendar.subtitle")} />
-          <CalendarCard
-            connections={(calRes.error ? [] : (calRes.data ?? [])) as CalendarConn[]}
-            configured={{ google: calendarConfigured("google"), microsoft: calendarConfigured("microsoft") }}
-            locked={!calOn}
-            status={calStatus && /^(connected|failed|cancelled|forbidden|not_configured)$/.test(calStatus) ? calStatus : null}
-          />
-        </Card>
-        {ctx.can("settings.manage") ? (
-          <Card id="routing" className="scroll-mt-24">
-            <CardHeader title={t("routing.title")} description={t("routing.subtitle")} />
-            <LeadRoutingCard routing={routing} members={(membersAll as { id: string; label: string }[]).map((m) => ({ ...m, available: availability.get(m.id) ?? true }))} locked={!routingOn} />
-          </Card>
-        ) : null}
-        {ctx.can("settings.manage") ? (
-          <Card id="conversation-policy" className="scroll-mt-24">
-            <CardHeader title={t("guard.policyTitle")} description={t("guard.policySubtitle")} />
-            <ConversationPolicyCard policy={policy} />
-          </Card>
-        ) : null}
 
         <Card id="notifications" className="scroll-mt-24">
           <CardHeader

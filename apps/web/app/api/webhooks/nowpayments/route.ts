@@ -25,19 +25,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid_signature" }, { status: 400 });
   }
   const ipn = JSON.parse(raw) as Ipn;
-  // wave 18: AI credit pack (order_id "pack:<purchase>:<nonce>") — amount checked in the database
-  if (String(ipn.order_id ?? "").startsWith("pack:")) {
-    if (ipn.payment_status !== "finished") return NextResponse.json({ received: true, status: ipn.payment_status });
-    const { processPackCrypto } = await import("@/lib/billing/packs");
-    const r = await processPackCrypto(String(ipn.order_id), Number(ipn.price_amount ?? 0), String(ipn.price_currency ?? "usd"), String(ipn.payment_id ?? ""));
-    return NextResponse.json({ received: true, pack: r.ok === true, error: r.ok ? undefined : r.error });
-  }
   const ref = parseOrderRef(ipn.order_id);
   if (!ref) return NextResponse.json({ received: true, ignored: "bad_order" });
   // only the final state activates the plan
   if (ipn.payment_status !== "finished") return NextResponse.json({ received: true, status: ipn.payment_status });
   // wave 12: the plan is given only for its real price (invoice amount = plan price)
-  const expected = await planPrice(ref.plan, ref.interval, true, ref.org).catch(() => null);
+  const expected = await planPrice(ref.plan, ref.interval, true).catch(() => null);
   if (expected && (String(ipn.price_currency ?? "").toUpperCase() !== expected.currency.toUpperCase() || Number(ipn.price_amount ?? 0) + 0.01 < expected.amount)) {
     console.error(`nowpayments ${ipn.payment_id}: amount mismatch (${ipn.price_amount} ${ipn.price_currency} for ${ref.plan}/${ref.interval})`);
     return NextResponse.json({ received: true, ignored: "amount_mismatch" });

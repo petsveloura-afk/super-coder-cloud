@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { dbErrorKey, type ActionState } from "@/lib/action-state";
 import { formLocale, pick, str } from "@/lib/form";
 
-const FIELDS = ["title", "description", "status", "dueAt", "assigneeId", "contactId", "dealId", "remind"];
+const FIELDS = ["title", "description", "status", "dueAt", "assigneeId", "contactId", "dealId"];
 
 function revalidateTasks(locale: string, contactId?: string) {
   revalidatePath(`/${locale}/tasks`);
@@ -28,15 +28,6 @@ function toRow(t: ReturnType<typeof taskSchema.parse>) {
   };
 }
 
-/** wave 15: reminder offset before the due time ("" = none, "0" = at the due time, minutes otherwise) */
-function reminderPatch(fd: FormData, dueIso: string | null): Record<string, unknown> {
-  if (!fd.has("remind")) return {};
-  const raw = str(fd, "remind");
-  const minutes = raw === "" ? null : Number(raw);
-  if (minutes === null || !Number.isFinite(minutes) || minutes < 0 || minutes > 10080 || !dueIso) return { remind_at: null, reminded_at: null };
-  return { remind_at: new Date(new Date(dueIso).getTime() - minutes * 60_000).toISOString(), reminded_at: null, snooze_count: 0 };
-}
-
 export async function createTaskAction(_prev: ActionState<{ id: string }>, fd: FormData): Promise<ActionState<{ id: string }>> {
   const locale = formLocale(fd);
   const ctx = await getOrgContext(locale);
@@ -47,7 +38,7 @@ export async function createTaskAction(_prev: ActionState<{ id: string }>, fd: F
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tasks")
-    .insert({ ...toRow(parsed.data), ...reminderPatch(fd, toRow(parsed.data).due_at), organization_id: ctx.org.id, created_by: ctx.userId })
+    .insert({ ...toRow(parsed.data), organization_id: ctx.org.id, created_by: ctx.userId })
     .select("id")
     .single();
   if (error) return { error: dbErrorKey(error), values };
@@ -66,7 +57,7 @@ export async function updateTaskAction(_prev: ActionState<{ id: string }>, fd: F
   const parsed = taskSchema.safeParse(values);
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error), values };
   const supabase = await createClient();
-  const { data, error } = await supabase.from("tasks").update({ ...toRow(parsed.data), ...reminderPatch(fd, toRow(parsed.data).due_at) }).eq("id", id.data).eq("organization_id", ctx.org.id).select("id");
+  const { data, error } = await supabase.from("tasks").update(toRow(parsed.data)).eq("id", id.data).eq("organization_id", ctx.org.id).select("id");
   if (error) return { error: dbErrorKey(error), values };
   if (!data?.length) return { error: "errors.notFound", values };
   revalidateTasks(locale, parsed.data.contactId);

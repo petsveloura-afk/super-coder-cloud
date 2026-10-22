@@ -1,4 +1,3 @@
-import { MORE_INDUSTRIES } from "./industries-more";
 /**
  * Industry templates — a ready conversation setup per business category
  * (script, details to collect, menu buttons and a pricing-policy example).
@@ -241,8 +240,6 @@ export const INDUSTRIES: IndustryTemplate[] = [
       pricing: "First consultation $110 (credited when engaged).",
     },
   },
-  // wave 16: 20 more categories
-  ...MORE_INDUSTRIES,
 ];
 
 export function industryByKey(key: string | null | undefined): IndustryTemplate | null {

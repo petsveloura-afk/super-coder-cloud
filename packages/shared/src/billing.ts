@@ -17,8 +17,6 @@ export const LIVE_FEATURES = new Set([
   "crm", "team", "demo", "csv_export", "ai_basic", "ai_agents", "audit_log", "priority_support",
   // wave 14: these work today (no longer "coming soon" on the pricing cards)
   "ai_site_landing", "ai_site_full", "ai_images", "white_label", "api_access", "site_pro_templates", "site_ai_editor", "site_custom_domain",
-  // waves 15-18
-  "contracts", "lead_routing", "invoicing_sync", "ai_insights", "voice_ai", "calendar_sync", "flow_builder", "ab_testing", "conversion_api", "advanced_analytics",
 ]);
 
 export const SUBSCRIPTION_STATUSES = ["trialing", "active", "past_due", "canceled", "incomplete", "unpaid"] as const;

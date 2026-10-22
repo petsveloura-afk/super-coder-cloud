@@ -302,9 +302,7 @@
     "invitation_revoked": "Invitation revoked",
     "settings_updated": "Settings updated",
     "billing_plan_changed": "Plan changed",
-    "ai_agents_insert": "AI agent created",
-    "routing_updated": "Lead routing updated",
-    "platform_overrides": "Platform admin overrides"
+    "ai_agents_insert": "AI agent created"
   },
   "billing": {
     "title": "Billing & plans",
@@ -384,17 +382,7 @@
       "ai_images": "AI images",
       "site_pro_templates": "All website design templates",
       "site_ai_editor": "Edit your site with the agent",
-      "site_custom_domain": "Your own domain for the site",
-      "contracts": "Contracts & e-signature",
-      "lead_routing": "Lead routing to the team",
-      "invoicing_sync": "Tax invoices (Morning / iCount)",
-      "ai_insights": "AI customer insights",
-      "voice_ai": "Phone voice agent",
-      "calendar_sync": "Google / Outlook sync",
-      "flow_builder": "Conversation flows",
-      "ab_testing": "Website A/B tests",
-      "conversion_api": "Meta / Google / TikTok conversions",
-      "advanced_analytics": "AI growth analysis"
+      "site_custom_domain": "Your own domain for the site"
     },
     "statuses": {
       "trialing": "Trial",
@@ -481,8 +469,7 @@
       "trouble": "Can't pay here? Pay on PayPal's secure page",
       "byPaying": "Want another plan?",
       "changePlan": "Back to plans"
-    },
-    "customPrice": "Your special price"
+    }
   },
   "ai": {
     "title": "AI Agents",
@@ -752,8 +739,7 @@
       "hint": "Pick your business type and instantly get a conversation script, details to collect, menu buttons and a pricing-policy example — then edit freely.",
       "confirm": "Load a new template? The script, details and menu will be replaced (pricing is kept if already filled).",
       "loaded": "Template loaded: {name}. Edit and save."
-    },
-    "badAnswer": "The AI did not return a valid answer — try again"
+    }
   },
   "deals": {
     "pageTitle": "Deals & pipelines",
@@ -895,8 +881,7 @@
     "emptyBody": "Create a task or change the filter.",
     "overdue": "Overdue",
     "openContact": "Open contact",
-    "none": "No tasks",
-    "reminderNotification": "⏰ Reminder: {title}"
+    "none": "No tasks"
   },
   "analytics": {
     "title": "Analytics",
@@ -994,22 +979,6 @@
       "inboundLead": {
         "name": "Inbound webhook → lead",
         "body": "A URL that receives leads from Zapier / Make / external forms, with a tag and a notification"
-      },
-      "pricingVisits": {
-        "name": "3 visits to pricing → urgent task",
-        "body": "A known contact who visits the pricing page 3 times gets a call task and a hot-intent tag"
-      },
-      "quoteViewed": {
-        "name": "Quote opened → call now",
-        "body": "When the customer opens a quote, a task to call them today is created"
-      },
-      "hotLead": {
-        "name": "Hot lead → alert managers",
-        "body": "When the agent spots a hot lead, managers get an alert with name and phone"
-      },
-      "optedOut": {
-        "name": "Opt-out → tag",
-        "body": "Customers who opted out are tagged opted-out for easy filtering"
       }
     },
     "empty": "No automations yet",
@@ -1038,12 +1007,7 @@
       "message_received": "Message received (WhatsApp/Telegram/SMS)",
       "appointment_booked": "Appointment booked",
       "ticket_created": "Support ticket created",
-      "invoice_paid": "Invoice paid",
-      "site_behavior": "Website behavior (visits / time on page)",
-      "quote_viewed": "Customer opened a quote",
-      "contract_signed": "Contract signed",
-      "lead_hot": "Lead became hot",
-      "customer_opted_out": "Customer opted out"
+      "invoice_paid": "Invoice paid"
     },
     "history": "Run history",
     "jobs": "External actions",
@@ -1090,11 +1054,7 @@
       "toAddress": "Fixed address",
       "subject": "Subject",
       "emailBody": "E-mail body",
-      "marketing": "Marketing e-mail — only send to contacts who opted in",
-      "pathContains": "Page address contains",
-      "pathHint": "Empty = any page; e.g. /pricing",
-      "minVisits": "At least visits",
-      "minSeconds": "At least seconds on page"
+      "marketing": "Marketing e-mail — only send to contacts who opted in"
     },
     "inboundUrl": "Webhook URL (POST, JSON or form)",
     "inboundHint": "Send fields like name, email, phone — the contact is matched or created automatically.",
@@ -1492,21 +1452,7 @@
     "latestSubmissions": "Latest submissions",
     "noSubmissions": "No submissions yet",
     "confirmDelete": "Delete this form and all its submissions?",
-    "notification": "New submission on \"{form}\"",
-    "step": "Step",
-    "showIf": "Show only if",
-    "always": "Always",
-    "condOp": "Condition",
-    "condValue": "Value",
-    "ops": {
-      "eq": "equals",
-      "neq": "is not",
-      "not_empty": "is filled"
-    },
-    "badCondition": "A condition must refer to another field of the form",
-    "stepOf": "Step {step} of {total}",
-    "next": "Next",
-    "back": "Back"
+    "notification": "New submission on \"{form}\""
   },
   "booking": {
     "confirmed": "You're booked!",
@@ -1646,29 +1592,7 @@
       "sent": "Sent",
       "failed": "Failed",
       "skipped": "Skipped"
-    },
-    "aiSegment": "Describe the audience in words",
-    "aiSegmentPlaceholder": "Hot leads who haven't written for a month",
-    "aiSegmentGo": "Build audience",
-    "segmentReady": "Audience updated from your description — review and count recipients",
-    "segmentFailed": "Could not understand the description — try rephrasing",
-    "smartFilters": "Smart filters (score, sentiment, activity, purchases)",
-    "minScore": "Minimum lead score",
-    "maxScore": "Maximum lead score",
-    "sentiment": "Sentiment",
-    "buyStage": "Buying stage",
-    "activeDays": "Wrote to us in the last X days",
-    "inactiveDays": "Haven't written for at least X days",
-    "purchasesMin": "Minimum total purchases",
-    "optOutExcluded": "Customers who opted out (on any channel) are never included",
-    "waTemplate": "Approved WhatsApp template (official API)",
-    "waTemplateHint": "On the official API, customers who haven't written in 24 hours can only get a Meta-approved template. The message above is kept in the inbox for reference.",
-    "waTemplateName": "Template name",
-    "waTemplateLang": "Language",
-    "waTemplateParams": "Values for {{1}}, {{2}}…",
-    "waTemplateParamsHint": "Separated by | — you can use {{contact.first_name}}",
-    "badTemplateName": "Template name: lowercase letters, digits and _",
-    "badTemplateLang": "Invalid language code (e.g. he, en_US)"
+    }
   },
   "inbox": {
     "title": "Inbox",
@@ -1849,8 +1773,7 @@
       "bit": "Bit",
       "paybox": "PayBox",
       "stripe": "Online (Stripe)",
-      "other": "Other",
-      "paypal": "PayPal / card"
+      "other": "Other"
     },
     "newQuote": "New quote",
     "newInvoice": "New invoice",
@@ -1968,10 +1891,7 @@
     "onlineFailed": "Couldn't start the payment — please try again",
     "paymentProcessing": "Thank you! Your payment is processing and will show here shortly.",
     "paidNotification": "Invoice #{number} paid in full ({total} {currency})",
-    "acceptedNotification": "Quote #{number} accepted by {name}",
-    "viewedNotification": "👀 The customer opened document #{number}",
-    "signedNotification": "✍️ {name} signed quote #{number}",
-    "payCardPayPal": "Pay {amount} by card / PayPal"
+    "acceptedNotification": "Quote #{number} accepted by {name}"
   },
   "websites": {
     "title": "Websites & landing pages",
@@ -2128,9 +2048,7 @@
         "tiktok": "TikTok",
         "linkedin": "LinkedIn",
         "youtube": "YouTube"
-      },
-      "gdpr": "Visitors from the EU (GDPR)",
-      "sslNote": "The site is always served over HTTPS with an auto-renewing SSL certificate — also on your own domain"
+      }
     },
     "legal": {
       "title": "Legal pages",
@@ -2269,11 +2187,6 @@
         "contact": "Check the owner details: all fields are required and the phone must be valid",
         "registerFailed": "Domain registration failed and the payment was refunded to the card"
       }
-    },
-    "copy": {
-      "improve": "Improve with AI",
-      "working": "Improving…",
-      "undo": "Undo"
     }
   },
   "admin": {
@@ -2360,44 +2273,7 @@
       "price": "Customer price",
       "profit": "Profit",
       "date": "Date"
-    },
-    "overridesTitle": "Per-organization quotas, price and credits",
-    "overridesHint": "Raise or lower a quota for one organization, set a special (white-label / negotiated) price, or grant AI credits",
-    "orgSlugOrId": "Organization slug or ID",
-    "load": "Load",
-    "limitOverrides": "Quotas",
-    "limitOverridesHint": "Empty = from the plan · -1 = unlimited",
-    "fromPlan": "From plan",
-    "priceOverrides": "Special price",
-    "priceOverridesHint": "Applies to card / PayPal one-time and crypto payments. Recurring PayPal, Stripe and Lemon Squeezy keep the list price.",
-    "priceKeys": {
-      "month": "Monthly (ILS)",
-      "year": "Yearly (ILS)",
-      "month_usd": "Monthly (USD)",
-      "year_usd": "Yearly (USD)"
-    },
-    "limits": {
-      "contacts": "Contacts",
-      "members": "Members",
-      "ai_credits_monthly": "AI credits / month",
-      "ai_agents": "AI agents",
-      "notify_recipients": "Update recipients"
-    },
-    "overridesSaved": "Overrides saved",
-    "badOverride": "Invalid value",
-    "grantCredits": "Credits to add (negative to remove)",
-    "note": "Note",
-    "grant": "Grant",
-    "creditsGranted": "Credits updated",
-    "aiUsageTitle": "AI usage per organization (30 days)",
-    "aiUsageHint": "Who uses the most, how many calls failed, and pack balances",
-    "aiCredits": "Credits",
-    "aiCalls": "Calls",
-    "aiErrors": "Errors",
-    "aiTokens": "Tokens",
-    "aiLimit": "Monthly limit",
-    "aiPacks": "Pack balance",
-    "aiTop": "Top feature"
+    }
   },
   "chat": {
     "title": "Chat",
@@ -2429,8 +2305,7 @@
       "telegram": "Telegram",
       "email": "E-mail",
       "whatsapp": "WhatsApp",
-      "sms": "SMS",
-      "call": "Phone call"
+      "sms": "SMS"
     },
     "events": {
       "messages": "Every conversation",
@@ -2501,785 +2376,7 @@
       "sites_published": {
         "title": "You reached the published-sites limit of your plan",
         "body": "Upgrade to {plan} to publish more sites."
-      },
-      "ai_insights": {
-        "title": "AI customer analysis is part of Pro",
-        "body": "Summary, sentiment, buying stage, next step and a fitting offer for every customer are included in {plan} and up. The basic score is free for everyone."
-      },
-      "contracts": {
-        "title": "Contracts and e-signatures are on the Pro plan",
-        "body": "Digital signatures on quotes and contracts, locking and fingerprinting — on {plan} and above."
-      },
-      "lead_routing": {
-        "title": "Lead routing is on the Pro plan",
-        "body": "Automatic distribution of leads and chats across the team — on {plan} and above."
-      },
-      "invoicing_sync": {
-        "title": "Automatic tax invoices are on the Pro plan",
-        "body": "Morning / iCount connection and an invoice for every payment — on {plan} and above."
-      },
-      "voice_ai": {
-        "title": "The voice agent is on the Business plan",
-        "body": "The agent answers and makes phone calls — on {plan}."
-      },
-      "calendar_sync": {
-        "title": "Calendar sync is on the Pro plan",
-        "body": "Two-way sync with Google and Outlook — on {plan} and above."
-      },
-      "flow_builder": {
-        "title": "Conversation flows are on the Pro plan",
-        "body": "Menus, buttons and lead qualification before the AI — on {plan} and above."
-      },
-      "ab_testing": {
-        "title": "A/B tests are on the Pro plan",
-        "body": "Two hero versions with an automatic winner — on {plan} and above."
-      },
-      "conversion_api": {
-        "title": "Ad conversions are on the Pro plan",
-        "body": "Server-side leads and purchases to Meta, Google and TikTok — on {plan} and above."
-      },
-      "advanced_analytics": {
-        "title": "AI analysis of your numbers is on the Pro plan",
-        "body": "Plain-language reading: what pays off, what to stop, what to expect — on {plan} and above."
       }
     }
-  },
-  "insights": {
-    "title": "Customer insights",
-    "subtitle": "Lead score, sentiment, buying stage and next step — from every channel",
-    "scored": "Score updated",
-    "analyzed": "Analysis ready",
-    "badAnswer": "The AI did not return a valid analysis — try again",
-    "scoreAria": "Lead score {score} of 100",
-    "band": {
-      "hot": "Hot lead",
-      "warm": "Warm lead",
-      "cold": "Cold lead",
-      "none": "Not scored yet"
-    },
-    "sentiment": {
-      "positive": "Positive sentiment",
-      "neutral": "Neutral sentiment",
-      "negative": "Negative sentiment"
-    },
-    "stage": {
-      "new": "Stage: new",
-      "interested": "Stage: interested",
-      "considering": "Stage: considering",
-      "ready": "Stage: ready to buy",
-      "customer": "Stage: customer",
-      "lost": "Stage: lost"
-    },
-    "urgency": {
-      "low": "Low urgency",
-      "medium": "Medium urgency",
-      "high": "Urgent"
-    },
-    "empty": "Not analysed yet — press “AI analysis” for a summary, next step and a fitting offer.",
-    "breakdown": "What the score is made of",
-    "factors": {
-      "status": "Status",
-      "ai_lead": "Agent lead",
-      "engagement": "Engagement",
-      "recency": "Recency",
-      "deals": "Deals",
-      "quotes": "Quotes",
-      "meeting": "Upcoming meeting",
-      "sentiment": "Sentiment",
-      "details": "Contact details",
-      "ai": "AI estimate"
-    },
-    "nextAction": "Recommended next step",
-    "offer": "What to offer",
-    "intent": "What the customer wants",
-    "objections": "Objections",
-    "bestChannel": "Best channel to reach out: {channel}",
-    "channels": {
-      "whatsapp": "WhatsApp",
-      "telegram": "Telegram",
-      "sms": "SMS",
-      "email": "E-mail",
-      "phone": "Phone",
-      "web": "Website chat"
-    },
-    "refresh": "Refresh score",
-    "analyze": "AI analysis",
-    "scoreShort": "Score",
-    "hotFilter": "Hot leads"
-  },
-  "timeline": {
-    "title": "Unified timeline",
-    "subtitle": "Every message from every channel, deals, quotes, meetings and tickets — in one place",
-    "empty": "No activity for this customer yet",
-    "channels": {
-      "whatsapp": "WhatsApp",
-      "whatsapp_qr": "WhatsApp",
-      "telegram": "Telegram",
-      "telegram_user": "Telegram",
-      "sms": "SMS",
-      "email": "E-mail",
-      "web": "Website chat"
-    },
-    "fromCustomer": "from the customer",
-    "fromAI": "AI reply",
-    "fromOwnerPhone": "sent from your phone",
-    "fromTeam": "from the team",
-    "note": "Note",
-    "appointment": "Meeting",
-    "ticket": "Ticket",
-    "form": "Submitted a form",
-    "deal": "Deal",
-    "open": "Open",
-    "more": "Show earlier activity",
-    "identities": "Ways this customer reached you",
-    "identityKinds": {
-      "phone": "Phone",
-      "email": "E-mail",
-      "telegram": "Telegram",
-      "web": "Website chat",
-      "other": "Other"
-    },
-    "activity": {
-      "deal_auto_stage": "Deal moved automatically to {stage}",
-      "contact_merged": "Merged with a duplicate ({name})",
-      "contact_analyzed": "AI analysis: score {score}",
-      "document_viewed": "The customer opened document #{number}",
-      "quote_accepted": "Quote #{number} accepted",
-      "quote_signed": "Quote #{number} signed",
-      "task_done_from_reminder": "Task “{title}” marked done from the reminder",
-      "task_snooze_from_reminder": "Reminder for “{title}” snoozed",
-      "contact_merged_auto": "Merged automatically",
-      "other": "Activity",
-      "contact_opted_out": "The customer opted out",
-      "contact_opted_in": "The customer opted back in",
-      "appointment_confirmed_by_customer": "The customer confirmed “{title}”",
-      "appointment_canceled_by_customer": "The customer canceled “{title}”"
-    }
-  },
-  "contract": {
-    "require": "Requires a signature (contract)",
-    "requireHint": "The customer signs digitally before accepting. After signing the document is locked and a fingerprint (hash) proves it was not changed.",
-    "terms": "Agreement terms",
-    "termsHint": "Shown above the signature. Write each clause on its own line.",
-    "termsPlaceholder": "1. Scope of work…\n2. Payment terms…\n3. Cancellation…",
-    "signTitle": "Digital signature",
-    "drawHere": "Sign here with your finger or mouse",
-    "clear": "Clear",
-    "agree": "I have read and agree to the terms",
-    "mustAgree": "Please agree to the terms",
-    "sign": {
-      "required": "Please sign before accepting"
-    },
-    "signAndAccept": "Sign and accept",
-    "legal": "Electronic signature. The signing time, a hashed IP address and the document fingerprint are recorded.",
-    "awaiting": "Waiting for the customer's signature",
-    "signedBy": "Signed by {name} · {date}",
-    "signatureAlt": "Customer signature",
-    "hash": "Document fingerprint",
-    "views": "Views",
-    "firstView": "first viewed:",
-    "notViewed": "The customer has not opened it yet"
-  },
-  "orgPaypal": {
-    "title": "Collect to your own PayPal",
-    "hint": "Customers pay quotes, invoices and payment links by card or PayPal and the money goes straight to your account.",
-    "step1": "Go to developer.paypal.com → Apps & Credentials → Live.",
-    "step2": "Create an app and copy the Client ID and Secret.",
-    "step3": "Paste them here and save — they are verified with PayPal and stored encrypted.",
-    "clientId": "Client ID",
-    "secret": "Secret",
-    "mode": "Environment",
-    "modes": {
-      "live": "Live",
-      "sandbox": "Testing (Sandbox)"
-    },
-    "connect": "Connect",
-    "update": "Update",
-    "connected": "PayPal connected",
-    "connectedBadge": "Connected · {mode}",
-    "notConnected": "Not connected",
-    "disconnect": "Disconnect",
-    "disconnected": "PayPal disconnected",
-    "verifyFailed": "PayPal rejected the details — check the Client ID, Secret and environment",
-    "badClientId": "Invalid Client ID",
-    "badSecret": "Invalid Secret"
-  },
-  "invoicing": {
-    "title": "Automatic tax invoices",
-    "hint": "Connect Morning (Green Invoice) or iCount and every recorded payment gets an official tax invoice-receipt sent to the customer.",
-    "none": "Not connected",
-    "connectedTo": "Connected to {provider}",
-    "provider": "Service",
-    "providers": {
-      "morning": "Morning (Green Invoice)",
-      "icount": "iCount"
-    },
-    "docType": "Document type",
-    "types": {
-      "invoice_receipt": "Tax invoice-receipt",
-      "receipt": "Receipt"
-    },
-    "keyId": "API Key ID",
-    "keySecret": "API Key Secret",
-    "apiToken": "API Token",
-    "auto": "Issue an invoice automatically for every payment",
-    "sandbox": "Sandbox (testing)",
-    "whereMorning": "Create the keys in Morning: Settings → Developer tools → API keys.",
-    "whereIcount": "Create the token in iCount: Settings → API → create token.",
-    "connect": "Connect",
-    "update": "Update",
-    "connected": "Invoicing connected",
-    "disconnect": "Disconnect",
-    "disconnected": "Invoicing disconnected",
-    "invalid": "Invalid details",
-    "verifyFailed": "The service rejected the details — check the keys",
-    "lastError": "Last error: {error}",
-    "working": "Working",
-    "issueNow": "Issue tax invoice",
-    "issued": "Tax invoice #{number}",
-    "issuedToast": "Tax invoice issued and sent to the customer",
-    "failed": "Issuing the invoice failed",
-    "notConnected": "Connect an invoicing service in finance settings first"
-  },
-  "payLink": {
-    "button": "Payment link",
-    "title": "Payment link for the customer",
-    "subtitle": "Creates an invoice with a card payment link and sends it on the customer's channel",
-    "amount": "Amount ({currency})",
-    "description": "What for",
-    "descriptionPlaceholder": "Project deposit",
-    "vatIncluded": "Amount includes VAT",
-    "create": "Create and send",
-    "sent": "Link sent to the customer",
-    "createdNotSent": "Link created but not sent — copy and send it yourself",
-    "hint": "The customer pays by card or PayPal; the payment is recorded and the deal moves on automatically.",
-    "invalid": "Invalid details"
-  },
-  "stageAuto": {
-    "button": "Auto-move",
-    "title": "Move to “{stage}” automatically",
-    "subtitle": "The customer's deal moves to this stage by itself when one of these happens",
-    "when": "When",
-    "marksWon": "This stage marks the deal as won",
-    "hint": "A deal never moves backwards automatically — only forward.",
-    "saved": "Auto-move saved",
-    "events": {
-      "quote_sent": "Quote sent",
-      "quote_viewed": "Customer opened the quote",
-      "quote_accepted": "Quote accepted",
-      "contract_signed": "Contract signed",
-      "deposit_paid": "Deposit paid",
-      "invoice_paid": "Invoice paid in full",
-      "appointment_booked": "Meeting booked",
-      "ai_lead": "The agent identified a lead",
-      "ai_lead_hot": "The agent identified a hot lead",
-      "form_submitted": "Submitted a form"
-    }
-  },
-  "taskRemind": {
-    "label": "Reminder",
-    "hint": "Sent to you on WhatsApp, Telegram, SMS or e-mail (“My channels” in settings) with a “done” button",
-    "options": {
-      "none": "No reminder",
-      "0": "At the due time",
-      "15": "15 minutes before",
-      "60": "1 hour before",
-      "1440": "1 day before"
-    }
-  },
-  "act": {
-    "title": "Confirm action",
-    "invalid": "This link is invalid or has expired",
-    "apptClosed": "This appointment was already canceled or completed",
-    "apptPast": "This appointment time has passed",
-    "taskDone": "Task “{title}” marked done ✅",
-    "taskSnoozed": "We'll remind you again in 15 minutes ⏰",
-    "taskClosed": "This task is already closed",
-    "apptConfirmed": "Thanks — your attendance is confirmed ✅",
-    "apptCanceled": "The appointment was canceled — we'd be happy to find another time",
-    "ask": {
-      "task_done": "Mark this task as done?",
-      "task_snooze": "Snooze this reminder for 15 minutes?",
-      "appt_confirm": "Confirm you'll attend the appointment?",
-      "appt_cancel": "Cancel the appointment?"
-    },
-    "buttons": {
-      "task_done": "✅ Done",
-      "task_snooze": "⏰ Snooze 15 minutes",
-      "appt_confirm": "✅ Confirm",
-      "appt_cancel": "Cancel appointment"
-    }
-  },
-  "myChannels": {
-    "title": "My channels",
-    "subtitle": "Where to send you reminders, meetings, leads routed to you and urgent calls",
-    "hint": "Only you get these. Up to 6 channels.",
-    "added": "Channel added",
-    "needBot": "To get them on Telegram, connect a Telegram bot on the integrations page first",
-    "telegramHint": "A personal link to {bot} is created — open it and press Start",
-    "tooMany": "Up to 6 personal channels",
-    "events": {
-      "tasks": "Task reminders",
-      "appointments": "Meetings",
-      "escalation": "Urgent escalations",
-      "leads": "Leads routed to me",
-      "handoff": "Request for a person"
-    }
-  },
-  "routing": {
-    "title": "Lead routing",
-    "subtitle": "Every new lead gets an owner from the team automatically",
-    "hint": "Round robin takes turns; “least loaded” picks whoever has the fewest open leads and chats. People marked away are skipped.",
-    "mode": "Method",
-    "modes": {
-      "off": "Off",
-      "round_robin": "Round robin",
-      "least_loaded": "Least loaded"
-    },
-    "members": "Who takes part",
-    "contacts": "New contacts",
-    "conversations": "New inbox conversations",
-    "saved": "Routing saved",
-    "invalid": "Invalid settings",
-    "available": "You are available for new leads",
-    "away": "You are away — no new leads",
-    "setAway": "Set away",
-    "setAvailable": "Set available",
-    "nowAvailable": "You are now available",
-    "nowAway": "You are now away",
-    "assignedNotification": "New lead routed to you: {name}"
-  },
-  "calendar": {
-    "title": "My calendar (Google / Outlook)",
-    "subtitle": "Booked meetings go into your calendar and busy times block your booking page",
-    "hint": "Two-way sync. Connect one calendar of each kind.",
-    "connect": "Connect {provider}",
-    "disconnect": "Disconnect",
-    "disconnected": "Calendar disconnected",
-    "push": "Add meetings to the calendar",
-    "block": "Block busy times for bookings",
-    "ok": "Synced",
-    "error": "Sync error",
-    "lastSync": "Last sync: {date}",
-    "neverSynced": "Not synced yet",
-    "notConfigured": "{provider} is not configured on the server yet (OAuth keys)",
-    "providers": {
-      "google": "Google Calendar",
-      "microsoft": "Outlook / Microsoft 365"
-    },
-    "status": {
-      "connected": "Calendar connected",
-      "failed": "Connecting the calendar failed — try again",
-      "forbidden": "Calendar sync is available on the Pro plan",
-      "not_configured": "Calendar connection is not configured on the server",
-      "cancelled": "Connection canceled"
-    }
-  },
-  "guard": {
-    "ownerAI": "Agent handling",
-    "ownerHuman": "A person is handling",
-    "humanAnswered": "A person already answered",
-    "optedOut": "Opted out",
-    "consentYes": "Marketing consent",
-    "serviceOnly": "Service messages only",
-    "pendingCount": "{count} scheduled messages",
-    "inHours": "in {hours} hours",
-    "cancel": "Cancel",
-    "canceled": "Scheduled message canceled",
-    "cancelsOnReply": "cancels if the customer replies",
-    "cancelOnReply": "Cancel automatically if the customer replies first",
-    "whyNot": "Why messages were not sent",
-    "markOut": "Mark opted out",
-    "markIn": "Mark opted in",
-    "confirmOptOut": "Mark this customer as opted out? All automated messages and campaigns to them stop on every channel.",
-    "schedule": "Schedule message",
-    "scheduleTitle": "Schedule a message",
-    "scheduleHint": "Sent at the chosen time only if still allowed — the customer has not opted out and (optionally) has not replied meanwhile.",
-    "message": "Message",
-    "when": "When to send",
-    "scheduleRules": "During quiet hours it waits for the morning. On the official WhatsApp API it can only go within 24 hours of the customer's last message.",
-    "scheduleSubmit": "Schedule",
-    "scheduled": "Message scheduled",
-    "badTime": "The time must be in the future (up to 60 days ahead)",
-    "policyTitle": "Automated messaging rules",
-    "policySubtitle": "One state for all channels: consent, ownership, attempts and quiet hours",
-    "policyHint": "Every automated message is checked before sending, on every channel: AI reply, follow-up, scheduled message, sequence, campaign, automation and reminder.",
-    "rule1": "A customer who wrote “STOP” on any channel gets no more automated messages or campaigns on any channel.",
-    "rule2": "When a person answers or takes over, every automatic follow-up to that customer is canceled at once.",
-    "rule3": "A customer reply immediately cancels a planned follow-up (e.g. “after 3 hours without an answer”).",
-    "rule4": "Attempt limits, gaps, a daily cap and quiet hours apply to all channels together.",
-    "followupMax": "Max follow-ups without a reply",
-    "followupGap": "Hours between follow-ups",
-    "minGap": "Minimum gap between automated messages (minutes)",
-    "dailyCap": "Max automated messages per customer per day",
-    "quietStart": "Quiet hours from",
-    "quietEnd": "until",
-    "optOutReply": "Send a short confirmation when a customer opts out",
-    "policySaved": "Rules saved",
-    "kinds": {
-      "ai_reply": "AI reply",
-      "followup": "Follow-up #{step}",
-      "scheduled": "Scheduled message",
-      "sequence": "Sequence step {step}",
-      "campaign": "Campaign",
-      "automation": "Automation",
-      "reminder": "Reminder",
-      "human": "Person"
-    },
-    "reasons": {
-      "ok": "Allowed",
-      "opted_out": "The customer opted out",
-      "no_consent": "No marketing consent",
-      "human_owns": "A person is handling the chat",
-      "human_answered": "A person already answered (on some channel)",
-      "customer_replied": "The customer already replied",
-      "max_attempts": "Max follow-ups reached",
-      "never_wrote": "The customer never wrote",
-      "too_soon": "Too soon after the previous message",
-      "daily_cap": "Daily cap reached",
-      "outside_24h": "Outside the WhatsApp / Telegram 24-hour window",
-      "quiet_hours": "Quiet hours",
-      "not_found": "Conversation not found",
-      "already_sent": "Already sent",
-      "already_canceled": "Already canceled",
-      "already_skipped": "Already skipped",
-      "already_failed": "Already failed",
-      "already_processing": "Already being sent",
-      "canceled_by_team": "Canceled by the team",
-      "replanned": "Rescheduled",
-      "guard_error": "Check failed — not sent to be safe",
-      "guard_missing": "Allowed"
-    },
-    "markedOut": "Marked as opted out — all automated messages stopped",
-    "markedIn": "The customer can receive messages again",
-    "tooMany": "Too many scheduled messages for this conversation"
-  },
-  "copilot": {
-    "suggest": "Suggest replies",
-    "suggestions": "Suggested replies",
-    "clickToUse": "Click to put it in the reply box — edit before sending",
-    "summarize": "Summarize",
-    "summaryTitle": "Conversation summary",
-    "nextStep": "Next step",
-    "noFields": "No new details found",
-    "apply": "Save the details to the contact",
-    "applied": "Details saved to the contact",
-    "badAnswer": "The AI did not return a valid answer — try again",
-    "noMessages": "No messages to summarize yet",
-    "fields": {
-      "first_name": "First name",
-      "last_name": "Last name",
-      "phone": "Phone",
-      "email": "E-mail",
-      "company": "Company",
-      "need": "Need",
-      "budget": "Budget"
-    },
-    "emailTaken": "This e-mail already belongs to another contact"
-  },
-  "video": {
-    "button": "Video call",
-    "sent": "Video call link sent to the customer",
-    "invite": "📹 Join the video call: {url}",
-    "createdNotSent": "The room was created but the link was not sent — copy and send it"
-  },
-  "voice": {
-    "title": "Phone voice agent (Twilio)",
-    "subtitle": "The agent answers calls to your Twilio number and calls the team when urgent",
-    "webhookHint": "In Twilio → Phone Numbers → your number → Voice Configuration → “A call comes in”, paste this URL (HTTP POST):",
-    "ready": "Active",
-    "callButton": "Call with the agent",
-    "confirmCall": "The voice agent will call the customer now. Continue?",
-    "calling": "The agent is calling the customer…",
-    "callFailed": "The call could not be placed — check the Twilio connection",
-    "notConnected": "Connect Twilio (SMS) on the integrations page first",
-    "noPhone": "The customer has no phone number"
-  },
-  "rails": {
-    "title": "Agent quality controls",
-    "subtitle": "When to hand over, what never to say, and how many replies per day",
-    "angry": "Angry customer → hand over to a person",
-    "angryHint": "The agent detects frustration, threats or cancellation requests and hands over with an alert",
-    "price": "Never invent prices",
-    "priceHint": "A reply quoting a price that is not in your business data is not sent — it goes to a person",
-    "kb": "Answer from the knowledge base",
-    "kbHint": "The agent uses your help-center articles for accurate answers",
-    "voice": "Voice replies",
-    "voiceHint": "When the customer sends a voice note, the agent answers with one too",
-    "voiceNeedsKey": "Needs an ElevenLabs or OpenAI key on the server",
-    "banned": "Banned phrases",
-    "bannedHint": "One per line — a reply containing one is not sent",
-    "bannedPlaceholder": "guaranteed discount\nfull refund",
-    "maxReplies": "Max AI replies per chat per day",
-    "maxRepliesHint": "Beyond this the chat goes to a person (keeps the budget safe)",
-    "saved": "Controls saved",
-    "invalid": "Invalid settings",
-    "handoffText": "I'm passing this to a team member who will get back to you shortly 🙏"
-  },
-  "flows": {
-    "title": "Conversation flows",
-    "subtitle": "Fixed questions and buttons before the AI steps in — menus, lead qualification, booking",
-    "hint": "A flow starts when the customer writes a keyword (or on the first message). When it ends, the AI continues as usual.",
-    "empty": "New flow",
-    "newFlow": "New flow",
-    "name": "Flow name",
-    "enabled": "Active",
-    "on": "On",
-    "off": "Off",
-    "firstMessage": "Start on a new customer's first message",
-    "keywords": "Keywords",
-    "keywordsHint": "Comma separated, e.g. menu, prices",
-    "kwMenu": "menu",
-    "type": "Step type",
-    "field": "Save as",
-    "text": "Text",
-    "buttonLabel": "Button label",
-    "addButton": "Button",
-    "addStep": "Add step",
-    "then": "then",
-    "nextNone": "End",
-    "aiTakesOver": "At the end the AI continues with everything collected",
-    "rules": "Up to 30 steps. Invalid answers (e.g. a bad phone number) are asked again.",
-    "stats": "{runs} started · {done} completed",
-    "saved": "Flow saved",
-    "deleted": "Flow deleted",
-    "invalid": "The flow is invalid",
-    "badLink": "A step points to a step that does not exist",
-    "duplicateStep": "Two steps have the same id",
-    "needButtons": "A buttons step needs at least one button",
-    "tplMenu": "Main menu",
-    "tplMenuQ": "Hi! How can we help? 👇",
-    "tplPrices": "💰 Prices",
-    "tplBook": "📅 Book",
-    "tplHuman": "🙋 A person",
-    "tplQualify": "Lead qualification",
-    "welcome": "Hi! A few quick questions so we can help best 🙂",
-    "askNeed": "What are you looking for?",
-    "askWhen": "When is this relevant?",
-    "now": "Now",
-    "thisMonth": "This month",
-    "justChecking": "Just checking",
-    "askName": "What's your name?",
-    "askPhone": "What number should we call back?",
-    "thanks": "Thanks! We got your details and will get back to you soon 🙏",
-    "thanksHuman": "Thanks! A team member will get back to you soon 🙏",
-    "toHuman": "Passing you to a team member 🙋",
-    "types": {
-      "message": "Message",
-      "buttons": "Question with buttons",
-      "collect": "Collect a detail",
-      "handoff": "Hand over to a person",
-      "ai": "Continue with AI",
-      "end": "End"
-    },
-    "placeholders": {
-      "message": "What to tell the customer",
-      "buttons": "The question above the buttons",
-      "collect": "The question, e.g. “What's your phone number?”",
-      "handoff": "Message before handing over",
-      "ai": "Instruction for the AI (optional)",
-      "end": "Closing message"
-    },
-    "fields": {
-      "name": "Name",
-      "phone": "Phone",
-      "email": "E-mail",
-      "need": "Need",
-      "budget": "Budget",
-      "date": "Date",
-      "custom": "Free field"
-    }
-  },
-  "kb": {
-    "title": "Knowledge base",
-    "subtitle": "Help articles customers find in your help center — and the agent uses to answer",
-    "articles": "{count} articles",
-    "aiHint": "When “Answer from the knowledge base” is on, the agent searches here before every answer",
-    "openPublic": "Public help center",
-    "new": "New article",
-    "edit": "Edit article",
-    "articleTitle": "Title",
-    "titlePlaceholder": "How do I cancel an appointment?",
-    "category": "Category",
-    "categoryPlaceholder": "Appointments",
-    "body": "Content",
-    "bodyHint": "Plain text; a blank line starts a new paragraph",
-    "published": "Published in the help center",
-    "draft": "Draft",
-    "saved": "Article saved",
-    "deleted": "Article deleted",
-    "empty": "No articles yet — write the questions customers ask most",
-    "stats": "{views} views · {helpful} found it helpful",
-    "publicTitle": "{org} help center",
-    "searchPlaceholder": "Search for an answer…",
-    "noResults": "No articles found — you can open a request below",
-    "back": "Back to the help center",
-    "updated": "Updated {date}",
-    "helpful": "This helped",
-    "thanks": "Thanks for the feedback!"
-  },
-  "abtest": {
-    "title": "A/B test of the hero",
-    "hint": "Half the visitors see A and half see B; conversions = form submissions. When there is a clear winner it stays on the site automatically.",
-    "running": "Running",
-    "variantA": "Variant A (current)",
-    "variantB": "Variant B",
-    "aiVariant": "Let AI write variant B",
-    "minViews": "Minimum visitors per variant",
-    "minViewsHint": "Before declaring a winner (with 95% confidence)",
-    "variant": "Variant",
-    "visitors": "Visitors",
-    "conversions": "Conversions",
-    "rate": "Rate",
-    "winner": "Winner",
-    "collecting": "Collecting data…",
-    "leading": "Variant {winner} is leading ({conf}% confidence)",
-    "decided": "Test finished — variant {winner} won and stays on the site",
-    "start": "Start the test",
-    "keepA": "Stop and keep A",
-    "keepB": "Stop and keep B",
-    "started": "Test started",
-    "saved": "Variant saved",
-    "stopped": "Test stopped",
-    "invalid": "Invalid details",
-    "needChange": "Change at least the title, text or button in variant B",
-    "needHero": "An A/B test needs a hero block on the site",
-    "decidedNotification": "🏆 A/B test on {site}: variant {winner} won"
-  },
-  "cmd": {
-    "title": "Quick actions",
-    "searchContacts": "Enter: search contacts for “{q}”",
-    "newContact": "New lead / contact",
-    "newTask": "New task",
-    "newQuote": "New quote",
-    "newInvoice": "New invoice",
-    "newCampaign": "New campaign",
-    "newAutomation": "New automation",
-    "newForm": "New form",
-    "newSite": "New website",
-    "inbox": "Inbox",
-    "appointments": "Calendar & meetings",
-    "pipelines": "Deals",
-    "analytics": "Reports & ROI",
-    "aiAgents": "AI agents",
-    "support": "Support tickets",
-    "kb": "Knowledge base",
-    "integrations": "Integrations",
-    "settings": "Settings",
-    "billing": "Plan & billing"
-  },
-  "conversions": {
-    "title": "Ad platform conversions",
-    "hint": "Every lead, meeting and payment is sent from the server to Meta, Google Analytics 4 and TikTok, so campaigns optimize even when ad blockers or iOS hide the pixel. E-mail and phone are sent hashed only (SHA-256).",
-    "provider": "Platform",
-    "providers": {
-      "meta_capi": "Meta (Facebook / Instagram)",
-      "ga4": "Google Analytics 4",
-      "tiktok": "TikTok"
-    },
-    "pixelId": "Pixel ID",
-    "measurementId": "Measurement ID",
-    "pixelCode": "Pixel Code",
-    "accessToken": "Access Token",
-    "apiSecret": "API Secret",
-    "testCode": "Test event code (optional)",
-    "testCodeHint": "Shows events under Test Events — remove it after testing",
-    "events": "Which events to send",
-    "ev": {
-      "Lead": "New lead",
-      "Schedule": "Meeting booked",
-      "Purchase": "Payment / purchase"
-    },
-    "requireConsent": "Only for customers who agreed to marketing (recommended)",
-    "where": {
-      "meta_capi": "Events Manager → your pixel → Settings → Conversions API → Generate access token.",
-      "ga4": "GA4 → Admin → Data streams → your stream → Measurement Protocol API secrets → Create.",
-      "tiktok": "TikTok Ads Manager → Assets → Events → Web Events → your pixel → Settings → Generate Access Token."
-    },
-    "connect": "Connect",
-    "update": "Update",
-    "disconnect": "Disconnect",
-    "saved": "Connection saved",
-    "disconnected": "Disconnected",
-    "invalid": "Invalid ID — check the format",
-    "badId": "Invalid ID",
-    "notConnected": "Connect the platform first",
-    "test": "Send a test event",
-    "testOk": "Test event accepted ✔",
-    "testFailed": "The platform rejected the event: {error}",
-    "lastError": "Last error: {error}",
-    "working": "Working"
-  },
-  "push": {
-    "title": "Notifications on your phone & computer",
-    "hint": "Every notification — new lead, reminder, meeting, request for a person — pops up even when the app is closed",
-    "enable": "Turn on for this device",
-    "disable": "Turn off on this device",
-    "test": "Send a test",
-    "enabled": "Notifications are on for this device",
-    "disabled": "Notifications turned off on this device",
-    "denied": "The browser blocks notifications — allow them in the site settings",
-    "failed": "Could not turn on — try again",
-    "unsupported": "This browser does not support notifications",
-    "iosNote": "On iPhone: add the app to the Home Screen first (Share → Add to Home Screen), then turn on",
-    "invalid": "Invalid subscription",
-    "notConfigured": "Push is not configured on the server yet (VAPID keys)",
-    "noDevices": "You haven't turned on notifications on any device yet",
-    "testBody": "✅ Notifications work on this device",
-    "testSent": "Test sent",
-    "testFailed": "Sending failed — try turning it off and on again"
-  },
-  "growth": {
-    "title": "Growth: ROI, CAC, LTV and forecast",
-    "subtitle": "What each source brought in, what it cost, and what to expect in the next three months",
-    "revenue": "Revenue",
-    "spend": "Marketing spend",
-    "roas": "Return on ad spend (ROAS)",
-    "roiValue": "ROI {roi}",
-    "addSpend": "Add spend to see ROI",
-    "cac": "Customer acquisition cost (CAC)",
-    "newCustomers": "{count} new paying customers",
-    "ltv": "Lifetime value (LTV)",
-    "ltvSub": "{orders} purchases on average · {months} months",
-    "ltvCac": "LTV : CAC",
-    "ltvCacGood": "Healthy (3:1 or better)",
-    "ltvCacLow": "Low — cut acquisition cost or raise customer value",
-    "runRate": "Revenue run rate",
-    "perMonth": "per month (last 3 months)",
-    "forecast3": "3-month forecast",
-    "bySource": "By source",
-    "bySourceHint": "A customer belongs to the source they came from; revenue = payments in the period",
-    "leads": "Leads",
-    "customers": "Customers",
-    "forecastTitle": "Revenue forecast",
-    "forecastHint": "Current run rate + open deals weighted by stage probability and expected close date",
-    "weightedDeals": "Weighted deals",
-    "spendTitle": "Marketing spend by month",
-    "spendHint": "Enter what you spent per source (Facebook, Google, Instagram…) to calculate ROI and CAC",
-    "month": "Month",
-    "amount": "Amount",
-    "note": "Note",
-    "noSpend": "No spend entered yet",
-    "spendSaved": "Spend saved",
-    "invalidSpend": "Invalid details",
-    "aiTitle": "What the numbers say",
-    "aiRun": "Explain with AI",
-    "aiHint": "AI explains what pays off, what to stop and what to expect — using only your data"
-  },
-  "credits": {
-    "title": "Extra AI credits",
-    "hint": "They never expire and are used only after your plan's monthly AI allowance runs out",
-    "balance": "Balance: {n} credits",
-    "packCredits": "{n} credits",
-    "buyCard": "Card / PayPal",
-    "buyCrypto": "Crypto",
-    "added": "Credits added ✔",
-    "processing": "Payment is processing — credits are added once it is confirmed",
-    "failed": "The payment was not completed — you were not charged",
-    "unknownPack": "Unknown pack",
-    "addedNotification": "⚡ {credits} AI credits added"
-  },
-  "followupMood": {
-    "negativeNotification": "😟 {name} sounded unhappy. The automatic follow-up was paused, a person should reply"
   }
 }

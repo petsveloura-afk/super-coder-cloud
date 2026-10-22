@@ -72,9 +72,7 @@ export async function mergeContactsAction(fd: FormData): Promise<ActionState> {
   const merge = uuidSchema.safeParse(str(fd, "mergeId"));
   if (!keep.success || !merge.success) return { error: "validation.invalidId" };
   const supabase = await createClient();
-  // wave 15: v2 also moves conversations, meetings, quotes/invoices, tickets and identities
-  let { error } = await supabase.rpc("merge_contacts_v2", { p_org: ctx.org.id, p_keep: keep.data, p_merge: merge.data });
-  if (error?.code === "PGRST202") ({ error } = await supabase.rpc("merge_contacts", { p_org: ctx.org.id, p_keep: keep.data, p_merge: merge.data }));
+  const { error } = await supabase.rpc("merge_contacts", { p_org: ctx.org.id, p_keep: keep.data, p_merge: merge.data });
   if (error) return { error: dbErrorKey(error) };
   revalidatePath(`/${locale}/crm`);
   revalidatePath(`/${locale}/crm/${keep.data}`);

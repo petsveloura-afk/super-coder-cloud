@@ -144,7 +144,7 @@ export function ProSite({
             {b.data.subtitle ? <p className="sub">{b.data.subtitle}</p> : null}
             <div className="btns">
               {b.data.cta_label ? (
-                <a data-site-cta="" href={safeHref(b.data.cta_href) ?? "#contact"} className="btn btn-a">
+                <a href={safeHref(b.data.cta_href) ?? "#contact"} className="btn btn-a">
                   {b.data.cta_label} <Arrow className="h-4 w-4" aria-hidden="true" />
                 </a>
               ) : null}
@@ -557,7 +557,6 @@ export function ProSite({
             hasForms: site.blocks.some((b) => b.type === "form"),
             hasBooking: site.blocks.some((b) => b.type === "booking"),
             hasChat: true,
-            gdpr: s.gdpr === true,
           }),
       ).map((p, k) => (p.kind === "h" ? <h2 key={k}>{p.text}</h2> : p.kind === "p" ? <p key={k}>{p.text}</p> : <ul key={k}>{p.items.map((it, m) => <li key={m}>{it}</li>)}</ul>))}
       <p style={{ marginTop: "2.5rem" }}>
