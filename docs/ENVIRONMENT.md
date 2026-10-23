@@ -162,3 +162,25 @@ No new variables. The Telegram webhook now subscribes to `message, edited_messag
 | `VERCEL_API_BASE` | tests | Mock base URL. |
 
 The global CSP now allows Google Fonts, https images, YouTube/Vimeo embeds and the PayPal JS SDK (needed after in-app navigation).
+
+## Waves 15–18 — CRM intelligence, conversation guard, agent+, marketing, growth (all optional)
+Server-only. Every feature works without its variable; the related screen says what is missing.
+
+| Variable | What |
+|---|---|
+| `ENCRYPTION_KEY` | Already required for channels. Also encrypts the PayPal / Morning / iCount / Meta / GA4 / TikTok / calendar credentials and signs the one-tap reminder links (`/a/…`). |
+| `CRON_SECRET` | Already used. GitHub Actions now also calls `/api/cron/growth` every 5 minutes (planned follow-ups & scheduled messages, task + appointment reminders, duplicate merge, lead scores, calendar busy times, A/B winners, site-event retention). |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google Calendar two-way sync (OAuth client of type "Web"; redirect URI `https://YOUR-DOMAIN/api/calendar/google/callback`; scope Calendar). |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | Outlook / Microsoft 365 calendar (Azure app registration; redirect `https://YOUR-DOMAIN/api/calendar/microsoft/callback`; `Calendars.ReadWrite offline_access`). |
+| `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL` | Voice replies of the agent (text-to-speech). Without them `OPENAI_API_KEY` is used (`AI_OPENAI_TTS_MODEL`, `AI_OPENAI_TTS_VOICE`). |
+| `AI_GROQ_WHISPER_MODEL`, `AI_OPENAI_TRANSCRIBE_MODEL`, `AI_GEMINI_MEDIA_MODEL` | Voice-message transcription (Groq Whisper → OpenAI → Gemini, first key that exists). |
+| (same Gemini / Anthropic keys) | Reading PDF documents customers send on Telegram / WhatsApp (Gemini native PDF → Claude). `.txt` files are read without AI. Card / ID-like numbers are masked. |
+| `AI_GROQ_VISION_MODEL`, `AI_OPENAI_VISION_MODEL`, `AI_ANTHROPIC_VISION_MODEL` | Image understanding of customer photos. |
+| `VIDEO_MEET_BASE` | Video-call rooms (default `https://meet.jit.si`). |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push to members' phones / computers. Generate with `node scripts/setup/generate-vapid.mjs`; `VAPID_SUBJECT` = `mailto:you@your-domain`. |
+| `CREDIT_PACKS_JSON` | AI credit packs for sale, e.g. `[{"key":"ai_1000","credits":1000,"usd":15}]` (default 500/$9, 2000/$29, 10000/$99). Paid by PayPal (`PAYPAL_*`) or crypto (`NOWPAYMENTS_*`). |
+| `ORG_PAYPAL_API_BASE`, `MORNING_API_BASE`, `ICOUNT_API_BASE`, `META_GRAPH_BASE`, `GA4_MP_BASE`, `TIKTOK_API_BASE`, `GOOGLE_CALENDAR_API_BASE`, `MS_GRAPH_API_BASE`, `GOOGLE_OAUTH_AUTHORIZE_URL`, `GOOGLE_OAUTH_TOKEN_URL`, `MICROSOFT_OAUTH_AUTHORIZE_URL`, `MICROSOFT_OAUTH_TOKEN_URL`, `ELEVENLABS_API_BASE`, `AI_OPENAI_BASE_URL`, `AI_ANTHROPIC_BASE_URL`, `PUSH_TEST_ENDPOINT_BASE` | Base-URL overrides for tests / proxies only — leave unset in production. |
+
+Per-business connections are entered in the app (never in Vercel): the business's own PayPal (Finance → Settings), Morning / iCount (Finance → Settings), Meta Pixel / GA4 / TikTok (Integrations → Ad conversions), Twilio voice webhook (Integrations), calendars (Settings → My calendar).
+
+Migrations: `20261015000032_crm_intelligence.sql`, `20261015000033_conversation_guard.sql`, `20261015000034_ai_agent_plus.sql`, `20261015000035_marketing_growth.sql`, `20261015000036_growth_admin.sql`, `20261015000037_followup_sentiment.sql`.

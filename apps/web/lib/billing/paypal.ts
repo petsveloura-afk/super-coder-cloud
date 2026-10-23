@@ -206,7 +206,7 @@ export async function verifyPayPalWebhook(headers: Headers, event: unknown): Pro
  * year), like crypto; a reminder is sent before it ends.
  */
 export async function createPayPalCardOrder(input: { orgId: string; plan: string; interval: "month" | "year"; locale: string; returnUrl: string; cancelUrl: string }): Promise<string> {
-  const price = await planPrice(input.plan, input.interval);
+  const price = await planPrice(input.plan, input.interval, false, input.orgId);
   if (!price) throw new Error("no_price");
   const { buildOrderRef } = await import("./payments-core");
   const nonce = Math.random().toString(36).slice(2, 12).replace(/[^a-z0-9]/gi, "") || "n0nce1";
@@ -277,7 +277,7 @@ export async function capturePayPalCardOrder(orderId: string): Promise<{ ok: boo
   const admin = createAdminClient();
   // wave 12: the plan is given only for the plan's real price — an order created elsewhere
   // (e.g. client-side with a lower amount) never activates a plan
-  const expected = await planPrice(ref.plan, ref.interval);
+  const expected = await planPrice(ref.plan, ref.interval, false, ref.org);
   const paid = Number(cap.amount?.value ?? 0);
   if (!expected || (cap.amount?.currency_code ?? "") !== expected.currency || paid + 0.01 < expected.amount) {
     console.error(`paypal order ${order.id}: amount mismatch (${paid} ${cap.amount?.currency_code ?? "?"} for ${ref.plan}/${ref.interval})`);
@@ -341,7 +341,7 @@ export function paypalSdkConfig(): { clientId: string; sdkUrl: string } | null {
  * we capture it server-side with capturePayPalCardOrder.
  */
 export async function createPayPalSdkOrder(input: { orgId: string; plan: string; interval: "month" | "year" }): Promise<{ id: string; amount: number; currency: string }> {
-  const price = await planPrice(input.plan, input.interval);
+  const price = await planPrice(input.plan, input.interval, false, input.orgId);
   if (!price) throw new Error("no_price");
   const { buildOrderRef } = await import("./payments-core");
   const nonce = Math.random().toString(36).slice(2, 12).replace(/[^a-z0-9]/gi, "") || "n0nce2";

@@ -4,7 +4,7 @@ import { LOCALE_COOKIE, firstVisitLocale, isLocale } from "@/lib/i18n/config";
 import { updateSession } from "@/lib/supabase/proxy-session";
 
 /** Routes reachable without a session (after the /{locale} prefix). */
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/offline", "/setup", "/f", "/book", "/c", "/s", "/q", "/help", "/t", "/chat"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/offline", "/setup", "/f", "/book", "/c", "/s", "/q", "/help", "/t", "/chat", "/a"];
 
 /* ---------------- wave 13: websites on their own domain / subdomain ---------------- */
 const hostCache = new Map<string, { at: number; v: { slug: string; lang: string } | null }>();

@@ -169,6 +169,23 @@ export function AutomationBuilder({ id, initial, options, inboundUrl }: { id?: s
             </Select>
           </Field>
         );
+      case "site.behavior":
+        // wave 17: "visited the pricing page 3 times" / "spent 2 minutes on the services page"
+        return (
+          <>
+            <Field label={t("automations.cfg.pathContains")} htmlFor="tc-path" hint={t("automations.cfg.pathHint")}>
+              <Input id="tc-path" dir="ltr" value={tc.path_contains ?? ""} onChange={(e) => setTc("path_contains", e.target.value.slice(0, 120))} placeholder="/pricing" />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={t("automations.cfg.minVisits")} htmlFor="tc-visits">
+                <Input id="tc-visits" type="number" min={1} max={100} value={tc.min_visits ?? ""} onChange={(e) => setTc("min_visits", e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="3" />
+              </Field>
+              <Field label={t("automations.cfg.minSeconds")} htmlFor="tc-secs">
+                <Input id="tc-secs" type="number" min={0} max={86400} value={tc.min_seconds ?? ""} onChange={(e) => setTc("min_seconds", e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="60" />
+              </Field>
+            </div>
+          </>
+        );
       case "webhook.inbound":
         return inboundUrl ? (
           <div className="space-y-1.5 sm:col-span-2">

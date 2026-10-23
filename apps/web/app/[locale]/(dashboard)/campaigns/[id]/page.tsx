@@ -37,14 +37,20 @@ export default async function CampaignPage({ params }: { params: Params }) {
     </Link>
   );
   if (c.status === "draft") {
-    const [{ data: tags }, ready] = await Promise.all([supabase.from("tags").select("name").eq("organization_id", ctx.org.id).order("name").limit(500), channelsReady(ctx.org.id)]);
+    const [{ data: tags }, ready, tplRes] = await Promise.all([
+      supabase.from("tags").select("name").eq("organization_id", ctx.org.id).order("name").limit(500),
+      channelsReady(ctx.org.id),
+      // wave 17 (separate read: works before the migration too)
+      supabase.from("campaigns").select("wa_template").eq("id", id.data).maybeSingle(),
+    ]);
+    const waTemplate = !tplRes.error ? ((tplRes.data?.wa_template as CampaignValue["wa_template"]) ?? null) : null;
     return (
       <>
         {header}
         <PageHeader title={c.name as string} description={t("campaigns.statuses.draft")} actions={<CampaignActions id={c.id as string} status="draft" />} />
         <CampaignEditor
           id={c.id as string}
-          initial={{ name: c.name as string, channel: c.channel as CampaignValue["channel"], subject: (c.subject as string | null) ?? "", body: c.body as string, audience: (c.audience as CampaignValue["audience"]) ?? {}, scheduled_at: (c.scheduled_at as string | null) ?? undefined }}
+          initial={{ name: c.name as string, channel: c.channel as CampaignValue["channel"], subject: (c.subject as string | null) ?? "", body: c.body as string, audience: (c.audience as CampaignValue["audience"]) ?? {}, scheduled_at: (c.scheduled_at as string | null) ?? undefined, wa_template: waTemplate }}
           tags={(tags ?? []).map((x) => x.name as string)}
           channelsReady={ready}
         />

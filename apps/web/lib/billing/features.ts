@@ -11,7 +11,27 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *   site_custom_domain  connect / buy a domain for a site
  *   white_label         no "built with" badge on published sites
  */
-export type PlanFeature = "api_access" | "audit_log" | "site_pro_templates" | "site_ai_editor" | "site_custom_domain" | "white_label" | "ai_site_full" | "ai_images";
+export type PlanFeature =
+  | "api_access"
+  | "audit_log"
+  | "site_pro_templates"
+  | "site_ai_editor"
+  | "site_custom_domain"
+  | "white_label"
+  | "ai_site_full"
+  | "ai_images"
+  // waves 15-18 (paid plans)
+  | "contracts"
+  | "lead_routing"
+  | "invoicing_sync"
+  | "ai_insights"
+  | "voice_ai"
+  | "calendar_sync"
+  | "ab_testing"
+  | "conversion_api"
+  | "ai_copilot"
+  | "flow_builder"
+  | "advanced_analytics";
 
 /** For the signed-in member (RLS session). */
 export async function orgHasFeature(orgId: string, feature: PlanFeature): Promise<boolean> {

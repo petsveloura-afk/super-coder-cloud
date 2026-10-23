@@ -42,7 +42,11 @@ export async function POST(request: NextRequest) {
       // wave 13: a domain bought for a website (custom_id "dom:<order>")
       const { processDomainPayment } = await import("@/lib/site/domains");
       const dom = orderId ? await processDomainPayment(orderId) : { handled: false as const };
-      if (dom.handled) {
+      // wave 18: an AI credit pack (custom_id "pack:<purchase>")
+      const pack = !dom.handled && orderId ? await import("@/lib/billing/packs").then((m) => m.processPackPayPal(orderId)) : { handled: false as const, orgId: undefined };
+      if (pack.handled) {
+        if (pack.orgId) await admin.from("billing_events").update({ organization_id: pack.orgId }).eq("provider", "paypal").eq("event_id", id);
+      } else if (dom.handled) {
         await admin.from("billing_events").update({ organization_id: dom.orgId }).eq("provider", "paypal").eq("event_id", id);
       } else if (orderId) {
         const out = await capturePayPalCardOrder(orderId);

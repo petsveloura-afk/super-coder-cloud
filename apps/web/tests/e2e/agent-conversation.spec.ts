@@ -1,6 +1,7 @@
 import { deflateSync } from "node:zlib";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { createOrg, shot, signIn, signUp, uniqueEmail } from "./helpers";
+import { addKnownPrice } from "./known-prices";
 
 /**
  * Wave 8 — the agent runs the whole conversation the way the business set it up:
@@ -72,6 +73,7 @@ test("conversation setup through the UI → Telegram menu on Start, commands, th
   await page.goto("/he/ai-agents");
   await page.getByTestId("quick-agent").click();
   await expect(page.getByText("הסוכן פעיל ועונה ללקוחות")).toBeVisible();
+  await addKnownPrice(request, slug, "תספורת לכלב: 150 ₪"); // v15: only prices from the business information
 
   // connect the Telegram bot (token only) → commands + menu button are configured automatically
   await page.goto("/he/integrations");

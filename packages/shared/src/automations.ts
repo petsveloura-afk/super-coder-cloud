@@ -21,6 +21,12 @@ export const AUTOMATION_TRIGGERS = [
   "appointment.booked",
   "ticket.created",
   "invoice.paid",
+  // wave 17 — behavior & sales signals
+  "site.behavior",
+  "quote.viewed",
+  "contract.signed",
+  "lead.hot",
+  "customer.opted_out",
 ] as const;
 export type AutomationTrigger = (typeof AUTOMATION_TRIGGERS)[number];
 
@@ -123,6 +129,31 @@ export const AUTOMATION_RECIPES: { key: string; trigger_type: AutomationTrigger;
     key: "dealLostFollowUp",
     trigger_type: "deal.lost",
     actions: [{ type: "create_task", config: { title: "↩️ {{deal.title}}", due_in_days: 90, assignee: "owner" } }],
+  },
+  // wave 17 — behavior & sales signals
+  {
+    key: "pricingVisits",
+    trigger_type: "site.behavior",
+    trigger_config: { path_contains: "pric", min_visits: "3" },
+    actions: [
+      { type: "create_task", config: { title: "🔥 {{contact.first_name}} {{contact.last_name}} — 3× /pricing", due_in_days: 0, assignee: "owner" } },
+      { type: "add_tag", config: { tag: "hot-intent" } },
+    ],
+  },
+  {
+    key: "quoteViewed",
+    trigger_type: "quote.viewed",
+    actions: [{ type: "create_task", config: { title: "👀 {{contact.first_name}} {{contact.last_name}}", due_in_days: 0, assignee: "owner" } }],
+  },
+  {
+    key: "hotLead",
+    trigger_type: "lead.hot",
+    actions: [{ type: "notify", config: { to: "admins", text: "🔥 {{contact.first_name}} {{contact.last_name}} {{contact.phone}}" } }],
+  },
+  {
+    key: "optedOut",
+    trigger_type: "customer.opted_out",
+    actions: [{ type: "add_tag", config: { tag: "opted-out" } }],
   },
   {
     key: "inboundLead",

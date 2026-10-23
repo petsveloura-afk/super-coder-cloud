@@ -35,7 +35,7 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
   const nowIso = new Date().toISOString();
   let req = supabase
     .from("tasks")
-    .select("id, title, description, status, due_at, assignee_id, contact_id, deal_id, created_at")
+    .select("id, title, description, status, due_at, assignee_id, contact_id, deal_id, created_at, remind_at")
     .eq("organization_id", ctx.org.id)
     .limit(300);
   if (filter === "mine") req = req.eq("assignee_id", ctx.userId).in("status", ["open", "in_progress"]);

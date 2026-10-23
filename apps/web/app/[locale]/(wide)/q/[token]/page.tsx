@@ -5,6 +5,8 @@ import { createAnonClient } from "@/lib/supabase/anon";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import { DocumentPublicActions, PrintButton } from "@/components/public/document-actions";
+import { ContractSign } from "@/components/public/contract-sign";
+import { visitorHash } from "@/lib/visitor";
 
 type Params = Promise<{ locale: string; token: string }>;
 
@@ -30,11 +32,23 @@ interface PublicDoc {
   online_payment: boolean;
   customer: { name: string; email: string | null; phone: string | null; company: string | null } | null;
   lines: { description: string; quantity: number; unit_price: number; discount_pct: number; tax_rate: number; line_total: number }[];
+  // wave 15 (get_public_document_v2)
+  require_signature?: boolean;
+  contract_terms?: string | null;
+  signed_at?: string | null;
+  signature?: string | null;
+  content_hash?: string | null;
+  paypal?: boolean;
+  stripe?: boolean;
 }
 
 async function load(token: string): Promise<PublicDoc | null> {
   if (!/^[a-f0-9]{32}$/.test(token)) return null;
-  const { data } = await createAnonClient().rpc("get_public_document", { p_token: token });
+  const anon = createAnonClient();
+  // wave 15: v2 adds the contract, signature and payment options; v1 before the migration ran
+  const v2 = await anon.rpc("get_public_document_v2", { p_token: token });
+  if (!v2.error) return (v2.data as PublicDoc | null) ?? null;
+  const { data } = await anon.rpc("get_public_document", { p_token: token });
   return (data as PublicDoc | null) ?? null;
 }
 
@@ -52,6 +66,9 @@ export default async function PublicDocumentPage({ params, searchParams }: { par
   const doc = await load(token);
   if (!doc) notFound();
   const sp = await searchParams;
+  // wave 15: the business sees that (and when) the customer opened the document
+  await createAnonClient().rpc("track_document_view", { p_token: token, p_visitor: await visitorHash() }).then(() => undefined, () => undefined);
+  const needsSignature = doc.kind === "quote" && Boolean(doc.require_signature) && !doc.signed_at;
   const money = (n: number) => formatCurrency(locale, Number(n), doc.currency);
   const balance = Math.round((Number(doc.total) - Number(doc.amount_paid)) * 100) / 100;
   const seller = doc.seller;
@@ -170,22 +187,48 @@ export default async function PublicDocumentPage({ params, searchParams }: { par
             <p className="whitespace-pre-wrap">{seller.payment_instructions}</p>
           </section>
         ) : null}
-        {doc.accepted_at ? (
+        {doc.contract_terms ? (
+          <section className="mt-6 rounded-2xl border border-line p-4" data-testid="public-contract-terms">
+            <h2 className="mb-2 text-sm font-semibold">{t("contract.terms")}</h2>
+            <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{doc.contract_terms}</p>
+          </section>
+        ) : null}
+        {doc.signed_at ? (
+          <section className="mt-6 rounded-2xl border border-success/30 bg-success-soft p-4" data-testid="public-signature">
+            <p className="text-sm font-semibold text-success">{t("contract.signedBy", { name: doc.accepted_by_name ?? "", date: formatDateTime(locale, doc.signed_at) })}</p>
+            {doc.signature ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={doc.signature} alt={t("contract.signatureAlt")} className="mt-2 h-20 max-w-full rounded-lg bg-white p-1" />
+            ) : null}
+            {doc.content_hash ? (
+              <p className="mt-2 break-all text-[11px] text-muted">
+                {t("contract.hash")}: <bdi dir="ltr" className="font-mono">{doc.content_hash}</bdi>
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+        {doc.accepted_at && !doc.signed_at ? (
           <p className="mt-6 flex items-center gap-2 text-sm text-success">
             <CheckCircle2 className="h-4 w-4" /> {t("finance.acceptedOn", { name: doc.accepted_by_name ?? "", date: formatDateTime(locale, doc.accepted_at) })}
           </p>
         ) : null}
         {sp.paid === "1" && doc.status !== "paid" ? <p role="status" className="mt-6 text-sm text-muted">{t("finance.paymentProcessing")}</p> : null}
+        {sp.paid === "0" ? <p role="alert" className="mt-6 text-sm text-danger">{t("finance.onlineFailed")}</p> : null}
         <div className="mt-8 print:hidden">
-          <DocumentPublicActions
-            token={token}
-            kind={doc.kind}
-            canAccept={doc.kind === "quote" && doc.status === "sent" && !doc.expired}
-            canPay={doc.kind === "invoice" && ["sent", "accepted"].includes(doc.status) && balance > 0}
-            online={doc.online_payment}
-            paymentUrl={doc.payment_url}
-            balanceLabel={money(balance)}
-          />
+          {needsSignature && doc.status === "sent" && !doc.expired ? (
+            <ContractSign token={token} />
+          ) : (
+            <DocumentPublicActions
+              token={token}
+              kind={doc.kind}
+              canAccept={doc.kind === "quote" && doc.status === "sent" && !doc.expired && !needsSignature}
+              canPay={doc.kind === "invoice" && ["sent", "accepted"].includes(doc.status) && balance > 0}
+              online={doc.stripe ?? doc.online_payment}
+              paypal={Boolean(doc.paypal)}
+              paymentUrl={doc.payment_url}
+              balanceLabel={money(balance)}
+            />
+          )}
         </div>
       </article>
       <p className="mt-6 text-center text-[11.5px] text-subtle print:hidden">{t("public.poweredBy")}</p>

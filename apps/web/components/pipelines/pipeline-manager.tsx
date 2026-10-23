@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Plus, Settings2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Settings2, Zap } from "lucide-react";
+import { STAGE_EVENTS } from "@/lib/crm/stage-events";
 import { useI18n } from "@/lib/i18n/client";
 import { pipelineLabel, stageLabel } from "@/lib/labels";
 import { Button, Field, Input } from "@/components/ui/primitives";
@@ -15,6 +16,7 @@ import {
   moveStageAction,
   renamePipelineAction,
   updateStageAction,
+  updateStageAutomationAction,
 } from "@/app/[locale]/(dashboard)/pipelines/actions";
 import type { ActionState } from "@/lib/action-state";
 
@@ -22,6 +24,48 @@ interface Stage {
   id: string;
   name: string;
   probability: number;
+  auto_on?: string[];
+  marks_won?: boolean;
+}
+
+/** Wave 15 — choose which business events move deals into this stage by themselves. */
+function StageAutomation({ stage }: { stage: Stage }) {
+  const { t } = useI18n();
+  const count = stage.auto_on?.length ?? 0;
+  return (
+    <FormDialog
+      action={updateStageAutomationAction}
+      title={t("stageAuto.title", { stage: stageLabel(t, stage.name) })}
+      description={t("stageAuto.subtitle")}
+      hidden={{ id: stage.id }}
+      trigger={
+        <Button variant="ghost" size="sm" data-testid="stage-auto" title={t("stageAuto.button")}>
+          <Zap className={`h-4 w-4 ${count ? "text-gold" : ""}`} />
+          {count ? <span className="text-[11px] font-semibold text-gold">{count}</span> : null}
+          <span className="sr-only">{t("stageAuto.button")}</span>
+        </Button>
+      }
+    >
+      {() => (
+        <fieldset className="space-y-2">
+          <legend className="mb-1 text-[13px] font-medium text-muted">{t("stageAuto.when")}</legend>
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            {STAGE_EVENTS.map((e) => (
+              <label key={e} className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-xl border border-line px-3 text-sm hover:bg-surface-hover">
+                <input type="checkbox" name="auto_on" value={e} defaultChecked={stage.auto_on?.includes(e)} className="h-4 w-4 accent-[var(--brand)]" />
+                {t(`stageAuto.events.${e}`)}
+              </label>
+            ))}
+          </div>
+          <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2.5 rounded-xl border border-success/30 bg-success-soft px-3 text-sm">
+            <input type="checkbox" name="marks_won" defaultChecked={stage.marks_won} className="h-4 w-4 accent-[var(--brand)]" />
+            {t("stageAuto.marksWon")}
+          </label>
+          <p className="text-[12px] text-subtle">{t("stageAuto.hint")}</p>
+        </fieldset>
+      )}
+    </FormDialog>
+  );
 }
 
 function StageFields({ state, stage }: { state: ActionState<unknown>; stage?: Stage }) {
@@ -99,6 +143,7 @@ export function PipelineManager({ pipeline }: { pipeline: { id: string; name: st
               <span className="w-6 text-center text-[12px] text-subtle">{i + 1}</span>
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{stageLabel(t, s.name)}</span>
               <span className="text-[12px] text-muted">{s.probability}%</span>
+              <StageAutomation stage={s} />
               <ConfirmActionButton action={moveStageAction} fields={{ id: s.id, direction: "-1" }} confirm={false} variant="ghost" size="sm" icon={<ArrowUp className="h-4 w-4" />} label={t("deals.moveEarlier")} />
               <ConfirmActionButton action={moveStageAction} fields={{ id: s.id, direction: "1" }} confirm={false} variant="ghost" size="sm" icon={<ArrowDown className="h-4 w-4" />} label={t("deals.moveLater")} />
               <FormDialog

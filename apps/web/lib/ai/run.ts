@@ -4,7 +4,22 @@ import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_MODELS, pickProvider, routerExtrasConfigured, type AIMessage, type AIProviderName } from "./providers";
 import { generateRouted, RouterError } from "./router";
 
-export type AIFeature = "contact_summary" | "followup_draft" | "agent_chat" | "site_builder";
+export type AIFeature =
+  | "contact_summary"
+  | "followup_draft"
+  | "agent_chat"
+  | "site_builder"
+  // waves 15-18
+  | "insights"
+  | "copilot"
+  | "segment"
+  | "site_copy"
+  | "vision"
+  | "transcribe"
+  | "voice"
+  | "kb"
+  | "forecast"
+  | "ab_variant";
 
 export type AIOutcome =
   | { ok: true; text: string; provider: AIProviderName | string; model: string; credits: number }

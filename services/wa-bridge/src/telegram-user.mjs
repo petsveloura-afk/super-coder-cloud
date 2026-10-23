@@ -26,7 +26,22 @@ export async function toTelegramUserEvent(event) {
   const from = String(sender.id ?? "");
   if (!/^\d{3,20}$/.test(from)) return null;
   const text = String(m.message ?? "").slice(0, 8000);
-  const media = m.media ? { type: m.photo ? "photo" : m.document ? "document" : "media" } : null;
+  let media = m.media ? { type: m.photo ? "photo" : m.voice ? "voice" : m.audio ? "audio" : m.document ? "document" : "media" } : null;
+  const docMime = m.document?.mimeType ?? "";
+  const docName = (m.document?.attributes ?? []).find((a) => a?.fileName)?.fileName;
+  if (media && media.type === "document" && docName) media = { ...media, name: String(docName).slice(0, 200) };
+  const readableDoc = media?.type === "document" && (/^application\/pdf|^text\/plain/.test(docMime) || /\.(pdf|txt)$/i.test(docName ?? ""));
+  // wave 16: voice notes and photos are downloaded (≤ 6 MB) so the agent can understand them
+  if (media && (media.type === "voice" || media.type === "photo" || media.type === "audio" || readableDoc) && typeof m.downloadMedia === "function") {
+    try {
+      const buf = await m.downloadMedia();
+      if (buf && buf.length && buf.length <= 6 * 1024 * 1024) {
+        media = { ...media, data: Buffer.from(buf).toString("base64"), mime: media.type === "photo" ? "image/jpeg" : readableDoc ? docMime || "application/pdf" : m.document?.mimeType ?? "audio/ogg" };
+      }
+    } catch {
+      // keep the message without the media data
+    }
+  }
   if (!text && !media) return null;
   return {
     type: "message",

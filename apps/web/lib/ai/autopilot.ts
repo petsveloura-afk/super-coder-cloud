@@ -180,6 +180,12 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
   const channel = conv.channel as string;
   if (!isAutopilotChannel(channel)) return { replied: false, handoff: false, reason: "channel" };
   const orgId = conv.organization_id as string;
+  // conversation guard (one state for all channels): opted out, a person owns it / already answered
+  {
+    const { checkGuard } = await import("@/lib/conversations/guard");
+    const g = await checkGuard(conv.id as string, "ai_reply");
+    if (!g.allowed) return { replied: false, handoff: false, reason: `guard:${g.reason}` };
+  }
 
   const { data: agent } = await admin
     .from("ai_agents")
@@ -278,6 +284,15 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     const text = formatForChannel(stopMessage(replyLocale), ch);
     await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string });
     await admin.from("conversations").update({ followup_count: 9 }).eq("id", conv.id).then(() => undefined, () => undefined);
+    // waves 15-18: one state for all channels — the request to stop also opts the customer out everywhere
+    // (every channel of this contact, campaigns, and anything already scheduled to him)
+    {
+      const contactId = (conv.contact_id as string | null) ?? null;
+      const scope = admin.from("conversations").update({ opt_out: true }).eq("organization_id", orgId);
+      await (contactId ? scope.or(`id.eq.${conv.id},contact_id.eq.${contactId}`) : scope.eq("id", conv.id)).then(() => undefined, () => undefined);
+      if (contactId) await admin.from("contacts").update({ opted_out_at: new Date().toISOString(), marketing_consent: false }).eq("id", contactId).then(() => undefined, () => undefined);
+      await admin.rpc("cancel_pending_schedules", { p_org: orgId, p_conversation: conv.id, p_reason: "opted_out", p_kinds: null, p_only_cancel_on_reply: false }).then(() => undefined, () => undefined);
+    }
     return { replied: true, handoff: false, reason: "customer_stop", text };
   }
   // legal threats / threats of harm: a person takes over immediately, no AI improvisation
@@ -286,6 +301,30 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string });
     await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "critical:legal_or_threat" });
     return { replied: true, handoff: true, reason: "critical:legal_or_threat", text };
+  }
+  // wave 16: guardrails (angry customer, budget per conversation), flows, knowledge base
+  const { data: gRow } = await admin.from("ai_agents").select("guardrails").eq("id", agent.id).maybeSingle();
+  const { normalizeGuardrails, isAngry, guardrailHandoffText } = await import("./guardrails");
+  const rails = normalizeGuardrails((gRow as { guardrails?: unknown } | null)?.guardrails);
+  if (rails.angry_handoff && isAngry(lastLine)) {
+    const text = formatForChannel(guardrailHandoffText(locale, "angry"), ch);
+    await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string, meta: { system: "guardrail" } });
+    await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "angry_customer" });
+    return { replied: true, handoff: true, reason: "angry_customer", text };
+  }
+  if (rails.max_replies_per_day > 0) {
+    const { data: used } = await admin.rpc("ai_replies_today", { p_conversation: conv.id });
+    if (Number(used ?? 0) >= rails.max_replies_per_day) {
+      const text = formatForChannel(guardrailHandoffText(locale, "budget"), ch);
+      await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string, meta: { system: "guardrail" } });
+      await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "ai_budget" });
+      return { replied: true, handoff: true, reason: "ai_budget", text };
+    }
+  }
+  {
+    const { runConversationFlow } = await import("./flows");
+    const flowRes = await runConversationFlow({ orgId, conversationId: conv.id as string, agentId: agent.id as string, contactId: (conv.contact_id as string | null) ?? null, channel: ch, text: lastLine, locale });
+    if (flowRes.handled) return { replied: true, handoff: flowRes.handoff, reason: flowRes.handoff ? "flow_handoff" : undefined, text: flowRes.text };
   }
 
   // customer details — and fill in a phone / e-mail the customer just typed
@@ -334,6 +373,13 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     locale,
   })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}`;
   await typingIndicator(orgId, ch, conv.external_id as string);
+  // wave 16: help-center answers (knowledge base) for this question
+  let kb = "";
+  if (rails.kb) {
+    const { data: hits } = await admin.rpc("kb_search", { p_org: orgId, p_query: lastLine.slice(0, 300), p_limit: 3 });
+    const { kbBlock } = await import("./guardrails");
+    kb = kbBlock(((hits ?? []) as { title: string; body: string }[]) ?? []);
+  }
 
   const out = await runAISystem({
     orgId,
@@ -341,7 +387,7 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     agentId: agent.id as string,
     provider: agent.provider as "openai" | "anthropic" | "gemini",
     model: agent.model as string,
-    system,
+    system: kb ? `${system}\n\n${kb}` : system,
     messages: history,
     temperature: Number(agent.temperature ?? 0.4),
     maxTokens: ch === "email" ? 1200 : 600,
@@ -417,6 +463,19 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     tools.handoff = true;
     tools.reason = "empty_answer";
   }
+  // wave 16: never send a forbidden phrase or a price that is not in the business data
+  {
+    const { bannedHit, unknownPrices } = await import("./guardrails");
+    const known = [JSON.stringify(agent.profile ?? {}), String(agent.instructions ?? ""), kb].join("\n");
+    const hit = bannedHit(tools.text, rails.banned);
+    const badPrices = rails.price_guard ? unknownPrices(tools.text, known) : [];
+    if (hit || badPrices.length) {
+      const safe = formatForChannel(guardrailHandoffText(locale, "check"), ch);
+      await sendToConversation(orgId, conv.id as string, safe, undefined, { aiAgentId: agent.id as string, meta: { system: "guardrail", blocked: hit ? "banned" : "price", draft: tools.text.slice(0, 1500) } });
+      await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: hit ? "guardrail_banned" : "guardrail_price" });
+      return { replied: true, handoff: true, reason: hit ? "guardrail_banned" : "guardrail_price", text: safe };
+    }
+  }
   const text = formatForChannel(tools.text || handoffMessage(locale), ch);
   await sendToConversation(orgId, conv.id as string, text, undefined, {
     aiAgentId: agent.id as string,
@@ -426,6 +485,17 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
   await admin.from("conversations").update({ last_ai_at: new Date().toISOString() }).eq("id", conv.id);
   // wave 15: remember the customer's mood and main intent for the inbox (ignored until the migration ran)
   await admin.from("conversations").update({ sentiment: analysis.mood, last_intent: analysis.intents[0] ?? null }).eq("id", conv.id).then(() => undefined, () => undefined);
+  // wave 16: the customer sent a voice note → also answer with a voice note (when enabled)
+  if (rails.voice_replies && (ch === "telegram" || ch === "whatsapp")) {
+    const { data: lastMsg } = await admin.from("messages").select("meta").eq("conversation_id", conv.id).eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (typeof (lastMsg?.meta as { transcript?: string } | null)?.transcript === "string") {
+      const { synthesizeSpeech, sendVoiceNote, ttsConfigured } = await import("./tts");
+      if (ttsConfigured()) {
+        const mp3 = await synthesizeSpeech(tools.text, locale);
+        if (mp3) await sendVoiceNote(orgId, ch, conv.external_id as string, mp3).catch(() => false);
+      }
+    }
+  }
   // examples / portfolio images the agent chose to show
   for (const item of pickMedia(answer, profile.media)) {
     await sendMediaToConversation(orgId, conv.id as string, item, { aiAgentId: agent.id as string });
@@ -508,6 +578,19 @@ export async function forwardAfterAutopilot(conversationId: string, res: Autopil
     if (res.replied && res.text) await forwardToTeam(orgId, "messages", { ...base, agentText: res.text });
     if (res.leadData && (res.leadData.name || res.leadData.phone || res.leadData.email)) await forwardToTeam(orgId, "leads", { ...base, lead: res.leadData });
     if (res.handoff) await forwardToTeam(orgId, "handoff", { ...base, reason: res.reason ?? null });
+    // wave 16: urgent phone call to the on-duty team member — hot lead / angry customer / asked for a person
+    if (res.handoff) {
+      const { data: hot } = await admin.from("conversations").select("lead_score").eq("id", conversationId).maybeSingle();
+      const urgent = hot?.lead_score === "hot" || ["angry_customer", "customer_asked", "phone_human"].includes(res.reason ?? "customer_asked");
+      if (urgent) {
+        const { data: callers } = await admin.from("notify_recipients").select("id").eq("organization_id", orgId).eq("kind", "call").eq("enabled", true).contains("events", ["escalation"]).limit(1);
+        if (callers?.length) {
+          await admin.from("jobs").insert({ organization_id: orgId, kind: "call", payload: { customer: base.customer, reason: res.reason ?? "handoff", conversation_id: conversationId } });
+          const { kickJobs } = await import("@/lib/jobs/kick");
+          kickJobs();
+        }
+      }
+    }
   } catch (e) {
     console.error("team update failed", (e as Error).message);
   }

@@ -18,7 +18,7 @@ interface BridgeEvent {
   name?: string | null;
   text?: string;
   isGroup?: boolean;
-  media?: { type: string; name?: string } | null;
+  media?: { type: string; name?: string; data?: string; mime?: string } | null;
   // status
   status?: "qr" | "connected" | "logged_out";
   phone?: string | null;
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // wave 12: the owner answered himself from the phone → recorded, the agent steps back
   if (ev.type === "owner_message" && ev.to && /^\d{6,20}$/.test(ev.to)) {
     const { ingestOwnerMessage } = await import("@/lib/channels/owner");
-    await ingestOwnerMessage({ kind: "whatsapp_qr", token, chat: ev.to, text: ev.text ?? "", messageId: ev.id ?? null, media: ev.media ?? null });
+    await ingestOwnerMessage({ kind: "whatsapp_qr", token, chat: ev.to, text: ev.text ?? "", messageId: ev.id ?? null, media: ev.media ? (({ data: _d, ...rest }) => (void _d, rest))(ev.media as { data?: string; type: string }) : null });
     return NextResponse.json({ ok: true });
   }
 

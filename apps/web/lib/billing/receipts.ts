@@ -122,8 +122,19 @@ export async function applyPlan(input: {
 }
 
 /** Plan price in a currency: plan currency (ILS) or the USD columns. */
-export async function planPrice(plan: string, interval: "month" | "year", usd = false): Promise<{ amount: number; currency: string } | null> {
+export async function planPrice(plan: string, interval: "month" | "year", usd = false, orgId?: string): Promise<{ amount: number; currency: string } | null> {
   const admin = createAdminClient();
+  // wave 18: a custom (white-label / negotiated) price set by the platform admin for this organization
+  if (orgId) {
+    const { data: o } = await admin.from("organizations").select("price_overrides").eq("id", orgId).maybeSingle();
+    const ov = ((o?.price_overrides ?? {}) as Record<string, Record<string, number>>)[plan];
+    const a = ov ? Number(ov[`${interval}${usd ? "_usd" : ""}`]) : NaN;
+    if (Number.isFinite(a) && a > 0) {
+      if (usd) return { amount: a, currency: "USD" };
+      const { data: pl } = await admin.from("plans").select("currency").eq("key", plan).maybeSingle();
+      return { amount: a, currency: String(pl?.currency ?? "ILS").toUpperCase() };
+    }
+  }
   const { data } = await admin.from("plans").select("price_monthly, price_yearly, price_monthly_usd, price_yearly_usd, currency").eq("key", plan).maybeSingle();
   if (!data) return null;
   if (usd) {

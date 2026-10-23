@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { FileText, Package, Plus, Receipt, Settings2 } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { FinanceSettingsForm, ProductButton } from "@/components/finance/finance-client";
+import { InvoicingCard, OrgPayPalCard } from "@/components/finance/finance-plus";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -122,6 +123,9 @@ export default async function FinancePage({ params, searchParams }: { params: Pr
       supabase.rpc("finance_stripe_ready", { p_org: ctx.org.id }),
     ]);
     const v = (k: string, d = "") => (s && (s as Record<string, unknown>)[k] != null ? String((s as Record<string, unknown>)[k]) : d);
+    // wave 15: the business's own PayPal + Morning / iCount tax documents
+    const money = canWrite && process.env.SUPABASE_SERVICE_ROLE_KEY ? await import("@/lib/finance/connections").then((m) => m.moneyConnections(ctx.org.id)).catch(() => null) : null;
+    const invoicingLocked = !(await import("@/lib/billing/features").then((m) => m.orgHasFeature(ctx.org.id, "invoicing_sync")));
     const webhookUrl = s?.stripe_webhook_token ? `${publicEnv.appUrl.replace(/\/$/, "")}/api/webhooks/payments/${s.stripe_webhook_token}` : null;
     return (
       <>
@@ -148,6 +152,18 @@ export default async function FinancePage({ params, searchParams }: { params: Pr
             <EmptyState title={t("errors.forbidden")} />
           )}
         </Card>
+        {money ? (
+          <>
+            <Card className="mt-4 p-5">
+              <OrgPayPalCard connected={money.paypal.connected} mode={money.paypal.mode} />
+            </Card>
+            {ctx.can("integrations.manage") ? (
+              <Card className="mt-4 p-5">
+                <InvoicingCard provider={money.invoicing.provider} config={money.invoicing.config} lastError={money.invoicing.last_error} lastSuccess={money.invoicing.last_success_at} locked={invoicingLocked} />
+              </Card>
+            ) : null}
+          </>
+        ) : null}
       </>
     );
   }

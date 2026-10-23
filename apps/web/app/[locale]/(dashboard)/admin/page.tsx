@@ -11,6 +11,7 @@ import { formatDate, formatNumber } from "@/lib/format";
 import { AdminPayments } from "@/components/admin/admin-payments";
 import { AiHealth } from "@/components/admin/ai-health";
 import { AdminDomains } from "@/components/admin/admin-domains";
+import { AdminOverrides } from "@/components/admin/admin-growth";
 import { providerKeys, ROUTE_PROVIDERS } from "@/lib/ai/router-core";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -40,11 +41,14 @@ export default async function AdminPage({ params, searchParams }: { params: Prom
   const q = typeof sp.q === "string" ? sp.q.slice(0, 80) : "";
   const page = Math.max(0, Number.parseInt(String(sp.page ?? "0"), 10) || 0);
   const supabase = await createClient();
-  const [{ data: ov }, { data: orgs }, { data: flags }] = await Promise.all([
+  const [{ data: ov }, { data: orgs }, { data: flags }, aiUsageRes] = await Promise.all([
     supabase.rpc("platform_overview"),
     supabase.rpc("platform_organizations", { p_search: q || null, p_limit: 50, p_offset: page * 50 }),
     supabase.rpc("platform_flags"),
+    // wave 18: AI usage per organization (last 30 days)
+    supabase.rpc("platform_ai_usage", { p_days: 30, p_limit: 30 }),
   ]);
+  const aiUsage = (aiUsageRes.error ? [] : (aiUsageRes.data ?? [])) as { organization_id: string; name: string; plan: string; credits: number; calls: number; errors: number; input_tokens: number; output_tokens: number; pack_balance: number; monthly_limit: number | null; top_feature: string | null }[];
   const o = (ov ?? {}) as Overview;
   const orgRows = (orgs ?? []) as { id: string; name: string; slug: string; plan: string; is_demo: boolean; created_at: string; members: number; contacts: number; owner_email: string | null }[];
   const flagRows = (flags ?? []) as { key: string; organization_id: string | null; organization_name: string | null; enabled: boolean }[];
@@ -77,6 +81,51 @@ export default async function AdminPage({ params, searchParams }: { params: Prom
           </Card>
         ))}
       </div>
+      <AdminOverrides />
+      <Card className="mb-4 overflow-hidden" data-testid="admin-ai-usage">
+        <div className="border-b border-line p-4">
+          <h2 className="font-semibold">{t("admin.aiUsageTitle")}</h2>
+          <p className="text-[12.5px] text-muted">{t("admin.aiUsageHint")}</p>
+        </div>
+        {aiUsage.length === 0 ? (
+          <p className="p-4 text-[13px] text-subtle">{t("analytics.noData")}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="text-[12.5px] text-muted">
+                <tr className="border-b border-line">
+                  <th className="px-4 py-2 text-start font-medium">{t("admin.org")}</th>
+                  <th className="px-4 py-2 text-end font-medium">{t("admin.aiCredits")}</th>
+                  <th className="px-4 py-2 text-end font-medium">{t("admin.aiCalls")}</th>
+                  <th className="px-4 py-2 text-end font-medium">{t("admin.aiErrors")}</th>
+                  <th className="px-4 py-2 text-end font-medium">{t("admin.aiTokens")}</th>
+                  <th className="px-4 py-2 text-end font-medium">{t("admin.aiLimit")}</th>
+                  <th className="px-4 py-2 text-end font-medium">{t("admin.aiPacks")}</th>
+                  <th className="px-4 py-2 text-start font-medium">{t("admin.aiTop")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aiUsage.map((u) => (
+                  <tr key={u.organization_id} className="border-b border-line/60">
+                    <td className="px-4 py-2">
+                      {u.name} <span className="text-[12px] text-subtle">({u.plan})</span>
+                    </td>
+                    <td className="px-4 py-2 text-end tabular-nums">{formatNumber(locale, Number(u.credits))}</td>
+                    <td className="px-4 py-2 text-end tabular-nums">{formatNumber(locale, Number(u.calls))}</td>
+                    <td className={`px-4 py-2 text-end tabular-nums ${Number(u.errors) > 0 ? "text-danger" : ""}`}>{formatNumber(locale, Number(u.errors))}</td>
+                    <td className="px-4 py-2 text-end tabular-nums">{formatNumber(locale, Number(u.input_tokens) + Number(u.output_tokens))}</td>
+                    <td className="px-4 py-2 text-end tabular-nums">{u.monthly_limit === null ? "∞" : formatNumber(locale, Number(u.monthly_limit))}</td>
+                    <td className="px-4 py-2 text-end tabular-nums">{formatNumber(locale, Number(u.pack_balance))}</td>
+                    <td className="px-4 py-2 text-[12.5px]" dir="ltr">
+                      {u.top_feature ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
       <Card className="mb-4 flex flex-wrap gap-2 p-4 text-[13px]">
         <span className="text-muted">{t("admin.plans")}:</span>
         {Object.entries(o.plans ?? {}).map(([p, n]) => (

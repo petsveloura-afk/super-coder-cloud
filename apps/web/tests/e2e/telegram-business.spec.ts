@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { createOrg, shot, signUp, uniqueEmail } from "./helpers";
+import { addKnownPrice } from "./known-prices";
 
 /**
  * Wave 10 — Telegram Business (the bot runs the owner's personal Telegram chats)
@@ -41,6 +42,7 @@ test("Telegram Business: the agent answers in the owner's own chats, steps back 
   await page.goto("/he/ai-agents");
   await page.getByTestId("quick-agent").click();
   await expect(page.getByText("הסוכן פעיל ועונה ללקוחות")).toBeVisible();
+  await addKnownPrice(request, `tgbiz-${stamp}`, "תספורת לכלב: 150 ₪"); // v15: only prices from the business information
 
   // connect the bot — the webhook asks Telegram for Business updates too
   await page.goto("/he/integrations");
