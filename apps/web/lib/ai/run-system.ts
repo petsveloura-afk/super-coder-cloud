@@ -2,7 +2,8 @@ import "server-only";
 import { limitErrorKey } from "@scc/shared/billing";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_MODELS, pickProvider, routerExtrasConfigured, type AIMessage, type AIProviderName } from "./providers";
-import { generateRouted, RouterError } from "./router";
+import { generateRouted, hedgePlan, RouterError } from "./router";
+import { hedgeDelayMs, hedged } from "./speed-core";
 import type { AIOutcome } from "./run";
 
 /**
@@ -14,7 +15,7 @@ import type { AIOutcome } from "./run";
 export async function runAISystem(input: {
   orgId: string;
   /** waves 15-18: background insights, voice/vision understanding, KB answers, phone agent */
-  feature: "autopilot" | "insights" | "vision" | "transcribe" | "voice" | "kb";
+  feature: "autopilot" | "insights" | "vision" | "transcribe" | "voice" | "kb" | "social" | "marketing" | "sales_manager" | "brief" | "collections" | "review_reply";
   agentId?: string | null;
   provider?: AIProviderName;
   model?: string;
@@ -40,7 +41,7 @@ export async function runAISystem(input: {
   try {
     // AI router: agent's provider first, then every configured provider; each key/model once,
     // limited ones rest (shared across instances) — answers in seconds or reports "busy" fast
-    const result = await generateRouted({
+    const routedArgs = {
       preferred: input.provider ?? provider,
       model,
       system: input.system,
@@ -48,7 +49,19 @@ export async function runAISystem(input: {
       temperature: input.temperature ?? 0.4,
       maxTokens: input.maxTokens ?? 600,
       budgetMs: input.patienceMs ?? (Number(process.env.AI_AUTOPILOT_PATIENCE_MS) > 0 ? Number(process.env.AI_AUTOPILOT_PATIENCE_MS) : 30_000),
-    });
+    };
+    // speed upgrade — live conversations (chat, phone, help-center answers): when the main engine is
+    // slow, a second configured engine starts in parallel after AI_HEDGE_MS (default 6s); first answer wins
+    const hedgeMs = ["autopilot", "voice", "kb"].includes(input.feature) ? hedgeDelayMs(process.env) : 0;
+    const plan = hedgeMs > 0 ? await hedgePlan(routedArgs.preferred, model).catch(() => null) : null;
+    const result = plan
+      ? await hedged(
+          () => generateRouted(routedArgs),
+          () => generateRouted({ ...routedArgs, preferred: plan.second, model: null, skipProviders: [plan.first] }),
+          hedgeMs,
+          () => console.info("ai hedge: second engine started", plan.first, "→", plan.second),
+        )
+      : await generateRouted(routedArgs);
     await admin.rpc("finalize_ai_usage_system", {
       p_usage_id: usageId,
       p_provider: result.provider,

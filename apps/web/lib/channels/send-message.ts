@@ -72,6 +72,10 @@ async function providerSend(kind: Kind | "web", orgId: string, externalId: strin
     } else {
       r = await telegramCall(acc.secrets.bot_token ?? "", "sendMessage", { chat_id: externalId, text });
     }
+  } else if (kind === "messenger" || kind === "instagram") {
+    // wave 19: Facebook Messenger / Instagram Direct (Page token, quick-reply buttons, split to Meta's limits)
+    const { metaSendText } = await import("./meta-pages");
+    r = await metaSendText(kind, acc.secrets.page_token ?? "", externalId, text, { buttons: rich?.buttons });
   } else if (kind === "whatsapp") {
     r = rich?.buttons?.length
       ? await whatsappSendButtons(acc.secrets.access_token ?? "", acc.config.phone_number_id ?? "", `+${externalId.replace(/^\+/, "")}`, text, rich.buttons)
@@ -180,7 +184,12 @@ export async function sendMediaToConversation(orgId: string, conversationId: str
         : { ok: false, error: "business_connection_missing", permanent: true };
     } else if (channel === "telegram") r = await telegramCall(acc.secrets.bot_token ?? "", "sendPhoto", { chat_id: conv.external_id, photo: item.url, caption });
     else if (channel === "whatsapp") r = await whatsappSendImage(acc.secrets.access_token ?? "", acc.config.phone_number_id ?? "", `+${String(conv.external_id).replace(/^\+/, "")}`, item.url, caption);
-    else if (channel === "whatsapp_qr") {
+    else if (channel === "messenger" || channel === "instagram") {
+      // wave 19: a real image in Messenger / Instagram, then the caption
+      const { metaSendImage, metaSendText } = await import("./meta-pages");
+      r = await metaSendImage(channel, acc.secrets.page_token ?? "", String(conv.external_id), item.url);
+      if (r.ok && caption) await metaSendText(channel, acc.secrets.page_token ?? "", String(conv.external_id), caption);
+    } else if (channel === "whatsapp_qr") {
       const { bridgeCall } = await import("./wa-bridge");
       const x = await bridgeCall(`/sessions/${acc.id}/send`, { method: "POST", body: { to: String(conv.external_id).replace(/[^\d]/g, ""), text: caption, image: item.url } });
       r = x.ok ? { ok: true } : { ok: false, error: String(x.data.error ?? "bridge") };

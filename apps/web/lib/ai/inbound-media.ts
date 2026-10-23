@@ -17,6 +17,8 @@ export interface InboundMediaRef {
   file_id?: string;
   media_id?: string;
   name?: string;
+  /** wave 19: Messenger / Instagram attachments come as a short-lived https URL */
+  url?: string;
 }
 
 export const isAudio = (t: string | undefined) => t === "audio" || t === "voice" || t === "ptt";
@@ -28,7 +30,7 @@ export const isReadableDoc = (t: string | undefined, mime?: string, name?: strin
 export function mediaUnderstandable(m: InboundMediaRef | null | undefined): boolean {
   if (!m) return false;
   if (!isAudio(m.type) && !isImage(m.type) && !isReadableDoc(m.type, m.mime, m.name)) return false;
-  return Boolean(m.data || m.file_id || m.media_id);
+  return Boolean(m.data || m.file_id || m.media_id || (m.url && /^https:\/\//.test(m.url)));
 }
 
 /** The DB copy of the media reference (never the file bytes). */
@@ -56,6 +58,10 @@ export async function understandInboundMedia(input: { kind: Kind; token: string;
       const acc = await loadAccount(orgId, "whatsapp");
       if (acc?.secrets.access_token) file = await whatsappMedia(acc.secrets.access_token, input.media.media_id);
     }
+    if (!file && input.media.url && /^https:\/\//.test(input.media.url)) {
+      // wave 19: Meta CDN attachment (Messenger / Instagram) — downloaded once, never stored
+      file = await fetchMediaUrl(input.media.url, input.media.mime);
+    }
     if (!file) return null;
     const isDoc = isReadableDoc(input.media.type, input.media.mime ?? file.mime, input.media.name);
     if (isDoc && file.mime === "application/octet-stream") file = { ...file, mime: /\.txt$/i.test(input.media.name ?? "") ? "text/plain" : "application/pdf" };
@@ -77,6 +83,21 @@ export async function understandInboundMedia(input: { kind: Kind; token: string;
     return body;
   } catch (e) {
     console.error("inbound media failed", (e as Error).message);
+    return null;
+  }
+}
+
+/** wave 19: downloads an https attachment (≤ 6 MB). */
+async function fetchMediaUrl(url: string, mime?: string): Promise<{ buf: Buffer; mime: string } | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(20_000), cache: "no-store" });
+    if (!res.ok) return null;
+    const len = Number(res.headers.get("content-length") ?? 0);
+    if (len > 6 * 1024 * 1024) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (!buf.length || buf.length > 6 * 1024 * 1024) return null;
+    return { buf, mime: mime ?? res.headers.get("content-type") ?? "application/octet-stream" };
+  } catch {
     return null;
   }
 }

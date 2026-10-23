@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { latencyLabel } from "@/lib/ai/speed-core";
 import type { Metadata } from "next";
-import { ArrowLeft, ArrowRight, Bot, Globe, Inbox, Mail, MessageCircle, Plug, QrCode, Send, Smartphone, User, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Camera, Globe, Inbox, Mail, MessageCircle, MessagesSquare, Plug, QrCode, Send, Smartphone, User, UserRound } from "lucide-react";
 import { uuidSchema } from "@scc/shared/validators";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { AiModeToggle, ConversationControls, LiveRefresh, MarkRead, ReplyBox } from "@/components/inbox/inbox-client";
@@ -8,7 +9,7 @@ import { ConversationTools } from "@/components/inbox/conversation-tools";
 import { ConversationStatePanel, type ConversationStateView } from "@/components/inbox/conversation-state";
 
 // icons resolved on the server (objects exported from client modules are only references here)
-const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone, whatsapp_qr: QrCode, email: Mail, web: Globe, telegram_user: UserRound } as const;
+const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone, whatsapp_qr: QrCode, email: Mail, web: Globe, telegram_user: UserRound, messenger: MessagesSquare, instagram: Camera } as const;
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -26,7 +27,7 @@ const FILTERS = ["open", "mine", "unassigned", "closed"] as const;
 
 interface ConvRow {
   id: string;
-  channel: "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email" | "web" | "telegram_user";
+  channel: "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email" | "web" | "telegram_user" | "messenger" | "instagram";
   title: string | null;
   ai_mode?: "auto" | "human";
   subject?: string | null;
@@ -225,7 +226,16 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                       <p className={cn("mt-1 text-[10.5px]", out && !m.ai_agent_id ? "text-accent-fg/75" : "text-subtle")}>
                         {formatDateTime(locale, m.created_at as string)}
                         {out ? ` · ${t(`inbox.status.${m.status}`)}${m.sent_by ? ` · ${memberName.get(m.sent_by as string) ?? ""}` : ""}` : ""}
+                        {/* speed upgrade: how fast the agent answered */}
+                        {out && m.ai_agent_id && latencyLabel((m.meta as { timing?: { total?: number } } | null)?.timing?.total) ? (
+                          <span data-testid="ai-latency" title={t("inbox.aiLatency")}>{` · ⚡ ${latencyLabel((m.meta as { timing: { total: number } }).timing.total)}`}</span>
+                        ) : null}
                       </p>
+                      {typeof (m.meta as { document_text?: string } | null)?.document_text === "string" ? (
+                        <p className="mt-1 rounded-lg bg-surface/60 px-2 py-1 text-[12.5px] text-muted" dir="auto" data-testid="document-note">
+                          📄 {(m.meta as { document_text: string }).document_text}
+                        </p>
+                      ) : null}
                       {m.status === "failed" && m.error ? <p className="mt-1 text-[11px] text-danger">{m.error as string}</p> : null}
                     </div>
                   </li>

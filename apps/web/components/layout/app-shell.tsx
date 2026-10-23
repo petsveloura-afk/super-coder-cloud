@@ -53,7 +53,7 @@ function NavLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed?: b
       title={collapsed ? t(item.label) : undefined}
       className={cn(
         "group relative flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] transition-colors",
-        active ? "bg-accent-soft font-semibold text-fg" : "text-muted hover:bg-surface-hover hover:text-fg",
+        active ? "nav-active bg-accent-soft font-semibold text-fg" : "text-muted hover:bg-surface-hover hover:text-fg",
         collapsed && "justify-center px-0",
       )}
     >

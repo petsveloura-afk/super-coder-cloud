@@ -105,7 +105,7 @@
   --color-success-soft: var(--success-soft);
   --color-ring: var(--ring);
   --font-sans: "Heebo Variable", "Heebo", "Noto Sans Arabic Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --radius-card: 1rem;
+  --radius-card: 1.125rem;
   --shadow-card: var(--shadow);
 }
 
@@ -177,4 +177,99 @@ body {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Wave 19 — premium design layer (additive). Same tokens and contrast as before;
+   depth, motion and finish on top: layered shadows, gradient accents, a refined
+   backdrop, smooth page entry, polished scrollbars and selection.
+--------------------------------------------------------------------------- */
+:root,
+[data-theme="dark"] {
+  --gradient-brand: linear-gradient(135deg, #3d6ff0 0%, #3366e6 45%, #2a56cf 100%);
+  --gradient-accent-soft: linear-gradient(135deg, rgb(71 123 255 / 0.16), rgb(0 217 197 / 0.08));
+  --shadow-lg: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 24px 48px -24px rgb(0 0 0 / 0.75);
+  --card-highlight: linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent 40%);
+}
+[data-theme="light"] {
+  --gradient-brand: linear-gradient(135deg, #3b6ef0 0%, #2f63e8 45%, #2653c8 100%);
+  --gradient-accent-soft: linear-gradient(135deg, rgb(47 99 232 / 0.09), rgb(0 165 150 / 0.05));
+  --shadow-lg: 0 1px 2px rgb(16 24 40 / 0.05), 0 22px 44px -22px rgb(16 24 40 / 0.22);
+  --card-highlight: linear-gradient(180deg, rgb(255 255 255 / 0.9), rgb(255 255 255 / 0) 40%);
+}
+
+/* the signature backdrop gets a third, very soft glow and a fine grid that fades out */
+.app-backdrop {
+  background:
+    radial-gradient(900px 480px at 85% -10%, rgb(71 123 255 / 0.11), transparent 60%),
+    radial-gradient(600px 360px at 10% 5%, rgb(201 166 107 / 0.05), transparent 60%),
+    radial-gradient(700px 420px at -10% 110%, rgb(0 217 197 / 0.06), transparent 60%),
+    var(--bg);
+}
+[data-theme="light"] .app-backdrop {
+  background:
+    radial-gradient(900px 480px at 85% -10%, rgb(47 99 232 / 0.08), transparent 60%),
+    radial-gradient(600px 360px at 10% 5%, rgb(156 122 62 / 0.05), transparent 60%),
+    var(--bg);
+}
+
+/* cards: a hairline highlight on top, deeper shadow on hover for interactive ones */
+.card-premium {
+  background-image: var(--card-highlight);
+}
+.card-lift {
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+.card-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-strong);
+}
+
+/* primary buttons: brand gradient + a soft glow, pressed state */
+.btn-brand {
+  background-image: var(--gradient-brand);
+}
+.btn-press:active {
+  transform: translateY(0.5px) scale(0.985);
+}
+
+/* page entry: content rises in softly (disabled for reduced motion, see above) */
+@keyframes page-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.page-enter {
+  animation: page-rise 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* headings: a short accent bar before the page title */
+.title-bar {
+  position: relative;
+}
+.title-bar::before {
+  content: "";
+  display: inline-block;
+  width: 0.36rem;
+  height: 1.15em;
+  margin-inline-end: 0.6rem;
+  vertical-align: -0.18em;
+  border-radius: 999px;
+  background-image: var(--gradient-brand);
+}
+
+/* scrollbars + selection */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+::selection { background: var(--accent-soft); color: var(--text); }
+
+/* active navigation item: soft gradient pill */
+.nav-active {
+  background-image: var(--gradient-accent-soft);
+  box-shadow: 0 0 0 1px rgb(71 123 255 / 0.18) inset;
 }

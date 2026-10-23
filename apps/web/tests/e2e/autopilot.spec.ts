@@ -123,8 +123,12 @@ test("Telegram: the bot answers Start and questions by itself and hands off on a
 
   await page.goto("/he/inbox");
   await expect(page.getByText("ממתין לנציג").first()).toBeVisible();
-  await page.locator("[data-conversation]").first().click();
-  await expect(page.locator('[data-ai="1"]')).toHaveCount(3);
+  // under load the first click can land before hydration finishes; retry until the thread opens
+  await expect(async () => {
+    await page.locator("[data-conversation]").first().click();
+    await expect(page).toHaveURL(/[?&]c=/, { timeout: 5000 });
+  }).toPass({ timeout: 30_000 });
+  await expect(page.locator('[data-ai="1"]')).toHaveCount(3, { timeout: 20_000 });
   await shot(page, "p4-inbox-telegram-ai");
 
   // group chats are never answered automatically

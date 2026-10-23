@@ -68,7 +68,8 @@ describe("Gemini provider", () => {
     const body = JSON.parse(String(init.body));
     expect(body.systemInstruction.parts[0].text).toBe("You are helpful");
     expect(body.contents.map((c: { role: string }) => c.role)).toEqual(["user", "model", "user"]);
-    expect(body.generationConfig).toEqual({ temperature: 0.3, maxOutputTokens: 2548 }); // room for thinking
+    // room for thinking; speed upgrade: 3.8 Flash answers chats at its lowest thinking level ("low")
+    expect(body.generationConfig).toEqual({ temperature: 0.3, maxOutputTokens: 2548, thinkingConfig: { thinkingLevel: "low" } });
   });
 
   it("turns thinking off for 2.5 Flash so the answer is never empty", async () => {

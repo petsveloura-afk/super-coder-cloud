@@ -33,7 +33,9 @@
     "sectionOps": "Operations",
     "billing": "Billing & plans",
     "companies": "Companies",
-    "tasks": "Tasks"
+    "tasks": "Tasks",
+    "agents": "AI team",
+    "social": "Social & reviews"
   },
   "common": {
     "save": "Save",
@@ -266,7 +268,8 @@
     "httpsUrl": "A valid https URL is required",
     "invalidOption": "Pick one of the options",
     "time": "Invalid time",
-    "color": "Invalid color (#RRGGBB)"
+    "color": "Invalid color (#RRGGBB)",
+    "invalid": "Something is not valid"
   },
   "errors": {
     "forbidden": "You don't have permission to do that",
@@ -561,7 +564,9 @@
         "telegram": "Telegram",
         "email": "E-mail",
         "sms": "SMS",
-        "telegram_user": "Telegram (personal account)"
+        "telegram_user": "Telegram (personal account)",
+        "messenger": "Facebook Messenger",
+        "instagram": "Instagram Direct"
       }
     },
     "templates": {
@@ -1010,6 +1015,22 @@
       "optedOut": {
         "name": "Opt-out → tag",
         "body": "Customers who opted out are tagged opted-out for easy filtering"
+      },
+      "newOrder": {
+        "name": "New order → customer + alert",
+        "body": "Every store order tags the buyer as a customer and alerts the team"
+      },
+      "socialLead": {
+        "name": "Social comment → alert",
+        "body": "When someone comments on a post, the team gets the comment"
+      },
+      "badReview": {
+        "name": "New review → alert",
+        "body": "Every new Google review reaches the managers at once"
+      },
+      "dealStuck": {
+        "name": "Deal went quiet → alert",
+        "body": "The sales manager spots a quiet deal and alerts"
       }
     },
     "empty": "No automations yet",
@@ -1043,7 +1064,13 @@
       "quote_viewed": "Customer opened a quote",
       "contract_signed": "Contract signed",
       "lead_hot": "Lead became hot",
-      "customer_opted_out": "Customer opted out"
+      "customer_opted_out": "Customer opted out",
+      "social_comment": "New Facebook / Instagram comment",
+      "order_created": "New store order",
+      "cart_abandoned": "Cart abandoned",
+      "review_received": "New Google review",
+      "invoice_overdue": "Invoice overdue",
+      "deal_stuck": "Deal went quiet (sales manager)"
     },
     "history": "Run history",
     "jobs": "External actions",
@@ -1239,7 +1266,8 @@
       "deals_read": "Read deals",
       "deals_write": "Create deals",
       "tasks_write": "Create tasks",
-      "events_read": "Read events (triggers)"
+      "events_read": "Read events (triggers)",
+      "webhooks_manage": "Instant webhooks (Zapier / Make / n8n)"
     },
     "needScope": "Pick at least one permission",
     "keyCreated": "Key created",
@@ -1412,6 +1440,14 @@
       "passwordFailed": "Password not accepted, try again",
       "connected": "Telegram account connected!",
       "notConfigured": "Personal-account connection isn't enabled on the platform yet."
+    },
+    "meta": {
+      "cancelled": "Connection cancelled",
+      "expired": "That took too long — click connect again",
+      "failed": "Facebook connection failed: {detail}",
+      "noPages": "No Facebook Page found. A business Page (with access) is needed for Messenger and Instagram.",
+      "connectedBoth": "Connected: {page} + Instagram @{ig}",
+      "connectedPage": "Connected: {page} (no linked Instagram account)"
     }
   },
   "public": {
@@ -1603,7 +1639,9 @@
       "telegram": "Telegram",
       "web": "Website chat",
       "whatsapp_qr": "WhatsApp (QR)",
-      "telegram_user": "Telegram (personal account)"
+      "telegram_user": "Telegram (personal account)",
+      "messenger": "Messenger",
+      "instagram": "Instagram"
     },
     "notConnected": "Not connected",
     "message": "Message",
@@ -1727,7 +1765,8 @@
       "deal": "Deal opened →"
     },
     "leadNotification": "New lead from the agent: {name} ({score}) {need}",
-    "ownerPhone": "Sent by you from the phone — the agent paused here"
+    "ownerPhone": "Sent by you from the phone — the agent paused here",
+    "aiLatency": "Agent response time"
   },
   "support": {
     "title": "Customer support",
@@ -2618,7 +2657,9 @@
       "telegram_user": "Telegram",
       "sms": "SMS",
       "email": "E-mail",
-      "web": "Website chat"
+      "web": "Website chat",
+      "messenger": "Messenger",
+      "instagram": "Instagram"
     },
     "fromCustomer": "from the customer",
     "fromAI": "AI reply",
@@ -3281,5 +3322,248 @@
   },
   "followupMood": {
     "negativeNotification": "😟 {name} sounded unhappy. The automatic follow-up was paused, a person should reply"
+  },
+  "speed": {
+    "title": "Response speed",
+    "subtitle": "Where the app runs, how far the database is, and how fast the agent answered in the last 24 hours.",
+    "region": "Server region (Vercel)",
+    "db": "Database round trip",
+    "p50": "Typical agent reply",
+    "p90": "Slow agent reply (slowest 10%)",
+    "replies": "{count} replies measured",
+    "farDb": "The database is far from the server, so every step of an agent reply is delayed. Set Vercel's function region to your Supabase region (Settings → Functions → Region)."
+  },
+  "agents": {
+    "title": "Your AI team",
+    "subtitle": "Agents that work for you every day: marketing, sales, a morning brief and collections. Each one switches on with a click, and everything they do is logged here.",
+    "on": "On",
+    "off": "Off",
+    "switch": "Switch the agent on",
+    "runNow": "Run now",
+    "ran": "Done — see the log",
+    "tooSoon": "You can run it again in two minutes",
+    "enabled": "Agent switched on",
+    "disabled": "Agent switched off",
+    "log": "What it did",
+    "noRuns": "Hasn't run yet. Run it now to see.",
+    "conversation": {
+      "title": "Conversation agent (WhatsApp, Telegram, Instagram, website)",
+      "on": "{name} is answering your customers",
+      "off": "No conversation agent yet — create one in a minute",
+      "open": "Agent settings"
+    },
+    "marketing": {
+      "title": "Marketing & social agent",
+      "body": "Writes a weekly content plan for Facebook and Instagram in your brand voice, and handles comments.",
+      "does1": "Every week: ready posts (tips, a customer story, an offer with a call to action)",
+      "does2": "Comments: a reply draft, a private DM to whoever asked for the price, spam hidden",
+      "does3": "Nothing is published without your approval — unless you turn on auto-publish",
+      "fields": {
+        "posts": "Posts per week",
+        "auto_publish": "Publish automatically"
+      }
+    },
+    "sales_manager": {
+      "title": "AI sales manager",
+      "body": "Every morning it goes over the pipeline, finds deals that went quiet and gives each one a clear next step.",
+      "does1": "Finds deals with no activity (after the days you choose)",
+      "does2": "Opens a task for the owner with the next step and a reminder",
+      "does3": "Fires the \"deal went quiet\" automation if you set one",
+      "fields": {
+        "quiet_days": "Days without activity",
+        "max_tasks": "Max tasks per day"
+      }
+    },
+    "analyst": {
+      "title": "Analyst & morning brief",
+      "body": "Every morning: yesterday in numbers, what changed, and what matters most today.",
+      "does1": "Leads, conversations, revenue and won deals — against the weekly average",
+      "does2": "What's waiting: unanswered chats, hot leads, overdue invoices, today's meetings",
+      "does3": "A phone notification and an e-mail to the owners",
+      "fields": {
+        "email": "Also by e-mail"
+      }
+    },
+    "collections": {
+      "title": "Collections & service agent",
+      "body": "Reminds customers about open invoices with a payment link, and brings back shoppers who left a cart.",
+      "does1": "Friendly → clear → final reminder, spaced as you choose",
+      "does2": "After the last reminder — a task for the team, no more messages",
+      "does3": "Abandoned carts (Shopify): one reminder to shoppers who agreed to messages",
+      "fields": {
+        "gap_days": "Days between reminders",
+        "max_reminders": "Max reminders per invoice",
+        "carts": "Abandoned-cart reminders"
+      }
+    },
+    "briefNotification": "☀️ {org}'s morning brief is ready",
+    "salesNotification": "🎯 The sales manager opened {count} follow-up tasks",
+    "marketingNotification": "📣 {count} posts for next week are waiting for you"
+  },
+  "social": {
+    "title": "Social & reviews",
+    "subtitle": "Facebook and Instagram comments, the posting calendar and Google reviews — with AI reply drafts ready.",
+    "connections": "Connections",
+    "connectNow": "Connect Facebook & Instagram",
+    "fbNotConnected": "Facebook not connected",
+    "igNotConnected": "Instagram not connected",
+    "googleOn": "Google reviews connected",
+    "googleOff": "Google reviews not connected",
+    "tabs": {
+      "comments": "Comments",
+      "posts": "Posts",
+      "reviews": "Reviews",
+      "settings": "Settings"
+    },
+    "someone": "Someone",
+    "aiDraft": "AI draft — edit as you like",
+    "replyPlaceholder": "Write a reply…",
+    "publishReply": "Publish reply",
+    "sendDm": "Send a private message",
+    "hide": "Hide",
+    "ignore": "Ignore",
+    "replied": "Reply published",
+    "replyFailed": "Publishing failed: {detail}",
+    "notConnected": "Facebook / Instagram is not connected",
+    "googleNotConnected": "Google Business is not connected",
+    "noComments": "No comments yet. When someone comments on a Facebook or Instagram post it shows up here with a reply draft.",
+    "intent": {
+      "lead": "Interested",
+      "question": "Question",
+      "negative": "Negative",
+      "spam": "Spam",
+      "positive": "Positive",
+      "neutral": "Neutral"
+    },
+    "status": {
+      "new": "New",
+      "replied": "Replied",
+      "auto_replied": "Auto-replied",
+      "hidden": "Hidden",
+      "ignored": "Ignored",
+      "dm_sent": "Private message sent"
+    },
+    "newPost": "New post",
+    "postText": "Post text",
+    "postPlaceholder": "What do you want to share today?",
+    "imageUrl": "Image link (required for Instagram)",
+    "when": "When to publish",
+    "saveDraft": "Save as draft",
+    "schedule": "Schedule",
+    "draftSaved": "Draft saved",
+    "scheduled": "Post scheduled",
+    "canceled": "Post canceled",
+    "publishing": "Publishing now…",
+    "invalidPost": "Text, platform or a valid time is missing",
+    "instagramNeedsImage": "Instagram needs an image — add an image link",
+    "approve": "Approve & schedule",
+    "publishNow": "Publish now",
+    "cancelPost": "Cancel",
+    "byAgent": "Written by the marketing agent",
+    "noPosts": "No posts yet. Write one, or switch on the marketing agent in \"AI team\".",
+    "postStatus": {
+      "draft": "Draft to approve",
+      "scheduled": "Scheduled",
+      "publishing": "Publishing",
+      "published": "Published",
+      "partial": "Partly published",
+      "failed": "Failed",
+      "canceled": "Canceled"
+    },
+    "reviewStatus": {
+      "new": "New",
+      "drafted": "Draft ready",
+      "replied": "Replied",
+      "auto_replied": "Auto-replied",
+      "ignored": "Ignored"
+    },
+    "noReviews": "No new reviews yet. They're pulled from Google every 30 minutes.",
+    "reviewsConnect": "Connect Google (\"Connect Google\" in Connections) to get your business reviews here with reply drafts.",
+    "settings": {
+      "comment_drafts": "An AI reply draft for every comment",
+      "comment_auto_reply": "Publish replies automatically (except negative comments)",
+      "comment_private_reply": "Whoever asks for price or details — a private message that opens a chat",
+      "hide_spam": "Hide spam and suspicious links",
+      "posts_per_week": "Posts per week (marketing agent)",
+      "brand_voice": "Brand voice",
+      "brandVoiceHint": "e.g. warm and family-like, second person, no slang, light humour",
+      "autoReviews": "Auto-reply to 4-5 star reviews"
+    }
+  },
+  "market": {
+    "title": "Connections marketplace",
+    "subtitle": "Every connection in one place, each in as few steps as possible — click, approve, done.",
+    "search": "Search connections…",
+    "pending": "Waiting for approval",
+    "oneClick": "One click + Facebook login",
+    "oneConsent": "One Google consent screen for everything",
+    "oneApproval": "Type the address, approve in the store — done",
+    "cats": {
+      "all": "All",
+      "social": "Social",
+      "google": "Google",
+      "stores": "Online stores",
+      "automation": "Automation & apps",
+      "more": "More"
+    },
+    "meta": {
+      "title": "Facebook + Instagram",
+      "body": "Messenger and Instagram messages reach the inbox and the agent answers; comments get reply drafts; the marketing agent posts for you.",
+      "connect": "Connect Facebook & Instagram",
+      "choose": "Which Page should we connect?",
+      "setup": "The platform owner sets up a Meta app once (META_APP_ID, META_PAGES_CONFIG_ID). After that every business connects in one click."
+    },
+    "waApp": {
+      "title": "WhatsApp Business — same number",
+      "body": "Keep using the WhatsApp Business app on your phone while the same number is connected here — the agent answers and history is kept.",
+      "connect": "Connect my app number"
+    },
+    "google": {
+      "title": "Google in one click",
+      "body": "Calendar, Gmail and your Google reviews — in one approval. Whatever you untick stays off.",
+      "calendar": "Calendar: bookings go to your calendar, busy times are blocked",
+      "gmail": "Gmail: e-mails reach the inbox and the agent answers",
+      "business": "Google reviews: a reply draft for every review",
+      "connect": "Connect with Google",
+      "reconnect": "Update the Google connection",
+      "setup": "The platform owner needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET."
+    },
+    "shopify": {
+      "body": "Orders reach the CRM (customer, amount, items), a \"new order\" automation, and abandoned-cart reminders.",
+      "shop": "Shopify store name",
+      "setup": "The platform owner needs a Shopify app (SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET)."
+    },
+    "woo": {
+      "body": "Type the store address, approve in WooCommerce — every order reaches the CRM and fires automations.",
+      "url": "Store address"
+    },
+    "store": {
+      "stats": "{orders} orders in 30 days · {revenue}"
+    },
+    "zapier": {
+      "title": "Zapier · Make · n8n",
+      "body": "Thousands of apps: every event (lead, deal, order, comment, review) is sent instantly, and you can create contacts, deals and tasks.",
+      "steps": "One API key, paste it in Zapier/Make — done",
+      "hooks": "{count} instant hooks active",
+      "key": "Create an API key"
+    },
+    "more": {
+      "conversions": "Ad conversions",
+      "invoicing": "Invoicing (Morning/iCount)",
+      "payments": "Payments",
+      "calendar": "My calendar",
+      "telegram_business": "Telegram Business",
+      "voice": "Voice agent (Twilio)"
+    },
+    "result": {
+      "connected": "Connected ✓",
+      "woocommerce": "WooCommerce approved — orders will start coming in",
+      "cancelled": "Connection cancelled",
+      "failed": "Connection failed ({detail})",
+      "forbidden": "You can't manage connections",
+      "not_configured": "This connection isn't set up on the platform yet",
+      "bad_shop": "Invalid Shopify store name",
+      "bad_url": "Invalid store address (https required)"
+    }
   }
 }

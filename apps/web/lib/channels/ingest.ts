@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { kickJobs } from "@/lib/jobs/kick";
 
 export interface InboundMessage {
-  kind: "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email" | "telegram_user";
+  kind: "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email" | "telegram_user" | "messenger" | "instagram";
   token: string;
   chatId: string;
   senderName?: string | null;

@@ -1,4 +1,5 @@
 import "server-only";
+import { geminiThinking, isThinkingConfigError, nextThinkingLevel } from "./speed-core";
 
 /**
  * AI provider abstraction (OpenAI + Anthropic + Google Gemini) over plain HTTPS — no SDKs,
@@ -138,18 +139,23 @@ async function anthropic(req: AIRequest): Promise<AIResult> {
 async function geminiOnce(req: AIRequest, key: string): Promise<AIResult> {
   const base = (process.env.AI_GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
   const url = `${base}/models/${encodeURIComponent(req.model)}:generateContent`;
-  const body = JSON.stringify({
-    systemInstruction: req.system ? { parts: [{ text: req.system }] } : undefined,
-    contents: req.messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
-    generationConfig: {
-      temperature: req.temperature,
-      // Gemini 2.5 "thinking" tokens count against maxOutputTokens and can leave the answer
-      // empty; Flash models allow turning thinking off, others get extra room for it.
-      maxOutputTokens: /2\.5-flash/.test(req.model) ? req.maxTokens : req.maxTokens + 2048,
-      ...(/2\.5-flash/.test(req.model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-      ...(req.json ? { responseMimeType: "application/json" } : {}),
-    },
-  });
+  // speed upgrade: Gemini 3.x thinks at "medium" by default — chat replies use the lowest level the
+  // model accepts (AI_GEMINI_THINKING_LEVEL overrides; "off" keeps the model default). 2.5 Flash as before.
+  let thinking = geminiThinking(req.model, process.env);
+  const makeBody = () =>
+    JSON.stringify({
+      systemInstruction: req.system ? { parts: [{ text: req.system }] } : undefined,
+      contents: req.messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+      generationConfig: {
+        temperature: req.temperature,
+        // Gemini 2.5 "thinking" tokens count against maxOutputTokens and can leave the answer
+        // empty; Flash models allow turning thinking off, others get extra room for it.
+        maxOutputTokens: /2\.5-flash/.test(req.model) ? req.maxTokens : req.maxTokens + 2048,
+        ...(thinking ? { thinkingConfig: thinking } : {}),
+        ...(req.json ? { responseMimeType: "application/json" } : {}),
+      },
+    });
+  let body = makeBody();
   const call = (withHeader: boolean) =>
     fetch(withHeader ? url : `${url}?key=${encodeURIComponent(key)}`, {
       method: "POST",
@@ -159,6 +165,15 @@ async function geminiOnce(req: AIRequest, key: string): Promise<AIResult> {
       cache: "no-store",
     });
   let res = await call(true);
+  // speed upgrade: a model that does not accept the requested thinking level → one level up, then the model default
+  for (let i = 0; i < 2 && res.status === 400 && thinking && "thinkingLevel" in thinking; i++) {
+    const msg = await res.clone().text().catch(() => "");
+    if (!isThinkingConfigError(res.status, msg)) break;
+    const up = nextThinkingLevel(thinking.thinkingLevel);
+    thinking = up ? { thinkingLevel: up } : null;
+    body = makeBody();
+    res = await call(true);
+  }
   // Newer "AQ." keys are rejected by some header paths but accepted as ?key= — retry once that way.
   if (res.status === 400 || res.status === 401 || res.status === 403) {
     const first = await res.text().catch(() => "");

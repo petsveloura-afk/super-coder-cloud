@@ -5,7 +5,7 @@
  * filter automatic e-mails that must never get an automatic answer.
  */
 
-export const AUTOPILOT_CHANNELS = ["web", "telegram", "whatsapp", "whatsapp_qr", "sms", "email", "telegram_user"] as const;
+export const AUTOPILOT_CHANNELS = ["web", "telegram", "whatsapp", "whatsapp_qr", "sms", "email", "telegram_user", "messenger", "instagram"] as const;
 export type AutopilotChannel = (typeof AUTOPILOT_CHANNELS)[number];
 
 export function isAutopilotChannel(v: unknown): v is AutopilotChannel {
@@ -135,6 +135,8 @@ const CHANNEL_NAMES: Record<AutopilotChannel, string> = {
   sms: "SMS",
   email: "e-mail",
   telegram_user: "Telegram",
+  messenger: "Facebook Messenger",
+  instagram: "Instagram Direct",
 };
 
 export function autopilotInstructions(input: {

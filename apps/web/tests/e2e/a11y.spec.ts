@@ -22,6 +22,7 @@ test("accessibility: auth pages in all locales", async ({ page }) => {
 });
 
 test("accessibility: core app screens (dark and light)", async ({ page }) => {
+  test.setTimeout(240_000); // 8 full axe audits + sign-up + demo data
   await signUp(page, { name: "Axe Tester", email: uniqueEmail("axe") });
   await audit(page, "onboarding");
   await createOrg(page, "Axe Org", `axe-${Date.now()}`);

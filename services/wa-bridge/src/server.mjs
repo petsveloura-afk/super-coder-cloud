@@ -56,7 +56,7 @@ export function createServer({ manager, secret, appUrl, telegram = null }) {
         }
         return send(405, { error: "method_not_allowed" });
       }
-      const m = url.pathname.match(/^\/sessions\/([^/]+)(?:\/(start|send|logout))?$/);
+      const m = url.pathname.match(/^\/sessions\/([^/]+)(?:\/(start|send|logout|typing))?$/);
       if (!m || !validSessionId(m[1])) return send(404, { error: "not_found" });
       const [, id, action] = m;
       let body = {};
@@ -81,6 +81,9 @@ export function createServer({ manager, secret, appUrl, telegram = null }) {
       if (req.method === "POST" && action === "send") {
         const msgId = await manager.send(id, body.to, body.text, body.image ?? null);
         return send(200, { ok: true, id: msgId });
+      }
+      if (req.method === "POST" && action === "typing") {
+        return send(200, { ok: await manager.typing(id, body.to, body.on !== false) });
       }
       if (req.method === "POST" && action === "logout") {
         await manager.logout(id);

@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { publicEnv } from "@/lib/env";
 import { sendMediaToConversation, sendToConversation } from "@/lib/channels/send-message";
 import { runAISystem } from "./run-system";
+import { selfCheckBudgetMs, smartDebounceMs, Timing, withSoftDeadline } from "./speed-core";
 import {
   autopilotInstructions,
   buildHistory,
@@ -152,7 +153,23 @@ export function autopilotLocale(lang: unknown): "he" | "ar" | "en" {
   return lang === "ar" || lang === "en" ? lang : "he";
 }
 
+/**
+ * Speed upgrade — the entry point keeps its contract; around the reply logic it now keeps
+ * "typing…" alive in the customer's app until the answer is out, and logs the reply latency.
+ */
 export async function handleInboundWithAI(input: { conversationId: string; messageId?: string | null; debounceMs?: number; retry?: boolean }): Promise<AutopilotResult> {
+  const started = Date.now();
+  try {
+    return await handleInboundWithAICore(input);
+  } finally {
+    const { stopTyping } = await import("./typing");
+    stopTyping(input.conversationId);
+    console.info("autopilot latency", JSON.stringify({ conversation: input.conversationId, ms: Date.now() - started, retry: Boolean(input.retry) }));
+  }
+}
+
+async function handleInboundWithAICore(input: { conversationId: string; messageId?: string | null; debounceMs?: number; retry?: boolean }): Promise<AutopilotResult> {
+  const timing = new Timing();
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { replied: false, handoff: false, reason: "no_service_key" };
   const admin = createAdminClient();
   const { data: conv } = await admin
@@ -181,22 +198,38 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
   if (!isAutopilotChannel(channel)) return { replied: false, handoff: false, reason: "channel" };
   const orgId = conv.organization_id as string;
   // conversation guard (one state for all channels): opted out, a person owns it / already answered
-  {
-    const { checkGuard } = await import("@/lib/conversations/guard");
-    const g = await checkGuard(conv.id as string, "ai_reply");
-    if (!g.allowed) return { replied: false, handoff: false, reason: `guard:${g.reason}` };
-  }
-
-  const { data: agent } = await admin
-    .from("ai_agents")
-    .select("id, name, instructions, provider, model, temperature, language, handoff_rules, greeting, profile, lead_goal")
-    .eq("organization_id", orgId)
-    .eq("enabled", true)
-    .contains("autopilot_channels", [channel])
-    .order("created_at")
-    .limit(1)
-    .maybeSingle();
+  // speed upgrade: the guard, the agent and the latest customer line load in parallel (one round trip)
+  const { checkGuard } = await import("@/lib/conversations/guard");
+  const [g, { data: agent }, { data: lastInRow }] = await Promise.all([
+    checkGuard(conv.id as string, "ai_reply"),
+    admin
+      .from("ai_agents")
+      .select("id, name, instructions, provider, model, temperature, language, handoff_rules, greeting, profile, lead_goal")
+      .eq("organization_id", orgId)
+      .eq("enabled", true)
+      .contains("autopilot_channels", [channel])
+      .order("created_at")
+      .limit(1)
+      .maybeSingle(),
+    admin.from("messages").select("id, body").eq("conversation_id", conv.id).eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  if (!g.allowed) return { replied: false, handoff: false, reason: `guard:${g.reason}` };
   if (!agent) return { replied: false, handoff: false, reason: "no_agent" };
+  timing.mark("load");
+  // speed upgrade: "typing…" from now until the answer is sent (stopped by handleInboundWithAI)
+  {
+    const { startTyping } = await import("./typing");
+    void startTyping({ orgId, conversationId: conv.id as string, channel: channel as AutopilotChannel, externalId: conv.external_id as string });
+  }
+  // speed upgrade: what the reply needs is fetched while we wait for more customer messages
+  const gRowP = admin.from("ai_agents").select("guardrails").eq("id", agent.id).maybeSingle();
+  const contactP = conv.contact_id ? admin.from("contacts").select("id, first_name, last_name, phone, email").eq("id", conv.contact_id).maybeSingle() : Promise.resolve({ data: null });
+  const linksP = Promise.all([
+    admin.from("organizations").select("name").eq("id", orgId).maybeSingle(),
+    admin.from("appointment_types").select("slug").eq("organization_id", orgId).eq("status", "active").order("created_at").limit(1).maybeSingle(),
+    admin.from("forms").select("slug").eq("organization_id", orgId).eq("status", "active").order("created_at").limit(1).maybeSingle(),
+    admin.from("sites").select("slug").eq("organization_id", orgId).eq("status", "published").order("created_at").limit(1).maybeSingle(),
+  ]);
 
   // wave 9: a retry (safety net / in-run retry) never answers twice — skip when the last
   // message is already a real reply (not the short "on it" hold message)
@@ -206,8 +239,9 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
   }
 
   // debounce: answer only the latest of several quick messages
-  if (input.debounceMs && input.debounceMs > 0) {
-    await sleep(input.debounceMs);
+  const waitMs = smartDebounceMs(input.debounceMs, (lastInRow?.body as string | null) ?? "", process.env);
+  if (input.debounceMs && input.debounceMs > 0 && waitMs > 0) {
+    await sleep(waitMs);
     const { data: latest } = await admin
       .from("messages")
       .select("id")
@@ -220,17 +254,19 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     const { data: again } = await admin.from("conversations").select("ai_mode").eq("id", conv.id).maybeSingle();
     if (again?.ai_mode !== "auto") return { replied: false, handoff: false, reason: "human_mode" };
   }
+  timing.mark("debounce");
 
   // loop / abuse protection
-  const { data: allowed } = await admin.rpc("public_rate_limit", { p_bucket: `autopilot:${conv.id}`, p_limit: 30, p_window_seconds: 3600 });
+  const [{ data: allowed }, { data: rows }] = await Promise.all([
+    admin.rpc("public_rate_limit", { p_bucket: `autopilot:${conv.id}`, p_limit: 30, p_window_seconds: 3600 }),
+    admin
+      .from("messages")
+      .select("direction, body, created_at, meta")
+      .eq("conversation_id", conv.id)
+      .order("created_at", { ascending: false })
+      .limit(30),
+  ]);
   if (allowed === false) return { replied: false, handoff: false, reason: "rate_limited" };
-
-  const { data: rows } = await admin
-    .from("messages")
-    .select("direction, body, created_at, meta")
-    .eq("conversation_id", conv.id)
-    .order("created_at", { ascending: false })
-    .limit(30);
   // "I'm checking…" holding replies are not part of the real conversation
   const history = buildHistory(((rows ?? []) as (StoredMessage & { meta?: { fallback?: boolean } | null })[]).reverse().filter((m) => !(m.direction === "out" && m.meta?.fallback)));
   const lastIn = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
@@ -303,9 +339,11 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     return { replied: true, handoff: true, reason: "critical:legal_or_threat", text };
   }
   // wave 16: guardrails (angry customer, budget per conversation), flows, knowledge base
-  const { data: gRow } = await admin.from("ai_agents").select("guardrails").eq("id", agent.id).maybeSingle();
+  const { data: gRow } = await gRowP;
   const { normalizeGuardrails, isAngry, guardrailHandoffText } = await import("./guardrails");
   const rails = normalizeGuardrails((gRow as { guardrails?: unknown } | null)?.guardrails);
+  // speed upgrade: the help-center search runs while the flows / customer details are checked
+  const kbP = rails.kb ? admin.rpc("kb_search", { p_org: orgId, p_query: lastLine.slice(0, 300), p_limit: 3 }) : null;
   if (rails.angry_handoff && isAngry(lastLine)) {
     const text = formatForChannel(guardrailHandoffText(locale, "angry"), ch);
     await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string, meta: { system: "guardrail" } });
@@ -330,7 +368,7 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
   // customer details — and fill in a phone / e-mail the customer just typed
   let customer: { name?: string | null; phone?: string | null; email?: string | null } = { name: (conv.title as string | null) ?? null };
   if (conv.contact_id) {
-    const { data: c } = await admin.from("contacts").select("id, first_name, last_name, phone, email").eq("id", conv.contact_id).maybeSingle();
+    const { data: c } = (await contactP) as { data: { id: string; first_name: string | null; last_name: string | null; phone: string | null; email: string | null } | null };
     if (c) {
       customer = { name: `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || null, phone: (c.phone as string | null) ?? null, email: (c.email as string | null) ?? null };
       const info = extractContactInfo(lastIn);
@@ -344,12 +382,7 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     }
   }
 
-  const [{ data: org }, { data: booking }, { data: form }, { data: site }] = await Promise.all([
-    admin.from("organizations").select("name").eq("id", orgId).maybeSingle(),
-    admin.from("appointment_types").select("slug").eq("organization_id", orgId).eq("status", "active").order("created_at").limit(1).maybeSingle(),
-    admin.from("forms").select("slug").eq("organization_id", orgId).eq("status", "active").order("created_at").limit(1).maybeSingle(),
-    admin.from("sites").select("slug").eq("organization_id", orgId).eq("status", "published").order("created_at").limit(1).maybeSingle(),
-  ]);
+  const [{ data: org }, { data: booking }, { data: form }, { data: site }] = await linksP;
   const base = publicEnv.appUrl.replace(/\/$/, "");
   const baseInstructions = autopilotInstructions({
     agentName: (agent.name as string) || "Assistant",
@@ -372,15 +405,16 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
     locale,
   })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}`;
-  await typingIndicator(orgId, ch, conv.external_id as string);
+  void typingIndicator(orgId, ch, conv.external_id as string); // speed upgrade: never waited for (the typing loop already runs)
   // wave 16: help-center answers (knowledge base) for this question
   let kb = "";
-  if (rails.kb) {
-    const { data: hits } = await admin.rpc("kb_search", { p_org: orgId, p_query: lastLine.slice(0, 300), p_limit: 3 });
+  if (rails.kb && kbP) {
+    const { data: hits } = await kbP;
     const { kbBlock } = await import("./guardrails");
     kb = kbBlock(((hits ?? []) as { title: string; body: string }[]) ?? []);
   }
 
+  timing.mark("prepare");
   const out = await runAISystem({
     orgId,
     feature: "autopilot",
@@ -424,6 +458,7 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     }
     return { replied: !recentHold, handoff: false, reason: out.error, text: recentHold ? undefined : hold };
   }
+  timing.mark("ai");
   // wave 15 — the agent checks its own answer (invented prices, repetition, leaks, empty text)
   // and gets exactly one chance to fix it; whatever is still wrong is removed or handed to a person
   let answer = out.text;
@@ -434,17 +469,24 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     const first = parseAgentTools(answer);
     const check = checkReply({ reply: first.text, facts, previousAssistant: previous, allowEmpty: first.handoff, customerText: lastIn });
     if (!check.ok) {
-      const fixed = await runAISystem({
-        orgId,
-        feature: "autopilot",
-        agentId: agent.id as string,
-        provider: agent.provider as "openai" | "anthropic" | "gemini",
-        model: agent.model as string,
-        system,
-        messages: [...history, { role: "assistant", content: answer.trim() || "(no answer)" }, { role: "user", content: correctionPrompt(check) }],
-        temperature: Math.min(0.5, Number(agent.temperature ?? 0.4) + 0.1),
-        maxTokens: ch === "email" ? 1200 : 600,
-      });
+      // speed upgrade: the correction gets a time budget (AI_SELF_CHECK_MS, default 7s); after it the
+      // checked first answer is used (invented prices are still removed below)
+      const fixed = await withSoftDeadline(
+        runAISystem({
+          orgId,
+          feature: "autopilot",
+          agentId: agent.id as string,
+          provider: agent.provider as "openai" | "anthropic" | "gemini",
+          model: agent.model as string,
+          system,
+          messages: [...history, { role: "assistant", content: answer.trim() || "(no answer)" }, { role: "user", content: correctionPrompt(check) }],
+          temperature: Math.min(0.5, Number(agent.temperature ?? 0.4) + 0.1),
+          maxTokens: ch === "email" ? 1200 : 600,
+        }),
+        selfCheckBudgetMs(process.env),
+        { ok: false, error: "ai.self_check_timeout" } as Awaited<ReturnType<typeof runAISystem>>,
+      );
+      timing.mark("self_check");
       if (fixed.ok) {
         const again = checkReply({ reply: parseAgentTools(fixed.text).text, facts, previousAssistant: previous, allowEmpty: parseAgentTools(fixed.text).handoff, customerText: lastIn });
         if (again.ok || again.issues.length < check.issues.length) answer = fixed.text;
@@ -477,14 +519,23 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
     }
   }
   const text = formatForChannel(tools.text || handoffMessage(locale), ch);
+  timing.mark("check");
   await sendToConversation(orgId, conv.id as string, text, undefined, {
     aiAgentId: agent.id as string,
-    meta: tools.buttons.length || tools.askPhone ? { buttons: tools.buttons, ask_phone: tools.askPhone } : undefined,
+    // speed upgrade: how long this reply took, per stage (shown in the inbox as ⚡)
+    meta: { ...(tools.buttons.length || tools.askPhone ? { buttons: tools.buttons, ask_phone: tools.askPhone } : {}), timing: timing.toJSON(), engine: out.provider ?? null },
     rich: { buttons: tools.buttons, askPhone: tools.askPhone, askPhoneLabel: sharePhoneLabel(locale), html: true },
   });
-  await admin.from("conversations").update({ last_ai_at: new Date().toISOString() }).eq("id", conv.id);
-  // wave 15: remember the customer's mood and main intent for the inbox (ignored until the migration ran)
-  await admin.from("conversations").update({ sentiment: analysis.mood, last_intent: analysis.intents[0] ?? null }).eq("id", conv.id).then(() => undefined, () => undefined);
+  {
+    const { stopTyping } = await import("./typing");
+    stopTyping(conv.id as string);
+  }
+  // speed upgrade: the bookkeeping after the answer runs in parallel
+  await Promise.all([
+    admin.from("conversations").update({ last_ai_at: new Date().toISOString() }).eq("id", conv.id),
+    // wave 15: remember the customer's mood and main intent for the inbox (ignored until the migration ran)
+    admin.from("conversations").update({ sentiment: analysis.mood, last_intent: analysis.intents[0] ?? null }).eq("id", conv.id).then(() => undefined, () => undefined),
+  ]);
   // wave 16: the customer sent a voice note → also answer with a voice note (when enabled)
   if (rails.voice_replies && (ch === "telegram" || ch === "whatsapp")) {
     const { data: lastMsg } = await admin.from("messages").select("meta").eq("conversation_id", conv.id).eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle();

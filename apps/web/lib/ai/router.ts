@@ -146,8 +146,10 @@ export async function generateRouted(input: {
   budgetMs?: number;
   /** at most this many calls (default 6) */
   maxCalls?: number;
+  /** speed upgrade (hedged request): providers this run must not use (the parallel run uses them) */
+  skipProviders?: string[];
 }): Promise<RoutedResult & { attempts: RouteAttempt[] }> {
-  const cands = buildCandidates({ preferred: input.preferred, model: input.model, env: process.env });
+  const cands = buildCandidates({ preferred: input.preferred, model: input.model, env: process.env }).filter((c) => !(input.skipProviders ?? []).includes(c.provider));
   if (!cands.length) throw new RouterError("ai_not_configured", [], null, false);
   const rests = await loadRests();
   const started = Date.now();
@@ -258,3 +260,18 @@ export async function probeAll(): Promise<{ provider: RouteProvider; model: stri
     }),
   );
 }
+
+/**
+ * Speed upgrade — the provider that a routed call would try first, and a second configured
+ * provider for a hedged (parallel) attempt; null when only one provider is configured.
+ */
+export async function hedgePlan(preferred?: string | null, model?: string | null): Promise<{ first: string; second: string } | null> {
+  const cands = buildCandidates({ preferred, model, env: process.env });
+  if (!cands.length) return null;
+  const rests = await loadRests();
+  const usable = cands.filter((c) => !isResting(c, rests));
+  const first = (usable[0] ?? cands[0])!.provider;
+  const second = usable.find((c) => c.provider !== first)?.provider;
+  return second ? { first, second } : null;
+}
+

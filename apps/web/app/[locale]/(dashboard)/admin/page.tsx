@@ -12,6 +12,7 @@ import { AdminPayments } from "@/components/admin/admin-payments";
 import { AiHealth } from "@/components/admin/ai-health";
 import { AdminDomains } from "@/components/admin/admin-domains";
 import { AdminOverrides } from "@/components/admin/admin-growth";
+import { SpeedCard } from "@/components/admin/speed-card";
 import { providerKeys, ROUTE_PROVIDERS } from "@/lib/ai/router-core";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -67,6 +68,7 @@ export default async function AdminPage({ params, searchParams }: { params: Prom
     <>
       <PageHeader title={t("admin.title")} description={t("admin.subtitle")} />
       <AiHealth configured={Object.fromEntries(ROUTE_PROVIDERS.map((p) => [p, providerKeys(p, process.env).length]))} />
+      <SpeedCard locale={locale} />
       <AdminPayments locale={locale} />
       <AdminDomains locale={locale} />
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -80,7 +80,7 @@ test("free plan: AI site with a free template, premium templates locked, busines
   await expect(site).toHaveAttribute("data-tpl", "minimal");
   await expect(site.getByText("נבנה עם Super Coder")).toBeVisible(); // free plan badge
   await expect(page.getByTestId("float-wa")).toHaveAttribute("href", "https://wa.me/972501234567");
-  await expect(page.getByTestId("cookie-banner")).toBeVisible();
+  await expect(page.getByTestId("cookie-banner")).toBeVisible({ timeout: 30_000 }); // shown after hydration; slow external fonts can delay it
   await page.getByTestId("cookie-banner").getByRole("button", { name: "הבנתי" }).click();
   await expect(page.getByTestId("cookie-banner")).toHaveCount(0);
   await page.getByTestId("a11y-button").click();

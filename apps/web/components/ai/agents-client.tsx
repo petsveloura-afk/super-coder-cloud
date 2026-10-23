@@ -41,8 +41,8 @@ const PROFILE_FIELDS = [
 ] as const;
 
 /** Channels the agent can answer on by itself (wave 6). */
-export const AUTOPILOT_CHANNEL_OPTIONS = ["web", "whatsapp", "whatsapp_qr", "telegram", "telegram_user", "email", "sms"] as const;
-const AUTOPILOT_DEFAULT = ["web", "whatsapp", "whatsapp_qr", "telegram", "telegram_user", "email"];
+export const AUTOPILOT_CHANNEL_OPTIONS = ["web", "whatsapp", "whatsapp_qr", "telegram", "telegram_user", "email", "sms", "messenger", "instagram"] as const;
+const AUTOPILOT_DEFAULT = ["web", "whatsapp", "whatsapp_qr", "telegram", "telegram_user", "email", "messenger", "instagram"];
 const TEMPLATE_KEYS = ["sales", "booking", "support", "realestate", "ecommerce"] as const;
 
 export function AgentDialog({ agent, defaults }: { agent?: AgentRow; defaults: { openai: string; anthropic: string; gemini: string; provider: "openai" | "anthropic" | "gemini" } }) {

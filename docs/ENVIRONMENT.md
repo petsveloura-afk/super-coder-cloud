@@ -184,3 +184,22 @@ Server-only. Every feature works without its variable; the related screen says w
 Per-business connections are entered in the app (never in Vercel): the business's own PayPal (Finance → Settings), Morning / iCount (Finance → Settings), Meta Pixel / GA4 / TikTok (Integrations → Ad conversions), Twilio voice webhook (Integrations), calendars (Settings → My calendar).
 
 Migrations: `20261015000032_crm_intelligence.sql`, `20261015000033_conversation_guard.sql`, `20261015000034_ai_agent_plus.sql`, `20261015000035_marketing_growth.sql`, `20261015000036_growth_admin.sql`, `20261015000037_followup_sentiment.sql`.
+
+## Wave 19 — speed, one-click connections, the AI team (all optional)
+
+| Variable | What it does |
+|---|---|
+| `AI_GEMINI_THINKING_LEVEL` | Gemini 3.x chat replies use the lowest thinking level the model accepts (`minimal`; `low` for 3.8 Flash / Pro). Set `low`/`medium`/`high` to think more, `off` for the model default. 2.5 Flash keeps thinking off as before. |
+| `AI_HEDGE_MS` | Live conversations: if the main AI engine has not answered after this many ms (default `6000`), a second configured engine starts in parallel and the first answer wins. `0` = off. |
+| `AI_SELF_CHECK_MS` | Time budget for the agent's one self-correction (default `7000`). After it the checked answer is used (invented prices are still removed). |
+| `AI_AUTOPILOT_DEBOUNCE_MS` | Wait for more customer messages before answering (default: 1.2s for a fragment, 0.5s for a complete question). |
+| `META_PAGES_CONFIG_ID` | Facebook Login for Business configuration for **Facebook Page + Instagram** (Messenger, Instagram Direct, comments, publishing). Same Meta app as WhatsApp (`META_APP_ID`, `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`). Webhook: `https://YOUR-DOMAIN/api/channels/meta/pages` (objects *page* + *instagram*). See `docs/CONNECT_SOCIAL_HE.md`. |
+| `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`, `SHOPIFY_API_VERSION` | Shopify app (Partners) — redirect `https://YOUR-DOMAIN/api/stores/shopify/callback`. Orders, abandoned checkouts, privacy webhooks at `/api/stores/shopify/webhook`. WooCommerce needs nothing (built-in one-click app approval). |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Also power "Google in one click" (Calendar + Gmail + Business Profile reviews) — add redirect `https://YOUR-DOMAIN/api/google/callback`, enable the Business Profile APIs for reviews. |
+| `GBP_ACCOUNTS_API_BASE`, `GBP_INFO_API_BASE`, `GBP_V4_API_BASE`, `SHOPIFY_API_BASE` | Base-URL overrides for tests only. |
+
+`CRON_SECRET`: GitHub Actions also calls `/api/cron/agents` every 5 minutes (collections, sales manager and morning brief in the morning, marketing weekly, abandoned carts, scheduled social posts, Google reviews).
+
+Public API: new scope `webhooks.manage` — REST hooks for Zapier / Make / n8n (`POST/GET /api/public/v1/hooks`, `DELETE /api/public/v1/hooks/{id}`, samples `GET /api/public/v1/samples?event=`).
+
+Migrations: `20261015000038_platform_social.sql`, `20261015000039_stores_reviews.sql`, `20261015000040_agents_events.sql`.

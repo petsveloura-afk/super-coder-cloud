@@ -10,7 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * taken from the key — a key can never reach another tenant's data.
  * Rate limit: 120 requests / minute / key.
  */
-export const API_SCOPES = ["contacts.read", "contacts.write", "deals.read", "deals.write", "tasks.write", "events.read"] as const;
+export const API_SCOPES = ["contacts.read", "contacts.write", "deals.read", "deals.write", "tasks.write", "events.read", "webhooks.manage"] as const;
 export type ApiScope = (typeof API_SCOPES)[number];
 
 export interface ApiContext {

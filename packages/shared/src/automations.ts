@@ -27,6 +27,13 @@ export const AUTOMATION_TRIGGERS = [
   "contract.signed",
   "lead.hot",
   "customer.opted_out",
+  // wave 19 — social, stores, reviews and the AI team
+  "social.comment",
+  "order.created",
+  "cart.abandoned",
+  "review.received",
+  "invoice.overdue",
+  "deal.stuck",
 ] as const;
 export type AutomationTrigger = (typeof AUTOMATION_TRIGGERS)[number];
 
@@ -154,6 +161,30 @@ export const AUTOMATION_RECIPES: { key: string; trigger_type: AutomationTrigger;
     key: "optedOut",
     trigger_type: "customer.opted_out",
     actions: [{ type: "add_tag", config: { tag: "opted-out" } }],
+  },
+  // wave 19
+  {
+    key: "newOrder",
+    trigger_type: "order.created",
+    actions: [
+      { type: "add_tag", config: { tag: "customer" } },
+      { type: "notify", config: { to: "admins", text: "🛒 {{contact.first_name}} {{contact.last_name}} — {{payload.total}} {{payload.currency}}" } },
+    ],
+  },
+  {
+    key: "socialLead",
+    trigger_type: "social.comment",
+    actions: [{ type: "notify", config: { to: "admins", text: "💬 {{payload.author}}: {{payload.text}}" } }],
+  },
+  {
+    key: "badReview",
+    trigger_type: "review.received",
+    actions: [{ type: "notify", config: { to: "admins", text: "⭐ {{payload.rating}} — {{payload.author}}: {{payload.text}}" } }],
+  },
+  {
+    key: "dealStuck",
+    trigger_type: "deal.stuck",
+    actions: [{ type: "notify", config: { to: "admins", text: "⏳ {{deal.title}} — {{payload.quiet_days}}" } }],
   },
   {
     key: "inboundLead",

@@ -2,7 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { openSecrets } from "./secrets";
 
-export type Kind = "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email" | "telegram_user";
+export type Kind = "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email" | "telegram_user" | "messenger" | "instagram";
 
 export interface LoadedAccount {
   id: string;

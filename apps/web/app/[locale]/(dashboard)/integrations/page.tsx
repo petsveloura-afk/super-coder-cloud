@@ -11,6 +11,7 @@ import { ChannelsSection } from "@/components/integrations/channels-section";
 import { ConnectHub, type HubProps } from "@/components/integrations/connect-hub";
 import { ConversionsCard, type ConversionConn } from "@/components/integrations/conversions-card";
 import { IntegrationsNotice } from "@/components/integrations/integrations-notice";
+import { IntegrationsMarketplace, type MarketProps } from "@/components/integrations/marketplace";
 import { TeamUpdates, type BusinessView, type RecipientView } from "@/components/integrations/team-updates";
 import { metaPublicConfig } from "@/lib/channels/meta";
 import { bridgeConfigured } from "@/lib/channels/wa-bridge";
@@ -119,16 +120,64 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
     conversionsOn = await orgHasFeature(ctx.org.id, "conversion_api");
   }
 
+  // wave 19 — the integrations marketplace (one-click connections by category)
+  let market: MarketProps | null = null;
+  if (canChannels) {
+    const fb = ch("messenger");
+    const ig = ch("instagram");
+    const sr = process.env.SUPABASE_SERVICE_ROLE_KEY ? await import("@/lib/supabase/admin").then((m) => m.createAdminClient()) : null;
+    const { listIntegrations } = await import("@/lib/integrations/store");
+    const ints = sr ? await listIntegrations(ctx.org.id, ["shopify", "woocommerce", "google_business", "morning", "icount", "meta_capi", "ga4", "tiktok", "paypal"]) : {};
+    const { storeStats } = await import("@/lib/stores/stats");
+    const [shopStats, { data: cal }, { count: hookCount }] = await Promise.all([
+      storeStats(ctx.org.id, "shopify"),
+      supabase.from("calendar_connections").select("provider, status").eq("organization_id", ctx.org.id).eq("user_id", ctx.userId).eq("provider", "google").maybeSingle(),
+      canApi ? supabase.from("webhooks").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).or("description.ilike.Zapier%,description.ilike.Make%,description.ilike.REST hook%") : Promise.resolve({ count: 0 }),
+    ]);
+    const { metaPagesPublicConfig } = await import("@/lib/channels/meta-pages");
+    const { googleConfigured } = await import("@/lib/google/connect");
+    const { shopifyConfigured } = await import("@/lib/stores/shopify");
+    const shop = ints.shopify;
+    const woo = ints.woocommerce;
+    market = {
+      appUrl: baseUrl,
+      canManage: canChannels,
+      metaPages: metaPagesPublicConfig(),
+      metaWa: metaPublicConfig(),
+      facebook: { connected: Boolean(fb && fb.status !== "disabled"), label: fb?.config.page_name ?? fb?.name ?? null, error: fb?.status === "error" ? fb.last_error : fb?.last_error ?? null },
+      instagram: { connected: Boolean(ig && ig.status !== "disabled"), label: ig?.config.username ? `@${ig.config.username}` : null },
+      whatsappMode: wa?.config.mode ?? null,
+      google: { configured: googleConfigured(), calendar: Boolean(cal && cal.status === "active"), gmail: mail?.config.auth === "google", business: Boolean(ints.google_business && ints.google_business.status === "active"), email: (ints.google_business?.config as { email?: string } | undefined)?.email ?? mail?.config.address ?? null },
+      shopify: { configured: shopifyConfigured(), connected: Boolean(shop && shop.status === "active"), shop: (shop?.config as { shop?: string } | undefined)?.shop ?? null, error: shop?.last_error ?? null, orders30: shopStats.orders, revenue30: shopStats.revenue },
+      woo: { connected: Boolean(woo && woo.status === "active" && (woo.config as { state?: string }).state === "connected"), origin: (woo?.config as { origin?: string } | undefined)?.origin ?? null, pending: woo?.status === "pending", error: woo?.last_error ?? null },
+      zapier: { hooks: hookCount ?? 0, apiAccess: hasApiAccess },
+      others: [
+        { key: "conversions", connected: Boolean(ints.meta_capi || ints.ga4 || ints.tiktok) },
+        { key: "invoicing", connected: Boolean(ints.morning || ints.icount) },
+        { key: "payments", connected: Boolean(ints.paypal) },
+        { key: "calendar", connected: Boolean(cal) },
+        { key: "telegram_business", connected: Boolean((bizRows ?? []).length) },
+        { key: "voice", connected: Boolean(voiceUrl) },
+      ],
+    };
+  }
+
   return (
     <>
       <PageHeader title={t("integrations.title")} description={t("integrations.hubSubtitle")} />
+      {market ? (
+        <Suspense fallback={null}>
+          <IntegrationsMarketplace {...market} />
+        </Suspense>
+      ) : null}
       <Suspense fallback={null}>
         <IntegrationsNotice />
       </Suspense>
       {canChannels ? <ConnectHub {...hub} /> : null}
+      {canChannels ? <div id="team-updates" /> : null}
       {canChannels ? <TeamUpdates recipients={(recRows ?? []) as RecipientView[]} business={(bizRows ?? []) as BusinessView[]} botUsername={tg?.config.username || null} /> : null}
       {canChannels && voiceUrl ? (
-        <Card className="mb-4" data-testid="voice-card">
+        <Card className="mb-4" data-testid="voice-card" id="voice">
           <CardHeader title={t("voice.title")} description={t("voice.subtitle")} />
           <div className="space-y-2 p-5 text-[13px]">
             <p className="text-muted">{t("voice.webhookHint")}</p>
@@ -141,7 +190,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
       ) : null}
 
       {/* wave 17: ad conversions (Meta CAPI / GA4 / TikTok) */}
-      {canChannels ? <ConversionsCard conns={conversionConns} locked={!conversionsOn} /> : null}
+      {canChannels ? <div id="conversions"><ConversionsCard conns={conversionConns} locked={!conversionsOn} /></div> : null}
 
       {ctx.isPlatformAdmin ? (
       <Card className="mb-4">
@@ -176,7 +225,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
 
       {canApi ? (
         <div className="grid gap-4 xl:grid-cols-2">
-          <Card>
+          <Card id="api-keys">
             <CardHeader title={t("integrations.apiKeys")} description={t("integrations.apiKeysHint")} />
             <div className="space-y-3 p-4">
               {/* wave 13: API access is part of the Business plan */}

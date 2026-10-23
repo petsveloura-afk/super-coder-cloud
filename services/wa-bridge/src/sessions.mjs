@@ -166,6 +166,20 @@ export class SessionManager {
     return r?.key?.id ?? null;
   }
 
+  /** speed upgrade: "typing…" (composing) in the customer's WhatsApp while the agent thinks. Never throws. */
+  async typing(id, to, on = true) {
+    const s = this.sessions.get(id);
+    if (!s || s.stopped || s.status !== "connected") return false;
+    const jid = jidFromPhone(to);
+    if (!jid || typeof s.sock?.sendPresenceUpdate !== "function") return false;
+    try {
+      await s.sock.sendPresenceUpdate(on ? "composing" : "paused", jid);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async logout(id) {
     const s = this.sessions.get(id);
     if (s) {

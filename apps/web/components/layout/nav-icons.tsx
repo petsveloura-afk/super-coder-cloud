@@ -19,6 +19,8 @@ import {
   Wallet,
   Workflow,
   ShieldCheck,
+  Sparkles,
+  Share2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -43,4 +45,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   billing: CreditCard,
   settings: Settings,
   admin: ShieldCheck,
+  // wave 19
+  agents: Sparkles,
+  social: Share2,
 };

@@ -6,7 +6,7 @@ type Variant = "primary" | "secondary" | "ghost" | "danger" | "outline";
 type Size = "sm" | "md" | "lg" | "icon";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-accent-solid text-accent-fg hover:bg-accent-solid-hover shadow-[0_6px_20px_-8px_var(--brand)]",
+  primary: "btn-brand bg-accent-solid text-accent-fg hover:bg-accent-solid-hover hover:brightness-110 shadow-[0_8px_22px_-10px_var(--brand)]",
   secondary: "bg-surface text-fg border border-line hover:bg-surface-hover",
   outline: "border border-line-strong text-fg hover:bg-surface-hover",
   ghost: "text-muted hover:text-fg hover:bg-surface-hover",
@@ -36,7 +36,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        "inline-flex select-none items-center rounded-xl font-medium transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50",
+        "btn-press inline-flex select-none items-center rounded-xl font-medium transition-[color,background-color,border-color,filter,transform,box-shadow] duration-150 disabled:pointer-events-none disabled:opacity-50",
         variants[variant],
         sizes[size],
         className,
@@ -60,7 +60,7 @@ export function Spinner({ className }: { className?: string }) {
 
 /* ----------------------------------------------------------------- Inputs */
 const fieldBase =
-  "w-full rounded-xl border border-line bg-elevated px-3.5 text-[15px] text-fg placeholder:text-subtle transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-ring aria-[invalid=true]:border-danger";
+  "w-full rounded-xl border border-line bg-elevated px-3.5 text-[15px] text-fg placeholder:text-subtle transition-[border-color,box-shadow] hover:border-line-strong focus:border-accent focus:outline-none focus:ring-4 focus:ring-ring/40 aria-[invalid=true]:border-danger";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className, ...props },
@@ -121,7 +121,7 @@ export function Field({
 
 /* ------------------------------------------------------------------- Card */
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-[var(--radius-card)] border border-line bg-surface shadow-card", className)} {...props} />;
+  return <div className={cn("card-premium rounded-[var(--radius-card)] border border-line bg-surface shadow-card", className)} {...props} />;
 }
 
 export function CardHeader({ title, description, action }: { title: ReactNode; description?: ReactNode; action?: ReactNode }) {
@@ -183,9 +183,9 @@ export function EmptyState({ icon, title, body, action }: { icon?: ReactNode; ti
 
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="page-enter mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <h1 className="text-[22px] font-bold tracking-tight text-fg sm:text-2xl">{title}</h1>
+        <h1 className="title-bar text-[22px] font-bold tracking-tight text-fg sm:text-[26px]">{title}</h1>
         {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}

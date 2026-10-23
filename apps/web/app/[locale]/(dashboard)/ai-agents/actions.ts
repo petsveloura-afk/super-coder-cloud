@@ -29,7 +29,7 @@ const agentSchema = z.object({
   siteBuilder: z.boolean().default(false),
   imageGen: z.boolean().default(false),
   // wave 6 — the agent answers customers automatically on these channels
-  autopilot: z.array(z.enum(["web", "telegram", "whatsapp", "whatsapp_qr", "sms", "email", "telegram_user"])).max(7).default([]),
+  autopilot: z.array(z.enum(["web", "telegram", "whatsapp", "whatsapp_qr", "sms", "email", "telegram_user", "messenger", "instagram"])).max(9).default([]),
   greeting: z.string().trim().max(500, "validation.tooLong").default(""),
   handoffRules: z.string().trim().max(2000, "validation.tooLong").default(""),
 });
