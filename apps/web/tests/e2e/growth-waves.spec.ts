@@ -127,7 +127,9 @@ test("waves 15-18: one conversation state + growth screens", async ({ page, requ
   await page.getByRole("option", { name: "קמפיין חדש" }).click();
   await page.waitForURL(/\/he\/campaigns\/new/);
 
-  // 14) the growth cron runs every step
+  // 14) the growth cron runs every step (needs CRON_SECRET on the server — the GitHub CI stack has none, so there only "no secret → 401" is checked)
+  expect((await request.post("/api/cron/growth")).status()).toBe(401);
+  if (!process.env.CRON_SECRET) return;
   const cron = await request.post("/api/cron/growth", { headers: { Authorization: `Bearer ${process.env.CRON_SECRET ?? "e2e-cron-secret-123456"}` } });
   expect(cron.ok()).toBe(true);
   const out = (await cron.json()) as Record<string, unknown>;
