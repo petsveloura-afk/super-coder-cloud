@@ -2,7 +2,7 @@
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import QRCode from "qrcode";
-import { RecentIds, attachMediaData, jidFromPhone, messageMime, newMessageId, phoneFromJid, sign, toInboundEvent, toOwnerEvent, validSessionId, wantsMediaData } from "./util.mjs";
+import { RecentIds, attachMediaData, formatPairCode, jidFromPhone, pairPhone, messageMime, newMessageId, phoneFromJid, sign, toInboundEvent, toOwnerEvent, validSessionId, wantsMediaData } from "./util.mjs";
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -34,7 +34,8 @@ export class SessionManager {
   status(id) {
     const s = this.sessions.get(id);
     if (!s) return null;
-    return { status: s.status, qr: s.status === "qr" ? s.qr : null, phone: s.phone, name: s.name, error: s.error };
+    // wave 20: "code" = waiting for the 8-character code to be typed in WhatsApp on the phone
+    return { status: s.status, qr: s.status === "qr" ? s.qr : null, phone: s.phone, name: s.name, error: s.error, code: s.status === "code" ? (s.code ?? null) : null };
   }
 
   async start(id, callback, { waitMs = 8000 } = {}) {
@@ -42,6 +43,12 @@ export class SessionManager {
     await mkdir(this.dir(id), { recursive: true });
     await writeFile(path.join(this.dir(id), "meta.json"), JSON.stringify({ callback }), "utf8");
     const existing = this.sessions.get(id);
+    // wave 20: switching back from "link with phone number" to the QR code
+    if (existing && !existing.stopped && existing.mode === "code" && existing.status === "code") {
+      existing.mode = "qr";
+      existing.code = null;
+      existing.status = existing.qr ? "qr" : "starting";
+    }
     if (existing && !existing.stopped && ["connected", "qr", "starting"].includes(existing.status)) {
       existing.callback = callback;
       return this.status(id);
@@ -85,6 +92,8 @@ export class SessionManager {
     session.sock = sock;
     sock.ev.on("creds.update", saveCreds);
     sock.ev.on("connection.update", (u) => {
+      // wave 20: a replaced socket (new code / reconnect) never drives the current session
+      if (this.sessions.get(id)?.sock !== sock) return;
       this.onConnectionUpdate(id, u).catch((e) => this.log.error?.("connection.update failed", e?.message));
     });
     sock.ev.on("messages.upsert", ({ messages, type }) => {
@@ -119,11 +128,14 @@ export class SessionManager {
     if (u.qr) {
       // the image first, then the status — so a caller never sees "qr" without the picture
       s.qr = await QRCode.toDataURL(u.qr, { margin: 1, width: 320 });
-      s.status = "qr";
+      // wave 20: while a phone-number code is shown, the rotating QR stays in the background
+      s.status = s.mode === "code" && s.code ? "code" : "qr";
     }
     if (u.connection === "open") {
       s.status = "connected";
       s.qr = null;
+      s.code = null;
+      s.mode = null;
       s.retries = 0;
       s.error = null;
       s.phone = phoneFromJid(s.sock?.user?.id ?? "") ?? (s.sock?.user?.id ?? "").split(":")[0].split("@")[0] ?? null;
@@ -148,6 +160,48 @@ export class SessionManager {
         if (!s.stopped) this.connect(id, s.callback).catch((e) => (s.error = e?.message ?? "reconnect_failed"));
       }, delay).unref?.();
     }
+  }
+
+  /**
+   * wave 20 — "Link with phone number": WhatsApp shows an 8-character code field on the phone
+   * (Linked devices → Link a device → Link with phone number instead). Works on the same phone
+   * that shows the page, where scanning a QR is impossible.
+   */
+  async pair(id, callback, phoneRaw, { waitMs = 9000 } = {}) {
+    if (!validSessionId(id)) throw Object.assign(new Error("invalid_id"), { code: 400 });
+    const phone = pairPhone(phoneRaw);
+    if (!phone) throw Object.assign(new Error("invalid_phone"), { code: 400 });
+    let s = this.sessions.get(id);
+    if (s && !s.stopped && s.status === "connected") return this.status(id);
+    // a device that is already linked is never wiped (it may just be reconnecting)
+    if (s?.sock?.authState?.creds?.account) return this.status(id);
+    if (s) {
+      s.stopped = true;
+      try {
+        s.sock?.end?.(undefined);
+      } catch {
+        /* ignore */
+      }
+      this.sessions.delete(id);
+    }
+    // a code only works for a fresh, unlinked device
+    await rm(this.dir(id), { recursive: true, force: true }).catch(() => {});
+    await mkdir(this.dir(id), { recursive: true });
+    await writeFile(path.join(this.dir(id), "meta.json"), JSON.stringify({ callback }), "utf8");
+    s = await this.connect(id, callback);
+    s.mode = "code";
+    s.code = null;
+    // the socket is ready for the request once WhatsApp sent the first QR
+    const until = Date.now() + waitMs;
+    while (Date.now() < until && !s.qr && s.status !== "connected") await wait(150);
+    if (s.status === "connected") return this.status(id);
+    if (typeof s.sock?.requestPairingCode !== "function") throw Object.assign(new Error("pairing_unsupported"), { code: 501 });
+    if (!s.qr) throw Object.assign(new Error("not_ready"), { code: 503 });
+    const raw = await s.sock.requestPairingCode(phone);
+    s.code = formatPairCode(raw);
+    s.codePhone = phone;
+    s.status = "code";
+    return this.status(id);
   }
 
   async send(id, to, text, image = null) {

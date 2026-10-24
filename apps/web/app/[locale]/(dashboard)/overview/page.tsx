@@ -5,6 +5,8 @@ import type { DailyPoint, DashboardKpis } from "@scc/database";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { DailyAreaChart, StatusBarChart } from "@/components/dashboard/charts";
 import { DemoLoader } from "@/components/dashboard/demo-loader";
+import { AiPulseBand } from "@/components/dashboard/ai-pulse";
+import { loadAiPulse } from "@/lib/dashboard/pulse";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -29,6 +31,8 @@ export default async function OverviewPage({ params }: { params: Promise<{ local
   const orgId = ctx.org.id;
 
   // All figures come from RLS-protected queries — never invented.
+  // wave 20: today's agent activity (the overview's "AI at work" band)
+  const pulseP = ctx.can("inbox.read") ? loadAiPulse(supabase, orgId) : Promise.resolve(null);
   const [kpiRes, dailyRes, membersRes, ...statusRes] = await Promise.all([
     supabase.rpc("dashboard_kpis", { org: orgId }).single(),
     supabase.rpc("contacts_daily", { org: orgId, days: 30 }),
@@ -38,6 +42,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ local
     ),
   ]);
 
+  const pulse = await pulseP;
   const raw = (kpiRes.data ?? EMPTY_KPIS) as DashboardKpis;
   const k = Object.fromEntries(Object.entries(raw).map(([key, v]) => [key, Number(v)])) as unknown as DashboardKpis;
   const daily = ((dailyRes.data ?? []) as DailyPoint[]).map((d) => ({ day: d.day, count: Number(d.count) }));
@@ -86,6 +91,8 @@ export default async function OverviewPage({ params }: { params: Promise<{ local
           </Badge>
         }
       />
+
+      {pulse ? <AiPulseBand pulse={pulse} locale={locale} t={t} /> : null}
 
       <section aria-label={t("nav.overview")} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map((kpi) => (

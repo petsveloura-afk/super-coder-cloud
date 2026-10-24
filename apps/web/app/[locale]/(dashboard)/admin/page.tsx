@@ -13,6 +13,9 @@ import { AiHealth } from "@/components/admin/ai-health";
 import { AdminDomains } from "@/components/admin/admin-domains";
 import { AdminOverrides } from "@/components/admin/admin-growth";
 import { SpeedCard } from "@/components/admin/speed-card";
+import { PlatformSetup } from "@/components/admin/platform-setup";
+import { setupSteps } from "@/lib/admin/setup-core";
+import { publicEnv } from "@/lib/env";
 import { providerKeys, ROUTE_PROVIDERS } from "@/lib/ai/router-core";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -67,6 +70,8 @@ export default async function AdminPage({ params, searchParams }: { params: Prom
   return (
     <>
       <PageHeader title={t("admin.title")} description={t("admin.subtitle")} />
+      {/* wave 20: the platform's one-time setup — after it, every business connects in one click */}
+      <PlatformSetup steps={setupSteps(process.env, publicEnv.appUrl)} />
       <AiHealth configured={Object.fromEntries(ROUTE_PROVIDERS.map((p) => [p, providerKeys(p, process.env).length]))} />
       <SpeedCard locale={locale} />
       <AdminPayments locale={locale} />

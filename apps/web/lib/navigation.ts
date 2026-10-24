@@ -40,7 +40,10 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "admin", label: "nav.admin", section: "ops", phase: null, platformOnly: true },
 ];
 
-export const MOBILE_PRIMARY = ["overview", "crm", "team", "settings"] as const;
+/** wave 20: the bottom tab bar — what a business owner opens most on the phone (team + settings live in "More") */
+export const MOBILE_PRIMARY = ["overview", "inbox", "crm", "ai-agents"] as const;
+/** previous set, kept for reference */
+export const MOBILE_PRIMARY_V1 = ["overview", "crm", "team", "settings"] as const;
 
 export function findNavItem(key: string) {
   return NAV_ITEMS.find((i) => i.key === key);

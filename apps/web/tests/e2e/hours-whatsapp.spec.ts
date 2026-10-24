@@ -82,7 +82,7 @@ test("WhatsApp (QR): the agent answers within opening hours, steps back when the
   await expect(page).not.toHaveURL(/\/login/, { timeout: 30_000 });
   // connect WhatsApp by QR (bridge stand-in)
   await page.goto("/he/integrations");
-  await page.getByTestId("wa-qr-connect").click();
+  await page.getByTestId("wa-connect").click(); // wave 20: one WhatsApp button (QR on a computer, a code on a phone)
   await expect(page.getByTestId("qr-box").locator("img")).toBeVisible({ timeout: 20_000 });
   expect((await emit(request, { type: "status", status: "connected", phone: "972541234567", name: "מספרת שירה" })).ok()).toBe(true);
   await page.keyboard.press("Escape");

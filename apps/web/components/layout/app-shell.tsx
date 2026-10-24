@@ -25,6 +25,8 @@ export interface ShellProps {
   permissions: Permission[];
   workspaces: { id: string; name: string; role: string }[];
   unreadNotifications: number;
+  /** wave 20: open conversations with unread messages (badge on the inbox tab) */
+  unreadInbox?: number;
   isPlatformAdmin: boolean;
   children: ReactNode;
 }
@@ -94,6 +96,41 @@ function NavList({ permissions, collapsed, onNavigate, isPlatformAdmin }: { perm
           </div>
         </div>
       ))}
+    </nav>
+  );
+}
+
+/** wave 20 — the "More" sheet on phones: every module as an app tile, grouped like the sidebar. */
+function NavGrid({ permissions, onNavigate, isPlatformAdmin }: { permissions: Permission[]; onNavigate?: () => void; isPlatformAdmin?: boolean }) {
+  const { t, locale } = useI18n();
+  const pathname = usePathname();
+  const items = useVisibleItems(permissions, isPlatformAdmin);
+  return (
+    <nav className="space-y-4" aria-label={t("nav.menu")} data-testid="nav-grid">
+      {SECTIONS.map((s) => {
+        const list = items.filter((i) => i.section === s.key);
+        if (!list.length) return null;
+        return (
+          <div key={s.key}>
+            <div className="mb-1 px-1 text-[12px] font-semibold text-subtle">{t(s.label)}</div>
+            <div className="grid grid-cols-4 gap-1">
+              {list.map((i) => {
+                const Icon = NAV_ICONS[i.key]!;
+                const href = `/${locale}/${i.key}`;
+                const active = pathname === href || pathname.startsWith(`${href}/`);
+                return (
+                  <Link key={i.key} href={href} onClick={onNavigate} aria-current={active ? "page" : undefined} className="module-tile">
+                    <span className="module-icon">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span className="line-clamp-2">{t(i.label)}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </nav>
   );
 }
@@ -363,20 +400,28 @@ export function AppShell(props: ShellProps) {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar */}
         <header className="glass sticky top-0 z-30 border-b border-line pt-safe">
-          <div className="flex h-16 items-center gap-2 px-4 sm:px-6">
-            <div className="lg:hidden">
-              <BrandMark className="h-8 w-8" />
+          <div className="flex h-14 items-center gap-2 px-4 sm:h-16 sm:px-6">
+            <div className="flex min-w-0 items-center gap-2 lg:hidden">
+              <BrandMark className="h-8 w-8 shrink-0" />
+              {/* wave 20: on phones the workspace name orients you (the sidebar is hidden) */}
+              <span className="max-w-[38vw] truncate text-[14px] font-semibold text-fg" data-testid="mobile-org">
+                {props.org.name}
+              </span>
             </div>
             <GlobalSearch className="hidden max-w-md flex-1 md:block" permissions={props.permissions} />
             <div className="ms-auto flex items-center gap-1">
+              {/* wave 20: search on phones opens the menu sheet with the search field on top */}
+              <button type="button" onClick={() => setMoreOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl text-muted hover:bg-surface-hover hover:text-fg md:hidden" aria-label={t("common.search")}>
+                <Search className="h-[18px] w-[18px]" />
+              </button>
               <ThemeToggle />
               <NotificationBell count={props.unreadNotifications} />
               <UserMenu user={props.user} role={props.role} isPlatformAdmin={props.isPlatformAdmin} />
             </div>
           </div>
           {props.org.isDemo ? (
-            <div className="border-t border-gold/25 bg-gold-soft px-4 py-1.5 text-center text-[12px] font-medium text-gold sm:px-6">
-              {t("dashboard.demoBanner")}
+            <div className="border-t border-gold/25 bg-gold-soft px-4 py-1 text-center text-[11.5px] font-medium text-gold sm:px-6 sm:py-1.5 sm:text-[12px]" title={t("dashboard.demoBanner")}>
+              <span className="line-clamp-1 sm:line-clamp-none">{t("dashboard.demoBanner")}</span>
             </div>
           ) : null}
         </header>
@@ -403,9 +448,16 @@ export function AppShell(props: ShellProps) {
                 key={key}
                 href={href}
                 aria-current={active ? "page" : undefined}
-                className={cn("flex flex-col items-center justify-center gap-1 text-[11px]", active ? "text-accent" : "text-subtle")}
+                className={cn("flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium", active ? "text-accent" : "text-subtle")}
               >
-                <Icon className="h-[22px] w-[22px]" />
+                <span className="tab-pill relative">
+                  <Icon className="h-[21px] w-[21px]" />
+                  {key === "inbox" && (props.unreadInbox ?? 0) > 0 ? (
+                    <span className="absolute -top-0.5 end-2 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white ring-2 ring-bg" data-testid="tab-inbox-badge">
+                      <span dir="ltr">{(props.unreadInbox ?? 0) > 9 ? "9+" : props.unreadInbox}</span>
+                    </span>
+                  ) : null}
+                </span>
                 <span className="max-w-full truncate px-1">{t(item.label)}</span>
               </Link>
             );
@@ -415,8 +467,10 @@ export function AppShell(props: ShellProps) {
             onOpenChange={setMoreOpen}
             title={t("nav.menu")}
             trigger={
-              <button type="button" className="flex flex-col items-center justify-center gap-1 text-[11px] text-subtle">
-                <Menu className="h-[22px] w-[22px]" />
+              <button type="button" className="flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-subtle">
+                <span className="tab-pill">
+                  <Menu className="h-[21px] w-[21px]" />
+                </span>
                 {t("nav.more")}
               </button>
             }
@@ -424,7 +478,7 @@ export function AppShell(props: ShellProps) {
             <div className="space-y-5">
               <GlobalSearch permissions={props.permissions} />
               <WorkspaceSwitcher org={props.org} workspaces={props.workspaces} />
-              <NavList permissions={props.permissions} onNavigate={() => setMoreOpen(false)} isPlatformAdmin={props.isPlatformAdmin} />
+              <NavGrid permissions={props.permissions} onNavigate={() => setMoreOpen(false)} isPlatformAdmin={props.isPlatformAdmin} />
             </div>
           </Dialog>
         </div>

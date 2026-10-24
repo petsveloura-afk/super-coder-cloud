@@ -18,6 +18,8 @@ import { connectWhatsAppEmbeddedAction } from "@/app/[locale]/(dashboard)/integr
 export interface MarketProps {
   appUrl: string;
   canManage: boolean;
+  /** wave 20: only platform admins see tiles that still need the one-time platform setup */
+  platformAdmin?: boolean;
   metaPages: { appId: string; configId: string; version: string } | null;
   metaWa: { appId: string; configId: string; version: string } | null;
   facebook: { connected: boolean; label: string | null; error: string | null };
@@ -124,6 +126,17 @@ function CopyLine({ value }: { value: string }) {
   );
 }
 
+/** wave 20 — what a platform admin sees on a tile that still needs the one-time setup (customers never see it). */
+function AdminSetup({ what }: { what: string }) {
+  const { t, locale } = useI18n();
+  return (
+    <a href={`/${locale}/admin#setup`} className="flex items-center justify-between gap-2 rounded-xl border border-dashed border-line-strong p-2.5 text-[12.5px] font-medium text-accent hover:bg-surface-hover" data-testid={`setup-${what}`}>
+      <span>{t("market.adminSetup")}</span>
+      <span className="text-[11.5px] text-subtle">{t("market.adminOnly")}</span>
+    </a>
+  );
+}
+
 /* ----------------------------------------------------------- Facebook + Instagram */
 function MetaTile({ p }: { p: MarketProps }) {
   const { t, locale } = useI18n();
@@ -209,7 +222,7 @@ function MetaTile({ p }: { p: MarketProps }) {
             {p.facebook.connected ? <ConfirmActionButton action={disconnectMetaPagesAction} fields={{ locale }} size="sm" variant="ghost" label={t("integrations.channels.disconnect")} confirm={t("integrations.channels.confirmDisconnect")} /> : null}
           </div>
         ) : (
-          <p className="rounded-xl bg-elevated p-2.5 text-[12px] text-muted">{t("market.meta.setup")}</p>
+          <AdminSetup what="meta" />
         )
       ) : null}
     </Tile>
@@ -274,7 +287,7 @@ function WhatsAppAppTile({ p }: { p: MarketProps }) {
             <MessageCircle className="h-4 w-4" /> {t("market.waApp.connect")}
           </Button>
         ) : (
-          <p className="rounded-xl bg-elevated p-2.5 text-[12px] text-muted">{t("market.meta.setup")}</p>
+          <AdminSetup what="wa-app" />
         )
       ) : null}
     </Tile>
@@ -306,7 +319,7 @@ function GoogleTile({ p }: { p: MarketProps }) {
             {t(any ? "market.google.reconnect" : "market.google.connect")}
           </a>
         ) : (
-          <p className="rounded-xl bg-elevated p-2.5 text-[12px] text-muted">{t("market.google.setup")}</p>
+          <AdminSetup what="google" />
         )
       ) : null}
     </Tile>
@@ -335,7 +348,7 @@ function ShopifyTile({ p }: { p: MarketProps }) {
             </Button>
           </form>
         ) : (
-          <p className="rounded-xl bg-elevated p-2.5 text-[12px] text-muted">{t("market.shopify.setup")}</p>
+          <AdminSetup what="shopify" />
         )
       ) : null}
     </Tile>
@@ -415,7 +428,10 @@ export function IntegrationsMarketplace(p: MarketProps) {
         { cat: "stores" as const, key: "shopify", words: "shopify store חנות שופיפיי", el: <ShopifyTile key="shopify" p={p} /> },
         { cat: "stores" as const, key: "woo", words: "woocommerce wordpress וורדפרס ווקומרס", el: <WooTile key="woo" p={p} /> },
         { cat: "automation" as const, key: "zapier", words: "zapier make n8n webhook זאפייר", el: <ZapierTile key="zapier" p={p} /> },
-      ].filter((x) => (cat === "all" || x.cat === cat) && (!q.trim() || `${x.key} ${x.words}`.toLowerCase().includes(q.trim().toLowerCase()))),
+      ]
+        // wave 20: a connection that still needs the platform's one-time setup is shown to platform admins only
+        .filter((x) => p.platformAdmin !== false || ({ meta: Boolean(p.metaPages), "wa-app": Boolean(p.metaWa), google: p.google.configured, shopify: p.shopify.configured } as Record<string, boolean>)[x.key] !== false)
+        .filter((x) => (cat === "all" || x.cat === cat) && (!q.trim() || `${x.key} ${x.words}`.toLowerCase().includes(q.trim().toLowerCase()))),
     [cat, q, p],
   );
   const cats: Cat[] = ["all", "social", "google", "stores", "automation", "more"];

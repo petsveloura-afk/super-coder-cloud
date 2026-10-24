@@ -19,8 +19,10 @@ export function bridgeConfigured(): boolean {
 const base = () => (process.env.WA_BRIDGE_URL ?? "").replace(/\/$/, "");
 
 export interface BridgeStatus {
-  status: "starting" | "qr" | "connected" | "logged_out" | "error" | "unknown";
+  status: "starting" | "qr" | "connected" | "logged_out" | "error" | "unknown" | "code";
   qr?: string | null; // data:image/png;base64,…
+  /** wave 20: "link with phone number" — the 8-character code to type in WhatsApp ("ABCD-1234") */
+  code?: string | null;
   phone?: string | null;
   name?: string | null;
   error?: string | null;
@@ -54,6 +56,13 @@ export function bridgeCallbackUrl(token: string) {
 
 export async function bridgeStart(accountId: string, token: string): Promise<BridgeStatus> {
   const r = await call(`/sessions/${accountId}/start`, { method: "POST", body: { callback: bridgeCallbackUrl(token) } });
+  if (!r.ok) return { status: "error", error: String(r.data.error ?? `bridge_${r.status}`) };
+  return r.data as unknown as BridgeStatus;
+}
+
+/** wave 20 — link with phone number: the bridge asks WhatsApp for an 8-character code for this phone. */
+export async function bridgePair(accountId: string, token: string, phone: string): Promise<BridgeStatus> {
+  const r = await call(`/sessions/${accountId}/pair`, { method: "POST", body: { callback: bridgeCallbackUrl(token), phone } });
   if (!r.ok) return { status: "error", error: String(r.data.error ?? `bridge_${r.status}`) };
   return r.data as unknown as BridgeStatus;
 }

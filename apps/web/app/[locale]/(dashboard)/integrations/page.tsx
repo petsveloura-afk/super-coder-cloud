@@ -12,6 +12,7 @@ import { ConnectHub, type HubProps } from "@/components/integrations/connect-hub
 import { ConversionsCard, type ConversionConn } from "@/components/integrations/conversions-card";
 import { IntegrationsNotice } from "@/components/integrations/integrations-notice";
 import { IntegrationsMarketplace, type MarketProps } from "@/components/integrations/marketplace";
+import { WhatsAppConnect } from "@/components/integrations/whatsapp-connect";
 import { TeamUpdates, type BusinessView, type RecipientView } from "@/components/integrations/team-updates";
 import { metaPublicConfig } from "@/lib/channels/meta";
 import { bridgeConfigured } from "@/lib/channels/wa-bridge";
@@ -142,6 +143,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
     market = {
       appUrl: baseUrl,
       canManage: canChannels,
+      platformAdmin: ctx.isPlatformAdmin,
       metaPages: metaPagesPublicConfig(),
       metaWa: metaPublicConfig(),
       facebook: { connected: Boolean(fb && fb.status !== "disabled"), label: fb?.config.page_name ?? fb?.name ?? null, error: fb?.status === "error" ? fb.last_error : fb?.last_error ?? null },
@@ -165,6 +167,18 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
   return (
     <>
       <PageHeader title={t("integrations.title")} description={t("integrations.hubSubtitle")} />
+      {/* wave 20: WhatsApp in one button — official (Meta) or straight from the phone (QR / code) */}
+      {canChannels ? (
+        <WhatsAppConnect
+          meta={hub.meta}
+          bridge={hub.bridge}
+          official={hub.channels.whatsapp}
+          quick={hub.channels.whatsapp_qr}
+          canManage={canChannels}
+          aiOn={hub.agent.channels.includes("whatsapp") || hub.agent.channels.includes("whatsapp_qr")}
+          platformAdmin={ctx.isPlatformAdmin}
+        />
+      ) : null}
       {market ? (
         <Suspense fallback={null}>
           <IntegrationsMarketplace {...market} />

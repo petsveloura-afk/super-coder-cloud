@@ -358,8 +358,10 @@ export async function connectWhatsAppEmbeddedAction(input: { locale: string; cod
 }
 
 export interface QrState {
-  status: "starting" | "qr" | "connected" | "logged_out" | "error" | "unknown" | "not_configured";
+  status: "starting" | "qr" | "connected" | "logged_out" | "error" | "unknown" | "not_configured" | "code";
   qr?: string | null;
+  /** wave 20: link with phone number — "ABCD-1234" */
+  code?: string | null;
   phone?: string | null;
   error?: string | null;
 }
@@ -397,7 +399,7 @@ export async function whatsAppQrStatusAction(input: { locale: string }): Promise
   if (!acc) return { status: "unknown" };
   const st = await bridgeStatus(acc.id as string);
   if (st.status === "connected") revalidatePath(`/${locale}/integrations`);
-  return { status: st.status, qr: st.qr ?? null, phone: st.phone ?? null, error: st.error ?? null };
+  return { status: st.status, qr: st.qr ?? null, phone: st.phone ?? null, error: st.error ?? null, code: st.code ?? null };
 }
 
 /* ------------------------------------- wave 8: Telegram personal account ---- */

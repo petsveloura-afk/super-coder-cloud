@@ -13,6 +13,8 @@ export function ServiceWorkerRegistrar() {
     navigator.serviceWorker.register("/sw.js", { scope: "/" }).then(
       (reg) => {
         // Activate updated workers on next navigation.
+        // wave 20: some browsers / privacy modes resolve without a registration — never throw
+        if (!reg || typeof reg.addEventListener !== "function") return;
         reg.addEventListener("updatefound", () => {
           const w = reg.installing;
           w?.addEventListener("statechange", () => {

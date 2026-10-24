@@ -123,3 +123,40 @@ test("mobile (iPhone viewport): wave 14 — plan cards show real feature names, 
   await page.getByTestId("mock-card-pay").click();
   await expect(page).toHaveURL(/\/he\/billing\?checkout=success/, { timeout: 30_000 });
 });
+
+test("mobile (iPhone viewport): wave 20 — inbox in the tab bar, modules grid, no sideways page, WhatsApp code by default", async ({ page }) => {
+  test.setTimeout(180_000);
+  await signUp(page, { name: "נייד 20", email: uniqueEmail("mob20") });
+  await createOrg(page, "נייד עשרים", `mob20-${Date.now()}`);
+  await page.getByRole("button", { name: "טעינת נתוני דמו" }).click();
+  await expect(page.getByText(/סביבת דמו — הנתונים בדויים/)).toBeVisible();
+  const tabs = page.locator("nav.fixed");
+  // what an owner opens most on the phone: overview, inbox, contacts, AI agents + More
+  for (const name of ["סקירה כללית", "תיבת הודעות", "אנשי קשר", "סוכני AI"]) await expect(tabs.getByRole("link", { name })).toBeVisible();
+  await expect(page.getByTestId("mobile-org")).toHaveText("נייד עשרים");
+  await expect(page.getByTestId("ai-pulse")).toBeVisible();
+  await tabs.getByRole("button", { name: "עוד" }).click();
+  const grid = page.getByRole("dialog").getByTestId("nav-grid");
+  await expect(grid).toBeVisible();
+  await expect(grid.getByRole("link", { name: "צוות", exact: true })).toBeVisible();
+  await shot(page, "m20-more-grid");
+  await grid.getByRole("link", { name: "צינורות מכירה" }).click();
+  await page.waitForURL(/\/he\/pipelines/);
+  await page.waitForLoadState("networkidle");
+  // the board scrolls inside its own box; the page itself never scrolls sideways
+  for (const path of ["/he/pipelines", "/he/analytics", "/he/integrations", "/he/crm", "/he/finance"]) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(over, `${path} scrolls sideways by ${over}px`).toBeLessThanOrEqual(1);
+  }
+  await shot(page, "m20-finance");
+  // a phone can't scan its own screen → the WhatsApp dialog opens on the code tab
+  if (process.env.E2E_PROVIDERS_MOCKED === "true") {
+    await page.goto("/he/integrations");
+    await page.getByTestId("wa-connect").click();
+    await expect(page.getByTestId("wa-tab-code")).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("wa-pair-phone")).toBeVisible();
+    await shot(page, "m20-wa-code");
+  }
+});

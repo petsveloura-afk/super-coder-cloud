@@ -273,3 +273,203 @@ body {
   background-image: var(--gradient-accent-soft);
   box-shadow: 0 0 0 1px rgb(71 123 255 / 0.18) inset;
 }
+
+/* ---------------------------------------------------------------------------
+   Wave 20 — mobile-first and professional finish (additive).
+   1. A phone never scrolls sideways: wide content scrolls inside its own box.
+   2. Touch targets ≥ 44px, fields at 16px (iOS never zooms into a field).
+   3. Tab rows and chip rows scroll horizontally instead of wrapping into piles.
+   4. One signature moment: the live "AI at work" band on the overview.
+--------------------------------------------------------------------------- */
+html,
+body {
+  overflow-x: clip;
+}
+
+/* Chrome + right-to-left: a horizontal scroll box (the deals board, chip rows) could widen the whole
+   page on a phone (it then zooms out). Containing its paint keeps the overflow inside the box. */
+main .overflow-x-auto {
+  contain: paint;
+}
+@media (max-width: 639px) {
+  main [role="tablist"] {
+    contain: paint;
+  }
+}
+
+@layer base {
+  /* grid and flex children may shrink below their content (charts, code, boards scroll inside) */
+  :where(main .grid) > * {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  [role="tablist"] {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  [role="tablist"]::-webkit-scrollbar {
+    display: none;
+  }
+  [role="tablist"] > * {
+    flex-shrink: 0;
+  }
+  /* page titles: compact, no wasted first screen */
+  .page-head h1 {
+    font-size: 22px;
+    line-height: 1.25;
+  }
+  .page-head p {
+    font-size: 13px;
+  }
+  /* header actions: one row that scrolls, the primary action first */
+  .page-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+    padding-bottom: 2px;
+  }
+  .page-actions::-webkit-scrollbar {
+    display: none;
+  }
+  .page-actions > * {
+    flex-shrink: 0;
+  }
+}
+
+@media (pointer: coarse) {
+  .btn-press {
+    min-height: 44px;
+  }
+}
+
+/* bottom tab bar: the active tab gets a pill behind its icon (native app feel) */
+.tab-pill {
+  display: grid;
+  place-items: center;
+  height: 30px;
+  width: 52px;
+  border-radius: 999px;
+  transition: background-color 160ms ease;
+}
+[aria-current="page"] .tab-pill {
+  background-image: var(--gradient-accent-soft);
+  box-shadow: 0 0 0 1px rgb(71 123 255 / 0.2) inset;
+}
+
+/* "More" sheet: modules as a grid of app tiles */
+.module-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 1rem;
+  padding: 0.75rem 0.25rem;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--text-muted);
+}
+.module-tile:active {
+  background: var(--surface-hover);
+}
+.module-tile[aria-current="page"] {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+.module-icon {
+  display: grid;
+  place-items: center;
+  height: 46px;
+  width: 46px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--accent);
+}
+
+/* WhatsApp: the brand green mark and the hero card */
+.wa-mark {
+  background: linear-gradient(145deg, #2fd46b 0%, #1fae55 60%, #128c4a 100%);
+  box-shadow: 0 10px 24px -12px rgb(31 174 85 / 0.7);
+}
+.wa-hero {
+  background-image: linear-gradient(120deg, rgb(37 211 102 / 0.09), transparent 45%), var(--card-highlight);
+}
+.step-dot {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  height: 22px;
+  width: 22px;
+  margin-top: 1px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.pair-code {
+  font-size: clamp(28px, 9vw, 38px);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* the signature: "AI at work" band on the overview */
+.ai-pulse {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(71 123 255 / 0.28);
+  background:
+    radial-gradient(420px 180px at 100% 0%, rgb(71 123 255 / 0.22), transparent 70%),
+    radial-gradient(380px 160px at 0% 100%, rgb(0 217 197 / 0.12), transparent 70%),
+    var(--surface);
+}
+[data-theme="light"] .ai-pulse {
+  border-color: rgb(47 99 232 / 0.22);
+  background:
+    radial-gradient(420px 180px at 100% 0%, rgb(47 99 232 / 0.12), transparent 70%),
+    radial-gradient(380px 160px at 0% 100%, rgb(0 165 150 / 0.08), transparent 70%),
+    var(--surface);
+}
+.live-dot {
+  position: relative;
+  display: inline-block;
+  height: 8px;
+  width: 8px;
+  border-radius: 999px;
+  background: var(--success);
+}
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 2px solid var(--success);
+  opacity: 0;
+  animation: live-ring 2.4s ease-out infinite;
+}
+@keyframes live-ring {
+  0% { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.pulse-figure {
+  font-size: clamp(26px, 7vw, 34px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}

@@ -151,3 +151,22 @@ export function attachMediaData(ev, buffer, mime) {
   if (!ev?.media || !buffer || !buffer.length || buffer.length > MEDIA_MAX_BYTES) return ev;
   return { ...ev, media: { ...ev.media, data: Buffer.from(buffer).toString("base64"), mime: mime ?? (ev.media.type === "image" || ev.media.type === "photo" ? "image/jpeg" : "audio/ogg") } };
 }
+
+/**
+ * wave 20 — phone number for "link with phone number" (pairing code): digits with the country code.
+ * Israeli local numbers (05x…) get 972. Returns null when it can't be a phone number.
+ */
+export function pairPhone(raw, defaultCc = "972") {
+  let d = String(raw ?? "").replace(/[^\d+]/g, "");
+  if (d.startsWith("+")) d = d.slice(1);
+  else if (d.startsWith("00")) d = d.slice(2);
+  else if (/^0\d{8,10}$/.test(d)) d = `${defaultCc}${d.slice(1)}`;
+  d = d.replace(/\D/g, "");
+  return /^[1-9]\d{7,14}$/.test(d) ? d : null;
+}
+
+/** wave 20 — "ABCD1234" → "ABCD-1234" (how WhatsApp shows it). */
+export function formatPairCode(code) {
+  const c = String(code ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return c.length === 8 ? `${c.slice(0, 4)}-${c.slice(4)}` : c;
+}

@@ -9,11 +9,13 @@ export default async function DashboardLayout({ children, params }: { children: 
   const locale = await resolveLocale(params);
   const ctx = await getOrgContext(locale);
   const supabase = await createClient();
-  const { count } = await supabase
-    .from("notifications")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", ctx.org.id)
-    .is("read_at", null);
+  // wave 20: the bell and the inbox tab both show a live count (one round trip)
+  const [{ count }, { count: inboxCount }] = await Promise.all([
+    supabase.from("notifications").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).is("read_at", null),
+    ctx.can("inbox.read")
+      ? supabase.from("conversations").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).eq("status", "open").gt("unread_count", 0)
+      : Promise.resolve({ count: 0 }),
+  ]);
 
   return (
     <AppShell
@@ -23,6 +25,7 @@ export default async function DashboardLayout({ children, params }: { children: 
       permissions={PERMISSIONS.filter((p) => ctx.can(p))}
       workspaces={ctx.memberships.map((m) => ({ id: m.organization_id, name: m.organizations?.name ?? "", role: m.role }))}
       unreadNotifications={count ?? 0}
+      unreadInbox={inboxCount ?? 0}
       isPlatformAdmin={ctx.isPlatformAdmin}
     >
       {children}

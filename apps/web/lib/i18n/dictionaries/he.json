@@ -144,7 +144,21 @@
     "checklistContact": "הוספת איש קשר ראשון",
     "checklistTeam": "הזמנת חבר צוות",
     "emptyTitle": "עדיין אין נתונים",
-    "emptyBody": "הוסיפו איש קשר ראשון או טענו נתוני דמו כדי לראות את הלוח בפעולה"
+    "emptyBody": "הוסיפו איש קשר ראשון או טענו נתוני דמו כדי לראות את הלוח בפעולה",
+    "pulse": {
+      "title": "הסוכן בעבודה",
+      "on": "{name} עונה ללקוחות עכשיו",
+      "onSub": "מה הסוכן עשה בשבילכם היום",
+      "off": "הסוכן עוד לא עונה ללקוחות",
+      "offSub": "הפעילו סוכן בלחיצה, והוא יענה בוואטסאפ, בטלגרם ובאתר 24/7",
+      "start": "הפעלת סוכן",
+      "settings": "הגדרות הסוכן",
+      "replies": "תשובות היום",
+      "leads": "לידים חדשים היום",
+      "speed": "זמן תגובה ממוצע",
+      "sec": "שנ׳",
+      "waiting": "ממתינים לכם"
+    }
   },
   "crm": {
     "title": "אנשי קשר",
@@ -1448,6 +1462,41 @@
       "noPages": "לא נמצא עמוד פייסבוק. צריך עמוד עסקי (והרשאה אליו) כדי לחבר מסנג'ר ואינסטגרם.",
       "connectedBoth": "מחובר: {page} + אינסטגרם @{ig}",
       "connectedPage": "מחובר: {page} (בלי חשבון אינסטגרם מקושר)"
+    },
+    "wa": {
+      "title": "וואטסאפ",
+      "body": "לקוחות כותבים לכם בוואטסאפ, והסוכן עונה להם מיד. כל השיחות נכנסות לתיבת ההודעות.",
+      "connect": "חיבור וואטסאפ",
+      "reconnect": "חיבור מחדש",
+      "connected": "וואטסאפ מחובר",
+      "doneTitle": "מחובר",
+      "doneBody": "מעכשיו הודעות וואטסאפ נכנסות לתיבת ההודעות, והסוכן עונה בהן לפי ההגדרות שלו.",
+      "dialogTitle": "חיבור וואטסאפ",
+      "viaOfficial": "חיבור רשמי של Meta",
+      "viaPhone": "מחובר מהטלפון",
+      "officialTitle": "חיבור רשמי של Meta",
+      "officialBody": "נכנסים עם פייסבוק ובוחרים את מספר העסק. בלי סיכון לחסימה, מתאים להודעות רבות.",
+      "recommended": "מומלץ",
+      "quickTitle": "חיבור מהיר מהטלפון",
+      "quickBody": "סורקים QR או מקלידים קוד בוואטסאפ, כמו WhatsApp Web. דקה אחת, בלי הרשמה.",
+      "tabQr": "סריקת QR",
+      "tabCode": "קוד לטלפון",
+      "qrAlt": "קוד QR לחיבור וואטסאפ",
+      "codeIntro": "נוח כשהדף פתוח באותו טלפון. מכניסים את מספר הוואטסאפ של העסק ומקבלים קוד בן 8 תווים.",
+      "phoneLabel": "מספר הוואטסאפ של העסק",
+      "getCode": "קבלת קוד",
+      "yourCode": "הקוד שלכם",
+      "newCode": "קוד חדש",
+      "codeStep1": "פותחים את וואטסאפ בטלפון של העסק",
+      "codeStep2": "הגדרות ← מכשירים מקושרים ← קישור מכשיר",
+      "codeStep3": "למטה במסך: \"קישור עם מספר טלפון במקום זאת\"",
+      "codeStep4": "מקלידים את הקוד שלמעלה",
+      "waitingLink": "ממתינים לחיבור… החלון יתעדכן לבד",
+      "badPhone": "המספר לא תקין. כתבו אותו עם קידומת, למשל 050-123-4567 או ‎+972 50 123 4567",
+      "codeFailed": "לא הצלחנו לקבל קוד מוואטסאפ. נסו שוב בעוד רגע, או סרקו QR.",
+      "unofficial": "חיבור מהטלפון אינו רשמי: וואטסאפ עלולה לחסום מספר ששולח הרבה הודעות בבת אחת. למספר עסקי מרכזי עדיף החיבור הרשמי.",
+      "adminSetup": "להפעלת החיבור ←",
+      "soon": "יופעל בקרוב"
     }
   },
   "public": {
@@ -2436,7 +2485,56 @@
     "aiTokens": "טוקנים",
     "aiLimit": "מכסה חודשית",
     "aiPacks": "יתרת חבילות",
-    "aiTop": "שימוש עיקרי"
+    "aiTop": "שימוש עיקרי",
+    "setup": {
+      "title": "הגדרת החיבורים של הפלטפורמה",
+      "subtitle": "פעם אחת, רק אתם. אחרי כל שלב, כל העסקים בפלטפורמה מתחברים לשירות בלחיצה, בלי לראות שום הגדרה.",
+      "progress": "הושלמו",
+      "check": "בדיקה חיה",
+      "done": "מוכן",
+      "todo": "לביצוע",
+      "vercelVars": "משתנים ב-Vercel (Settings ← Environment Variables, ואז Redeploy):",
+      "varSet": "מוגדר",
+      "varMissing": "חסר",
+      "makeToken": "יצירת טוקן אימות",
+      "tokenReady": "הטוקן שלכם (מדביקים אותו גם ב-Meta וגם ב-Vercel)",
+      "bridgeOk": "הגשר פעיל · {n} חיבורים פעילים",
+      "metaOk": "המפתחות תקינים · {name}",
+      "liveFail": "הבדיקה נכשלה: {error}",
+      "footer": "המפתחות נשמרים רק ב-Vercel, לא במסד הנתונים ולא בקוד. אף לקוח לא רואה את המסך הזה.",
+      "steps": {
+        "bridge": {
+          "title": "וואטסאפ מהטלפון (QR וקוד)",
+          "unlocks": "כל עסק מחבר וואטסאפ בדקה, בלי מטא",
+          "how": "1. ב-Railway: New Project ← Deploy from GitHub repo ← הריפו של הפלטפורמה.\n2. Settings ← Root Directory: services/wa-bridge (להקליד באנגלית, בלי רווחים).\n3. Variables: ‏WA_BRIDGE_SECRET (סיסמה אקראית, 24 תווים ומעלה) ו-APP_URL (הכתובת שלמטה).\n4. Volume עם Mount path ‏/data, ואז Networking ← Generate Domain על פורט 8080.\n5. ב-Vercel: ‏WA_BRIDGE_URL = הכתובת מ-Railway, ו-WA_BRIDGE_SECRET = אותה סיסמה. ואז Redeploy."
+        },
+        "meta_app": {
+          "title": "אפליקציית Meta",
+          "unlocks": "הבסיס לכל החיבורים הרשמיים של מטא",
+          "how": "1. developers.facebook.com ← Create App ← סוג Business.\n2. App settings ← Basic: מעתיקים את App ID ואת App Secret ל-Vercel ‏(META_APP_ID, META_APP_SECRET).\n3. App domains: הדומיין שלמטה. Privacy Policy URL: דף המדיניות של האתר.\n4. Business verification לעסק שלכם ב-Business Manager. נדרש פעם אחת, ולוקח כמה ימים."
+        },
+        "wa_official": {
+          "title": "וואטסאפ רשמי בלחיצה",
+          "unlocks": "חיבור רשמי בלי סיכון לחסימה, דרך חלון פייסבוק",
+          "how": "1. באפליקציה: Add product ← WhatsApp, ו-Facebook Login for Business.\n2. Facebook Login for Business ← Configurations ← Create ← WhatsApp Embedded Signup. מעתיקים את ה-Configuration ID ל-META_WA_CONFIG_ID.\n3. WhatsApp ← Configuration ← Webhook: הכתובת שלמטה, ו-Verify token (צרו אחד כאן). מסמנים messages.\n4. את אותו טוקן מכניסים ל-Vercel בשם META_WEBHOOK_VERIFY_TOKEN, ועושים Redeploy.\n5. App Review: ‏whatsapp_business_messaging ו-whatsapp_business_management."
+        },
+        "meta_pages": {
+          "title": "פייסבוק ואינסטגרם",
+          "unlocks": "מסנג'ר, אינסטגרם ותגובות לפוסטים בלחיצה",
+          "how": "1. Facebook Login for Business ← Configurations ← Create, עם ההרשאות: pages_messaging, pages_manage_metadata, pages_read_engagement, instagram_basic, instagram_manage_messages, instagram_manage_comments. מעתיקים את ה-ID ל-META_PAGES_CONFIG_ID.\n2. Webhooks ← Page ו-Instagram: הכתובת שלמטה ואותו Verify token. מסמנים messages, messaging_postbacks, feed, comments.\n3. App Review להרשאות האלה."
+        },
+        "google": {
+          "title": "גוגל",
+          "unlocks": "יומן, ג'ימייל וביקורות גוגל בלחיצה",
+          "how": "1. console.cloud.google.com ← פרויקט ← APIs & Services ← OAuth consent screen ‏(External).\n2. Credentials ← Create OAuth client ID ← Web application, עם שתי כתובות ה-Redirect שלמטה.\n3. מפעילים את Google Calendar API, ‏Gmail API ו-Business Profile API.\n4. מעתיקים את Client ID ואת Secret ל-Vercel ‏(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)."
+        },
+        "shopify": {
+          "title": "Shopify",
+          "unlocks": "הזמנות ועגלות נטושות מ-Shopify בלחיצה",
+          "how": "1. partners.shopify.com ← Apps ← Create app.\n2. App URL ו-Allowed redirection URL: הכתובות שלמטה.\n3. מעתיקים את Client ID ואת Client secret ל-Vercel ‏(SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET)."
+        }
+      }
+    }
   },
   "chat": {
     "title": "צ׳אט",
@@ -3564,6 +3662,8 @@
       "not_configured": "החיבור עוד לא הוגדר בפלטפורמה",
       "bad_shop": "שם חנות Shopify לא תקין",
       "bad_url": "כתובת חנות לא תקינה (צריך https)"
-    }
+    },
+    "adminSetup": "הגדרה חד-פעמית בניהול ←",
+    "adminOnly": "רק אתם רואים את זה"
   }
 }

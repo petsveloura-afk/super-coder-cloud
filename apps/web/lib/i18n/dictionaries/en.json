@@ -144,7 +144,21 @@
     "checklistContact": "Add your first contact",
     "checklistTeam": "Invite a teammate",
     "emptyTitle": "No data yet",
-    "emptyBody": "Add your first contact or load demo data to see the dashboard in action"
+    "emptyBody": "Add your first contact or load demo data to see the dashboard in action",
+    "pulse": {
+      "title": "Your agent at work",
+      "on": "{name} is answering customers now",
+      "onSub": "What the agent did for you today",
+      "off": "The agent isn't answering customers yet",
+      "offSub": "Turn on an agent in one click and it answers on WhatsApp, Telegram and your site 24/7",
+      "start": "Turn on an agent",
+      "settings": "Agent settings",
+      "replies": "Replies today",
+      "leads": "New leads today",
+      "speed": "Average reply time",
+      "sec": "sec",
+      "waiting": "Waiting for you"
+    }
   },
   "crm": {
     "title": "Contacts",
@@ -1448,6 +1462,41 @@
       "noPages": "No Facebook Page found. A business Page (with access) is needed for Messenger and Instagram.",
       "connectedBoth": "Connected: {page} + Instagram @{ig}",
       "connectedPage": "Connected: {page} (no linked Instagram account)"
+    },
+    "wa": {
+      "title": "WhatsApp",
+      "body": "Customers message you on WhatsApp and the agent answers right away. Every conversation lands in the inbox.",
+      "connect": "Connect WhatsApp",
+      "reconnect": "Reconnect",
+      "connected": "WhatsApp is connected",
+      "doneTitle": "Connected",
+      "doneBody": "WhatsApp messages now reach the inbox, and the agent answers them by its settings.",
+      "dialogTitle": "Connect WhatsApp",
+      "viaOfficial": "Official Meta connection",
+      "viaPhone": "Linked from the phone",
+      "officialTitle": "Official Meta connection",
+      "officialBody": "Sign in with Facebook and pick the business number. No risk of blocking, fit for high volume.",
+      "recommended": "Recommended",
+      "quickTitle": "Quick link from the phone",
+      "quickBody": "Scan a QR or type a code in WhatsApp, like WhatsApp Web. One minute, no sign-up.",
+      "tabQr": "Scan QR",
+      "tabCode": "Code for the phone",
+      "qrAlt": "QR code for linking WhatsApp",
+      "codeIntro": "Handy when this page is open on the same phone. Enter the business WhatsApp number and get an 8-character code.",
+      "phoneLabel": "Business WhatsApp number",
+      "getCode": "Get a code",
+      "yourCode": "Your code",
+      "newCode": "New code",
+      "codeStep1": "Open WhatsApp on the business phone",
+      "codeStep2": "Settings → Linked devices → Link a device",
+      "codeStep3": "At the bottom: “Link with phone number instead”",
+      "codeStep4": "Type the code above",
+      "waitingLink": "Waiting for the link… this window updates by itself",
+      "badPhone": "That number isn't valid. Include the prefix, e.g. +972 50 123 4567",
+      "codeFailed": "We couldn't get a code from WhatsApp. Try again in a moment, or scan a QR.",
+      "unofficial": "Linking from the phone is unofficial: WhatsApp may block a number that sends many messages at once. For a main business number, prefer the official connection.",
+      "adminSetup": "Set up the connection",
+      "soon": "Coming soon"
     }
   },
   "public": {
@@ -2436,7 +2485,56 @@
     "aiTokens": "Tokens",
     "aiLimit": "Monthly limit",
     "aiPacks": "Pack balance",
-    "aiTop": "Top feature"
+    "aiTop": "Top feature",
+    "setup": {
+      "title": "Platform connections setup",
+      "subtitle": "Once, only you. After each step, every business on the platform connects that service in one click, without seeing any setup.",
+      "progress": "Done",
+      "check": "Live check",
+      "done": "Ready",
+      "todo": "To do",
+      "vercelVars": "Variables in Vercel (Settings → Environment Variables, then Redeploy):",
+      "varSet": "set",
+      "varMissing": "missing",
+      "makeToken": "Generate a verify token",
+      "tokenReady": "Your token (paste it in Meta and in Vercel)",
+      "bridgeOk": "Bridge is up · {n} active sessions",
+      "metaOk": "Keys are valid · {name}",
+      "liveFail": "Check failed: {error}",
+      "footer": "Keys live only in Vercel — not in the database or the code. No customer sees this screen.",
+      "steps": {
+        "bridge": {
+          "title": "WhatsApp from the phone (QR and code)",
+          "unlocks": "Every business links WhatsApp in a minute, no Meta needed",
+          "how": "1. In Railway: New Project → Deploy from GitHub repo → the platform repo.\n2. Settings → Root Directory: services/wa-bridge.\n3. Variables: WA_BRIDGE_SECRET (a random password, 24+ characters) and APP_URL (below).\n4. A Volume mounted at /data, then Networking → Generate Domain on port 8080.\n5. In Vercel: WA_BRIDGE_URL = the Railway address, WA_BRIDGE_SECRET = the same password. Then Redeploy."
+        },
+        "meta_app": {
+          "title": "Meta app",
+          "unlocks": "The base for every official Meta connection",
+          "how": "1. developers.facebook.com → Create App → type Business.\n2. App settings → Basic: copy App ID and App Secret to Vercel (META_APP_ID, META_APP_SECRET).\n3. App domains: the domain below. Privacy Policy URL: your site's policy page.\n4. Business verification for your company in Business Manager — once, takes a few days."
+        },
+        "wa_official": {
+          "title": "Official WhatsApp in one click",
+          "unlocks": "An official connection without blocking risk, through a Facebook popup",
+          "how": "1. In the app: Add product → WhatsApp, and Facebook Login for Business.\n2. Facebook Login for Business → Configurations → Create → WhatsApp Embedded Signup. Copy the Configuration ID to META_WA_CONFIG_ID.\n3. WhatsApp → Configuration → Webhook: the address below and a Verify token (generate one here). Subscribe to messages.\n4. Put the same token in Vercel as META_WEBHOOK_VERIFY_TOKEN, then Redeploy.\n5. App Review: whatsapp_business_messaging and whatsapp_business_management."
+        },
+        "meta_pages": {
+          "title": "Facebook and Instagram",
+          "unlocks": "Messenger, Instagram and post comments in one click",
+          "how": "1. Facebook Login for Business → Configurations → Create, with: pages_messaging, pages_manage_metadata, pages_read_engagement, instagram_basic, instagram_manage_messages, instagram_manage_comments. Copy the ID to META_PAGES_CONFIG_ID.\n2. Webhooks → Page and Instagram: the address below and the same Verify token. Subscribe to messages, messaging_postbacks, feed, comments.\n3. App Review for these permissions."
+        },
+        "google": {
+          "title": "Google",
+          "unlocks": "Calendar, Gmail and Google reviews in one click",
+          "how": "1. console.cloud.google.com → project → APIs & Services → OAuth consent screen (External).\n2. Credentials → Create OAuth client ID → Web application, with both redirect URIs below.\n3. Enable Google Calendar API, Gmail API and Business Profile API.\n4. Copy Client ID and Secret to Vercel (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)."
+        },
+        "shopify": {
+          "title": "Shopify",
+          "unlocks": "Shopify orders and abandoned carts in one click",
+          "how": "1. partners.shopify.com → Apps → Create app.\n2. App URL and Allowed redirection URL: the addresses below.\n3. Copy Client ID and Client secret to Vercel (SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET)."
+        }
+      }
+    }
   },
   "chat": {
     "title": "Chat",
@@ -3564,6 +3662,8 @@
       "not_configured": "This connection isn't set up on the platform yet",
       "bad_shop": "Invalid Shopify store name",
       "bad_url": "Invalid store address (https required)"
-    }
+    },
+    "adminSetup": "One-time setup in admin",
+    "adminOnly": "Only you see this"
   }
 }

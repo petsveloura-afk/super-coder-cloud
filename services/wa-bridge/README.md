@@ -22,6 +22,7 @@ An always-on service that lets each business connect **its own WhatsApp by scann
 Every request needs `Authorization: Bearer WA_BRIDGE_SECRET`.
 - `POST /sessions/{accountId}/start` `{callback}` → `{status, qr}` (QR as a data URL)
 - `GET /sessions/{accountId}` → `{status: starting|qr|connected|logged_out, qr, phone, name}`
+- `POST /sessions/{accountId}/pair` `{callback, phone}` → `{status: "code", code: "ABCD-1234"}` — wave 20: "link with phone number" (for the phone that shows the page; it can't scan its own screen). Typed in WhatsApp → Linked devices → Link a device → Link with phone number instead.
 - `POST /sessions/{accountId}/send` `{to, text}` → `{ok, id}`
 - `POST /sessions/{accountId}/logout`
 - `GET /health`

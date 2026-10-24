@@ -169,7 +169,8 @@ function loadFacebook(appId: string, version: string): Promise<void> {
   });
 }
 
-function WhatsAppOfficialCard({ p }: { p: HubProps }) {
+/** wave 20: replaced on the page by the one-button WhatsApp card (components/integrations/whatsapp-connect.tsx) */
+export function WhatsAppOfficialCard({ p }: { p: HubProps }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -248,7 +249,8 @@ function WhatsAppOfficialCard({ p }: { p: HubProps }) {
 
 /* --------------------------------------------------------------- WhatsApp QR */
 
-function WhatsAppQrCard({ p }: { p: HubProps }) {
+/** wave 20: replaced on the page by the one-button WhatsApp card (QR or an 8-character code) */
+export function WhatsAppQrCard({ p }: { p: HubProps }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -651,8 +653,7 @@ export function ConnectHub(p: HubProps) {
       </div>
       <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
         <WebChatCard p={p} />
-        <WhatsAppOfficialCard p={p} />
-        <WhatsAppQrCard p={p} />
+        {/* wave 20: WhatsApp (official + QR + code) lives in the one-button card at the top of the page */}
         <TelegramCard p={p} />
         <TelegramUserCard p={p} />
         <EmailCard p={p} />

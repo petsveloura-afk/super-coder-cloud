@@ -144,7 +144,21 @@
     "checklistContact": "إضافة أول جهة اتصال",
     "checklistTeam": "دعوة عضو فريق",
     "emptyTitle": "لا توجد بيانات بعد",
-    "emptyBody": "أضف أول جهة اتصال أو حمّل بيانات تجريبية لرؤية اللوحة"
+    "emptyBody": "أضف أول جهة اتصال أو حمّل بيانات تجريبية لرؤية اللوحة",
+    "pulse": {
+      "title": "الوكيل يعمل",
+      "on": "{name} يرد على العملاء الآن",
+      "onSub": "ما أنجزه الوكيل لك اليوم",
+      "off": "الوكيل لا يرد على العملاء بعد",
+      "offSub": "فعّل وكيلاً بنقرة واحدة ليرد عبر واتساب وتيليجرام وموقعك على مدار الساعة",
+      "start": "تفعيل وكيل",
+      "settings": "إعدادات الوكيل",
+      "replies": "ردود اليوم",
+      "leads": "عملاء محتملون اليوم",
+      "speed": "متوسط زمن الرد",
+      "sec": "ث",
+      "waiting": "بانتظارك"
+    }
   },
   "crm": {
     "title": "جهات الاتصال",
@@ -1448,6 +1462,41 @@
       "noPages": "لم يتم العثور على صفحة فيسبوك. يلزم وجود صفحة أعمال للربط.",
       "connectedBoth": "متصل: {page} + إنستغرام @{ig}",
       "connectedPage": "متصل: {page} (دون حساب إنستغرام مرتبط)"
+    },
+    "wa": {
+      "title": "واتساب",
+      "body": "يراسلك العملاء عبر واتساب ويرد الوكيل فوراً. كل المحادثات تصل إلى صندوق الرسائل.",
+      "connect": "ربط واتساب",
+      "reconnect": "إعادة الربط",
+      "connected": "واتساب متصل",
+      "doneTitle": "تم الربط",
+      "doneBody": "تصل رسائل واتساب الآن إلى صندوق الرسائل، ويرد عليها الوكيل حسب إعداداته.",
+      "dialogTitle": "ربط واتساب",
+      "viaOfficial": "ربط رسمي من Meta",
+      "viaPhone": "مرتبط من الهاتف",
+      "officialTitle": "ربط رسمي من Meta",
+      "officialBody": "سجّل الدخول عبر فيسبوك واختر رقم العمل. دون خطر الحظر، ومناسب للرسائل الكثيرة.",
+      "recommended": "موصى به",
+      "quickTitle": "ربط سريع من الهاتف",
+      "quickBody": "امسح رمز QR أو اكتب رمزاً في واتساب، مثل WhatsApp Web. دقيقة واحدة دون تسجيل.",
+      "tabQr": "مسح QR",
+      "tabCode": "رمز للهاتف",
+      "qrAlt": "رمز QR لربط واتساب",
+      "codeIntro": "مناسب عندما تكون الصفحة مفتوحة على الهاتف نفسه. أدخل رقم واتساب العمل واحصل على رمز من 8 أحرف.",
+      "phoneLabel": "رقم واتساب العمل",
+      "getCode": "الحصول على رمز",
+      "yourCode": "رمزك",
+      "newCode": "رمز جديد",
+      "codeStep1": "افتح واتساب على هاتف العمل",
+      "codeStep2": "الإعدادات ← الأجهزة المرتبطة ← ربط جهاز",
+      "codeStep3": "في الأسفل: «الربط برقم الهاتف بدلاً من ذلك»",
+      "codeStep4": "اكتب الرمز أعلاه",
+      "waitingLink": "بانتظار الربط… تتحدث النافذة تلقائياً",
+      "badPhone": "الرقم غير صالح. اكتبه مع المقدمة، مثل ‎+972 50 123 4567",
+      "codeFailed": "تعذر الحصول على رمز من واتساب. حاول بعد لحظة أو امسح رمز QR.",
+      "unofficial": "الربط من الهاتف غير رسمي: قد يحظر واتساب رقماً يرسل رسائل كثيرة دفعة واحدة. للرقم الرئيسي يفضل الربط الرسمي.",
+      "adminSetup": "إعداد الربط",
+      "soon": "قريباً"
     }
   },
   "public": {
@@ -2436,7 +2485,56 @@
     "aiTokens": "الرموز",
     "aiLimit": "الحد الشهري",
     "aiPacks": "رصيد الباقات",
-    "aiTop": "الاستخدام الأبرز"
+    "aiTop": "الاستخدام الأبرز",
+    "setup": {
+      "title": "إعداد اتصالات المنصة",
+      "subtitle": "مرة واحدة، أنت فقط. بعد كل خطوة، تتصل كل الأعمال على المنصة بالخدمة بنقرة واحدة دون رؤية أي إعداد.",
+      "progress": "مكتمل",
+      "check": "فحص مباشر",
+      "done": "جاهز",
+      "todo": "للتنفيذ",
+      "vercelVars": "المتغيرات في Vercel (Settings ← Environment Variables ثم Redeploy):",
+      "varSet": "مُعد",
+      "varMissing": "ناقص",
+      "makeToken": "إنشاء رمز تحقق",
+      "tokenReady": "رمزك (الصقه في Meta وفي Vercel)",
+      "bridgeOk": "الجسر يعمل · {n} جلسات نشطة",
+      "metaOk": "المفاتيح صالحة · {name}",
+      "liveFail": "فشل الفحص: {error}",
+      "footer": "تُحفظ المفاتيح في Vercel فقط، لا في قاعدة البيانات ولا في الكود. لا يرى أي عميل هذه الشاشة.",
+      "steps": {
+        "bridge": {
+          "title": "واتساب من الهاتف (QR ورمز)",
+          "unlocks": "يربط كل عمل واتساب في دقيقة دون Meta",
+          "how": "1. في Railway: New Project ← Deploy from GitHub repo ← مستودع المنصة.\n2. Settings ← Root Directory: services/wa-bridge.\n3. Variables: ‏WA_BRIDGE_SECRET (كلمة سر عشوائية 24 حرفاً فأكثر) و APP_URL (أدناه).\n4. Volume على المسار ‏/data، ثم Networking ← Generate Domain على المنفذ 8080.\n5. في Vercel: ‏WA_BRIDGE_URL = عنوان Railway و WA_BRIDGE_SECRET = نفس كلمة السر. ثم Redeploy."
+        },
+        "meta_app": {
+          "title": "تطبيق Meta",
+          "unlocks": "الأساس لكل اتصالات Meta الرسمية",
+          "how": "1. developers.facebook.com ← Create App ← النوع Business.\n2. App settings ← Basic: انسخ App ID و App Secret إلى Vercel ‏(META_APP_ID, META_APP_SECRET).\n3. App domains: النطاق أدناه. Privacy Policy URL: صفحة السياسة في موقعك.\n4. توثيق النشاط التجاري في Business Manager — مرة واحدة، ويستغرق أياماً."
+        },
+        "wa_official": {
+          "title": "واتساب الرسمي بنقرة واحدة",
+          "unlocks": "ربط رسمي دون خطر الحظر عبر نافذة فيسبوك",
+          "how": "1. في التطبيق: Add product ← WhatsApp و Facebook Login for Business.\n2. Facebook Login for Business ← Configurations ← Create ← WhatsApp Embedded Signup. انسخ Configuration ID إلى META_WA_CONFIG_ID.\n3. WhatsApp ← Configuration ← Webhook: العنوان أدناه ورمز Verify (أنشئه هنا). اشترك في messages.\n4. ضع الرمز نفسه في Vercel باسم META_WEBHOOK_VERIFY_TOKEN ثم Redeploy.\n5. App Review: ‏whatsapp_business_messaging و whatsapp_business_management."
+        },
+        "meta_pages": {
+          "title": "فيسبوك وإنستغرام",
+          "unlocks": "ماسنجر وإنستغرام والتعليقات بنقرة واحدة",
+          "how": "1. Facebook Login for Business ← Configurations ← Create مع: pages_messaging, pages_manage_metadata, pages_read_engagement, instagram_basic, instagram_manage_messages, instagram_manage_comments. انسخ المعرف إلى META_PAGES_CONFIG_ID.\n2. Webhooks ← Page و Instagram: العنوان أدناه ونفس رمز Verify. اشترك في messages و messaging_postbacks و feed و comments.\n3. App Review لهذه الأذونات."
+        },
+        "google": {
+          "title": "جوجل",
+          "unlocks": "التقويم وجيميل ومراجعات جوجل بنقرة واحدة",
+          "how": "1. console.cloud.google.com ← مشروع ← APIs & Services ← OAuth consent screen ‏(External).\n2. Credentials ← Create OAuth client ID ← Web application مع عنواني Redirect أدناه.\n3. فعّل Google Calendar API و Gmail API و Business Profile API.\n4. انسخ Client ID و Secret إلى Vercel ‏(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)."
+        },
+        "shopify": {
+          "title": "Shopify",
+          "unlocks": "طلبات Shopify والسلال المتروكة بنقرة واحدة",
+          "how": "1. partners.shopify.com ← Apps ← Create app.\n2. App URL و Allowed redirection URL: العناوين أدناه.\n3. انسخ Client ID و Client secret إلى Vercel ‏(SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET)."
+        }
+      }
+    }
   },
   "chat": {
     "title": "دردشة",
@@ -3564,6 +3662,8 @@
       "not_configured": "هذا الربط غير مُعد بعد",
       "bad_shop": "اسم متجر غير صالح",
       "bad_url": "عنوان متجر غير صالح"
-    }
+    },
+    "adminSetup": "إعداد لمرة واحدة في الإدارة",
+    "adminOnly": "أنت فقط ترى هذا"
   }
 }

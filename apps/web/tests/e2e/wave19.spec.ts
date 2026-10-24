@@ -51,13 +51,17 @@ test("wave 19: AI team, social, marketplace, REST hooks, store + Meta webhooks",
   await expect(page.locator('[data-post="draft"]').first()).toBeVisible();
   await shot(page, "w19-social");
 
-  // 3) the marketplace: every category with its one-click tile
+  // 3) the marketplace: every category with its one-click tile.
+  // wave 20: a tile that still needs the platform's one-time setup (Meta / Google / Shopify keys not set
+  // here) is shown to platform admins only — a customer never sees setup instructions.
   await page.goto("/he/integrations");
   await expect(page.getByTestId("marketplace")).toBeVisible();
-  for (const id of ["meta", "wa-app", "google", "shopify", "woocommerce", "zapier"]) await expect(page.locator(`[data-market="${id}"]`)).toBeVisible();
+  for (const id of ["woocommerce", "zapier"]) await expect(page.locator(`[data-market="${id}"]`)).toBeVisible();
+  for (const id of ["meta", "wa-app", "google", "shopify"]) await expect(page.locator(`[data-market="${id}"]`)).toHaveCount(0);
+  await expect(page.getByText("בעל הפלטפורמה צריך")).toHaveCount(0);
   await page.getByRole("tab", { name: "חנויות אונליין" }).click();
-  await expect(page.locator('[data-market="meta"]')).toHaveCount(0);
-  await expect(page.locator('[data-market="shopify"]')).toBeVisible();
+  await expect(page.locator('[data-market="zapier"]')).toHaveCount(0);
+  await expect(page.locator('[data-market="woocommerce"]')).toBeVisible();
   await shot(page, "w19-marketplace");
 
   // 4) REST hooks (Zapier / Make) with an API key that has webhooks.manage

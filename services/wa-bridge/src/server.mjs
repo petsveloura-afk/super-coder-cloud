@@ -56,7 +56,7 @@ export function createServer({ manager, secret, appUrl, telegram = null }) {
         }
         return send(405, { error: "method_not_allowed" });
       }
-      const m = url.pathname.match(/^\/sessions\/([^/]+)(?:\/(start|send|logout|typing))?$/);
+      const m = url.pathname.match(/^\/sessions\/([^/]+)(?:\/(start|send|logout|typing|pair))?$/);
       if (!m || !validSessionId(m[1])) return send(404, { error: "not_found" });
       const [, id, action] = m;
       let body = {};
@@ -77,6 +77,11 @@ export function createServer({ manager, secret, appUrl, telegram = null }) {
       if (req.method === "POST" && action === "start") {
         if (!validCallback(body.callback, appUrl)) return send(400, { error: "invalid_callback" });
         return send(200, await manager.start(id, body.callback));
+      }
+      // wave 20: link with phone number → { status: "code", code: "ABCD-1234" }
+      if (req.method === "POST" && action === "pair") {
+        if (!validCallback(body.callback, appUrl)) return send(400, { error: "invalid_callback" });
+        return send(200, await manager.pair(id, body.callback, body.phone));
       }
       if (req.method === "POST" && action === "send") {
         const msgId = await manager.send(id, body.to, body.text, body.image ?? null);
