@@ -76,13 +76,16 @@ test("wave 20: WhatsApp by QR or phone code, no setup text for customers, the AI
       await expect(wiz).toBeVisible();
       await expect(wiz.locator("[data-step]")).toHaveCount(6);
       // the bridge is configured here (stand-in) → step 1 is done; Meta isn't → its webhook address is ready to copy
-      await expect(wiz.locator('[data-step="bridge"]')).toContainText("מוכן");
+      // with the bridge stand-in (local stack) step 1 is done; in CI there is no bridge → still to do
+      await expect(wiz.locator('[data-step="bridge"]')).toContainText(mocked ? "מוכן" : "לביצוע");
       await wiz.locator('[data-step="wa_official"] summary').click();
       await expect(wiz.locator('[data-step="wa_official"]')).toContainText("/api/channels/meta/whatsapp");
       await wiz.locator('[data-step="wa_official"]').getByRole("button", { name: "יצירת טוקן אימות" }).click();
       await expect(wiz.locator('[data-step="wa_official"] code').filter({ hasText: /^[a-f0-9]{48}$/ })).toHaveCount(1);
-      await page.getByTestId("setup-check").click();
-      await expect(page.getByTestId("live-bridge")).toBeVisible({ timeout: 20_000 });
+      if (mocked) {
+        await page.getByTestId("setup-check").click();
+        await expect(page.getByTestId("live-bridge")).toBeVisible({ timeout: 20_000 });
+      }
       await shot(page, "w20-admin-setup");
     } finally {
       await request.delete(`${supabaseUrl}/rest/v1/platform_admins?user_id=eq.${prof[0]!.id}`, { headers });
