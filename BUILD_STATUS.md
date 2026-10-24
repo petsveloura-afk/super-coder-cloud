@@ -624,3 +624,8 @@
   - הודעה אמיתית של בעל העסק כן עוצרת אותו.
   - תיבת ההודעות מסבירה, והחזרה עובדת בלחיצה.
   - ה-tick מקבל רק קריאות חתומות.
+
+### Wave 21 — תוספת: עמודים משפטיים לפלטפורמה (דרישת Meta)
+- `/[locale]/legal/privacy`, `/legal/terms`, `/legal/data-deletion` — ציבוריים (`/legal` נוסף ל-`PUBLIC_PATHS`), עברית ואנגלית.
+- תוכן: `lib/legal/platform.ts` (שם העסק מ-`BILLING_BUSINESS_NAME`, מייל אופציונלי מ-`LEGAL_CONTACT_EMAIL`).
+- בדיקות: `tests/unit/legal.test.ts`, `tests/e2e/legal.spec.ts`.
