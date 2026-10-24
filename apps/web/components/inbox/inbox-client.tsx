@@ -176,7 +176,7 @@ export function MessageContactButton({ contactId, channels }: { contactId: strin
 }
 
 /** Who answers this conversation: the AI agent (auto) or the team (human). A team reply switches to "human". */
-export function AiModeToggle({ conversationId, mode }: { conversationId: string; mode: "auto" | "human" }) {
+export function AiModeToggle({ conversationId, mode, testId = "ai-mode" }: { conversationId: string; mode: "auto" | "human"; testId?: string }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -186,7 +186,7 @@ export function AiModeToggle({ conversationId, mode }: { conversationId: string;
       variant={auto ? "secondary" : "primary"}
       size="sm"
       loading={pending}
-      data-testid="ai-mode"
+      data-testid={testId}
       data-mode={mode}
       title={t(auto ? "inbox.aiModeAutoHint" : "inbox.aiModeHumanHint")}
       onClick={() =>

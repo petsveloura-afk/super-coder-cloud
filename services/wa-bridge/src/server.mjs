@@ -11,7 +11,7 @@
 //                     to read new e-mails and run queued automations (faster than GitHub cron)
 import http from "node:http";
 import { SessionManager } from "./sessions.mjs";
-import { authorized, validCallback, validSessionId } from "./util.mjs";
+import { authorized, sign, validCallback, validSessionId } from "./util.mjs";
 
 export function createServer({ manager, secret, appUrl, telegram = null }) {
   return http.createServer(async (req, res) => {
@@ -146,6 +146,22 @@ async function main() {
 
   const port = Number(process.env.PORT ?? 8080);
   createServer({ manager, secret, appUrl, telegram }).listen(port, () => console.log(`wa-bridge listening on :${port} (restored ${restored} sessions)`));
+
+  // wave 21: a reliable heartbeat to the web app every 30s, signed with WA_BRIDGE_SECRET (no extra setup):
+  // customers who got "on it…" while the AI was busy get their real answer within ~30 seconds,
+  // and queued automations go out — GitHub's scheduled runs can be hours late.
+  if (appUrl) {
+    const beat = async () => {
+      const body = JSON.stringify({ sessions: manager.sessions.size, at: Date.now() });
+      try {
+        await fetch(`${appUrl}/api/bridge/tick`, { method: "POST", headers: { "Content-Type": "application/json", ...sign(secret, body) }, body, signal: AbortSignal.timeout(55_000) });
+      } catch {
+        /* next beat */
+      }
+    };
+    setTimeout(beat, 20_000).unref();
+    setInterval(beat, 30_000).unref();
+  }
 
   // optional heartbeat: faster e-mail reading + automation jobs
   const cron = process.env.CRON_SECRET ?? "";

@@ -107,6 +107,16 @@ export async function setAiModeAction(input: { locale: string; conversationId: s
     .eq("id", id.data)
     .eq("organization_id", ctx.org.id);
   if (error) return { error: dbErrorKey(error) };
+  if (input.mode === "auto") {
+    // wave 21: back to the agent → the take-over clock and note are cleared, and a customer message
+    // that is still waiting gets its answer right away (no need to wait for the customer to write again)
+    await supabase.from("conversations").update({ owner_takeover_at: null, ai_note: null, ai_note_at: null }).eq("id", id.data).eq("organization_id", ctx.org.id).then(() => undefined, () => undefined);
+    const { data: last } = await supabase.from("messages").select("id, direction").eq("conversation_id", id.data).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (last?.direction === "in" && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const { scheduleAutopilot } = await import("@/lib/ai/autopilot");
+      await scheduleAutopilot({ conversationId: id.data, messageId: last.id as string });
+    }
+  }
   revalidatePath(`/${locale}/inbox`);
   return { ok: true, message: input.mode === "auto" ? "inbox.aiResumed" : "inbox.aiPaused" };
 }

@@ -20,6 +20,7 @@ import {
   busyMessage,
   commandIntent,
   pickMedia,
+  DEFAULT_RESUME_MINUTES,
   type AgentProfile,
   type AutopilotChannel,
   type LeadData,
@@ -157,7 +158,7 @@ export function autopilotLocale(lang: unknown): "he" | "ar" | "en" {
  * Speed upgrade — the entry point keeps its contract; around the reply logic it now keeps
  * "typing…" alive in the customer's app until the answer is out, and logs the reply latency.
  */
-export async function handleInboundWithAI(input: { conversationId: string; messageId?: string | null; debounceMs?: number; retry?: boolean }): Promise<AutopilotResult> {
+export async function handleInboundWithAI(input: { conversationId: string; messageId?: string | null; debounceMs?: number; retry?: boolean; quietRetry?: boolean }): Promise<AutopilotResult> {
   const started = Date.now();
   try {
     return await handleInboundWithAICore(input);
@@ -168,7 +169,7 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
   }
 }
 
-async function handleInboundWithAICore(input: { conversationId: string; messageId?: string | null; debounceMs?: number; retry?: boolean }): Promise<AutopilotResult> {
+async function handleInboundWithAICore(input: { conversationId: string; messageId?: string | null; debounceMs?: number; retry?: boolean; quietRetry?: boolean }): Promise<AutopilotResult> {
   const timing = new Timing();
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { replied: false, handoff: false, reason: "no_service_key" };
   const admin = createAdminClient();
@@ -189,7 +190,8 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
       .order("created_at")
       .limit(1)
       .maybeSingle();
-    const minutes = Number((ra?.profile as { resume_after_minutes?: number } | null)?.resume_after_minutes ?? 0);
+    // wave 21: an agent that never set this comes back after 30 minutes of owner silence (0 = never)
+    const minutes = Number((ra?.profile as { resume_after_minutes?: number } | null)?.resume_after_minutes ?? DEFAULT_RESUME_MINUTES);
     const { maybeResumeAgent } = await import("@/lib/channels/owner");
     if (!(minutes > 0 && (await maybeResumeAgent(conv.id as string, minutes)))) return { replied: false, handoff: false, reason: "human_mode" };
     conv.ai_mode = "auto";
@@ -282,6 +284,16 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     const text = formatForChannel(locale === "en" ? "Choose an option 👇" : locale === "ar" ? "اختر من القائمة 👇" : "בחרו מהתפריט 👇", ch);
     await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string, meta: { buttons: menu.slice(0, 3) }, rich: { menu, html: true } });
     return { replied: true, handoff: false, text };
+  }
+  // wave 21: "2" after a numbered list of choices (WhatsApp shows buttons as "1. … 2. …") = that choice
+  {
+    const pick = /^\s*([1-9])\s*[.)]?\s*$/.exec(lastLine);
+    if (pick) {
+      const lastOut = ((rows ?? []) as { direction: string; meta?: { buttons?: string[]; fallback?: boolean } | null }[]).find((m) => m.direction === "out" && !m.meta?.fallback);
+      const choice = lastOut?.meta?.buttons?.[Number(pick[1]) - 1];
+      const lastUser = [...history].reverse().find((m) => m.role === "user");
+      if (choice && lastUser) lastUser.content = lastUser.content.replace(/[1-9]\s*[.)]?\s*$/, choice);
+    }
   }
   if (intent.kind === "text" && intent.text !== lastLine) {
     const lastUser = [...history].reverse().find((m) => m.role === "user");
@@ -437,6 +449,16 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     // provider busy: a short "on it" — the conversation stays with the agent and the
     // safety net (cron, every 1–5 min) answers properly; never a second holding message
     if (input.retry) return { replied: false, handoff: false, reason: out.error };
+    // wave 21: a provider that frees up within seconds → the customer only sees "typing…", no hold message
+    {
+      const soon = (out as { retryInMs?: number | null }).retryInMs;
+      if (!input.quietRetry && typeof soon === "number" && soon <= 9_000) {
+        await sleep(Math.max(soon, 1_500));
+        const quiet = await handleInboundWithAI({ conversationId: conv.id as string, retry: true, quietRetry: true });
+        if (quiet.replied) return quiet;
+      }
+    }
+    await admin.from("conversations").update({ ai_note: "ai_busy", ai_note_at: new Date().toISOString() }).eq("id", conv.id).then(() => undefined, () => undefined);
     // wave 9: at most ONE "on it" message per conversation every 15 minutes
     const { data: recentHold } = await admin
       .from("messages")
@@ -450,11 +472,17 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     const hold = formatForChannel(busyMessage(locale), ch);
     if (!recentHold) await sendToConversation(orgId, conv.id as string, hold, undefined, { aiAgentId: agent.id as string, meta: { fallback: true } });
     // wave 9: when a provider frees up soon, answer from this same run instead of waiting for the cron
-    const waitMs = (out as { retryInMs?: number | null }).retryInMs;
-    if (typeof waitMs === "number" && waitMs <= 40_000) {
-      await sleep(Math.max(waitMs, 3000));
+    // wave 21: a ladder of retries inside this run (the webhook may run 120s) — the real answer follows
+    // the hold message within about a minute; the bridge heartbeat (every 30s) covers anything left
+    const ladderUntil = Date.now() + 80_000;
+    let waitMs = (out as { retryInMs?: number | null }).retryInMs ?? null;
+    for (let attempt = 0; attempt < 6 && Date.now() < ladderUntil; attempt++) {
+      const pause = Math.min(Math.max(typeof waitMs === "number" ? waitMs : [5_000, 10_000, 15_000, 20_000, 20_000, 20_000][attempt]!, 3_000), 25_000);
+      if (Date.now() + pause > ladderUntil) break;
+      await sleep(pause);
       const again = await handleInboundWithAI({ conversationId: conv.id as string, retry: true });
-      if (again.replied) return again;
+      if (again.replied || again.reason === "already_answered" || again.reason === "human_mode" || again.reason?.startsWith("guard:")) return again.replied ? again : { replied: !recentHold, handoff: false, reason: again.reason, text: recentHold ? undefined : hold };
+      waitMs = null;
     }
     return { replied: !recentHold, handoff: false, reason: out.error, text: recentHold ? undefined : hold };
   }

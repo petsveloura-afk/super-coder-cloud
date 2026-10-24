@@ -170,3 +170,29 @@ export function formatPairCode(code) {
   const c = String(code ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
   return c.length === 8 ? `${c.slice(0, 4)}-${c.slice(4)}` : c;
 }
+
+/**
+ * wave 21 — a long answer reads like a person typing: up to 3 WhatsApp bubbles, split on blank
+ * lines (a numbered choice list stays together). Short answers stay one message.
+ */
+export function splitBubbles(text, { minTotal = 380, target = 450, max = 3 } = {}) {
+  const t = String(text ?? "").trim();
+  if (t.length <= minTotal) return [t];
+  const paras = t.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (paras.length < 2) return [t];
+  const out = [];
+  let cur = "";
+  for (const p of paras) {
+    if (cur && cur.length + p.length + 2 > target && out.length < max - 1) {
+      out.push(cur);
+      cur = p;
+    } else cur = cur ? `${cur}\n\n${p}` : p;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/** wave 21 — how long "typing…" shows before a bubble (ms): natural, never slow. */
+export function typingPauseMs(text) {
+  return Math.min(1800, 450 + Math.round(String(text ?? "").length * 9));
+}

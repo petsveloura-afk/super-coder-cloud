@@ -471,3 +471,5 @@ export function busyMessage(locale: string): string {
   if (locale === "ar") return "تم الاستلام! 🙏 أتحقق من ذلك وسأرد عليك هنا خلال لحظات.";
   return "קיבלתי! 🙏 אני בודק את זה ואחזור אליך כאן תוך רגע.";
 }
+
+export { DEFAULT_RESUME_MINUTES } from "./resume";

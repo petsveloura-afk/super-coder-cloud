@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 interface BridgeEvent {
+  /** wave 21: when the phone sent it (seconds) */
+  ts?: number | null;
   type: "message" | "status" | "owner_message";
   // owner_message (wave 12): the owner typed it himself on his phone
   to?: string;
@@ -54,8 +56,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // wave 12: the owner answered himself from the phone → recorded, the agent steps back
   if (ev.type === "owner_message" && ev.to && /^\d{6,20}$/.test(ev.to)) {
-    const { ingestOwnerMessage } = await import("@/lib/channels/owner");
-    await ingestOwnerMessage({ kind: "whatsapp_qr", token, chat: ev.to, text: ev.text ?? "", messageId: ev.id ?? null, media: ev.media ? (({ data: _d, ...rest }) => (void _d, rest))(ev.media as { data?: string; type: string }) : null });
+    // wave 21: an automatic greeting / away message or an echo of the agent's reply never stops the agent
+    const { ingestOwnerMessageSmart } = await import("@/lib/channels/owner");
+    await ingestOwnerMessageSmart({ kind: "whatsapp_qr", token, chat: ev.to, text: ev.text ?? "", messageId: ev.id ?? null, sentAtSec: typeof ev.ts === "number" ? ev.ts : null, media: ev.media ? (({ data: _d, ...rest }) => (void _d, rest))(ev.media as { data?: string; type: string }) : null });
     return NextResponse.json({ ok: true });
   }
 

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { latencyLabel } from "@/lib/ai/speed-core";
+import { aiNoteKey, resumeInMinutes, type AiNoteKey } from "@/lib/inbox/ai-note";
+import { DEFAULT_RESUME_MINUTES } from "@/lib/ai/resume";
 import type { Metadata } from "next";
 import { ArrowLeft, ArrowRight, Bot, Camera, Globe, Inbox, Mail, MessageCircle, MessagesSquare, Plug, QrCode, Send, Smartphone, User, UserRound } from "lucide-react";
 import { uuidSchema } from "@scc/shared/validators";
@@ -93,6 +95,22 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
   const { data: msgs } = selected
     ? await supabase.from("messages").select("id, direction, body, status, error, created_at, sent_by, media, ai_agent_id, meta").eq("organization_id", ctx.org.id).eq("conversation_id", selected.id).order("created_at").limit(300)
     : { data: [] };
+  // wave 21: why the agent is not answering this conversation (plain words + back to the agent)
+  let aiNote: { key: AiNoteKey; resumeIn: number | null } | null = null;
+  if (selected) {
+    const lastMsg = (msgs ?? []).at(-1);
+    const holding = lastMsg?.direction === "out" && (lastMsg.meta as { fallback?: boolean } | null)?.fallback === true;
+    if (selected.ai_mode === "human" || holding) {
+      const [{ data: note }, { data: ag }] = await Promise.all([
+        supabase.from("conversations").select("ai_note, owner_takeover_at").eq("id", selected.id).maybeSingle(),
+        supabase.from("ai_agents").select("profile").eq("organization_id", ctx.org.id).eq("enabled", true).contains("autopilot_channels", [selected.channel]).order("created_at").limit(1).maybeSingle(),
+      ]);
+      const n = (note ?? null) as { ai_note?: string | null; owner_takeover_at?: string | null } | null;
+      const minutes = (ag?.profile as { resume_after_minutes?: number } | null)?.resume_after_minutes ?? DEFAULT_RESUME_MINUTES;
+      const key: AiNoteKey = selected.ai_mode !== "human" ? "busy" : aiNoteKey(n?.ai_note ?? (n?.owner_takeover_at ? "owner_phone" : null));
+      aiNote = { key, resumeIn: key === "owner_phone" ? resumeInMinutes(n?.owner_takeover_at, minutes) : null };
+    }
+  }
   const Back = locale === "en" ? ArrowLeft : ArrowRight;
   const href = (over: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
@@ -188,6 +206,16 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
               {ctx.can("inbox.reply") ? <ConversationControls conversationId={selected.id} status={selected.status} assigneeId={selected.assignee_id} members={members} /> : null}
             </header>
             {guardState ? <ConversationStatePanel conversationId={selected.id} state={guardState} canReply={ctx.can("inbox.reply")} /> : null}
+            {aiNote ? (
+              <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-2.5 text-[13px]", aiNote.key === "busy" ? "bg-accent-soft/40" : "bg-warning-soft/60")} data-testid="ai-note" data-note={aiNote.key}>
+                <Bot className="h-4 w-4 shrink-0 text-accent" />
+                <span className="min-w-0 flex-1 leading-relaxed">
+                  {t(`inbox.aiNote.${aiNote.key}`)}
+                  {aiNote.key === "owner_phone" ? ` ${aiNote.resumeIn === null ? t("inbox.aiNote.noResume") : aiNote.resumeIn === 0 ? t("inbox.aiNote.resumeNext") : t("inbox.aiNote.resumeIn", { n: String(aiNote.resumeIn) })}` : ""}
+                </span>
+                {aiNote.key !== "busy" && ctx.can("inbox.reply") ? <AiModeToggle conversationId={selected.id} mode="human" testId="ai-note-resume" /> : null}
+              </div>
+            ) : null}
             <ol className="flex-1 space-y-2 overflow-y-auto p-4" aria-live="polite">
               {(msgs ?? []).map((m) => {
                 const out = m.direction === "out";

@@ -2,7 +2,7 @@
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import QRCode from "qrcode";
-import { RecentIds, attachMediaData, formatPairCode, jidFromPhone, pairPhone, messageMime, newMessageId, phoneFromJid, sign, toInboundEvent, toOwnerEvent, validSessionId, wantsMediaData } from "./util.mjs";
+import { RecentIds, attachMediaData, formatPairCode, jidFromPhone, pairPhone, splitBubbles, typingPauseMs, messageMime, newMessageId, phoneFromJid, sign, toInboundEvent, toOwnerEvent, validSessionId, wantsMediaData } from "./util.mjs";
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -15,7 +15,9 @@ export class SessionManager {
    * @param {Function} [o.fetchImpl]
    * @param {object} [o.logger]
    */
-  constructor({ dataDir, secret, baileys, fetchImpl = fetch, logger = console, ownerDelayMs = 1500 }) {
+  constructor({ dataDir, secret, baileys, fetchImpl = fetch, logger = console, ownerDelayMs = 1500, pauseScale = 1 }) {
+    /** wave 21: 0 in tests (no real "typing…" pauses between bubbles) */
+    this.pauseScale = pauseScale;
     /** wave 12: owner messages are checked after a short delay so the bridge's own sends are recognised */
     this.ownerDelayMs = ownerDelayMs;
     this.dataDir = dataDir;
@@ -105,7 +107,8 @@ export class SessionManager {
           if (ts && Date.now() / 1000 - ts > 300) continue; // history sync, not a live message
           setTimeout(() => {
             const ev = toOwnerEvent(m, session.sentIds, session.phone);
-            if (ev) this.post(id, ev).catch(() => {});
+            // wave 21: when it was written (the app tells an automatic greeting from a person by the timing)
+            if (ev) this.post(id, { ...ev, ts: ts || null }).catch(() => {});
           }, this.ownerDelayMs).unref?.();
         }
       }
@@ -113,6 +116,11 @@ export class SessionManager {
       for (const m of messages ?? []) {
         const ev = toInboundEvent(m);
         if (!ev) continue;
+        // wave 21: remember the customer's latest message → blue ticks when the agent answers
+        session.lastIn = session.lastIn ?? new Map();
+        session.lastIn.set(ev.from, m.key);
+        if (session.lastIn.size > 2000) session.lastIn.delete(session.lastIn.keys().next().value);
+        ev.ts = Number(m.messageTimestamp ?? 0) || null;
         // wave 16: voice notes and images are downloaded (≤ 6 MB) so the agent can understand them
         this.withMedia(m, ev)
           .then((full) => this.post(id, full))
@@ -213,11 +221,42 @@ export class SessionManager {
     const body = String(text ?? "").slice(0, 4000);
     const img = typeof image === "string" && /^https:\/\/\S+$/.test(image) ? image : null;
     if (!body.trim() && !img) throw Object.assign(new Error("empty"), { code: 400 });
-    const messageId = newMessageId();
-    s.sentIds?.add(messageId);
-    const r = await s.sock.sendMessage(jid, img ? { image: { url: img }, caption: body.slice(0, 1000) } : { text: body }, { messageId });
-    s.sentIds?.add(r?.key?.id);
-    return r?.key?.id ?? null;
+    // wave 21: the customer's message turns blue (read) the moment the agent answers
+    const digits = String(to ?? "").replace(/[^\d]/g, "");
+    const lastKey = s.lastIn?.get(digits);
+    if (lastKey && typeof s.sock.readMessages === "function") {
+      try {
+        await s.sock.readMessages([lastKey]);
+      } catch {
+        /* best effort */
+      }
+    }
+    // wave 21: a long text goes out as up to 3 natural bubbles with "typing…" between them
+    const parts = img ? [body] : splitBubbles(body);
+    let lastId = null;
+    for (let i = 0; i < parts.length; i++) {
+      if (i > 0) {
+        try {
+          await s.sock.sendPresenceUpdate?.("composing", jid);
+        } catch {
+          /* ignore */
+        }
+        await wait(typingPauseMs(parts[i]) * this.pauseScale);
+      }
+      const messageId = newMessageId();
+      s.sentIds?.add(messageId);
+      const r = await s.sock.sendMessage(jid, img ? { image: { url: img }, caption: body.slice(0, 1000) } : { text: parts[i] }, { messageId });
+      s.sentIds?.add(r?.key?.id);
+      lastId = r?.key?.id ?? messageId;
+    }
+    if (parts.length > 1) {
+      try {
+        await s.sock.sendPresenceUpdate?.("paused", jid);
+      } catch {
+        /* ignore */
+      }
+    }
+    return lastId;
   }
 
   /** speed upgrade: "typing…" (composing) in the customer's WhatsApp while the agent thinks. Never throws. */

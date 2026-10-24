@@ -84,7 +84,9 @@ test("session: owner types on the phone → owner_message posted; the bridge's o
   sock.ev.emit("messages.upsert", { type: "append", messages: [{ key: { fromMe: true, id: "OLD", remoteJid: "972509998888@s.whatsapp.net" }, messageTimestamp: now() - 3600, message: { conversation: "ישן" } }] });
   await new Promise((r) => setTimeout(r, 80));
   const owner = posts.filter((x) => x.type === "owner_message");
-  assert.deepEqual(owner, [{ type: "owner_message", id: "PHONE1", to: "972509998888", text: "היי, כאן בעל העסק", media: null }]);
+  // wave 21: the event also carries when it was written (ts, seconds) — the app tells an automatic greeting from a person
+  assert.deepEqual(owner.map(({ ts, ...rest }) => (void ts, rest)), [{ type: "owner_message", id: "PHONE1", to: "972509998888", text: "היי, כאן בעל העסק", media: null }]);
+  assert.ok(owner.every((x) => x.ts === null || typeof x.ts === "number"));
   await mgr.logout(ID);
   await rm(dataDir, { recursive: true, force: true });
 });

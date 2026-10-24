@@ -1815,7 +1815,22 @@
     },
     "leadNotification": "New lead from the agent: {name} ({score}) {need}",
     "ownerPhone": "Sent by you from the phone — the agent paused here",
-    "aiLatency": "Agent response time"
+    "aiLatency": "Agent response time",
+    "aiNote": {
+      "owner_phone": "You wrote to the customer from your phone, so the agent paused in this conversation.",
+      "resumeIn": "It comes back by itself in {n} minutes if you don't write again.",
+      "resumeNext": "It comes back with the customer's next message.",
+      "noResume": "It doesn't come back by itself (change it in the agent settings).",
+      "customer_asked": "The customer asked for a person, so the agent handed the conversation to you.",
+      "angry": "The customer sounded upset, so the agent handed the conversation to you.",
+      "unsure": "The agent wasn't sure about the answer (a price or a sensitive topic), so it handed over to you.",
+      "budget": "This conversation reached the agent's daily reply limit.",
+      "critical": "A legal issue or a threat came up, so the conversation came to you right away.",
+      "credits": "This month's AI credits ran out, so the agent handed over to you.",
+      "busy": "The AI providers are busy for a moment. The answer goes out automatically within a minute.",
+      "flow": "The conversation script handed the customer to you.",
+      "agent": "The agent handed the conversation to you."
+    }
   },
   "support": {
     "title": "Customer support",

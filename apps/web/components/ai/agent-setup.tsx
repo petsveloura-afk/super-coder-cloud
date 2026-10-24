@@ -10,6 +10,7 @@ import { Button, Input, Textarea } from "@/components/ui/primitives";
 import { saveAgentSetupAction, uploadAgentMediaAction } from "@/app/[locale]/(dashboard)/ai-agents/actions";
 import { cn } from "@/lib/utils";
 import { DEFAULT_SCHEDULE, HoursEditor, IndustryPicker, TakeoverEditor } from "@/components/ai/agent-hours";
+import { DEFAULT_RESUME_MINUTES } from "@/lib/ai/resume";
 import { DAYS, type BusinessSchedule } from "@/lib/ai/schedule";
 
 /**
@@ -158,7 +159,8 @@ export function AgentSetup({ agent }: { agent: SetupAgent }) {
   const [media, setMedia] = useState<{ title: string; url: string; caption?: string }[]>(p.media ?? []);
   const [uploading, setUploading] = useState(false);
   const [schedule, setSchedule] = useState<BusinessSchedule>(p.schedule ? { ...DEFAULT_SCHEDULE, ...p.schedule } : DEFAULT_SCHEDULE);
-  const [resumeAfter, setResumeAfter] = useState<number>(p.resume_after_minutes ?? 0);
+  // wave 21: never chosen → the agent comes back after 30 minutes of the owner's silence
+  const [resumeAfter, setResumeAfter] = useState<number>(p.resume_after_minutes ?? DEFAULT_RESUME_MINUTES);
   const [industry, setIndustry] = useState<string>(p.industry ?? "");
   const [pending, start] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
