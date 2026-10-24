@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import path from "node:path";
 import QRCode from "qrcode";
 import { RecentIds, attachMediaData, formatPairCode, jidFromPhone, pairPhone, splitBubbles, typingPauseMs, messageMime, newMessageId, phoneFromJid, sign, toInboundEvent, toOwnerEvent, validSessionId, wantsMediaData } from "./util.mjs";
+import { decodeVoice } from "./util.mjs"; // wave 22
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -257,6 +258,35 @@ export class SessionManager {
       }
     }
     return lastId;
+  }
+
+  /**
+   * Wave 22 — the agent answers a voice note with a voice note: OGG/Opus goes out as a real
+   * WhatsApp voice message (push-to-talk), MP3 as an audio file.
+   */
+  async sendVoice(id, to, audioB64, mime) {
+    const s = this.sessions.get(id);
+    if (!s || s.stopped) throw Object.assign(new Error("not_found"), { code: 404 });
+    if (s.status !== "connected") throw Object.assign(new Error("not_connected"), { code: 409 });
+    const jid = jidFromPhone(to);
+    if (!jid) throw Object.assign(new Error("invalid_recipient"), { code: 400 });
+    const v = decodeVoice(audioB64, mime);
+    if (!v) throw Object.assign(new Error("invalid_audio"), { code: 400 });
+    try {
+      await s.sock.sendPresenceUpdate?.("recording", jid);
+    } catch {
+      /* ignore */
+    }
+    const messageId = newMessageId();
+    s.sentIds?.add(messageId);
+    const r = await s.sock.sendMessage(jid, { audio: v.buf, mimetype: v.mime, ptt: v.ogg }, { messageId });
+    s.sentIds?.add(r?.key?.id);
+    try {
+      await s.sock.sendPresenceUpdate?.("paused", jid);
+    } catch {
+      /* ignore */
+    }
+    return r?.key?.id ?? messageId;
   }
 
   /** speed upgrade: "typing…" (composing) in the customer's WhatsApp while the agent thinks. Never throws. */

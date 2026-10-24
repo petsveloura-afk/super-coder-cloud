@@ -629,3 +629,13 @@
 - `/[locale]/legal/privacy`, `/legal/terms`, `/legal/data-deletion` — ציבוריים (`/legal` נוסף ל-`PUBLIC_PATHS`), עברית ואנגלית.
 - תוכן: `lib/legal/platform.ts` (שם העסק מ-`BILLING_BUSINESS_NAME`, מייל אופציונלי מ-`LEGAL_CONTACT_EMAIL`).
 - בדיקות: `tests/unit/legal.test.ts`, `tests/e2e/legal.spec.ts`.
+
+## Wave 22 — הקלטות קוליות (טלגרם עסקי + תשובה קולית בכל ערוץ)
+- **באג שתוקן:** בטלגרם העסקי הודעה קולית / תמונה / PDF נשמרו בלי מזהה הקובץ, ולכן לא תומללו והסוכן לא ענה בכלל.
+  עכשיו: `file_id` נשמר → תמלול / תיאור → הסוכן עונה (`lib/channels/telegram-business.ts`).
+- **תשובה קולית בכל ערוץ:** `lib/ai/voice-note.ts` (OGG/Opus = הודעה קולית אמיתית, MP3 כגיבוי) +
+  `lib/ai/voice-note-core.ts`. ערוצים: טלגרם בוט / עסקי (`business_connection_id`) / אישי, וואטסאפ QR / Cloud.
+- **ElevenLabs:** ברירת מחדל `eleven_v3` (Multilingual v2 לא תומך בעברית).
+- **גשר:** `POST /sessions/{id}/voice` (וואטסאפ, push-to-talk) ו-`POST /tg/sessions/{id}/voice` (טלגרם אישי). גוף עד 4MB רק לנתיבים האלה.
+- **מדיה שלא נפתחה:** הסוכן מבקש בנימוס לכתוב, במקום לשתוק (`markUnreadableMedia`).
+- **בדיקות:** `tests/unit/wave22.test.ts`, `services/wa-bridge/tests/wave22.test.mjs`, `tests/e2e/wave22.spec.ts`.

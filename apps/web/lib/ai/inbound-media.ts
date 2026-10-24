@@ -101,3 +101,32 @@ async function fetchMediaUrl(url: string, mime?: string): Promise<{ buf: Buffer;
     return null;
   }
 }
+
+/**
+ * Wave 22 — a voice note / picture the system could not turn into text (no AI key for it, the
+ * provider failed, the file was too big): the message gets a short marker so the agent still
+ * answers ("I couldn't play the recording, could you write it?") instead of staying silent.
+ */
+export function unreadableMediaMarker(type: string | undefined, locale: string): string {
+  const he = locale !== "en" && locale !== "ar";
+  if (isAudio(type)) return he ? "🎙️ [הלקוח שלח הודעה קולית שלא הצלחנו להשמיע — בקש ממנו בנימוס לכתוב בהודעה]" : "🎙️ [The customer sent a voice message that could not be played — politely ask them to type it]";
+  if (isImage(type)) return he ? "🖼️ [הלקוח שלח תמונה שלא הצלחנו לפתוח — שאל בנימוס מה רצה להראות]" : "🖼️ [The customer sent a picture that could not be opened — politely ask what they wanted to show]";
+  return he ? "📎 [הלקוח שלח קובץ שלא הצלחנו לפתוח — שאל בנימוס מה צריך]" : "📎 [The customer sent a file that could not be opened — politely ask what they need]";
+}
+
+export async function markUnreadableMedia(conversationId: string, messageId: string, type: string | undefined): Promise<boolean> {
+  try {
+    const admin = createAdminClient();
+    const { data: conv } = await admin.from("conversations").select("organization_id").eq("id", conversationId).maybeSingle();
+    if (!conv) return false;
+    const { data: agent } = await admin.from("ai_agents").select("language").eq("organization_id", conv.organization_id).eq("enabled", true).order("created_at").limit(1).maybeSingle();
+    const marker = unreadableMediaMarker(type, (agent?.language as string | undefined) ?? "he");
+    const { data: msg } = await admin.from("messages").select("body, meta").eq("id", messageId).maybeSingle();
+    if ((msg?.body as string | undefined)?.trim()) return true; // it has text — the agent answers that
+    await admin.from("messages").update({ body: marker, meta: { ...((msg?.meta as Record<string, unknown> | null) ?? {}), media_unreadable: true } }).eq("id", messageId);
+    return true;
+  } catch (e) {
+    console.error("mark unreadable media failed", (e as Error).message);
+    return false;
+  }
+}

@@ -196,3 +196,20 @@ export function splitBubbles(text, { minTotal = 380, target = 450, max = 3 } = {
 export function typingPauseMs(text) {
   return Math.min(1800, 450 + Math.round(String(text ?? "").length * 9));
 }
+
+
+/**
+ * Wave 22 — a voice note from the web app (the agent's spoken answer): base64 → Buffer (≤ 3 MB),
+ * and whether it can go out as a real "voice message" (OGG/Opus → push-to-talk bubble in WhatsApp,
+ * voice note in Telegram) or only as an audio file (MP3).
+ */
+export const MAX_VOICE_BYTES = 3 * 1024 * 1024;
+export function decodeVoice(b64, mime) {
+  if (typeof b64 !== "string" || !b64 || b64.length > Math.ceil((MAX_VOICE_BYTES * 4) / 3) + 8) return null;
+  if (!/^[A-Za-z0-9+/=\s]+$/.test(b64)) return null;
+  const buf = Buffer.from(b64, "base64");
+  if (!buf.length || buf.length > MAX_VOICE_BYTES) return null;
+  const m = String(mime ?? "").toLowerCase();
+  const ogg = /ogg|opus/.test(m) || (buf.length > 4 && buf.subarray(0, 4).toString("latin1") === "OggS");
+  return { buf, ogg, mime: ogg ? "audio/ogg; codecs=opus" : "audio/mpeg" };
+}

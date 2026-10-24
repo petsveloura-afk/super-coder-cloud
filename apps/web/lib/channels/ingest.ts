@@ -77,7 +77,9 @@ export async function ingest(m: InboundMessage) {
       const job = async () => {
         const { understandInboundMedia } = await import("@/lib/ai/inbound-media");
         const text = await understandInboundMedia({ kind: m.kind, token: m.token, conversationId: r.conversation_id!, messageId: r.message_id!, media: mediaRef as never, caption: m.text ?? "" });
-        if ((text || (m.text ?? "").trim()) && privateChat && m.autoReply !== false) {
+        // wave 22: could not hear / open it → a marker, and the agent still answers (asks to type)
+        const answerable = Boolean(text || (m.text ?? "").trim()) || (privateChat && m.autoReply !== false && (await import("@/lib/ai/inbound-media").then((x) => x.markUnreadableMedia(r.conversation_id!, r.message_id!, (mediaRef as { type?: string }).type))));
+        if (answerable && privateChat && m.autoReply !== false) {
           const { handleInboundWithAI, forwardAfterAutopilot } = await import("@/lib/ai/autopilot");
           const res = await handleInboundWithAI({ conversationId: r.conversation_id!, messageId: r.message_id ?? null, debounceMs: 1500 });
           await forwardAfterAutopilot(r.conversation_id!, res);
@@ -88,6 +90,16 @@ export async function ingest(m: InboundMessage) {
         after(() => job().catch((e) => console.error("media job failed", (e as Error).message)));
       } catch {
         await job().catch((e) => console.error("media job failed", (e as Error).message));
+      }
+      return { data, error };
+    }
+    // wave 22: a voice note / picture whose file never arrived (too big, download failed) → the agent still answers
+    if (r.ok && !r.duplicate && r.conversation_id && r.message_id && privateChat && m.autoReply !== false && !(m.text ?? "").trim() && mediaRef) {
+      const t = (mediaRef as { type?: string }).type;
+      const { isAudio, isImage, markUnreadableMedia } = await import("@/lib/ai/inbound-media");
+      if ((isAudio(t) || isImage(t) || t === "document") && (await markUnreadableMedia(r.conversation_id, r.message_id, t))) {
+        const { scheduleAutopilot } = await import("@/lib/ai/autopilot");
+        await scheduleAutopilot({ conversationId: r.conversation_id, messageId: r.message_id, debounceMs: 2500 });
       }
       return { data, error };
     }

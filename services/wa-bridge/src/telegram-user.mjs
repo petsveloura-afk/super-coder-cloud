@@ -8,6 +8,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import QRCode from "qrcode";
 import { sign, validSessionId } from "./util.mjs";
+import { decodeVoice } from "./util.mjs"; // wave 22
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -244,6 +245,29 @@ export class TelegramUserManager {
     const hash = s.peers[uid];
     const peer = hash && Api && bigInt ? new Api.InputPeerUser({ userId: bigInt(uid), accessHash: bigInt(hash) }) : uid;
     const r = await s.client.sendMessage(peer, { message: body });
+    if (r?.id != null) {
+      s.sentIds = s.sentIds ?? new Set();
+      s.sentIds.add(`${uid}:${r.id}`);
+      if (s.sentIds.size > 500) s.sentIds.delete(s.sentIds.values().next().value);
+    }
+    return r?.id != null ? `${uid}:${r.id}` : null;
+  }
+
+  /** Wave 22 — the agent's spoken answer as a Telegram voice note (OGG/Opus) or audio (MP3). */
+  async sendVoice(id, to, audioB64, mime) {
+    const s = this.sessions.get(id);
+    if (!s || s.stopped) throw Object.assign(new Error("not_found"), { code: 404 });
+    if (s.status !== "connected") throw Object.assign(new Error("not_connected"), { code: 409 });
+    const uid = String(to ?? "").replace(/[^\d]/g, "");
+    if (!/^\d{3,20}$/.test(uid)) throw Object.assign(new Error("invalid_recipient"), { code: 400 });
+    const v = decodeVoice(audioB64, mime);
+    if (!v) throw Object.assign(new Error("invalid_audio"), { code: 400 });
+    const { Api, bigInt, CustomFile } = this.lib;
+    if (!CustomFile) throw Object.assign(new Error("voice_unsupported"), { code: 501 });
+    const hash = s.peers[uid];
+    const peer = hash && Api && bigInt ? new Api.InputPeerUser({ userId: bigInt(uid), accessHash: bigInt(hash) }) : uid;
+    const file = new CustomFile(v.ogg ? "voice.ogg" : "voice.mp3", v.buf.length, "", v.buf);
+    const r = await s.client.sendFile(peer, { file, voiceNote: v.ogg, forceDocument: false });
     if (r?.id != null) {
       s.sentIds = s.sentIds ?? new Set();
       s.sentIds.add(`${uid}:${r.id}`);

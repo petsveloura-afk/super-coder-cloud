@@ -24,7 +24,7 @@ export function createServer({ manager, secret, appUrl, telegram = null }) {
       if (req.method === "GET" && url.pathname === "/health") return send(200, { ok: true, sessions: manager.sessions.size, telegram: Boolean(telegram?.configured()) });
       if (!authorized(req.headers.authorization, secret)) return send(401, { error: "unauthorized" });
       // personal Telegram accounts: /tg/sessions/{id}[/start|send|logout|password]
-      const tg = url.pathname.match(/^\/tg\/sessions\/([^/]+)(?:\/(start|send|logout|password))?$/);
+      const tg = url.pathname.match(/^\/tg\/sessions\/([^/]+)(?:\/(start|send|logout|password|voice))?$/); // wave 22: + voice
       if (tg) {
         if (!telegram || !telegram.configured()) return send(503, { error: "tg_not_configured" });
         if (!validSessionId(tg[1])) return send(404, { error: "not_found" });
@@ -35,7 +35,7 @@ export function createServer({ manager, secret, appUrl, telegram = null }) {
           let size = 0;
           for await (const c of req) {
             size += c.length;
-            if (size > 64 * 1024) return send(413, { error: "too_large" });
+            if (size > (tact === "voice" ? 4 * 1024 * 1024 : 64 * 1024)) return send(413, { error: "too_large" });
             chunks.push(c);
           }
           tbody = chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
@@ -48,6 +48,7 @@ export function createServer({ manager, secret, appUrl, telegram = null }) {
           if (!validCallback(tbody.callback, appUrl)) return send(400, { error: "invalid_callback" });
           return send(200, await telegram.start(tid, tbody.callback));
         }
+        if (req.method === "POST" && tact === "voice") return send(200, { ok: true, id: await telegram.sendVoice(tid, tbody.to, tbody.audio, tbody.mime) });
         if (req.method === "POST" && tact === "password") return send(200, telegram.password(tid, tbody.password));
         if (req.method === "POST" && tact === "send") return send(200, { ok: true, id: await telegram.send(tid, tbody.to, tbody.text) });
         if (req.method === "POST" && tact === "logout") {
@@ -56,7 +57,7 @@ export function createServer({ manager, secret, appUrl, telegram = null }) {
         }
         return send(405, { error: "method_not_allowed" });
       }
-      const m = url.pathname.match(/^\/sessions\/([^/]+)(?:\/(start|send|logout|typing|pair))?$/);
+      const m = url.pathname.match(/^\/sessions\/([^/]+)(?:\/(start|send|logout|typing|pair|voice))?$/); // wave 22: + voice
       if (!m || !validSessionId(m[1])) return send(404, { error: "not_found" });
       const [, id, action] = m;
       let body = {};
@@ -65,7 +66,7 @@ export function createServer({ manager, secret, appUrl, telegram = null }) {
         let size = 0;
         for await (const c of req) {
           size += c.length;
-          if (size > 64 * 1024) return send(413, { error: "too_large" });
+          if (size > (action === "voice" ? 4 * 1024 * 1024 : 64 * 1024)) return send(413, { error: "too_large" });
           chunks.push(c);
         }
         body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
@@ -86,6 +87,10 @@ export function createServer({ manager, secret, appUrl, telegram = null }) {
       if (req.method === "POST" && action === "send") {
         const msgId = await manager.send(id, body.to, body.text, body.image ?? null);
         return send(200, { ok: true, id: msgId });
+      }
+      // wave 22: the agent's spoken answer (voice note)
+      if (req.method === "POST" && action === "voice") {
+        return send(200, { ok: true, id: await manager.sendVoice(id, body.to, body.audio, body.mime) });
       }
       if (req.method === "POST" && action === "typing") {
         return send(200, { ok: await manager.typing(id, body.to, body.on !== false) });
@@ -138,7 +143,8 @@ async function main() {
       dataDir: process.env.DATA_DIR ?? "/data",
       secret,
       api: { apiId, apiHash },
-      lib: { TelegramClient: gram.TelegramClient, Api: gram.Api, StringSession, NewMessage, bigInt },
+      // wave 22: CustomFile → voice notes from a Buffer
+      lib: { TelegramClient: gram.TelegramClient, Api: gram.Api, StringSession, NewMessage, bigInt, CustomFile: (await import("telegram/client/uploads.js")).CustomFile },
     });
     const n = await telegram.restoreAll();
     console.log(`telegram user sessions restored: ${n}`);

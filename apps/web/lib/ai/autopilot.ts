@@ -565,13 +565,17 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     admin.from("conversations").update({ sentiment: analysis.mood, last_intent: analysis.intents[0] ?? null }).eq("id", conv.id).then(() => undefined, () => undefined),
   ]);
   // wave 16: the customer sent a voice note → also answer with a voice note (when enabled)
-  if (rails.voice_replies && (ch === "telegram" || ch === "whatsapp")) {
+  // wave 22: on every channel that carries voice (Telegram bot / Business / personal, WhatsApp QR / Cloud),
+  // as a real voice message (OGG/Opus) when possible
+  const { voiceChannel } = await import("./voice-note-core");
+  if (rails.voice_replies && voiceChannel(ch)) {
     const { data: lastMsg } = await admin.from("messages").select("meta").eq("conversation_id", conv.id).eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (typeof (lastMsg?.meta as { transcript?: string } | null)?.transcript === "string") {
-      const { synthesizeSpeech, sendVoiceNote, ttsConfigured } = await import("./tts");
+      const { ttsConfigured } = await import("./tts");
       if (ttsConfigured()) {
-        const mp3 = await synthesizeSpeech(tools.text, locale);
-        if (mp3) await sendVoiceNote(orgId, ch, conv.external_id as string, mp3).catch(() => false);
+        const { synthesizeVoiceNote, deliverVoiceNote } = await import("./voice-note");
+        const audio = await synthesizeVoiceNote(tools.text, locale);
+        if (audio) await deliverVoiceNote({ orgId, channel: ch, externalId: conv.external_id as string, conversationId: conv.id as string, audio });
       }
     }
   }

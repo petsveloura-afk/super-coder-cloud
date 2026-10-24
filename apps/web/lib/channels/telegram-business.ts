@@ -39,9 +39,11 @@ export interface TgBusinessMessage {
   sender_business_bot?: TgUser;
   text?: string;
   caption?: string;
-  photo?: unknown[];
-  document?: { file_name?: string };
-  voice?: unknown;
+  photo?: { file_id?: string; file_size?: number }[];
+  document?: { file_name?: string; file_id?: string; mime_type?: string };
+  voice?: { file_id?: string; mime_type?: string; duration?: number };
+  /** wave 22: music / audio files */
+  audio?: { file_id?: string; mime_type?: string; file_name?: string };
   sticker?: { emoji?: string };
   contact?: { phone_number?: string };
   location?: { latitude: number; longitude: number };
@@ -94,9 +96,11 @@ export async function handleTelegramBusiness(
   let media: Record<string, unknown> | null = null;
   if (!text && m.contact?.phone_number) text = `📞 ${m.contact.phone_number}`;
   if (!text && m.sticker?.emoji) text = m.sticker.emoji;
-  if (m.photo) media = { type: "photo" };
-  else if (m.document) media = { type: "document", name: m.document.file_name };
-  else if (m.voice) media = { type: "voice" };
+  // wave 22: keep Telegram's file id so the agent can hear voice notes and see pictures / documents
+  if (m.photo) media = { type: "photo", ...(m.photo.at(-1)?.file_id ? { file_id: m.photo.at(-1)!.file_id } : {}) };
+  else if (m.document) media = { type: "document", name: m.document.file_name, ...(m.document.file_id ? { file_id: m.document.file_id } : {}), ...(m.document.mime_type ? { mime: m.document.mime_type } : {}) };
+  else if (m.voice) media = { type: "voice", ...(m.voice.file_id ? { file_id: m.voice.file_id } : {}), mime: m.voice.mime_type ?? "audio/ogg" };
+  else if (m.audio) media = { type: "audio", name: m.audio.file_name, ...(m.audio.file_id ? { file_id: m.audio.file_id } : {}), mime: m.audio.mime_type ?? "audio/mpeg" };
   else if (m.location) {
     media = { type: "location", lat: m.location.latitude, lng: m.location.longitude };
     text ||= `📍 ${m.location.latitude},${m.location.longitude}`;
@@ -117,6 +121,21 @@ export async function handleTelegramBusiness(
     return;
   }
   const r = (data ?? {}) as { ok?: boolean; duplicate?: boolean; conversation_id?: string; message_id?: string; owner?: boolean; can_reply?: boolean };
+  // wave 22: a voice note / picture / PDF from the customer → transcript / description first, then the agent answers
+  if (r.ok && !r.duplicate && !r.owner && r.conversation_id && r.message_id && media && !(conn && (!conn.is_enabled || !conn.can_reply))) {
+    const { mediaUnderstandable } = await import("@/lib/ai/inbound-media");
+    if (mediaUnderstandable(media as never)) {
+      const { understandInboundMedia } = await import("@/lib/ai/inbound-media");
+      const heard = await understandInboundMedia({ kind: "telegram", token, conversationId: r.conversation_id, messageId: r.message_id, media: media as never, caption: text });
+      // wave 22: could not hear / open it → a marker, and the agent still answers (asks to type)
+      const answerable = Boolean(heard || text.trim()) || (await import("@/lib/ai/inbound-media").then((x) => x.markUnreadableMedia(r.conversation_id!, r.message_id!, (media as { type?: string }).type)));
+      if (answerable) {
+        const { scheduleAutopilot } = await import("@/lib/ai/autopilot");
+        await scheduleAutopilot({ conversationId: r.conversation_id, messageId: r.message_id, debounceMs: 1500 });
+      }
+      return;
+    }
+  }
   if (!r.ok || r.duplicate || r.owner || !r.conversation_id || !text.trim()) return;
   if (conn && (!conn.is_enabled || !conn.can_reply)) return; // no permission to answer — kept in the inbox for the team
   const { scheduleAutopilot } = await import("@/lib/ai/autopilot");
