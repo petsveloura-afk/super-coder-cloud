@@ -13,6 +13,22 @@ export interface PublicResult {
   data?: Record<string, unknown>;
 }
 
+/**
+ * Wave 24 — app-level throttle for the public token links (cancel, unsubscribe, quotes, tickets,
+ * helpful votes): per link + visitor. Fails open if the limiter is unreachable, so a real customer
+ * is never blocked by an infrastructure hiccup; the database keeps its own limits as well.
+ */
+async function throttled(bucket: string, limit: number, windowSeconds: number): Promise<boolean> {
+  try {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { data } = await createAdminClient().rpc("public_rate_limit", { p_bucket: `${bucket}:${await visitorHash()}`, p_limit: limit, p_window_seconds: windowSeconds });
+    return data === false;
+  } catch {
+    return false;
+  }
+}
+const LIMITED: PublicResult = { ok: false, error: "public.rateLimited" };
+
 function mapError(message: string | undefined): string {
   if (!message) return "errors.generic";
   if (message.includes("rate_limited")) return "public.rateLimited";
@@ -58,6 +74,7 @@ export async function bookPublicAppointment(input: { slug: string; start: string
 
 export async function cancelPublicAppointment(token: string): Promise<PublicResult> {
   if (!/^[a-f0-9]{32}$/.test(token)) return { ok: false, error: "errors.notFound" };
+  if (await throttled(`appt-cancel:${token}`, 10, 600)) return LIMITED;
   const supabase = createAnonClient();
   const { data, error } = await supabase.rpc("cancel_public_appointment", { p_token: token });
   if (error) return { ok: false, error: mapError(error.message) };
@@ -66,6 +83,7 @@ export async function cancelPublicAppointment(token: string): Promise<PublicResu
 
 export async function unsubscribePublic(token: string): Promise<PublicResult> {
   if (!/^[a-f0-9]{32}$/.test(token)) return { ok: false, error: "errors.notFound" };
+  if (await throttled(`unsub:${token}`, 10, 600)) return LIMITED;
   const supabase = createAnonClient();
   const { data, error } = await supabase.rpc("unsubscribe", { p_token: token });
   if (error) return { ok: false, error: mapError(error.message) };
@@ -93,6 +111,7 @@ export async function createPublicTicket(input: { org: string; name: string; ema
 
 export async function replyPublicTicket(input: { token: string; body: string }): Promise<PublicResult> {
   if (!/^[a-f0-9]{32}$/.test(input.token)) return { ok: false, error: "errors.notFound" };
+  if (await throttled(`ticket-reply:${input.token}`, 20, 600)) return LIMITED;
   const supabase = createAnonClient();
   const { data, error } = await supabase.rpc("reply_public_ticket", { p_token: input.token, p_body: input.body.slice(0, 20000), p_meta: { ip_hash: await visitorHash() } });
   if (error) return { ok: false, error: mapError(error.message) };
@@ -103,6 +122,7 @@ export async function replyPublicTicket(input: { token: string; body: string }):
 /* ------------------------------------------- quotes / invoices (wave 4) */
 export async function acceptPublicQuote(input: { token: string; name: string }): Promise<PublicResult> {
   if (!/^[a-f0-9]{32}$/.test(input.token)) return { ok: false, error: "errors.notFound" };
+  if (await throttled(`quote-accept:${input.token}`, 10, 600)) return LIMITED;
   const supabase = createAnonClient();
   const { data, error } = await supabase.rpc("accept_public_quote", { p_token: input.token, p_name: input.name.slice(0, 120) });
   if (error) return { ok: false, error: mapError(error.message) };
@@ -157,6 +177,7 @@ export async function startDocumentPayment(input: { token: string; locale: strin
 export async function signPublicQuote(input: { token: string; name: string; signature: string; agree: boolean }): Promise<PublicResult> {
   if (!/^[a-f0-9]{32}$/.test(input.token)) return { ok: false, error: "errors.notFound" };
   if (!input.agree) return { ok: false, error: "contract.mustAgree" };
+  if (await throttled(`quote-sign:${input.token}`, 10, 600)) return LIMITED;
   if (typeof input.signature !== "string" || !input.signature.startsWith("data:image/png;base64,") || input.signature.length > 300_000) return { ok: false, error: "contract.sign.required" };
   const { headers } = await import("next/headers");
   const h = await headers();
@@ -250,6 +271,7 @@ export async function performActAction(input: { token: string }): Promise<Public
 /** Wave 16 — "this article helped" on the public help center. */
 export async function markArticleHelpful(input: { id: string }): Promise<PublicResult> {
   if (!/^[0-9a-f-]{36}$/.test(input.id)) return { ok: false, error: "errors.notFound" };
+  if (await throttled(`kb-helpful:${input.id}`, 3, 3600)) return { ok: true }; // silently ignore repeat votes
   await createAnonClient().rpc("kb_article_helpful", { p_id: input.id });
   return { ok: true };
 }

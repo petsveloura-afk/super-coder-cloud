@@ -7,6 +7,8 @@ import { DailyAreaChart, StatusBarChart } from "@/components/dashboard/charts";
 import { DemoLoader } from "@/components/dashboard/demo-loader";
 import { AiPulseBand } from "@/components/dashboard/ai-pulse";
 import { loadAiPulse } from "@/lib/dashboard/pulse";
+import { loadNextActions } from "@/lib/dashboard/next-actions";
+import { NextActionsCard } from "@/components/dashboard/next-actions";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -47,6 +49,8 @@ export default async function OverviewPage({ params }: { params: Promise<{ local
   const k = Object.fromEntries(Object.entries(raw).map(([key, v]) => [key, Number(v)])) as unknown as DashboardKpis;
   const daily = ((dailyRes.data ?? []) as DailyPoint[]).map((d) => ({ day: d.day, count: Number(d.count) }));
   const closed = k.won_deals + k.lost_deals;
+  // wave 24: "what to do now" (waiting customers, hand-offs, hot leads, late tasks/deals, setup gaps)
+  const next = await loadNextActions(supabase, orgId, { inbox: ctx.can("inbox.read"), deals: ctx.can("deals.read"), integrations: ctx.can("integrations.manage"), ai: ctx.can("ai.use") }, k.overdue_tasks).catch(() => null);
   const currency = ctx.org.currency || "ILS";
   const status = CONTACT_STATUSES.map((s, i) => ({ name: t(`crm.statuses.${s}`), value: statusRes[i]?.count ?? 0 }));
 
@@ -93,6 +97,8 @@ export default async function OverviewPage({ params }: { params: Promise<{ local
       />
 
       {pulse ? <AiPulseBand pulse={pulse} locale={locale} t={t} /> : null}
+
+      {next ? <NextActionsCard items={next} locale={locale} t={t} /> : null}
 
       <section aria-label={t("nav.overview")} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map((kpi) => (

@@ -12,6 +12,8 @@ import { companyOptions, contactOptions, memberOptions, pipelinesWithStages } fr
 import { formatCurrency, formatDate } from "@/lib/format";
 import { pipelineLabel, stageLabel } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { DEAL_FLAGS, dealAgeDays, isOverdue, isStale, pipelineInsights, type DealFlag } from "@/lib/deals/insights";
+import { searchTerm } from "@/lib/inbox/sla";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -77,18 +79,50 @@ export default async function PipelinesPage({ params, searchParams }: { params: 
   const contactName = new Map(contacts.map((c) => [c.id, c.label]));
   const companyName = new Map(companies.map((c) => [c.id, c.label]));
   const memberName = new Map(members.map((m) => [m.id, m.label]));
-  const deals: (BoardDeal & { closed_at: string | null; lost_reason: string | null })[] = (rawDeals ?? []).map((d) => ({
+  const nowMs = new Date().getTime();
+  const allDeals: (BoardDeal & { closed_at: string | null; lost_reason: string | null; updated_at?: string | null })[] = (rawDeals ?? []).map((d) => ({
     ...(d as unknown as BoardDeal & { closed_at: string | null; lost_reason: string | null }),
     value: Number(d.value),
     contact_name: d.contact_id ? (contactName.get(d.contact_id as string) ?? null) : null,
     company_name: d.company_id ? (companyName.get(d.company_id as string) ?? null) : null,
     owner_name: d.owner_id ? (memberName.get(d.owner_id as string) ?? null) : null,
+    age_days: view === "board" ? dealAgeDays(d.updated_at as string | null, nowMs) : null,
+    overdue: view === "board" ? isOverdue(d.expected_close_date as string | null) : false,
   }));
+  // wave 24: quick filters (mine / stuck / late) and search, kept in the URL
+  const dealFlag = (DEAL_FLAGS as readonly string[]).includes(String(sp.fl)) ? (sp.fl as DealFlag) : null;
+  const dealSearch = searchTerm(sp.q);
+  const deals = allDeals.filter((d) => {
+    if (dealFlag === "mine" && d.owner_id !== ctx.userId) return false;
+    if (dealFlag === "stale" && !isStale(d.age_days ?? null)) return false;
+    if (dealFlag === "overdue" && !d.overdue) return false;
+    if (dealSearch) {
+      const hay = `${d.title} ${d.contact_name ?? ""} ${d.company_name ?? ""}`.toLowerCase();
+      if (!hay.includes(dealSearch.toLowerCase())) return false;
+    }
+    return true;
+  });
 
   const openValue = view === "board" ? deals.reduce((s, d) => s + d.value, 0) : 0;
   const prob = new Map(selected.stages.map((s) => [s.id, s.probability]));
   const weighted = view === "board" ? deals.reduce((s, d) => s + (d.value * (prob.get(d.stage_id) ?? 0)) / 100, 0) : 0;
   const currency = ctx.org.currency || "ILS";
+  const since = new Date(nowMs - 90 * 86_400_000).toISOString();
+  const { data: closedRows } =
+    view === "board"
+      ? await supabase.from("deals").select("status, value").eq("organization_id", ctx.org.id).eq("pipeline_id", selected.id).in("status", ["won", "lost"]).gte("closed_at", since).limit(2000)
+      : { data: [] };
+  const insights = pipelineInsights(
+    allDeals.map((d) => ({ value: d.value, stage_id: d.stage_id, expected_close_date: d.expected_close_date, updated_at: d.updated_at })),
+    ((closedRows ?? []) as { status: "won" | "lost"; value: number }[]).map((r) => ({ status: r.status, value: Number(r.value) })),
+    prob,
+  );
+  const flagHref = (fl: DealFlag | null) => {
+    const q = new URLSearchParams({ p: selected.id });
+    if (fl) q.set("fl", fl);
+    if (dealSearch) q.set("q", dealSearch);
+    return `/${locale}/pipelines?${q.toString()}`;
+  };
   const href = (over: Record<string, string>) => {
     const q = new URLSearchParams({ p: selected.id, ...over });
     if (q.get("view") === "board") q.delete("view");
@@ -155,6 +189,36 @@ export default async function PipelinesPage({ params, searchParams }: { params: 
             <Badge tone="gold">
               {t("deals.weightedValue")}: <bdi dir="ltr">{formatCurrency(locale, weighted, currency)}</bdi>
             </Badge>
+          </div>
+          {/* wave 24: insights + quick filters */}
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="deal-insights">
+            {[
+              { k: "winRate", v: insights.winRate === null ? "—" : `${insights.winRate}%`, sub: t("deals.insights.closed90", { won: insights.closedWon, lost: insights.closedLost }) },
+              { k: "avgWon", v: insights.avgWon === null ? "—" : formatCurrency(locale, insights.avgWon, currency), sub: t("deals.insights.last90") },
+              { k: "forecast", v: formatCurrency(locale, insights.forecastMonth, currency), sub: t("deals.insights.forecastSub") },
+              { k: "attention", v: String(insights.staleCount + insights.overdueCount), sub: t("deals.insights.attentionSub", { stale: insights.staleCount, overdue: insights.overdueCount }) },
+            ].map((x) => (
+              <Card key={x.k} className="p-3">
+                <p className="text-[11.5px] font-medium text-muted">{t(`deals.insights.${x.k}`)}</p>
+                <p className="mt-0.5 text-lg font-bold tabular-nums" dir="ltr">{x.v}</p>
+                <p className="text-[11px] text-subtle">{x.sub}</p>
+              </Card>
+            ))}
+          </div>
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <Link href={flagHref(null)} aria-pressed={dealFlag === null} className={cn("rounded-full border px-2.5 py-1 text-[12px]", dealFlag === null ? "border-accent bg-accent-soft font-semibold text-accent" : "border-line text-muted hover:bg-surface-hover")}>
+              {t("deals.insights.all")}
+            </Link>
+            {DEAL_FLAGS.map((fl) => (
+              <Link key={fl} href={flagHref(dealFlag === fl ? null : fl)} aria-pressed={dealFlag === fl} data-testid={`deal-flag-${fl}`} className={cn("rounded-full border px-2.5 py-1 text-[12px]", dealFlag === fl ? "border-accent bg-accent-soft font-semibold text-accent" : "border-line text-muted hover:bg-surface-hover")}>
+                {t(`deals.insights.flags.${fl}`)}
+              </Link>
+            ))}
+            <form key={`${dealFlag ?? ""}|${dealSearch ?? ""}`} action={`/${locale}/pipelines`} method="get" role="search" className="ms-auto flex gap-1.5">
+              <input type="hidden" name="p" value={selected.id} />
+              {dealFlag ? <input type="hidden" name="fl" value={dealFlag} /> : null}
+              <input name="q" defaultValue={dealSearch ?? ""} maxLength={60} placeholder={t("deals.insights.search")} aria-label={t("deals.insights.search")} className="h-8 w-40 rounded-lg border border-line bg-surface px-2.5 text-[12.5px] outline-none focus:border-accent sm:w-56" />
+            </form>
           </div>
           {deals.length === 0 && !canWrite ? (
             <Card>

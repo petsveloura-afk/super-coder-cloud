@@ -36,7 +36,8 @@
     "tasks": "Tasks",
     "agents": "AI team",
     "social": "Social & reviews",
-    "guide": "User guide"
+    "guide": "User guide",
+    "calculators": "Calculators"
   },
   "common": {
     "save": "Save",
@@ -159,6 +160,18 @@
       "speed": "Average reply time",
       "sec": "sec",
       "waiting": "Waiting for you"
+    },
+    "next": {
+      "title": "What to do now",
+      "calm": "All calm — nobody is waiting and nothing is late.",
+      "waiting": "{count} customers waiting for a reply",
+      "needsHuman": "{count} conversations handed to you",
+      "hotLeads": "{count} hot leads open — time to close",
+      "overdueTasks": "{count} overdue tasks",
+      "overdueDeals": "{count} deals past their close date",
+      "staleDeals": "{count} deals stuck 14+ days",
+      "connectChannel": "Connect a first channel (WhatsApp / Telegram) to start receiving messages",
+      "createAgent": "Create an AI agent that answers 24/7"
     }
   },
   "crm": {
@@ -500,7 +513,27 @@
       "byPaying": "Want another plan?",
       "changePlan": "Back to plans"
     },
-    "customPrice": "Your special price"
+    "customPrice": "Your special price",
+    "advisor": {
+      "daysLeft": "{days} days left",
+      "ok": "Your plan fits your usage",
+      "okSub": "All limits are under 80% — no need to upgrade now.",
+      "near": "Getting close to a limit",
+      "over": "A limit is reached — some actions will stop",
+      "suggest": "Recommended: {plan}",
+      "yearlyEq": "≈ {perMonth}/month · save {saved} a year",
+      "yearlyHint": "Save {pct}% with yearly billing",
+      "compare": "Full plan comparison",
+      "feature": "Included",
+      "trust": {
+        "secure": "Secure payment",
+        "secureSub": "Card details are never stored by us — only by the payment provider.",
+        "cancel": "Cancel anytime",
+        "cancelSub": "No commitment; the plan stays active until the paid period ends.",
+        "receipts": "A receipt for every payment",
+        "receiptsSub": "All payments and receipts are in the history below."
+      }
+    }
   },
   "ai": {
     "title": "AI Agents",
@@ -853,6 +886,25 @@
     },
     "defaultPipelines": {
       "Sales": "Sales"
+    },
+    "insights": {
+      "winRate": "Win rate",
+      "avgWon": "Average deal",
+      "forecast": "This month forecast",
+      "attention": "Need attention",
+      "closed90": "{won} won · {lost} lost (90 days)",
+      "last90": "Won in the last 90 days",
+      "forecastSub": "By stage probability and expected close",
+      "attentionSub": "{stale} stuck · {overdue} late",
+      "all": "All",
+      "flags": {
+        "mine": "Mine",
+        "stale": "⏸ Stuck 14+ days",
+        "overdue": "⏰ Past close date"
+      },
+      "search": "Search deals…",
+      "overdueBadge": "⏰ Late",
+      "staleBadge": "⏸ {days} days unchanged"
     }
   },
   "companies": {
@@ -1498,6 +1550,12 @@
       "unofficial": "Linking from the phone is unofficial: WhatsApp may block a number that sends many messages at once. For a main business number, prefer the official connection.",
       "adminSetup": "Set up the connection",
       "soon": "Coming soon"
+    },
+    "shopifyInstall": {
+      "title": "Connecting your Shopify store",
+      "body": "{shop} will be connected to the workspace {org}. Taking you to Shopify to approve…",
+      "noShop": "No store address was received. You can connect a store from Integrations.",
+      "go": "Continue to Shopify"
     }
   },
   "public": {
@@ -1831,6 +1889,36 @@
       "busy": "The AI providers are busy for a moment. The answer goes out automatically within a minute.",
       "flow": "The conversation script handed the customer to you.",
       "agent": "The agent handed the conversation to you."
+    },
+    "tools": {
+      "search": "Search conversations",
+      "searchPlaceholder": "Search by name or message…",
+      "channel": "Channel",
+      "allChannels": "All channels",
+      "go": "Search",
+      "quick": "Quick filters",
+      "flags": {
+        "waiting": "Waiting for reply",
+        "hot": "Hot leads",
+        "human": "Needs a person"
+      },
+      "clear": "Clear filters",
+      "waiting": "Waiting {time}"
+    },
+    "saved": {
+      "button": "Saved replies",
+      "search": "Search or /shortcut",
+      "new": "New",
+      "titleField": "Title (e.g. Send price list)",
+      "bodyField": "Reply text",
+      "shortcutField": "Shortcut (optional), e.g. price",
+      "hint": "Use {name} for the customer's name and {business} for your business — filled in automatically.",
+      "empty": "No saved replies yet.",
+      "starters": "Add 4 example replies",
+      "noMatch": "No match",
+      "added": "Reply saved",
+      "badShortcut": "Shortcut may contain only letters, numbers and dashes",
+      "shortcutTaken": "This shortcut is already used"
     }
   },
   "support": {
@@ -3321,7 +3409,8 @@
     "kb": "Knowledge base",
     "integrations": "Integrations",
     "settings": "Settings",
-    "billing": "Plan & billing"
+    "billing": "Plan & billing",
+    "calculators": "Business calculators"
   },
   "conversions": {
     "title": "Ad platform conversions",
@@ -3689,5 +3778,195 @@
     "loading": "Loading the guide…",
     "help": "Help for this screen",
     "helpShort": "Help"
+  },
+  "calculators": {
+    "title": "Business calculators",
+    "subtitle": "VAT, margin, discounts, loans, break-even, commission, hourly rate, ROI and more — updates as you type.",
+    "categories": "Categories",
+    "cat": {
+      "all": "All",
+      "tax": "VAT & finance",
+      "pricing": "Pricing & profit",
+      "sales": "Sales",
+      "marketing": "Marketing & AI",
+      "team": "Team & pay"
+    },
+    "reset": "Reset",
+    "copy": "Copy",
+    "copied": "Result copied",
+    "invalid": "Enter valid numbers to see a result",
+    "disclaimer": "Calculations are for planning only and do not replace advice from an accountant.",
+    "vat": {
+      "title": "VAT calculator",
+      "desc": "Add VAT to a price or extract it from a total",
+      "f": {
+        "amount": "Amount",
+        "rate": "VAT rate",
+        "mode": "Action"
+      },
+      "o": {
+        "add": "Add VAT",
+        "extract": "Extract VAT"
+      }
+    },
+    "margin": {
+      "title": "Margin & markup",
+      "desc": "What you earn, and the price for a wanted margin",
+      "f": {
+        "cost": "Cost",
+        "price": "Selling price",
+        "wanted": "Wanted margin"
+      }
+    },
+    "discount": {
+      "title": "Discount",
+      "desc": "Final price after discount (also double discount)",
+      "f": {
+        "price": "Price",
+        "pct": "Discount",
+        "extra": "Extra discount"
+      }
+    },
+    "quote": {
+      "title": "Quick quote",
+      "desc": "Up to 3 lines, discount and VAT — total to pay",
+      "f": {
+        "q1": "Qty 1",
+        "p1": "Price 1",
+        "q2": "Qty 2",
+        "p2": "Price 2",
+        "q3": "Qty 3",
+        "p3": "Price 3",
+        "disc": "Discount",
+        "rate": "VAT"
+      }
+    },
+    "loan": {
+      "title": "Loan & installments",
+      "desc": "Monthly payment (equal installments) and total interest",
+      "f": {
+        "principal": "Loan amount",
+        "annual": "Annual interest",
+        "months": "Months"
+      }
+    },
+    "breakEven": {
+      "title": "Break-even",
+      "desc": "How many units cover your fixed costs",
+      "f": {
+        "fixed": "Monthly fixed costs",
+        "price": "Price per unit",
+        "variable": "Variable cost per unit"
+      }
+    },
+    "commission": {
+      "title": "Sales commission",
+      "desc": "Base commission + bonus above target",
+      "f": {
+        "sales": "Sales",
+        "pct": "Commission",
+        "target": "Target",
+        "bonus": "Bonus above target"
+      }
+    },
+    "hourly": {
+      "title": "Hourly rate",
+      "desc": "What to charge per hour to reach your net goal",
+      "f": {
+        "goal": "Monthly net goal",
+        "expenses": "Monthly expenses",
+        "hours": "Billable hours / month",
+        "tax": "Estimated tax"
+      }
+    },
+    "employer": {
+      "title": "Employer cost",
+      "desc": "Gross salary + employer add-ons",
+      "f": {
+        "gross": "Gross salary",
+        "addons": "Employer add-ons"
+      }
+    },
+    "roi": {
+      "title": "AI agent ROI",
+      "desc": "Time and money the agent saves vs. its cost",
+      "f": {
+        "convs": "Conversations / month",
+        "minutes": "Minutes per conversation",
+        "hourCost": "Staff hourly cost",
+        "cost": "Monthly plan cost",
+        "deals": "Extra deals",
+        "dealValue": "Deal value"
+      }
+    },
+    "ltv": {
+      "title": "Customer lifetime value",
+      "desc": "What a customer is worth and what to pay to win one",
+      "f": {
+        "order": "Average order",
+        "perYear": "Orders per year",
+        "years": "Years as customer",
+        "marginPct": "Margin"
+      }
+    },
+    "campaign": {
+      "title": "Campaign performance",
+      "desc": "Cost per lead, per customer and return on ad spend",
+      "f": {
+        "spend": "Spend",
+        "leads": "Leads",
+        "customers": "Customers",
+        "revenue": "Revenue"
+      }
+    },
+    "percent": {
+      "title": "Percent change",
+      "desc": "How much it went up or down",
+      "f": {
+        "from": "From",
+        "to": "To"
+      }
+    },
+    "r": {
+      "gross": "Incl. VAT",
+      "net": "Before VAT",
+      "vatPart": "VAT",
+      "profit": "Profit per unit",
+      "marginPct": "Margin",
+      "markupPct": "Markup",
+      "priceForWanted": "Price for wanted margin",
+      "final": "Final price",
+      "saved": "Saved",
+      "effectivePct": "Effective discount",
+      "total": "Total to pay",
+      "subtotal": "Subtotal",
+      "discountAmt": "Discount",
+      "monthly": "Monthly payment",
+      "totalPaid": "Total paid",
+      "interest": "Total interest",
+      "units": "Units to break even",
+      "revenue": "Break-even revenue",
+      "contribution": "Contribution per unit",
+      "totalCommission": "Total commission",
+      "base": "Base",
+      "bonusAmt": "Bonus",
+      "rate": "Hourly rate",
+      "rateWithVat": "Incl. VAT",
+      "monthlyRevenue": "Monthly revenue needed",
+      "employerTotal": "Monthly cost",
+      "addOns": "Add-ons",
+      "yearly": "Yearly cost",
+      "hoursSaved": "Hours saved",
+      "value": "Monthly value",
+      "roiPct": "ROI",
+      "ltvValue": "Customer value",
+      "maxCac": "Max to win a customer",
+      "roas": "Return on ad spend",
+      "cpl": "Cost per lead",
+      "cac": "Cost per customer",
+      "conversionPct": "Conversion",
+      "change": "Change",
+      "netGain": "Net gain / month"
+    }
   }
 }

@@ -1,4 +1,5 @@
 import {
+  Calculator,
   BarChart3,
   Building2,
   CheckSquare,
@@ -28,6 +29,7 @@ import {
 export const NAV_ICONS: Record<string, LucideIcon> = {
   // wave 23
   guide: BookOpen,
+  calculators: Calculator,
   overview: LayoutDashboard,
   crm: Users,
   companies: Building2,

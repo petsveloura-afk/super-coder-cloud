@@ -84,6 +84,7 @@ test("booking page: customer books a free slot, team sees it, customer cancels",
   await shot(p, "w3-03-booking");
   const cancelHref = await p.getByRole("link", { name: /לבטל/ }).getAttribute("href");
 
+  await page.bringToFront(); // a background tab never runs requestAnimationFrame, so streamed content would stay hidden
   await page.goto("/he/appointments");
   await expect(page.getByText(/שיחת היכרות — עמית לקוח/)).toBeVisible({ timeout: 30_000 }); // streamed page on slow CI browsers
 
@@ -91,6 +92,7 @@ test("booking page: customer books a free slot, team sees it, customer cancels",
   await p.getByRole("button", { name: "כן, בטלו" }).click();
   await expect(p.getByText("הפגישה בוטלה")).toBeVisible();
   await anon.close();
+  await page.bringToFront();
   await page.reload();
   await expect(page.getByText("בוטלה").first()).toBeVisible();
 });

@@ -9,6 +9,8 @@ import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives"
 import { AiModeToggle, ConversationControls, LiveRefresh, MarkRead, ReplyBox } from "@/components/inbox/inbox-client";
 import { ConversationTools } from "@/components/inbox/conversation-tools";
 import { ConversationStatePanel, type ConversationStateView } from "@/components/inbox/conversation-state";
+import { SavedReplies } from "@/components/inbox/saved-replies";
+import { INBOX_CHANNELS, INBOX_FLAGS, searchTerm, slaTone, waitingMinutes, waitLabel, type InboxChannel, type InboxFlag } from "@/lib/inbox/sla";
 
 // icons resolved on the server (objects exported from client modules are only references here)
 const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone, whatsapp_qr: QrCode, email: Mail, web: Globe, telegram_user: UserRound, messenger: MessagesSquare, instagram: Camera } as const;
@@ -42,6 +44,10 @@ interface ConvRow {
   unread_count: number;
   last_message_at: string | null;
   last_message_preview: string | null;
+  last_customer_at?: string | null;
+  last_human_at?: string | null;
+  last_ai_at?: string | null;
+  last_auto_at?: string | null;
 }
 
 export default async function InboxPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: SP }) {
@@ -58,11 +64,15 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
   const sp = await searchParams;
   const filter = (FILTERS as readonly string[]).includes(String(sp.f)) ? (sp.f as (typeof FILTERS)[number]) : "open";
   const selectedId = uuidSchema.safeParse(sp.c).success ? (sp.c as string) : null;
+  // wave 24: channel / search / quick-flag filters (all kept in the URL, so links and refresh keep them)
+  const chFilter = (INBOX_CHANNELS as readonly string[]).includes(String(sp.ch)) ? (sp.ch as InboxChannel) : null;
+  const flag = (INBOX_FLAGS as readonly string[]).includes(String(sp.fl)) ? (sp.fl as InboxFlag) : null;
+  const search = searchTerm(sp.q);
   const supabase = await createClient();
 
   let q = supabase
     .from("conversations")
-    .select("id, channel, title, contact_id, status, assignee_id, unread_count, last_message_at, last_message_preview, ai_mode, subject, lead_score, summary, deal_id")
+    .select("id, channel, title, contact_id, status, assignee_id, unread_count, last_message_at, last_message_preview, ai_mode, subject, lead_score, summary, deal_id, last_customer_at, last_human_at, last_ai_at, last_auto_at")
     .eq("organization_id", ctx.org.id)
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .limit(200);
@@ -72,19 +82,36 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
     if (filter === "mine") q = q.eq("assignee_id", ctx.userId);
     if (filter === "unassigned") q = q.is("assignee_id", null);
   }
+  if (chFilter) q = q.eq("channel", chFilter);
+  if (search) q = q.or(`title.ilike.*${search}*,last_message_preview.ilike.*${search}*`);
+  if (flag === "hot") q = q.eq("lead_score", "hot");
+  if (flag === "human") q = q.eq("ai_mode", "human");
+  const openCount = () => supabase.from("conversations").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).eq("status", "open");
+  const [{ count: cOpen }, { count: cMine }, { count: cUnassigned }, { count: cHuman }, { count: cHot }] = await Promise.all([
+    openCount(),
+    openCount().eq("assignee_id", ctx.userId),
+    openCount().is("assignee_id", null),
+    openCount().eq("ai_mode", "human"),
+    openCount().eq("lead_score", "hot"),
+  ]);
+  const filterCount: Record<string, number | null> = { open: cOpen ?? null, mine: cMine ?? null, unassigned: cUnassigned ?? null, closed: null };
   const [{ data: convs }, { count: channelCount }, members] = await Promise.all([
     q,
     supabase.from("channel_accounts").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id),
     memberOptions(ctx.org.id),
   ]);
-  const list = (convs ?? []) as ConvRow[];
+  const nowMs = new Date().getTime();
+  const allRows = (convs ?? []) as ConvRow[];
+  const list = flag === "waiting" ? allRows.filter((c) => waitingMinutes(c, nowMs) !== null) : allRows;
+  const waitingCount = allRows.filter((c) => waitingMinutes(c, nowMs) !== null).length;
+  const flagCount: Record<InboxFlag, number | null> = { waiting: flag === null || flag === "waiting" ? waitingCount : null, hot: cHot ?? null, human: cHuman ?? null };
   const memberName = new Map(members.map((m) => [m.id, m.label]));
 
   let selected: ConvRow | null = list.find((c) => c.id === selectedId) ?? null;
   if (selectedId && !selected) {
     const { data } = await supabase
       .from("conversations")
-      .select("id, channel, title, contact_id, status, assignee_id, unread_count, last_message_at, last_message_preview, ai_mode, subject, lead_score, summary, deal_id")
+      .select("id, channel, title, contact_id, status, assignee_id, unread_count, last_message_at, last_message_preview, ai_mode, subject, lead_score, summary, deal_id, last_customer_at, last_human_at, last_ai_at, last_auto_at")
       .eq("id", selectedId)
       .eq("organization_id", ctx.org.id)
       .maybeSingle();
@@ -114,7 +141,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
   const Back = locale === "en" ? ArrowLeft : ArrowRight;
   const href = (over: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
-    const merged = { f: filter === "open" ? undefined : filter, c: selectedId ?? undefined, ...over };
+    const merged = { f: filter === "open" ? undefined : filter, ch: chFilter ?? undefined, fl: flag ?? undefined, q: search ?? undefined, c: selectedId ?? undefined, ...over };
     for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
     const s = p.toString();
     return `/${locale}/inbox${s ? `?${s}` : ""}`;
@@ -141,8 +168,35 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
             {FILTERS.map((f) => (
               <Link key={f} href={href({ f: f === "open" ? undefined : f, c: undefined })} role="tab" aria-selected={filter === f} className={cn("shrink-0 rounded-lg px-3 py-1.5 text-[13px]", filter === f ? "bg-accent-soft font-semibold text-accent" : "text-muted hover:bg-surface-hover")}>
                 {t(`inbox.filters.${f}`)}
+                {filterCount[f] ? <span className="ms-1.5 rounded-full bg-surface-hover px-1.5 text-[11px] font-semibold tabular-nums text-muted" data-testid={`inbox-count-${f}`}>{filterCount[f]}</span> : null}
               </Link>
             ))}
+          </div>
+          {/* wave 24: search + channel + quick flags */}
+          <form key={`${filter}|${flag ?? ""}|${chFilter ?? ""}|${search ?? ""}`} action={`/${locale}/inbox`} method="get" className="flex gap-2 border-b border-line p-2" role="search" data-testid="inbox-search">
+            {filter !== "open" ? <input type="hidden" name="f" value={filter} /> : null}
+            {flag ? <input type="hidden" name="fl" value={flag} /> : null}
+            <input name="q" defaultValue={search ?? ""} placeholder={t("inbox.tools.searchPlaceholder")} aria-label={t("inbox.tools.search")} maxLength={60} className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[13px] outline-none focus:border-accent" />
+            <select name="ch" defaultValue={chFilter ?? ""} aria-label={t("inbox.tools.channel")} className="h-9 max-w-[42%] rounded-lg border border-line bg-surface px-2 text-[13px]">
+              <option value="">{t("inbox.tools.allChannels")}</option>
+              {INBOX_CHANNELS.map((ch) => (
+                <option key={ch} value={ch}>{t(`campaigns.channels.${ch}`)}</option>
+              ))}
+            </select>
+            <button type="submit" className="h-9 shrink-0 rounded-lg bg-accent-solid px-3 text-[13px] font-semibold text-accent-fg">{t("inbox.tools.go")}</button>
+          </form>
+          <div className="flex flex-wrap gap-1.5 border-b border-line px-2 py-1.5" aria-label={t("inbox.tools.quick")}>
+            {INBOX_FLAGS.map((fl) => (
+              <Link key={fl} href={href({ fl: flag === fl ? undefined : fl, c: undefined })} aria-pressed={flag === fl} data-testid={`inbox-flag-${fl}`} className={cn("inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[12px]", flag === fl ? "border-accent bg-accent-soft font-semibold text-accent" : "border-line text-muted hover:bg-surface-hover")}>
+                {fl === "waiting" ? "⏳" : fl === "hot" ? "🔥" : "🙋"} {t(`inbox.tools.flags.${fl}`)}
+                {flagCount[fl] ? <span className="tabular-nums">· {flagCount[fl]}</span> : null}
+              </Link>
+            ))}
+            {chFilter || search || flag ? (
+              <Link href={href({ ch: undefined, q: undefined, fl: undefined, c: undefined })} className="shrink-0 px-2 py-1 text-[12px] text-accent hover:underline" data-testid="inbox-clear">
+                {t("inbox.tools.clear")}
+              </Link>
+            ) : null}
           </div>
           {list.length === 0 ? (
             <p className="p-6 text-center text-sm text-subtle">{t("inbox.empty")}</p>
@@ -150,6 +204,8 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
             <ul className="max-h-[70dvh] divide-y divide-line overflow-y-auto">
               {list.map((c) => {
                 const Icon = CHANNEL_ICON[c.channel];
+                const wait = waitingMinutes(c, nowMs);
+                const tone = slaTone(wait);
                 return (
                   <li key={c.id}>
                     <Link href={href({ c: c.id })} className={cn("flex gap-3 px-4 py-3 hover:bg-surface-hover", selected?.id === c.id && "bg-accent-soft/50")} data-conversation={c.id}>
@@ -163,6 +219,11 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                         {c.ai_mode === "human" ? <p className="text-[11px] font-medium text-warning">{t("inbox.needsHuman")}</p> : null}
                         {c.lead_score ? <p className={cn("text-[11px] font-medium", c.lead_score === "hot" ? "text-danger" : c.lead_score === "warm" ? "text-gold" : "text-subtle")}>{t(`inbox.lead.${c.lead_score}`)}</p> : null}
                         <p className="text-[11px] text-subtle">{c.last_message_at ? formatDateTime(locale, c.last_message_at) : ""}</p>
+                        {wait !== null ? (
+                          <p data-testid="sla-badge" className={cn("mt-0.5 inline-flex rounded-full px-2 py-0.5 text-[10.5px] font-semibold", tone === "late" ? "bg-danger/10 text-danger" : tone === "warn" ? "bg-gold/10 text-gold" : "bg-success/10 text-success")}>
+                            ⏳ {t("inbox.tools.waiting", { time: waitLabel(wait, locale) })}
+                          </p>
+                        ) : null}
                       </div>
                     </Link>
                   </li>
@@ -273,6 +334,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
             {ctx.can("inbox.reply") ? (
               <ConversationTools conversationId={selected.id} currency={ctx.org.currency || "ILS"} canAI={ctx.can("ai.use")} canFinance={ctx.can("finance.write")} canWriteContacts={ctx.can("contacts.write")} />
             ) : null}
+            {ctx.can("inbox.reply") ? <SavedReplies conversationId={selected.id} locale={locale} customerName={selected.title} businessName={ctx.org.name} /> : null}
             {ctx.can("inbox.reply") ? <ReplyBox conversationId={selected.id} /> : null}
           </Card>
         ) : (

@@ -17,6 +17,7 @@ import { PaymentMethods, PaymentHistory, type PaymentRow } from "@/components/bi
 import { paypalConfigured, paypalSdkConfig } from "@/lib/billing/paypal";
 import { lemonConfigured, lemonVariant } from "@/lib/billing/lemonsqueezy";
 import { cryptoConfigured } from "@/lib/billing/nowpayments";
+import { daysLeft, planAdvice, yearlySavings } from "@/lib/billing/advisor";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -127,6 +128,14 @@ export default async function BillingPage({
     { key: "ai_agents" as const, label: t("billing.aiAgents"), used: n(ent?.ai_agents_used) },
   ];
 
+  // wave 24: plan advisor (usage ≥ 80 %), renewal countdown, yearly savings, comparison table
+  const advice = planAdvice(
+    meters.map((m) => ({ key: m.key, used: m.used, limit: lim(m.key) })),
+    current,
+    plans.map((p) => ({ key: p.key, limits: p.limits as unknown as Record<string, number | null> })),
+  );
+  const renewIn = daysLeft(ent?.current_period_end);
+  const allFeatures = [...new Set(plans.flatMap((p) => p.features))];
   return (
     <>
       <PageHeader title={t("billing.title")} description={t("billing.subtitle")} />
@@ -165,6 +174,11 @@ export default async function BillingPage({
                 {ent.current_period_end ? (
                   <span className="text-muted">
                     {t(ent.cancel_at_period_end ? "billing.cancelsAt" : "billing.renews", { date: formatDate(locale, ent.current_period_end) })}
+                  </span>
+                ) : null}
+                {renewIn !== null && renewIn >= 0 ? (
+                  <span data-testid="renew-countdown" className={cn("rounded-full px-2 py-0.5 text-[11.5px] font-semibold", renewIn <= 3 ? "bg-warning-soft text-warning" : "bg-surface-hover text-muted")}>
+                    {t("billing.advisor.daysLeft", { days: String(renewIn) })}
                   </span>
                 ) : null}
               </div>
@@ -213,6 +227,26 @@ export default async function BillingPage({
         </Card>
       </div>
 
+      {/* wave 24: plan advisor */}
+      <div data-testid="plan-advisor" className={cn("mt-4 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center", advice.level === "over" ? "border-danger/30 bg-danger-soft" : advice.level === "near" ? "border-warning/30 bg-warning-soft" : "border-success/30 bg-success-soft")}>
+        <span className="text-2xl" aria-hidden>{advice.level === "over" ? "🚦" : advice.level === "near" ? "📈" : "✅"}</span>
+        <div className="flex-1 text-sm">
+          <p className="font-semibold">{t(`billing.advisor.${advice.level}`)}</p>
+          {advice.hot.length ? (
+            <p className="mt-0.5 text-[13px] text-muted">
+              {advice.hot.map((h) => `${t(`billing.limitLabels.${h.key as "contacts"}`)} ${h.pct}%`).join(" · ")}
+            </p>
+          ) : (
+            <p className="mt-0.5 text-[13px] text-muted">{t("billing.advisor.okSub")}</p>
+          )}
+        </div>
+        {advice.suggest && advice.suggest !== current ? (
+          <a href={advice.suggest === "enterprise" ? "#plans" : `#plan-${advice.suggest}`} className="inline-flex h-10 items-center justify-center rounded-xl bg-accent-solid px-4 text-sm font-semibold text-white hover:bg-accent-solid-hover" data-testid="advisor-suggest">
+            {t("billing.advisor.suggest", { plan: t(`billing.plans.${advice.suggest}.name`) })}
+          </a>
+        ) : null}
+      </div>
+
       {/* wave 18: AI credit packs */}
       {packBalance !== null ? (
         <div className="mt-4">
@@ -232,7 +266,7 @@ export default async function BillingPage({
         </div>
       ) : null}
 
-      <div className="mb-4 mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div id="plans" className="mb-4 mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-bold">{t("billing.choosePlan")}</h2>
         <div className="inline-flex rounded-xl border border-line bg-surface p-1" role="tablist" aria-label={t("billing.interval")}>
           {(["month", "year"] as const).map((iv) => (
@@ -259,7 +293,7 @@ export default async function BillingPage({
           const price = Number.isFinite(custom) && custom > 0 ? custom : listPrice;
           const purchasable = (p.key === "pro" || p.key === "business") && canManage && payments && !ctx.org.is_demo && Boolean(priceIdFor(p.key, interval));
           return (
-            <Card key={p.key} className={cn("flex flex-col p-5", p.key === "pro" && "ring-2 ring-brand/60")}>
+            <Card key={p.key} id={`plan-${p.key}`} className={cn("flex flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-lg", p.key === "pro" && "ring-2 ring-brand/60", advice.suggest === p.key && p.key !== current && "ring-2 ring-success/70")}>
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold">{t(`billing.plans.${p.key}.name`)}</h3>
                 {p.key === "pro" ? (
@@ -279,6 +313,17 @@ export default async function BillingPage({
                     <span className="text-3xl font-black tracking-tight" dir="ltr">{formatCurrency(locale, price, p.currency)}</span>
                     <span className="ms-1 text-sm text-muted">{t(interval === "year" ? "billing.perYear" : "billing.perMonth")}</span>
                     {price !== listPrice ? <span className="ms-2 rounded-full bg-success/15 px-2 py-0.5 text-[11px] text-success">{t("billing.customPrice")}</span> : null}
+                    {(() => {
+                      const sv = yearlySavings(Number(p.price_monthly), Number(p.price_yearly));
+                      if (!sv || sv.saved <= 0) return null;
+                      return (
+                        <p className="mt-1 text-[12px] text-success" data-testid={`yearly-save-${p.key}`}>
+                          {interval === "year"
+                            ? t("billing.advisor.yearlyEq", { perMonth: formatCurrency(locale, sv.perMonth, p.currency), saved: formatCurrency(locale, sv.saved, p.currency) })
+                            : t("billing.advisor.yearlyHint", { pct: String(sv.pct) })}
+                        </p>
+                      );
+                    })()}
                   </>
                 )}
               </div>
@@ -349,6 +394,50 @@ export default async function BillingPage({
         })}
       </div>
       <p className="mt-4 text-center text-[12px] text-subtle">{t("billing.vat")}</p>
+
+      {/* wave 24: full comparison + trust */}
+      <details className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface" data-testid="plan-compare">
+        <summary className="cursor-pointer select-none px-5 py-3.5 font-semibold hover:bg-surface-hover">{t("billing.advisor.compare")}</summary>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-[13px]">
+            <thead>
+              <tr className="border-y border-line bg-surface-hover/60">
+                <th className="px-4 py-2 text-start font-medium text-muted">{t("billing.advisor.feature")}</th>
+                {plans.map((p) => (
+                  <th key={p.key} className={cn("px-3 py-2 text-center font-semibold", p.key === current && "text-accent")}>{t(`billing.plans.${p.key}.name`)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {(["contacts", "members", "ai_credits_monthly", "ai_agents"] as const).map((k) => (
+                <tr key={k}>
+                  <td className="px-4 py-2">{t(`billing.limitLabels.${k}`)}</td>
+                  {plans.map((p) => {
+                    const v = p.limits?.[k];
+                    return <td key={p.key} className="px-3 py-2 text-center font-semibold tabular-nums" dir="ltr">{v === null || v === undefined ? "∞" : formatNumber(locale, Number(v))}</td>;
+                  })}
+                </tr>
+              ))}
+              {allFeatures.map((f) => (
+                <tr key={f}>
+                  <td className="px-4 py-2">{t(`billing.features.${f}`)}</td>
+                  {plans.map((p) => (
+                    <td key={p.key} className="px-3 py-2 text-center">{p.features.includes(f) ? <Check className="mx-auto h-4 w-4 text-success" aria-label="✓" /> : <span className="text-subtle">—</span>}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3" data-testid="billing-trust">
+        {(["secure", "cancel", "receipts"] as const).map((k) => (
+          <div key={k} className="flex items-start gap-2 rounded-xl border border-line bg-surface p-3 text-[13px]">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+            <span><b className="block">{t(`billing.advisor.trust.${k}`)}</b><span className="text-muted">{t(`billing.advisor.trust.${k}Sub`)}</span></span>
+          </div>
+        ))}
+      </div>
       {canManage ? <PaymentHistory locale={locale} rows={(payRows ?? []) as PaymentRow[]} /> : null}
     </>
   );

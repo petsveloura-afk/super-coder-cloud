@@ -16,6 +16,9 @@ export interface BoardDeal extends DealRecord {
   company_name: string | null;
   owner_name: string | null;
   position: number;
+  /** wave 24: days since the last change, and whether the expected close date passed */
+  age_days?: number | null;
+  overdue?: boolean;
 }
 
 export interface BoardStage {
@@ -175,6 +178,12 @@ export function KanbanBoard({
                               </span>
                             ) : null}
                           </div>
+                          {d.overdue || (d.age_days ?? 0) > 14 ? (
+                            <div className="mt-1.5 flex flex-wrap gap-1" data-testid="deal-alerts">
+                              {d.overdue ? <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-semibold text-danger">{t("deals.insights.overdueBadge")}</span> : null}
+                              {(d.age_days ?? 0) > 14 ? <span className="rounded-full bg-gold/10 px-2 py-0.5 text-[10.5px] font-semibold text-gold">{t("deals.insights.staleBadge", { days: d.age_days ?? 0 })}</span> : null}
+                            </div>
+                          ) : null}
                         </button>
                       }
                     />

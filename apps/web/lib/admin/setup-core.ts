@@ -74,7 +74,7 @@ export function setupSteps(env: Env, appUrl: string): SetupStep[] {
       key: "shopify",
       vars: [v("SHOPIFY_CLIENT_ID"), v("SHOPIFY_CLIENT_SECRET", true)],
       copies: [
-        { label: "App URL", value: `${base}/he/integrations` },
+        { label: "App URL", value: `${base}/api/stores/shopify/install` },
         { label: "Redirect URL", value: `${base}/api/stores/shopify/callback` },
       ],
       links: [{ label: "Shopify Partners", href: "https://partners.shopify.com" }],
