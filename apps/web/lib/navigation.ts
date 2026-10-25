@@ -36,6 +36,8 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "integrations", label: "nav.integrations", section: "ops", phase: null, permission: "integrations.manage" },
   { key: "team", label: "nav.team", section: "ops", phase: null, permission: "members.read" },
   { key: "billing", label: "nav.billing", section: "ops", phase: null, permission: "billing.read" },
+  // wave 23: the user guide (29 steps with marked screenshots and search) — every member
+  { key: "guide", label: "nav.guide", section: "ops", phase: null },
   { key: "settings", label: "nav.settings", section: "ops", phase: null },
   { key: "admin", label: "nav.admin", section: "ops", phase: null, platformOnly: true },
 ];

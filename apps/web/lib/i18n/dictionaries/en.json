@@ -35,7 +35,8 @@
     "companies": "Companies",
     "tasks": "Tasks",
     "agents": "AI team",
-    "social": "Social & reviews"
+    "social": "Social & reviews",
+    "guide": "User guide"
   },
   "common": {
     "save": "Save",
@@ -3680,5 +3681,13 @@
     },
     "adminSetup": "One-time setup in admin",
     "adminOnly": "Only you see this"
+  },
+  "guide": {
+    "title": "User guide",
+    "subtitle": "29 short steps, one per page. The numbers on each picture match the list beside it. Move with the arrows, a swipe or the keyboard, and search any topic.",
+    "onlyHebrew": "The guide is in Hebrew for now.",
+    "loading": "Loading the guide…",
+    "help": "Help for this screen",
+    "helpShort": "Help"
   }
 }

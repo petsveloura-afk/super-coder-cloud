@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { PERMISSIONS } from "@scc/shared/permissions";
 import { AppShell } from "@/components/layout/app-shell";
+import { GuideHelpButton } from "@/components/guide/help-button";
 import { getOrgContext } from "@/lib/auth";
 import { resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -29,6 +30,8 @@ export default async function DashboardLayout({ children, params }: { children: 
       isPlatformAdmin={ctx.isPlatformAdmin}
     >
       {children}
+      {/* wave 23: help for the screen you are on → the matching step of the user guide */}
+      <GuideHelpButton />
     </AppShell>
   );
 }

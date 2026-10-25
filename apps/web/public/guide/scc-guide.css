@@ -1,0 +1,147 @@
+/* Super Coder Cloud (in-app copy, wave 23) — the guide, scoped under .scc-guide so nothing leaks into the app.
+   A self-contained dark panel in both app themes (the screenshots are dark). */
+.scc-guide {
+  --ink: #070b16; --ink-2: #0b1222; --panel: #101a30; --panel-2: #15213b; --line: #22304f; --line-soft: rgba(132, 160, 220, 0.14);
+  --text: #eef2fb; --muted: #9aa8c4; --faint: #6c7a96; --blue: #477bff; --teal: #00d9c5; --gold: #c9a66b;
+  --signal: linear-gradient(120deg, var(--blue), var(--teal));
+  --f-display: var(--font-sans, "Heebo", system-ui, sans-serif); --f-body: var(--font-sans, "Heebo", system-ui, sans-serif); --f-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r-m: 16px; --ease: cubic-bezier(0.2, 0.7, 0.1, 1);
+  --shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.75), 0 0 0 1px var(--line-soft);
+  color-scheme: dark; color: var(--text); background: var(--ink); border-radius: 28px; padding: clamp(12px, 2.4vw, 24px);
+  border: 1px solid var(--line-soft); line-height: 1.6;
+}
+.scc-guide *, .scc-guide *::before, .scc-guide *::after { box-sizing: border-box; }
+.scc-guide [hidden] { display: none !important; }
+.scc-guide img { max-width: 100%; display: block; }
+.scc-guide h3, .scc-guide h4 { font-weight: 700; line-height: 1.2; margin: 0; text-wrap: balance; }
+.scc-guide p { margin: 0; }
+.scc-guide :focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; border-radius: 6px; }
+.scc-guide .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.scc-guide .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 46px; padding: 0 22px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-weight: 600; font-size: 0.98rem; font-family: var(--f-body); text-decoration: none; cursor: pointer; transition: transform 0.25s var(--ease), box-shadow 0.25s; white-space: nowrap; }
+.scc-guide .btn:hover { transform: translateY(-2px); }
+.scc-guide .btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+.scc-guide .btn svg { width: 18px; height: 18px; flex: none; }
+.scc-guide .btn-primary { background: var(--signal); border-color: transparent; color: #04101e; box-shadow: 0 12px 34px -12px rgba(0, 217, 197, 0.55); }
+.scc-guide .btn-ghost { background: transparent; }
+.scc-guide .frame { position: relative; border-radius: var(--r-m); background: var(--panel); box-shadow: var(--shadow); }
+.scc-guide .frame .bar { display: flex; align-items: center; gap: 7px; height: 32px; padding-inline: 14px; background: #0d1528; border-bottom: 1px solid var(--line-soft); direction: ltr; }
+.scc-guide .frame .bar i { width: 10px; height: 10px; border-radius: 50%; background: #2a3657; }
+.scc-guide .frame .bar span { margin-inline: auto; font-family: var(--f-mono); font-size: 0.7rem; color: var(--faint); padding: 3px 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.04); }
+/* Super Coder Cloud — the step-by-step guide (a row of pages, one step per page) */
+.scc-guide .guide { --gap: 20px; position: relative; }
+.scc-guide .g-bar { position: sticky; top: calc(74px + env(safe-area-inset-top, 0px)); z-index: 20; display: grid; gap: 12px; padding-block: 14px; background: linear-gradient(var(--ink) 70%, rgba(7, 11, 22, 0)); }
+.scc-guide .guide.embed .g-bar { top: calc(74px + env(safe-area-inset-top, 0px)); }
+.scc-guide .g-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.scc-guide .g-search { position: relative; flex: 1 1 320px; min-width: 0; }
+.scc-guide .g-search input { width: 100%; height: 52px; border-radius: 16px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: 500 1rem var(--f-body); padding-inline: 48px 16px; transition: border-color 0.2s, box-shadow 0.2s; }
+.scc-guide .g-search input::placeholder { color: var(--faint); }
+.scc-guide .g-search input:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 4px rgba(0, 217, 197, 0.14); }
+.scc-guide .g-search > svg { position: absolute; inset-inline-start: 16px; top: 50%; width: 20px; height: 20px; transform: translateY(-50%); color: var(--faint); pointer-events: none; }
+.scc-guide .g-search kbd { position: absolute; inset-inline-end: 12px; top: 50%; transform: translateY(-50%); font-family: var(--f-mono); font-size: 0.72rem; color: var(--faint); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; }
+.scc-guide .g-results { position: absolute; inset-inline: 0; top: calc(100% + 8px); z-index: 30; max-height: min(60vh, 460px); overflow: auto; border-radius: 18px; background: #0e172c; border: 1px solid var(--line); box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.85); padding: 8px; }
+.scc-guide .g-results button { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; width: 100%; text-align: start; padding: 10px; border-radius: 12px; border: 0; background: transparent; color: var(--text); cursor: pointer; font: inherit; align-items: center; }
+.scc-guide .g-results button:hover, .scc-guide .g-results button[aria-selected="true"] { background: rgba(71, 123, 255, 0.14); }
+.scc-guide .g-results .num { font-family: var(--f-mono); font-size: 0.8rem; color: var(--gold); width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--panel); }
+.scc-guide .g-results b { display: block; font-weight: 600; }
+.scc-guide .g-results small { display: block; color: var(--muted); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scc-guide .g-results mark { background: rgba(0, 217, 197, 0.25); color: var(--text); border-radius: 3px; padding: 0 2px; }
+.scc-guide .g-results .empty { padding: 18px; color: var(--muted); text-align: center; }
+.scc-guide .g-progress { display: flex; align-items: center; gap: 12px; font-family: var(--f-mono); font-size: 0.82rem; color: var(--muted); white-space: nowrap; }
+.scc-guide .g-progress .track { width: 130px; height: 6px; border-radius: 6px; background: var(--line); overflow: hidden; }
+.scc-guide .g-progress .fill { height: 100%; width: 0; background: var(--signal); border-radius: 6px; transition: width 0.4s var(--ease); }
+.scc-guide .g-chapters { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.scc-guide .g-chapters::-webkit-scrollbar { display: none; }
+.scc-guide .g-chapters button { flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-soft); background: var(--panel); color: var(--muted); font: 500 0.92rem var(--f-body); cursor: pointer; transition: all 0.2s; }
+.scc-guide .g-chapters button small { font-family: var(--f-mono); font-size: 0.72rem; color: var(--faint); }
+.scc-guide .g-chapters button[aria-current="true"] { color: var(--text); border-color: transparent; background: linear-gradient(var(--panel), var(--panel)) padding-box, var(--signal) border-box; border: 1px solid transparent; }
+
+.scc-guide .g-viewport { position: relative; }
+.scc-guide .g-track { display: flex; align-items: flex-start; transition: height 0.45s var(--ease); gap: var(--gap); overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; overscroll-behavior-x: contain; scrollbar-width: none; padding-block: 6px 18px; }
+.scc-guide .g-track::-webkit-scrollbar { display: none; }
+.scc-guide .g-slide { flex: 0 0 100%; scroll-snap-align: start; min-width: 0; display: grid; grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr); gap: clamp(20px, 3.2vw, 44px); align-items: start; padding: clamp(18px, 3vw, 34px); border-radius: 28px; background: radial-gradient(80% 60% at 0% 0%, rgba(71, 123, 255, 0.1), transparent 60%), var(--ink-2); border: 1px solid var(--line-soft); }
+.scc-guide .g-slide.phone { grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr); }
+.scc-guide .g-text { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.scc-guide .g-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--f-mono); font-size: 0.78rem; color: var(--muted); }
+.scc-guide .g-meta .ch { color: var(--teal); font-family: var(--f-body); font-weight: 600; }
+.scc-guide .g-meta .of { padding: 3px 9px; border-radius: 999px; background: rgba(201, 166, 107, 0.12); color: var(--gold); }
+.scc-guide .g-text h3 { font-size: clamp(1.6rem, 2.6vw, 2.15rem); }
+.scc-guide .g-text > p { color: var(--muted); font-size: 1.05rem; }
+.scc-guide .g-list { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 8px; }
+.scc-guide .g-list li { margin: 0; }
+.scc-guide .g-list button { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; align-items: start; width: 100%; text-align: start; padding: 10px 12px; border-radius: 14px; border: 1px solid transparent; background: rgba(255, 255, 255, 0.025); color: var(--text); font: 500 1rem/1.5 var(--f-body); cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+.scc-guide .g-list button:hover, .scc-guide .g-list button.on { background: rgba(71, 123, 255, 0.12); border-color: #2f4677; }
+.scc-guide .g-list .k { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-mono); font-size: 0.85rem; font-weight: 600; color: #04101e; background: var(--signal); box-shadow: 0 0 0 4px rgba(0, 217, 197, 0.14); }
+.scc-guide .g-list button.nomark .k { background: var(--line); color: var(--muted); box-shadow: none; }
+.scc-guide .g-tip { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 14px 16px; border-radius: 16px; background: rgba(201, 166, 107, 0.08); border: 1px solid rgba(201, 166, 107, 0.22); color: #e6d3ad; font-size: 0.97rem; }
+.scc-guide .g-tip svg { width: 22px; height: 22px; color: var(--gold); margin-top: 2px; }
+.scc-guide .g-open { display: inline-flex; align-items: center; gap: 8px; color: var(--teal); font-weight: 600; text-decoration: none; font-size: 0.97rem; }
+.scc-guide .g-open:hover { text-decoration: underline; }
+
+.scc-guide .g-fig { position: relative; margin: 0; min-width: 0; }
+.scc-guide .g-fig .frame { overflow: visible; }
+.scc-guide .g-fig .frame .bar { border-radius: var(--r-m) var(--r-m) 0 0; }
+.scc-guide .g-pic { position: relative; line-height: 0; border-radius: 0 0 var(--r-m) var(--r-m); overflow: hidden; }
+.scc-guide .g-slide.phone .g-fig .frame { max-width: 330px; margin-inline: auto; border-radius: 38px; padding: 10px; background: linear-gradient(160deg, #1b2747, #0a1020 55%); }
+.scc-guide .g-slide.phone .g-fig .frame .bar { display: none; }
+.scc-guide .g-slide.phone .g-pic { border-radius: 30px; }
+.scc-guide .g-pic img { width: 100%; height: auto; }
+.scc-guide .g-pic .dim { position: absolute; inset: 0; background: rgba(4, 7, 14, 0.38); pointer-events: none; transition: opacity 0.4s; }
+
+/* markers: a ring around the exact spot, a numbered badge, and a label with an arrow */
+.scc-guide .mk { position: absolute; pointer-events: none; }
+.scc-guide .mk .ring { position: absolute; inset: -5px; border-radius: 12px; border: 2.5px solid var(--teal); box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0), 0 0 0 4px rgba(0, 217, 197, 0.25), 0 0 24px rgba(0, 217, 197, 0.45); }
+.scc-guide .mk .ring::after { content: ""; position: absolute; inset: -3px; border-radius: inherit; border: 2px solid var(--teal); opacity: 0; animation: scc-ping 2.2s var(--ease) infinite; }
+.scc-guide .mk .badge { position: absolute; top: -17px; inset-inline-end: -17px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 700 0.9rem var(--f-mono); color: #04101e; background: var(--signal); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), 0 0 0 3px var(--ink); pointer-events: auto; cursor: pointer; }
+.scc-guide .mk .label { opacity: 0; transition: opacity 0.3s var(--ease), translate 0.3s var(--ease); translate: 0 6px; position: absolute; inset-inline-start: 50%; width: max-content; max-width: 230px; padding: 8px 12px; border-radius: 12px; background: #f4f7ff; color: #0a1224; font: 600 0.84rem/1.35 var(--f-body); box-shadow: 0 14px 30px -8px rgba(0, 0, 0, 0.7); white-space: normal; text-align: start; transform: translateX(50%); }
+.scc-guide .mk .label::before { content: ""; position: absolute; inset-inline-start: 50%; width: 12px; height: 12px; background: inherit; transform: translateX(50%) rotate(45deg); border-radius: 2px; }
+.scc-guide .mk.below .label { top: calc(100% + 16px); }
+.scc-guide .mk.below .label::before { top: -5px; }
+.scc-guide .mk.above .label { bottom: calc(100% + 22px); }
+.scc-guide .mk.above .label::before { bottom: -5px; }
+.scc-guide .mk.edge-s .label { inset-inline-start: 0; transform: none; }
+.scc-guide .mk.edge-s .label::before { inset-inline-start: 18px; transform: rotate(45deg); }
+.scc-guide .mk.edge-e .label { inset-inline-start: auto; inset-inline-end: 0; transform: none; }
+.scc-guide .mk.edge-e .label::before { inset-inline-start: auto; inset-inline-end: 18px; transform: rotate(45deg); }
+.scc-guide .mk .label .lk { font-family: var(--f-mono); color: #2457e6; margin-inline-end: 4px; }
+.scc-guide .mk.focus .ring { border-color: #ffd36b; box-shadow: 0 0 0 4px rgba(255, 211, 107, 0.3), 0 0 30px rgba(255, 211, 107, 0.55); }
+.scc-guide .mk.focus .badge { background: #ffd36b; }
+.scc-guide .mk.focus { z-index: 3; }
+.scc-guide .mk.focus .label { opacity: 1; translate: 0 0; }
+.scc-guide .g-slide .mk { opacity: 0; transform: scale(0.94); transition: opacity 0.45s var(--ease), transform 0.45s var(--ease); transition-delay: calc(var(--i) * 0.14s + 0.15s); }
+.scc-guide .g-slide.active .mk, .scc-guide .guide.static .mk { opacity: 1; transform: none; }
+.scc-guide .guide .labels-off .mk .label { display: none; }
+@keyframes scc-ping { 0% { opacity: 0.8; transform: scale(1); } 80%, 100% { opacity: 0; transform: scale(1.25); } }
+@media (max-width: 900px) { .scc-guide .mk .label { display: none; } .scc-guide .mk .badge { width: 26px; height: 26px; top: -13px; inset-inline-end: -13px; font-size: 0.78rem; } }
+
+.scc-guide .g-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; }
+.scc-guide .g-nav .btn { min-width: 132px; }
+.scc-guide .g-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; flex: 1; min-width: 0; }
+.scc-guide .g-dots button { width: 9px; height: 9px; padding: 0; border-radius: 9px; border: 0; background: var(--line); cursor: pointer; transition: width 0.3s var(--ease), background 0.3s; }
+.scc-guide .g-dots button.on { width: 26px; background: var(--signal); }
+.scc-guide .g-dots button.ch-start { margin-inline-start: 8px; }
+@media (max-width: 860px) {
+  .scc-guide .g-slide, .scc-guide .g-slide.phone { grid-template-columns: minmax(0, 1fr); }
+  .scc-guide .g-slide .g-fig { order: -1; }
+  .scc-guide .g-nav .btn { min-width: 0; padding: 0 16px; }
+  .scc-guide .g-nav .btn .t { display: none; }
+  .scc-guide .g-progress .track { width: 80px; }
+}
+@media (max-width: 560px) { .scc-guide .g-dots { display: none; } }
+
+/* contents panel (full guide page) */
+.scc-guide .g-toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 14px; margin-top: 40px; }
+.scc-guide .g-toc section { padding: 18px 18px 14px; border-radius: 20px; background: var(--panel); border: 1px solid var(--line-soft); }
+.scc-guide .g-toc h4 { margin: 0 0 8px; font-family: var(--f-display); font-weight: 400; font-size: 1.15rem; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.scc-guide .g-toc h4 small { font-family: var(--f-mono); font-size: 0.72rem; color: var(--faint); }
+.scc-guide .g-toc ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.scc-guide .g-toc ol button { width: 100%; text-align: start; padding: 7px 8px; border-radius: 10px; border: 0; background: none; color: var(--muted); font: 500 0.95rem var(--f-body); cursor: pointer; display: flex; gap: 10px; }
+.scc-guide .g-toc ol button span { font-family: var(--f-mono); color: var(--gold); font-size: 0.8rem; min-width: 22px; padding-top: 2px; }
+.scc-guide .g-toc ol button:hover { background: rgba(71, 123, 255, 0.1); color: var(--text); }
+
+/* in the app: the bar scrolls with the guide (the app has its own sticky header) */
+.scc-guide .g-bar { position: relative; top: auto; background: none; padding-top: 0; }
+.scc-guide .g-toc { margin-top: 28px; }
+
+/* phones: keep the numbers inside the picture, and the address bar on one line */
+@media (max-width: 900px) { .scc-guide .mk .badge { top: 3px; inset-inline-end: 3px; } }
+.scc-guide .frame .bar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
