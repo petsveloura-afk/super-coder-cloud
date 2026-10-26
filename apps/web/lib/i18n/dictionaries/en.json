@@ -108,7 +108,6 @@
     "showPassword": "Show password",
     "hidePassword": "Hide password",
     "strength": {
-      "0": "",
       "1": "Too weak",
       "2": "Fair",
       "3": "Good",
