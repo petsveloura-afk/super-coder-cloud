@@ -29,7 +29,15 @@ export async function GET(request: NextRequest) {
   const locale = isLocale(l) ? l : "he";
   const back = new URL(`/${locale}/integrations`, request.url);
   back.hash = "marketplace";
+  const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
   const finish = (status: string, detail?: string, extra?: (res: NextResponse) => void) => {
+    // wave 26: a failed WhatsApp full-page signup shows the whole reason on a plain page (the toast vanishes and cuts it)
+    if (isWa && status !== "connected") {
+      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WhatsApp</title></head><body style="font-family:system-ui,sans-serif;background:#080d19;color:#f8fafc;padding:24px;max-width:760px;margin:auto"><h3>WhatsApp: ${esc(status)}</h3><pre dir="ltr" style="white-space:pre-wrap;word-break:break-word;background:#111a2b;padding:14px;border-radius:12px">${esc(detail ?? "-")}</pre><p><a href="/${locale}/integrations" style="color:#6b95ff">Back</a></p></body></html>`;
+      const r = new NextResponse(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+      r.cookies.set("scc_meta_oauth", "", { path: "/api/channels/meta/pages", maxAge: 0 });
+      return r;
+    }
     back.searchParams.set("meta", status);
     if (detail) back.searchParams.set("detail", detail.slice(0, 600));
     const res = NextResponse.redirect(back);
