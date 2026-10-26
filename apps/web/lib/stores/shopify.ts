@@ -54,7 +54,12 @@ export async function shopifyRegisterWebhooks(shop: string, token: string): Prom
         cache: "no-store",
       });
       if (res.ok || res.status === 422) ok++;
-      else failed.push(`${topic}:${res.status}`);
+      else {
+        // wave 28: keep Shopify's own explanation so the dashboard can say exactly what to fix
+        const j = (await res.json().catch(() => ({}))) as { errors?: unknown };
+        const why = typeof j.errors === "string" ? j.errors : j.errors ? JSON.stringify(j.errors) : "";
+        failed.push(`${topic}:${res.status}${why ? ` ${why.replace(/\s+/g, " ").slice(0, 90)}` : ""}`);
+      }
     } catch (e) {
       failed.push(`${topic}:${(e as Error).message}`);
     }

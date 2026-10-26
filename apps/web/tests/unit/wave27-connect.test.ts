@@ -21,3 +21,12 @@ describe("wave 27 — store connect buttons actually navigate", () => {
     }
   });
 });
+
+describe("wave 28 — Shopify connected-with-warning", () => {
+  it("a webhook-only problem keeps the tile connected and shows the reason", () => {
+    const m = read("components/integrations/marketplace.tsx");
+    expect(m).toContain('startsWith("webhooks")');
+    expect(m).toContain("shopify-warning");
+    for (const l of ["he", "en", "ar"]) expect(JSON.parse(read(`lib/i18n/dictionaries/${l}.json`)).market.shopify.warn.hint403).toBeTruthy();
+  });
+});

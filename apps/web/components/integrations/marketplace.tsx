@@ -439,7 +439,7 @@ function ShopifyTile({ p }: { p: MarketProps }) {
   };
   const tone = check.status === "found" ? "text-success" : check.status === "not_found" || check.status === "not_shopify" || check.status === "invalid" ? "text-danger" : "text-muted";
   return (
-    <Tile id="shopify" icon={ShoppingBag} title="Shopify" body={t("market.shopify.body")} gradient="from-lime-500/15 to-transparent" state={<State on={p.shopify.connected} error={p.shopify.error} />} steps={t("market.oneApproval")}>
+    <Tile id="shopify" icon={ShoppingBag} title="Shopify" body={t("market.shopify.body")} gradient="from-lime-500/15 to-transparent" state={<State on={p.shopify.connected} error={p.shopify.error && !p.shopify.error.startsWith("webhooks") ? p.shopify.error : null} />} steps={t("market.oneApproval")}>
       {p.shopify.connected ? (
         <div className="space-y-2">
           <p className="text-[12.5px] text-muted">{t("market.store.stats", { orders: String(p.shopify.orders30), revenue: `₪${Math.round(p.shopify.revenue30).toLocaleString("he-IL")}` })}</p>
@@ -447,6 +447,15 @@ function ShopifyTile({ p }: { p: MarketProps }) {
             <p className="text-[12px] text-subtle" dir="ltr">
               {p.shopify.shop}
             </p>
+          ) : null}
+          {p.shopify.error ? (
+            <div role="alert" className="space-y-1 rounded-xl border border-line bg-elevated p-2.5 text-[12px]" data-testid="shopify-warning">
+              <p className="font-semibold">{t(p.shopify.error.startsWith("webhooks") ? "market.shopify.warn.webhooks" : "market.shopify.warn.error")}</p>
+              <p dir="ltr" className="break-words text-subtle">
+                {p.shopify.error}
+              </p>
+              <p className="text-muted">{t(/40[13]/.test(p.shopify.error) ? "market.shopify.warn.hint403" : "market.shopify.warn.hintGeneric")}</p>
+            </div>
           ) : null}
           {p.canManage ? (
             <div className="flex flex-wrap gap-2">

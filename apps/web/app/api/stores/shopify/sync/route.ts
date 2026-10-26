@@ -34,5 +34,10 @@ export async function POST(request: NextRequest) {
   const hooks = await shopifyRegisterWebhooks(shop, token);
   const filled = await shopifyBackfill(ctx.org.id, shop, token);
   await markIntegration(integ.id, !filled.error, filled.error ?? (hooks.failed.length ? hooks.failed.join(",") : null));
+  // wave 28: orders imported fine but live webhooks failed → keep that visible as a warning (not an error)
+  if (!filled.error && hooks.failed.length) {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    await createAdminClient().from("integrations").update({ last_error: `webhooks: ${hooks.failed.join(", ")}`.slice(0, 500) }).eq("id", integ.id);
+  }
   return NextResponse.json({ ok: true, name: ping.name ?? null, orders: filled.orders, carts: filled.carts, webhooks: hooks.ok, webhookErrors: hooks.failed });
 }
