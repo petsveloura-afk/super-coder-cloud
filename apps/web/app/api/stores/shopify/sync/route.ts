@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getOrgContext } from "@/lib/auth";
 import { isLocale } from "@/lib/i18n/config";
-import { missingScopes, shopifyBackfill, shopifyGrantedScopes, shopifyPing, shopifyRegisterWebhooks } from "@/lib/stores/shopify";
+import { freshShopifyToken, missingScopes, shopifyBackfill, shopifyGrantedScopes, shopifyPing, shopifyRegisterWebhooks } from "@/lib/stores/shopify";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -24,8 +24,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, disconnected: true });
   }
   const shop = String((integ.config as { shop?: string }).shop ?? "");
-  const token = integ.secrets.access_token;
-  if (!shop || !token) return NextResponse.json({ ok: false, error: "no_token" }, { status: 409 });
+  if (!shop || !integ.secrets.access_token) return NextResponse.json({ ok: false, error: "no_token" }, { status: 409 });
+  // wave 30: expiring offline tokens — refresh (and store) before calling the Admin API
+  const fresh = await freshShopifyToken(ctx.org.id, integ);
+  if (!fresh) {
+    await markIntegration(integ.id, false, "token_revoked");
+    return NextResponse.json({ ok: false, error: "token_revoked" }, { status: 502 });
+  }
+  const token = fresh.token;
   const ping = await shopifyPing(shop, token);
   if (!ping.ok) {
     await markIntegration(integ.id, false, ping.status === 401 || ping.status === 403 ? "token_revoked" : `shop_unreachable:${ping.status}`);

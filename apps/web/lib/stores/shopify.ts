@@ -30,20 +30,80 @@ export function shopifyAuthorizeUrl(shop: string, state: string): string {
   return u.toString();
 }
 
-export async function shopifyExchange(shop: string, code: string): Promise<{ ok: boolean; token?: string; scope?: string; error?: string }> {
+export interface ShopifyTokenResult {
+  ok: boolean;
+  token?: string;
+  scope?: string;
+  /** wave 30: Shopify now only accepts EXPIRING offline tokens (≈60 min) + a rotating refresh token (≈90 days) */
+  refreshToken?: string;
+  expiresAt?: string;
+  refreshExpiresAt?: string;
+  error?: string;
+}
+
+type TokenJson = { access_token?: string; scope?: string; expires_in?: number; refresh_token?: string; refresh_token_expires_in?: number; error?: string; error_description?: string };
+
+const tokenResult = (res: Response, j: TokenJson, now = Date.now()): ShopifyTokenResult =>
+  res.ok && j.access_token
+    ? {
+        ok: true,
+        token: j.access_token,
+        scope: j.scope,
+        refreshToken: j.refresh_token,
+        expiresAt: typeof j.expires_in === "number" ? new Date(now + j.expires_in * 1000).toISOString() : undefined,
+        refreshExpiresAt: typeof j.refresh_token_expires_in === "number" ? new Date(now + j.refresh_token_expires_in * 1000).toISOString() : undefined,
+      }
+    : { ok: false, error: j.error_description ?? j.error ?? `HTTP ${res.status}` };
+
+async function oauthToken(shop: string, params: Record<string, string>): Promise<ShopifyTokenResult> {
   try {
     const res = await fetch(`${shopBase(shop)}/admin/oauth/access_token`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ client_id: process.env.SHOPIFY_CLIENT_ID, client_secret: process.env.SHOPIFY_CLIENT_SECRET, code }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: new URLSearchParams({ client_id: process.env.SHOPIFY_CLIENT_ID ?? "", client_secret: process.env.SHOPIFY_CLIENT_SECRET ?? "", ...params }).toString(),
       signal: AbortSignal.timeout(15_000),
       cache: "no-store",
     });
-    const j = (await res.json().catch(() => ({}))) as { access_token?: string; scope?: string; error?: string; error_description?: string };
-    return res.ok && j.access_token ? { ok: true, token: j.access_token, scope: j.scope } : { ok: false, error: j.error_description ?? j.error ?? `HTTP ${res.status}` };
+    return tokenResult(res, (await res.json().catch(() => ({}))) as TokenJson);
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
+}
+
+/** wave 30: `expiring=1` — Shopify rejects non-expiring offline tokens for the Admin API ("Non-expiring access tokens are no longer accepted"). */
+export async function shopifyExchange(shop: string, code: string): Promise<ShopifyTokenResult> {
+  return oauthToken(shop, { code, expiring: "1" });
+}
+
+/** wave 30: trades the refresh token for a new access token (the refresh token ROTATES — always store the new one). */
+export async function shopifyRefresh(shop: string, refreshToken: string): Promise<ShopifyTokenResult> {
+  return oauthToken(shop, { grant_type: "refresh_token", refresh_token: refreshToken });
+}
+
+/** pure: does this stored token need refreshing now? (no expiry known + refresh token present → refresh to be safe) */
+export function tokenNeedsRefresh(config: Record<string, unknown>, secrets: Record<string, string>, now = Date.now()): boolean {
+  if (!secrets.refresh_token) return false;
+  const exp = typeof config.token_expires_at === "string" ? Date.parse(config.token_expires_at) : NaN;
+  return !Number.isFinite(exp) || exp - now < 120_000;
+}
+
+/**
+ * wave 30: the token to use for an Admin API call — refreshed (and stored, encrypted) when it is about to expire.
+ * Returns null when Shopify refused the refresh (the person has to reconnect).
+ */
+export async function freshShopifyToken(orgId: string, integ: { id: string; config: Record<string, unknown>; secrets: Record<string, string> }): Promise<{ token: string; refreshed: boolean } | null> {
+  const shop = String(integ.config.shop ?? "");
+  const current = integ.secrets.access_token ?? "";
+  if (!tokenNeedsRefresh(integ.config, integ.secrets)) return current ? { token: current, refreshed: false } : null;
+  const r = await shopifyRefresh(shop, integ.secrets.refresh_token!);
+  if (!r.ok || !r.token) return null;
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { sealSecrets } = await import("@/lib/channels/secrets");
+  const admin = createAdminClient();
+  const config = { ...integ.config, scope: r.scope ?? integ.config.scope ?? "", token_expires_at: r.expiresAt ?? null, refresh_expires_at: r.refreshExpiresAt ?? null };
+  await admin.from("integrations").update({ config, updated_at: new Date().toISOString() }).eq("id", integ.id);
+  await admin.from("integration_credentials").upsert({ integration_id: integ.id, organization_id: orgId, ciphertext: sealSecrets({ access_token: r.token, ...(r.refreshToken ? { refresh_token: r.refreshToken } : {}) }), rotated_at: new Date().toISOString() }, { onConflict: "integration_id" });
+  return { token: r.token, refreshed: true };
 }
 
 /** Registers the webhooks (idempotent: Shopify answers 422 "already taken" for existing ones). */

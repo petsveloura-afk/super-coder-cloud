@@ -37,7 +37,12 @@ export async function GET(request: NextRequest) {
   const tok = await shopifyExchange(shop, code);
   if (!tok.ok || !tok.token) return done("failed", tok.error ?? "token");
   const { saveIntegration } = await import("@/lib/integrations/store");
-  await saveIntegration(ctx.org.id, "shopify", { shop, scope: tok.scope ?? "", connected_at: new Date().toISOString(), nonce: randomBytes(4).toString("hex") }, { access_token: tok.token });
+  await saveIntegration(
+    ctx.org.id,
+    "shopify",
+    { shop, scope: tok.scope ?? "", connected_at: new Date().toISOString(), nonce: randomBytes(4).toString("hex"), token_expires_at: tok.expiresAt ?? null, refresh_expires_at: tok.refreshExpiresAt ?? null },
+    { access_token: tok.token, ...(tok.refreshToken ? { refresh_token: tok.refreshToken } : {}) },
+  );
   const hooks = await shopifyRegisterWebhooks(shop, tok.token);
   // wave 29: say plainly when Shopify did not grant every scope we asked for (the usual reason for 403 on every webhook)
   const lacking = missingScopes(tok.scope);
