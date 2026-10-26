@@ -61,21 +61,32 @@ export interface EmbeddedResult {
  *   code → business token → (find the WABA + number if the popup did not report them) →
  *   subscribe the app to the WABA webhooks → register the number for Cloud API → read the display number.
  */
-export async function completeEmbeddedSignup(input: { code: string; phoneNumberId: string; wabaId: string }): Promise<EmbeddedResult> {
+export async function completeEmbeddedSignup(input: { code: string; phoneNumberId: string; wabaId: string; locale?: string }): Promise<EmbeddedResult> {
   if (!metaEmbeddedConfigured()) return { ok: false, error: "not_configured" };
   // A code from the Facebook JS SDK popup is bound to the redirect_uri the SDK used. Depending on the
-  // app / SDK version Meta expects it omitted, empty, or the site URL — try them in that order, and only
-  // move on when Meta complains specifically about redirect_uri.
+  // app / SDK version Meta expects it omitted, empty, or the page the popup was opened from — try them in
+  // that order, and only move on while Meta complains about the redirect_uri / URL domain.
   const site = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
-  const redirectCandidates: (string | undefined)[] = [undefined, "", ...(site && !/localhost/.test(site) ? [site, `${site}/`] : [])];
+  const loc = input.locale === "en" || input.locale === "ar" ? input.locale : "he";
+  const redirectCandidates: (string | undefined)[] = [
+    undefined,
+    "",
+    ...(site && !/localhost/.test(site) ? [`${site}/${loc}/integrations`, site, `${site}/`] : []),
+  ];
   let tok: Awaited<ReturnType<typeof g>> = { ok: false, status: 0, data: {}, error: "token_failed" };
+  const attempts: string[] = [];
   for (const redirect of redirectCandidates) {
     const qs = new URLSearchParams({ client_id: process.env.META_APP_ID!, client_secret: process.env.META_APP_SECRET!, code: input.code });
     if (redirect !== undefined) qs.set("redirect_uri", redirect);
     tok = await g(`/oauth/access_token?${qs.toString()}`);
     if (tok.ok && tok.data.access_token) break;
-    if (!/redirect_uri/i.test(tok.error ?? "")) break;
+    attempts.push(`[${redirect === undefined ? "none" : redirect === "" ? "empty" : redirect}] ${tok.error ?? "failed"}`);
+    // keep trying only for redirect_uri / App Domains complaints (Meta words these in the user's language,
+    // so also match on the error code 36008 / 191 / 100 family)
+    const code = (tok.data.error as { code?: number } | undefined)?.code;
+    if (!/redirect_uri|domain|URL/i.test(tok.error ?? "") && ![191, 36008, 100].includes(code ?? 0)) break;
   }
+  if (!tok.ok || !tok.data.access_token) return { ok: false, step: "token", error: attempts.join(" | ").slice(0, 600) || (tok.error ?? "token_failed") };
   const accessToken = tok.data.access_token as string | undefined;
   if (!tok.ok || !accessToken) return { ok: false, step: "token", error: tok.error ?? "token_failed" };
 

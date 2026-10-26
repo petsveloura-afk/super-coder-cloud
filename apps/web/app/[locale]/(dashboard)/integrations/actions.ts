@@ -337,7 +337,7 @@ export async function connectWhatsAppEmbeddedAction(input: { locale: string; cod
   const { encryptionReady, sealSecrets } = await import("@/lib/channels/secrets");
   if (!encryptionReady()) return { error: "integrations.channels.encryptionMissing" };
   const { completeEmbeddedSignup } = await import("@/lib/channels/meta");
-  const done = await completeEmbeddedSignup(parsed.data);
+  const done = await completeEmbeddedSignup({ ...parsed.data, locale });
   if (!done.ok || !done.accessToken || !done.config) return { error: "integrations.whatsapp.signupFailed", messageParams: { detail: `${done.step ?? ""} ${done.error ?? ""}`.trim() } };
   const supabase = await createClient();
   const row = {
