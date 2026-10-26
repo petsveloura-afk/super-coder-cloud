@@ -134,7 +134,7 @@ export async function completeEmbeddedSignup(input: { code: string; phoneNumberI
           for (const w of ((r.data.data as { id?: string }[] | undefined) ?? [])) if (/^\d{5,30}$/.test(w.id ?? "")) found.add(w.id as string);
         }
       }
-      if (found.size === 1) wabaId = [...found][0];
+      if (found.size === 1) wabaId = [...found][0] ?? "";
       else note = found.size > 1 ? `multiple_wabas:${found.size}` : "no_waba_in_business";
     }
     if (!wabaId) {
