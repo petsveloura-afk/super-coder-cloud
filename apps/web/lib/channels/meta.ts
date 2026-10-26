@@ -91,9 +91,21 @@ export async function completeEmbeddedSignup(input: { code: string; phoneNumberI
     const appId = process.env.META_APP_ID ?? "";
     const secret = process.env.META_APP_SECRET ?? "";
     const chk = await g(`/${encodeURIComponent(appId)}?${new URLSearchParams({ fields: "id,name", access_token: `${appId}|${secret}` }).toString()}`);
+    let cli = "";
+    try {
+      const { cookies } = await import("next/headers");
+      const raw = (await cookies()).get("wa_dbg")?.value;
+      if (raw) {
+        const c = decodeURIComponent(raw);
+        const t0 = Number(/(?:^|;)t=(\d+)/.exec(c)?.[1] ?? 0);
+        cli = ` cli[age=${t0 ? Math.round((Date.now() - t0) / 1000) : "?"}s ${c.replace(/(^|;)t=\d+;?/, "$1")}]`;
+      } else cli = " cli[none]";
+    } catch {
+      cli = " cli[err]";
+    }
     const le = tok.data.error as { code?: number; error_subcode?: number } | undefined;
-    const diag = `diag: v=${graphVersion()} cfg=…${(process.env.META_WA_CONFIG_ID ?? "").slice(-4)} ids=${input.phoneNumberId ? 1 : 0}${input.wabaId ? 1 : 0} tries=${attempts.length} last=${le?.code ?? "-"}/${le?.error_subcode ?? "-"} codeLen=${input.code.length} app=…${appId.slice(-4)} secretLen=${secret.length} appCheck=${chk.ok ? `ok(${String(chk.data.id ?? "").slice(-4)})` : (chk.error ?? "failed").slice(0, 80)}`;
-    return { ok: false, step: "token", error: `${attempts[0] ?? tok.error ?? "token_failed"} | ${diag}`.slice(0, 600) };
+    const diag = `diag: v=${graphVersion()} cfg=…${(process.env.META_WA_CONFIG_ID ?? "").slice(-4)} ids=${input.phoneNumberId ? 1 : 0}${input.wabaId ? 1 : 0} tries=${attempts.length} last=${le?.code ?? "-"}/${le?.error_subcode ?? "-"} codeLen=${input.code.length} app=…${appId.slice(-4)} secretLen=${secret.length} appCheck=${chk.ok ? `ok(${String(chk.data.id ?? "").slice(-4)})` : (chk.error ?? "failed").slice(0, 80)}${cli}`;
+    return { ok: false, step: "token", error: `${attempts[0] ?? tok.error ?? "token_failed"} | ${diag}`.slice(0, 800) };
   }
   const accessToken = tok.data.access_token as string | undefined;
   if (!tok.ok || !accessToken) return { ok: false, step: "token", error: tok.error ?? "token_failed" };
