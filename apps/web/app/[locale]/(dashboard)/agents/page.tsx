@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Bot } from "lucide-react";
 import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { AgentsHub, type AgentView } from "@/components/agents/agents-hub";
+import { AgentsBrain } from "@/components/agents/agents-brain";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -56,6 +57,7 @@ export default async function AgentsPage({ params }: { params: Promise<{ locale:
           {t("agents.conversation.open")}
         </Link>
       </Card>
+      <AgentsBrain agents={views} canManage={ctx.can("ai.manage")} />
       <AgentsHub agents={views} canManage={ctx.can("ai.manage")} />
     </>
   );

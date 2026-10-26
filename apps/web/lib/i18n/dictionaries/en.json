@@ -2510,6 +2510,12 @@
       "improve": "Improve with AI",
       "working": "Improving…",
       "undo": "Undo"
+    },
+    "kits": {
+      "title": "Industry starter kits",
+      "hint": "Add a ready set of sections for your business type. Added at the end — nothing you wrote is changed.",
+      "added": "Added {n} sections",
+      "full": "The site already has the maximum number of sections"
     }
   },
   "admin": {
@@ -3067,11 +3073,11 @@
     "label": "Reminder",
     "hint": "Sent to you on WhatsApp, Telegram, SMS or e-mail (“My channels” in settings) with a “done” button",
     "options": {
-      "none": "No reminder",
       "0": "At the due time",
       "15": "15 minutes before",
       "60": "1 hour before",
-      "1440": "1 day before"
+      "1440": "1 day before",
+      "none": "No reminder"
     }
   },
   "act": {
@@ -3645,7 +3651,48 @@
     },
     "briefNotification": "☀️ {org}'s morning brief is ready",
     "salesNotification": "🎯 The sales manager opened {count} follow-up tasks",
-    "marketingNotification": "📣 {count} posts for next week are waiting for you"
+    "marketingNotification": "📣 {count} posts for next week are waiting for you",
+    "brain": {
+      "title": "Team brain",
+      "subtitle": "How your AI team is doing and what to improve next.",
+      "score": "Team score",
+      "next": "Best next steps",
+      "apply": "Apply",
+      "allGood": "Everything is set up well. Nothing to change right now.",
+      "level": {
+        "off": "Off",
+        "great": "Great",
+        "ok": "OK",
+        "attention": "Needs attention"
+      },
+      "reason": {
+        "off": "Switched off",
+        "neverRan": "Enabled but has not run yet",
+        "stale": "Has not run on schedule",
+        "idle": "Ran but found nothing to do lately",
+        "active": "Working as expected"
+      },
+      "sev": {
+        "high": "Important",
+        "medium": "Recommended",
+        "low": "Nice to have"
+      },
+      "rec": {
+        "startAnalyst": "Start with the Analyst: a short daily brief of what changed and what needs you.",
+        "enableCollections": "Switch on Collections so overdue invoices get polite reminders automatically.",
+        "enableSales": "Switch on the Sales manager so quiet deals turn into tasks for you.",
+        "enableAnalyst": "Switch on the Analyst for a daily summary in numbers.",
+        "enableMarketing": "Switch on Marketing for a weekly content plan with ready post drafts.",
+        "neverRan": "This agent is on but has not run yet — press Run now to see what it does.",
+        "stale": "This agent is overdue. Press Run now, and check the cron schedule if it keeps happening.",
+        "idle": "This agent has found nothing to do in its last runs. Check its settings.",
+        "tuneQuiet": "Deals that quiet for over two weeks are usually lost. Check after 7 days instead.",
+        "tuneCarts": "Turn on abandoned-cart reminders — they recover sales that were already close.",
+        "tuneReminders": "Allow up to 3 reminders: friendly, clear, then final.",
+        "tunePosts": "Three posts a week keeps the page active without overloading it.",
+        "reviewFirst": "Review the first posts before auto-publishing. Switch auto-publish off for now."
+      }
+    }
   },
   "social": {
     "title": "Social & reviews",

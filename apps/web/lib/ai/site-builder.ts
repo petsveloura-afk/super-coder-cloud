@@ -5,7 +5,7 @@ import type { Locale } from "@/lib/i18n/config";
 import { runAI } from "./run";
 import { generateAndStoreImage, imagesConfigured } from "./images";
 import { extractJson, normalizeAiSite, siteJsonInstructionsPro, siteSlug, type SiteMode } from "./site-json";
-import { FREE_TEMPLATES, TEMPLATES } from "@/lib/site/templates";
+import { FREE_TEMPLATES, ALL_TEMPLATES } from "@/lib/site/templates";
 import type { AIMessage, AIProviderName } from "./providers";
 
 /** What the organization's plan allows: every plan builds landing pages; paid plans full sites + AI images. */
@@ -69,14 +69,14 @@ export async function buildSiteWithAI(input: {
     feature: "site_builder",
     agentId: input.agentId ?? null,
     provider: input.provider,
-    system: siteJsonInstructionsPro(mode, input.locale, ctx, caps.proTemplates ? TEMPLATES.map((t) => t.key) : FREE_TEMPLATES),
+    system: siteJsonInstructionsPro(mode, input.locale, ctx, caps.proTemplates ? ALL_TEMPLATES.map((t) => t.key) : FREE_TEMPLATES),
     messages: [{ role: "user", content: userPrompt }],
     temperature: 0.6,
     maxTokens: mode === "full" ? 6000 : 3500,
     json: true,
   });
   if (!out.ok) return { ok: false, error: out.error };
-  const site = normalizeAiSite(extractJson(out.text), mode, ctx, input.brief.split(/[.,\n]/)[0] ?? "", { templates: caps.proTemplates ? TEMPLATES.map((t) => t.key) : FREE_TEMPLATES });
+  const site = normalizeAiSite(extractJson(out.text), mode, ctx, input.brief.split(/[.,\n]/)[0] ?? "", { templates: caps.proTemplates ? ALL_TEMPLATES.map((t) => t.key) : FREE_TEMPLATES });
   if (!site) {
     console.error("ai site json unusable", out.text.slice(0, 300));
     return { ok: false, error: "websites.aiInvalid" };
@@ -102,7 +102,7 @@ export async function buildSiteWithAI(input: {
 
   // wave 13: the template the business picked wins (when the plan allows it)
   if (input.template) {
-    const tpl = TEMPLATES.find((x) => x.key === input.template);
+    const tpl = ALL_TEMPLATES.find((x) => x.key === input.template);
     if (tpl && (!tpl.pro || caps.proTemplates)) site.theme = { ...site.theme, template: tpl.key, accent2: site.theme.accent2 ?? tpl.accent2, mode: tpl.mode };
   }
   const slug = siteSlug(site.name, randomBytes(4).toString("hex"));

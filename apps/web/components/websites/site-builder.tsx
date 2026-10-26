@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Briefcase, ExternalLink, Globe, ImageIcon, LayoutTemplate, ListTree, Plus, Save, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { SITE_BLOCK_TYPES, type SiteBlockType } from "@scc/shared/engagement";
+import { StarterKits } from "./starter-kits";
+import { kitBlocks, type StarterKit } from "@/lib/site/starter-kits";
+import { FREE_TEMPLATES } from "@/lib/site/templates";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Card, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { ImproveCopyButton } from "./growth-tools";
@@ -131,6 +134,23 @@ export function SiteBuilder({
     });
   }
   const set = (patch: Partial<SiteValue>) => setV((x) => ({ ...x, ...patch }));
+  /** wave 27: add a starter kit's sections after the existing ones (never replaces anything) */
+  function addKit(kit: StarterKit) {
+    const room = 40 - v.blocks.length;
+    if (room <= 0) {
+      toast.error(t("websites.kits.full"));
+      return;
+    }
+    const add = kitBlocks(kit.key, locale).slice(0, room) as unknown as BlockValue[];
+    const allowedTemplate = proTemplates || FREE_TEMPLATES.includes(kit.template as never);
+    setV((x) => ({
+      ...x,
+      blocks: [...x.blocks, ...add],
+      // a brand-new site gets the kit's look; an existing design is never changed
+      theme: x.theme.template ? x.theme : allowedTemplate ? { ...x.theme, template: kit.template, accent: kit.accent, accent2: kit.accent2 } : x.theme,
+    }));
+    toast.success(t("websites.kits.added", { n: add.length }));
+  }
   const setBlock = (i: number, data: BlockValue["data"]) => setV((x) => ({ ...x, blocks: x.blocks.map((b, j) => (j === i ? { ...b, data } : b)) }));
   const move = (i: number, d: -1 | 1) =>
     setV((x) => {
@@ -374,6 +394,8 @@ export function SiteBuilder({
           </p>
         ) : null}
       </Card>
+
+      <StarterKits onPick={addKit} />
 
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">

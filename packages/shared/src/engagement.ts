@@ -356,7 +356,7 @@ export const siteBlockSchema = z.discriminatedUnion("type", [
 
 /* wave 13 — design templates, site settings (business details for the footer and legal pages) */
 export const SITE_FONTS = ["rubik", "heebo", "assistant", "frank", "inter", "playfair", "secular", "varela", "suez", "karantina", "noto-serif"] as const;
-export const SITE_TEMPLATE_KEYS = ["classic", "minimal", "fresh", "aurora", "luxe", "bold", "corporate", "pastel", "neon", "nature"] as const;
+export const SITE_TEMPLATE_KEYS = ["classic", "minimal", "fresh", "aurora", "luxe", "bold", "corporate", "pastel", "neon", "nature", "editorial", "midnight", "sunset", "ocean", "clinic", "noir", "terracotta", "studio"] as const;
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, { message: "validation.color" });
 export const siteSettingsSchema = z
   .object({

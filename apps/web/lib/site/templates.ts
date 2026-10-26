@@ -1,4 +1,5 @@
 import type { SITE_FONTS, SITE_TEMPLATE_KEYS } from "@scc/shared/engagement";
+import { EXTRA_TEMPLATES } from "./templates-plus";
 
 /**
  * Wave 13 — website design templates. Pure data (used by the public renderer, the
@@ -219,8 +220,11 @@ export const TEMPLATES: SiteTemplate[] = [
   },
 ];
 
+/** wave 27: the original ten + the extra templates (TEMPLATES itself is unchanged). */
+export const ALL_TEMPLATES: SiteTemplate[] = [...TEMPLATES, ...EXTRA_TEMPLATES];
+
 export function templateByKey(key: string | null | undefined): SiteTemplate {
-  return TEMPLATES.find((t) => t.key === key) ?? TEMPLATES[0]!;
+  return ALL_TEMPLATES.find((t) => t.key === key) ?? TEMPLATES[0]!;
 }
 
 export const FREE_TEMPLATES = TEMPLATES.filter((t) => !t.pro).map((t) => t.key);

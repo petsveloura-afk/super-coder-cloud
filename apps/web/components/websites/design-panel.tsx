@@ -4,7 +4,7 @@ import { Check, Lock } from "lucide-react";
 import { SITE_FONTS } from "@scc/shared/engagement";
 import { useI18n } from "@/lib/i18n/client";
 import { Card, Field, Input, Select } from "@/components/ui/primitives";
-import { FONTS, TEMPLATES, fontsHref, type SiteTemplate } from "@/lib/site/templates";
+import { FONTS, ALL_TEMPLATES, fontsHref, type SiteTemplate } from "@/lib/site/templates";
 import { cn } from "@/lib/utils";
 
 /**
@@ -95,7 +95,7 @@ export function DesignPanel({ theme, onChange, proAllowed }: { theme: DesignThem
         <h2 className="font-semibold">{t("websites.design.templates")}</h2>
         <p className="mb-4 text-[12.5px] text-muted">{t("websites.design.templatesHint")}</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-          {TEMPLATES.map((tpl) => {
+          {ALL_TEMPLATES.map((tpl) => {
             const L = locale === "he" ? tpl.he : tpl.en;
             const locked = tpl.pro && !proAllowed;
             const active = current === tpl.key;
@@ -124,7 +124,7 @@ export function DesignPanel({ theme, onChange, proAllowed }: { theme: DesignThem
             );
           })}
         </div>
-        {TEMPLATES.find((x) => x.key === current)?.pro && !proAllowed ? (
+        {ALL_TEMPLATES.find((x) => x.key === current)?.pro && !proAllowed ? (
           <p className="mt-3 rounded-lg bg-gold-soft px-3 py-2 text-[12.5px] text-gold" role="status" data-testid="template-locked">
             {t("websites.design.lockedNote")}
           </p>

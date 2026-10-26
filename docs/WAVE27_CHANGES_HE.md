@@ -1,11 +1,15 @@
-# גל 27 — תיקון חיבור Shopify / WooCommerce שלא נלחץ
+# גל 27 — מוח לסוכנים, תבניות וערכות התחלה לאתרים
 
-**הסיבה:** בדף האינטגרציות מוגדר `form-action 'self'` ב-CSP. הדפדפן מחיל אותו גם על ההפניה שאחרי שליחת טופס, ולכן ההפניה ל-Shopify נחסמה בשקט. הכפתור נראה תקין (✓ זוהתה) אבל לא קרה כלום.
+הכול נוסף על הקיים. לא נמחק, לא שונה ולא הוסר שום דבר, ולא נוספו מיגרציות DB.
 
-**התיקון (תוספות בלבד):**
-- `components/integrations/marketplace.tsx`: Shopify ו-WooCommerce עוברים כעת בניווט רגיל (`window.location.assign`), שאינו כפוף ל-form-action. הטופס המקורי נשאר כגיבוי. נוסף מצב "מתחברים ל-Shopify…" למניעת לחיצה כפולה.
-- `next.config.ts`: רשת ביטחון, בדף האינטגרציות בלבד נוסף `*.myshopify.com`, `admin.shopify.com`, `accounts.shopify.com` ל-form-action.
-- תרגומים (עברית/אנגלית/ערבית): `market.shopify.connecting`.
-- `tests/unit/wave27-connect.test.ts`: 3 בדיקות רגרסיה.
+## בניית אתרים
+- **8 תבניות חדשות** (בנוסף ל-10 הקיימות, בכל המסלולים בתשלום): מגזין, חצות, שקיעה, אוקיינוס, קליניקה, נואר, טרקוטה, סטודיו. הן מופיעות בגלריית העיצוב, ב-AI שבונה אתרים וב-AI שעורך אתרים.
+- **ערכות התחלה לפי תחום** (מסעדה, קליניקה, עו״ד/רו״ח, כושר, יופי, סוכנות): כפתור בעורך האתר שמוסיף 7 מקטעים מוכנים בסוף האתר. אתר שכבר יש לו עיצוב לא משנה את העיצוב שלו, ומקטעים קיימים לא נוגעים. בקיטים אין מספרי טלפון, מחירים, ביקורות או כתובות מומצאים.
 
-**אם עדיין לא עובר ל-Shopify אחרי הפריסה:** ודאו ב-Vercel ש-`SHOPIFY_CLIENT_ID` ו-`SHOPIFY_CLIENT_SECRET` מוגדרים, וב-Shopify Partners שכתובת ה-Redirect היא `https://<האפליקציה>/api/stores/shopify/callback`. אם היא שונה, Shopify יציג שגיאת redirect_uri.
+## סוכנים
+- **המוח של הצוות** בראש מסך הסוכנים: ציון צוות, מצב כל סוכן (כבוי / מצוין / תקין / דורש תשומת לב) והצעדים הבאים המומלצים, כל אחד עם כפתור "החלה" שמשתמש באותה שמירה של הכרטיסים הקיימים.
+- הלוגיקה דטרמיניסטית, בלי קריאת AI ובלי עלות, ולכן לא יכולה לסתור את יומן ההרצות.
+
+## קבצים
+חדשים: `lib/site/templates-plus.ts`, `lib/site/starter-kits.ts`, `components/websites/starter-kits.tsx`, `lib/agents/intelligence.ts`, `components/agents/agents-brain.tsx`, `tests/unit/wave27.test.ts`.
+מורחבים: `templates.ts`, `site-json.ts`, `site-builder.ts` (ai), `site-edit.ts`, `site-builder.tsx`, `design-panel.tsx`, `ai-site-card.tsx`, `agents/page.tsx`, `packages/shared/src/engagement.ts`, מילוני he / en / ar.

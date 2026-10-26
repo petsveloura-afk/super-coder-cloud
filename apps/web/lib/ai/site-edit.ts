@@ -4,7 +4,7 @@ import type { siteSchema } from "@scc/shared/engagement";
 import type { Locale } from "@/lib/i18n/config";
 import { runAI } from "./run";
 import { extractJson, normalizeAiSite, siteJsonInstructionsPro } from "./site-json";
-import { FREE_TEMPLATES, TEMPLATES } from "@/lib/site/templates";
+import { FREE_TEMPLATES, ALL_TEMPLATES } from "@/lib/site/templates";
 
 /**
  * Wave 13 — edit an existing site with the AI ("make it more modern", "add pricing",
@@ -15,7 +15,7 @@ import { FREE_TEMPLATES, TEMPLATES } from "@/lib/site/templates";
 type Site = z.infer<typeof siteSchema>;
 
 export async function editSiteWithAI(input: { orgId: string; locale: Locale; instruction: string; site: Site; proTemplates: boolean }): Promise<{ ok: true; site: { name: string; theme: Record<string, unknown>; seo: { title: string; description: string }; blocks: unknown[] } } | { ok: false; error: string }> {
-  const templates = input.proTemplates ? TEMPLATES.map((t) => t.key) : FREE_TEMPLATES;
+  const templates = input.proTemplates ? ALL_TEMPLATES.map((t) => t.key) : FREE_TEMPLATES;
   // keep the current template first so the model only switches when asked
   const ordered = input.site.theme.template && templates.includes(input.site.theme.template) ? [input.site.theme.template, ...templates.filter((t) => t !== input.site.theme.template)] : templates;
   const form = input.site.blocks.find((b) => b.type === "form");

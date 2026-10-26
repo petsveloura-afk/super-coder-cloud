@@ -6,7 +6,7 @@ import { ImageIcon, Lock, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Card, Field, Select, Textarea } from "@/components/ui/primitives";
-import { TEMPLATES } from "@/lib/site/templates";
+import { ALL_TEMPLATES } from "@/lib/site/templates";
 import { buildSiteWithAIAction } from "@/app/[locale]/(dashboard)/websites/actions";
 
 /** "Describe your business → get a professional site" (draft). Full sites + AI images on paid plans. */
@@ -35,7 +35,7 @@ export function AiSiteCard({ caps }: { caps: { full: boolean; images: boolean; p
         <Field label={t("websites.design.pickForAi")} htmlFor="ai-template">
           <Select id="ai-template" value={template} onChange={(e) => setTemplate(e.target.value)} data-testid="ai-template">
             <option value="">{t("websites.design.aiChooses")}</option>
-            {TEMPLATES.map((x) => (
+            {ALL_TEMPLATES.map((x) => (
               <option key={x.key} value={x.key} disabled={x.pro && !caps.proTemplates}>
                 {(locale === "he" ? x.he : x.en).name}
                 {x.pro && !caps.proTemplates ? " · Pro" : ""}

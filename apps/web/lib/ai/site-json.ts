@@ -159,7 +159,7 @@ function coerceBlock(raw: unknown, ctx: SiteContext): SiteBlock | null {
 }
 
 /** wave 13: template + second colour + font + corners chosen by the model (validated) */
-const AI_TEMPLATES = ["classic", "minimal", "fresh", "aurora", "luxe", "bold", "corporate", "pastel", "neon", "nature"] as const;
+const AI_TEMPLATES = ["classic", "minimal", "fresh", "aurora", "luxe", "bold", "corporate", "pastel", "neon", "nature", "editorial", "midnight", "sunset", "ocean", "clinic", "noir", "terracotta", "studio"] as const;
 const AI_FONTS = ["rubik", "heebo", "assistant", "frank", "inter", "playfair", "secular", "varela", "suez", "karantina", "noto-serif"] as const;
 function aiThemeExtras(r: Record<string, unknown>, allowed?: readonly string[]): { template?: (typeof AI_TEMPLATES)[number]; accent2?: string; font?: (typeof AI_FONTS)[number]; radius?: "sharp" | "soft" | "round"; animations?: boolean } {
   const out: ReturnType<typeof aiThemeExtras> = {};
@@ -228,7 +228,7 @@ export function siteJsonInstructionsPro(mode: SiteMode, locale: "he" | "ar" | "e
     siteJsonInstructions(mode, locale, ctx),
     "",
     "EXTRA TOP-LEVEL FIELDS (add them to the same JSON object):",
-    `"template": one of ${JSON.stringify(templates)} — the design that best fits the business (e.g. luxe for real estate / fine dining, fresh for clinics & beauty, corporate for law / accounting, bold for shops & events, aurora for tech, nature for natural products, pastel for kids & bakeries, neon for nightlife & fitness, minimal for consultants).`,
+    `"template": one of ${JSON.stringify(templates)} — the design that best fits the business (e.g. luxe for real estate / fine dining, fresh for clinics & beauty, corporate for law / accounting, bold for shops & events, aurora for tech, nature for natural products, pastel for kids & bakeries, neon for nightlife & fitness, minimal for consultants, editorial for blogs & architects, midnight for SaaS & fintech, sunset for restaurants & cafes, ocean for travel & marine, clinic for doctors & therapists, noir for photographers & fashion, terracotta for boutiques & ceramics, studio for agencies & freelancers).`,
     `"accent2": "#RRGGBB" a second brand colour that harmonises with accent; "font": one of ["rubik","heebo","assistant","frank","secular","varela","suez","noto-serif"] (Hebrew-friendly) or omit; "radius": "sharp"|"soft"|"round".`,
     "EXTRA BLOCK TYPES you may use (in addition to the ones above):",
     `{"type":"about","data":{"title","body"}} (the story, values, experience — 2-4 short paragraphs)`,
