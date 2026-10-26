@@ -12,6 +12,7 @@ import { ConfirmActionButton } from "@/components/ui/form-dialog";
 import { connectWhatsAppEmbeddedAction, disconnectChannelAction, disconnectChannelV2Action, startWhatsAppQrAction, whatsAppQrStatusAction, type QrState } from "@/app/[locale]/(dashboard)/integrations/actions";
 import { pairWhatsAppAction } from "@/app/[locale]/(dashboard)/integrations/whatsapp-actions";
 import { cn } from "@/lib/utils";
+import { waitForSignup } from "@/lib/channels/wa-signup-wait";
 
 /**
  * Wave 20 — WhatsApp in one button.
@@ -118,7 +119,8 @@ export function WhatsAppConnect(p: WaConnectProps) {
             toast.error(t("integrations.whatsapp.cancelled"));
             return;
           }
-          setTimeout(async () => {
+          void (async () => {
+            await waitForSignup(signup);
             const r = await connectWhatsAppEmbeddedAction({ locale, code, phoneNumberId: signup.current.phone_number_id ?? "", wabaId: signup.current.waba_id ?? "" });
             setBusyOfficial(false);
             if (r.error) toast.error(t(r.error, r.messageParams));
@@ -127,9 +129,9 @@ export function WhatsAppConnect(p: WaConnectProps) {
               toast.success(t("integrations.wa.connected"));
               router.refresh();
             }
-          }, 800);
+          })();
         },
-        { config_id: p.meta.configId, response_type: "code", override_default_response_type: true, extras: { setup: {} } },
+        { config_id: p.meta.configId, response_type: "code", override_default_response_type: true, extras: { setup: {}, sessionInfoVersion: "3" } },
       );
     } catch {
       setBusyOfficial(false);

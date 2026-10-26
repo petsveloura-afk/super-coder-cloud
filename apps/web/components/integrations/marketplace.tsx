@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { Badge, Button, Input } from "@/components/ui/primitives";
 import { ConfirmActionButton } from "@/components/ui/form-dialog";
 import { cn } from "@/lib/utils";
+import { waitForSignup } from "@/lib/channels/wa-signup-wait";
 import { chooseMetaPageAction, connectMetaPagesAction, disconnectMetaPagesAction, type MetaPageChoice } from "@/app/[locale]/(dashboard)/integrations/connect-actions";
 import { connectWhatsAppEmbeddedAction } from "@/app/[locale]/(dashboard)/integrations/actions";
 
@@ -301,7 +302,8 @@ function WhatsAppAppTile({ p }: { p: MarketProps }) {
             toast.error(t("integrations.whatsapp.cancelled"));
             return;
           }
-          setTimeout(async () => {
+          void (async () => {
+            await waitForSignup(signup);
             const r = await connectWhatsAppEmbeddedAction({ locale, code, phoneNumberId: signup.current.phone_number_id ?? "", wabaId: signup.current.waba_id ?? "" });
             setBusy(false);
             if (r.error) toast.error(t(r.error, r.messageParams));
@@ -309,7 +311,7 @@ function WhatsAppAppTile({ p }: { p: MarketProps }) {
               toast.success(t("integrations.channels.connected"));
               router.refresh();
             }
-          }, 800);
+          })();
         },
         // coexistence: keep using the WhatsApp Business app on the phone, the same number also works here
         { config_id: p.metaWa.configId, response_type: "code", override_default_response_type: true, extras: { setup: {}, featureType: "whatsapp_business_app_onboarding", sessionInfoVersion: "3" } },

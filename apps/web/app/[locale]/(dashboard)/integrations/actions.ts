@@ -322,8 +322,9 @@ export async function disconnectChannelV2Action(fd: FormData): Promise<ActionSta
 
 const embeddedSchema = z.object({
   code: z.string().trim().min(10).max(2000),
-  phoneNumberId: z.string().trim().regex(/^\d{5,30}$/),
-  wabaId: z.string().trim().regex(/^\d{5,30}$/),
+  // the popup's FINISH message can be missing (e.g. Coexistence) — the server then finds the ids from the token
+  phoneNumberId: z.union([z.literal(""), z.string().trim().regex(/^\d{5,30}$/)]).default(""),
+  wabaId: z.union([z.literal(""), z.string().trim().regex(/^\d{5,30}$/)]).default(""),
 });
 
 /** Official WhatsApp — finishes Meta Embedded Signup (the popup returned a code + the chosen number). */

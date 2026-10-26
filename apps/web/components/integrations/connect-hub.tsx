@@ -25,6 +25,7 @@ import {
   type TgUserState,
 } from "@/app/[locale]/(dashboard)/integrations/actions";
 import { cn } from "@/lib/utils";
+import { waitForSignup } from "@/lib/channels/wa-signup-wait";
 
 /**
  * Integrations — simple "connect in one click" hub (wave 6).
@@ -208,7 +209,8 @@ export function WhatsAppOfficialCard({ p }: { p: HubProps }) {
             return;
           }
           // the FINISH message can arrive a moment after the callback
-          setTimeout(async () => {
+          void (async () => {
+            await waitForSignup(signup);
             const r = await connectWhatsAppEmbeddedAction({ locale, code, phoneNumberId: signup.current.phone_number_id ?? "", wabaId: signup.current.waba_id ?? "" });
             setBusy(false);
             if (r.error) toast.error(t(r.error, r.messageParams));
@@ -216,10 +218,10 @@ export function WhatsAppOfficialCard({ p }: { p: HubProps }) {
               toast.success(t("integrations.channels.connected"));
               router.refresh();
             }
-          }, 800);
+          })();
         },
         // Embedded Signup v4: the version comes from the Facebook Login for Business configuration; extras stay minimal
-        { config_id: p.meta.configId, response_type: "code", override_default_response_type: true, extras: { setup: {} } },
+        { config_id: p.meta.configId, response_type: "code", override_default_response_type: true, extras: { setup: {}, sessionInfoVersion: "3" } },
       );
     } catch {
       setBusy(false);
