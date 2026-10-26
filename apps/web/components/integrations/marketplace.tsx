@@ -163,22 +163,26 @@ function MetaTile({ p }: { p: MarketProps }) {
   const sdkReady = usePreloadFacebook(p.metaPages);
   // wave 25: Pages the business must pick after the full-page flow come back in a short cookie
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const m = document.cookie.match(/(?:^|; )scc_meta_choose=([^;]*)/);
       if (!m) return;
       document.cookie = `scc_meta_choose=; Max-Age=0; path=/${locale}/integrations`;
       const j = JSON.parse(decodeURIComponent(m[1]!)) as { pages?: MetaPageChoice[]; sealed?: string };
-      if (j.pages?.length && j.sealed) setChoose({ pages: j.pages, sealed: j.sealed });
+      if (j.pages?.length && j.sealed) timer = setTimeout(() => setChoose({ pages: j.pages!, sealed: j.sealed! }), 0);
     } catch {
       /* no pending choice */
     }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [locale]);
   const fullPageUrl = `/api/channels/meta/pages/oauth?locale=${locale}`;
   async function connect() {
     if (!p.metaPages) return;
     // no popup possible (script still loading / blocked): go through the full-page flow instead of showing a false "popup blocked"
     if (!sdkReady || !window.FB) {
-      window.location.assign(fullPageUrl);
+      window.location.assign(new URL(fullPageUrl, window.location.origin).toString());
       return;
     }
     setBusy(true);
@@ -204,7 +208,7 @@ function MetaTile({ p }: { p: MarketProps }) {
       );
     } catch {
       setBusy(false);
-      window.location.assign(fullPageUrl);
+      window.location.assign(new URL(fullPageUrl, window.location.origin).toString());
     }
   }
   return (

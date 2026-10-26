@@ -409,7 +409,9 @@ function TelegramUserCard({ p }: { p: HubProps }) {
   // wave 25: while the 2FA password form is on screen, polling pauses and the form stays — it must not
   // disappear / re-render under the user's fingers (a QR refresh used to swap it back to the QR code).
   const holdPw = useRef(false);
-  holdPw.current = st?.status === "password";
+  useEffect(() => {
+    holdPw.current = st?.status === "password";
+  }, [st?.status]);
 
   useEffect(() => {
     if (!open) return;
