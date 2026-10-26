@@ -113,7 +113,21 @@
       "3": "Good",
       "4": "Strong"
     },
-    "linkExpired": "This link has expired or is invalid"
+    "linkExpired": "This link has expired or is invalid",
+    "trust": {
+      "secure": {
+        "title": "Secure",
+        "body": "Encryption and role-based access"
+      },
+      "free": {
+        "title": "Start free",
+        "body": "No credit card needed"
+      },
+      "agents": {
+        "title": "AI agents",
+        "body": "Answer customers 24/7"
+      }
+    }
   },
   "onboarding": {
     "title": "Let's set up your workspace",
@@ -1822,7 +1836,29 @@
     "waTemplateParams": "Values for {{1}}, {{2}}…",
     "waTemplateParamsHint": "Separated by | — you can use {{contact.first_name}}",
     "badTemplateName": "Template name: lowercase letters, digits and _",
-    "badTemplateLang": "Invalid language code (e.g. he, en_US)"
+    "badTemplateLang": "Invalid language code (e.g. he, en_US)",
+    "kpi": {
+      "total": "Total campaigns",
+      "drafts": "{count} drafts",
+      "sent": "Messages sent",
+      "recipients": "of {count} recipients",
+      "delivery": "Delivery rate",
+      "failed": "{count} failed",
+      "active": "Active now",
+      "activeHint": "scheduled or sending"
+    },
+    "filters": {
+      "all": "All",
+      "allChannels": "All channels",
+      "search": "Search by name",
+      "apply": "Filter",
+      "none": "No campaigns match this filter"
+    },
+    "duplicate": "Duplicate",
+    "duplicated": "A new draft was created from the campaign",
+    "progressLabel": "{pct}% of the send is done",
+    "failureRate": "{pct}% failed",
+    "pending": "{count} waiting"
   },
   "inbox": {
     "title": "Inbox",
@@ -3742,7 +3778,28 @@
     "shopify": {
       "body": "Orders reach the CRM (customer, amount, items), a \"new order\" automation, and abandoned-cart reminders.",
       "shop": "Shopify store name",
-      "setup": "The platform owner needs a Shopify app (SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET)."
+      "setup": "The platform owner needs a Shopify app (SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET).",
+      "placeholder": "Store name, website address or my-store",
+      "checking": "Checking the store…",
+      "found": "Recognised: {shop}",
+      "unverified": "Couldn't verify ahead of time — we'll continue to Shopify and it will confirm.",
+      "notFound": "We couldn't find a store with that name. Try the address from your Shopify admin (…myshopify.com) or your website domain.",
+      "notShopify": "That domain doesn't look like a Shopify store.",
+      "invalid": "Type your store name in English, your website domain, or paste your Shopify admin address.",
+      "useThis": "Use {shop}",
+      "hint": "Type a store name, a domain (www.mystore.com) or paste a link from your admin — we'll recognise it.",
+      "syncNow": "Sync now",
+      "syncing": "Syncing…",
+      "synced": "Synced {orders} orders and {carts} carts",
+      "disconnect": "Disconnect store",
+      "disconnectConfirm": "Disconnect your Shopify store? New orders will stop reaching the CRM. You can reconnect any time.",
+      "err": {
+        "forbidden": "You can't manage connections",
+        "not_connected": "The store isn't connected",
+        "no_token": "Access token missing — please reconnect",
+        "token_revoked": "Access was revoked in Shopify — please reconnect",
+        "unreachable": "We couldn't reach the store, try again in a moment"
+      }
     },
     "woo": {
       "body": "Type the store address, approve in WooCommerce — every order reaches the CRM and fires automations.",
@@ -3776,7 +3833,9 @@
       "bad_shop": "Invalid Shopify store name",
       "bad_url": "Invalid store address (https required)",
       "no_permissions": "No permission was ticked on the Google screen. Try again and tick the checkboxes (or \"Select all\").",
-      "partial": "Partly connected ({detail}) — you can retry what failed"
+      "partial": "Partly connected ({detail}) — you can retry what failed",
+      "shop_not_found": "We couldn't find a Shopify store with that name",
+      "not_shopify": "That domain isn't a Shopify store"
     },
     "adminSetup": "One-time setup in admin",
     "adminOnly": "Only you see this"

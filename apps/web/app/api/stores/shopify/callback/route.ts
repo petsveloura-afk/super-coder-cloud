@@ -3,7 +3,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { getOrgContext } from "@/lib/auth";
 import { isLocale } from "@/lib/i18n/config";
 import { validShopDomain, verifyShopifyQuery } from "@/lib/stores/core";
-import { shopifyExchange, shopifyRegisterWebhooks } from "@/lib/stores/shopify";
+import { shopifyBackfill, shopifyExchange, shopifyRegisterWebhooks } from "@/lib/stores/shopify";
 import { encryptionReady } from "@/lib/channels/secrets";
 
 export const dynamic = "force-dynamic";
@@ -43,5 +43,7 @@ export async function GET(request: NextRequest) {
     const { createAdminClient } = await import("@/lib/supabase/admin");
     await createAdminClient().from("integrations").update({ last_error: `webhooks: ${hooks.failed.join(", ")}`.slice(0, 500) }).eq("organization_id", ctx.org.id).eq("provider", "shopify");
   }
-  return done("connected");
+  // wave 26: fill the CRM right away with the latest orders + abandoned carts (best effort, never blocks the connection)
+  const filled = await shopifyBackfill(ctx.org.id, shop, tok.token).catch(() => ({ orders: 0, carts: 0 }));
+  return done("connected", `${filled.orders}/${filled.carts}`);
 }

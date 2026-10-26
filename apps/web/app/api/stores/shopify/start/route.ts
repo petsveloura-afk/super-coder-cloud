@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { getOrgContext } from "@/lib/auth";
 import { isLocale } from "@/lib/i18n/config";
 import { validShopDomain } from "@/lib/stores/core";
+import { resolveShop } from "@/lib/stores/resolve";
 import { shopifyAuthorizeUrl, shopifyConfigured } from "@/lib/stores/shopify";
 
 export const dynamic = "force-dynamic";
@@ -13,13 +14,17 @@ export async function GET(request: NextRequest) {
   const locale = isLocale(l) ? l : "he";
   const back = new URL(`/${locale}/integrations`, request.url);
   back.hash = "stores";
-  const shop = validShopDomain(request.nextUrl.searchParams.get("shop"));
+  const typed = request.nextUrl.searchParams.get("shop");
   if (!shopifyConfigured()) {
     back.searchParams.set("store", "not_configured");
     return NextResponse.redirect(back);
   }
+  // wave 26: smart recognition — store name / custom domain / admin URL / handle → verified <handle>.myshopify.com
+  const found = await resolveShop(typed);
+  let shop = found.shop && found.status !== "not_found" ? validShopDomain(found.shop) : null;
+  if (!shop && found.status === "unverified") shop = validShopDomain(typed);
   if (!shop) {
-    back.searchParams.set("store", "bad_shop");
+    back.searchParams.set("store", found.status === "not_found" ? "shop_not_found" : found.status === "not_shopify" ? "not_shopify" : "bad_shop");
     return NextResponse.redirect(back);
   }
   const ctx = await getOrgContext(locale);

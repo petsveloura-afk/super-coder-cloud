@@ -132,3 +132,29 @@ export async function aiSegmentAction(input: { locale: string; text: string }): 
   if (!audience) return { error: "campaigns.segmentFailed" };
   return { ok: true, message: "campaigns.segmentReady", data: { audience } };
 }
+
+/**
+ * Wave 26 — "duplicate campaign": a fresh DRAFT with the same channel, message, audience (and WhatsApp template).
+ * Nothing is sent, nothing is scheduled; the original is untouched. Opens the copy for editing.
+ */
+export async function duplicateCampaignAction(fd: FormData): Promise<ActionState<{ id: string }>> {
+  const locale = formLocale(fd);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("campaigns.manage")) return { error: "errors.forbidden" };
+  const id = uuidSchema.safeParse(str(fd, "id"));
+  if (!id.success) return { error: "validation.invalidId" };
+  const supabase = await createClient();
+  const { data: src, error: e1 } = await supabase.from("campaigns").select("name, channel, subject, body, audience").eq("id", id.data).eq("organization_id", ctx.org.id).maybeSingle();
+  if (e1) return { error: dbErrorKey(e1) };
+  if (!src) return { error: "validation.invalidId" };
+  const { copyName } = await import("@/lib/campaigns/metrics");
+  const suffix = locale === "he" ? "(עותק)" : locale === "ar" ? "(نسخة)" : "(copy)";
+  const row = { organization_id: ctx.org.id, created_by: ctx.userId, name: copyName(String(src.name), suffix), channel: src.channel, subject: src.subject, body: src.body, audience: src.audience, status: "draft" };
+  const { data, error } = await supabase.from("campaigns").insert(row).select("id").single();
+  if (error) return { error: dbErrorKey(error) };
+  // wave 17 column — separate, best effort (works before that migration too)
+  const { data: tpl } = await supabase.from("campaigns").select("wa_template").eq("id", id.data).maybeSingle();
+  if (tpl && (tpl as { wa_template?: unknown }).wa_template) await supabase.from("campaigns").update({ wa_template: (tpl as { wa_template: unknown }).wa_template }).eq("id", data.id).eq("organization_id", ctx.org.id);
+  revalidatePath(`/${locale}/campaigns`);
+  return { ok: true, message: "campaigns.duplicated", data: { id: data.id as string } };
+}

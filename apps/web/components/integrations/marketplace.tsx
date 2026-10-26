@@ -369,25 +369,115 @@ function GoogleTile({ p }: { p: MarketProps }) {
 }
 
 /* ----------------------------------------------------------- stores */
+type ShopCheck = { status: "idle" | "checking" | "found" | "not_found" | "unverified" | "invalid" | "not_shopify"; shop?: string | null; name?: string | null; tried?: string[] };
+
 function ShopifyTile({ p }: { p: MarketProps }) {
   const { t, locale } = useI18n();
+  const router = useRouter();
   const [shop, setShop] = useState(p.shopify.shop?.replace(/\.myshopify\.com$/, "") ?? "");
+  const [result, setResult] = useState<{ forInput: string; data: ShopCheck }>({ forInput: "", data: { status: "idle" } });
+  const [busy, setBusy] = useState<"sync" | "disconnect" | null>(null);
+  const v = shop.trim();
+  const active = v.length >= 2 && p.canManage && p.shopify.configured;
+  // derived (no setState in the effect body): idle when inactive, "checking" until the answer for THIS text arrives
+  const check: ShopCheck = !active ? { status: "idle" } : result.forInput === v ? result.data : { status: "checking" };
+
+  // wave 26: recognise the store while typing (debounced) — name, handle, custom domain or admin address
+  useEffect(() => {
+    if (!active) return;
+    let alive = true;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/stores/shopify/resolve?shop=${encodeURIComponent(v)}`, { cache: "no-store" });
+        const j = (await res.json()) as ShopCheck & { ok?: boolean };
+        if (alive) setResult({ forInput: v, data: j.ok ? { status: j.status, shop: j.shop, name: j.name, tried: j.tried } : { status: "idle" } });
+      } catch {
+        if (alive) setResult({ forInput: v, data: { status: "idle" } });
+      }
+    }, 600);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [v, active]);
+
+  const handle = check.shop?.replace(/\.myshopify\.com$/, "") ?? null;
+  // pasting a full address (https://…/admin, admin.shopify.com/store/x) → keep just what matters
+  const onPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const txt = e.clipboardData.getData("text");
+    if (/^\s*(https?:\/\/|admin\.shopify\.com|[a-z0-9-]+\.myshopify\.)/i.test(txt)) {
+      e.preventDefault();
+      const m = txt.trim().match(/admin\.shopify\.com\/store\/([a-z0-9-]+)/i) ?? txt.trim().match(/([a-z0-9][a-z0-9-]*)\.myshopify\./i);
+      setShop(m?.[1]?.toLowerCase() ?? txt.trim());
+    }
+  };
+  const act = async (action: "sync" | "disconnect") => {
+    setBusy(action);
+    try {
+      const res = await fetch("/api/stores/shopify/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, locale }) });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; orders?: number; carts?: number; error?: string };
+      if (j.ok) {
+        toast.success(action === "sync" ? t("market.shopify.synced", { orders: String(j.orders ?? 0), carts: String(j.carts ?? 0) }) : t("integrations.channels.disconnected"));
+        router.refresh();
+      } else toast.error(t(`market.shopify.err.${j.error ?? "unreachable"}`));
+    } catch {
+      toast.error(t("market.shopify.err.unreachable"));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const tone = check.status === "found" ? "text-success" : check.status === "not_found" || check.status === "not_shopify" || check.status === "invalid" ? "text-danger" : "text-muted";
   return (
     <Tile id="shopify" icon={ShoppingBag} title="Shopify" body={t("market.shopify.body")} gradient="from-lime-500/15 to-transparent" state={<State on={p.shopify.connected} error={p.shopify.error} />} steps={t("market.oneApproval")}>
-      {p.shopify.connected ? <p className="text-[12.5px] text-muted">{t("market.store.stats", { orders: String(p.shopify.orders30), revenue: `₪${Math.round(p.shopify.revenue30).toLocaleString("he-IL")}` })}</p> : null}
+      {p.shopify.connected ? (
+        <div className="space-y-2">
+          <p className="text-[12.5px] text-muted">{t("market.store.stats", { orders: String(p.shopify.orders30), revenue: `₪${Math.round(p.shopify.revenue30).toLocaleString("he-IL")}` })}</p>
+          {p.shopify.shop ? (
+            <p className="text-[12px] text-subtle" dir="ltr">
+              {p.shopify.shop}
+            </p>
+          ) : null}
+          {p.canManage ? (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => act("sync")} data-testid="shopify-sync">
+                {busy === "sync" ? t("market.shopify.syncing") : t("market.shopify.syncNow")}
+              </Button>
+              <Button type="button" variant="danger" disabled={busy !== null} onClick={() => (window.confirm(t("market.shopify.disconnectConfirm")) ? act("disconnect") : undefined)} data-testid="shopify-disconnect">
+                {t("market.shopify.disconnect")}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {p.canManage ? (
         p.shopify.configured ? (
-          <form action="/api/stores/shopify/start" method="get" className="flex gap-2">
+          <form action="/api/stores/shopify/start" method="get" className="space-y-1.5">
             <input type="hidden" name="locale" value={locale} />
-            <div className="relative min-w-0 flex-1">
-              <Input name="shop" value={shop} onChange={(e) => setShop(e.target.value)} placeholder="my-store" dir="ltr" aria-label={t("market.shopify.shop")} className="pe-28" required />
-              <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-[11.5px] text-subtle" dir="ltr">
-                .myshopify.com
-              </span>
+            <div className="flex gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Input name="shop" value={shop} onChange={(e) => setShop(e.target.value)} onPaste={onPaste} placeholder={t("market.shopify.placeholder")} dir="ltr" autoComplete="off" autoCapitalize="none" spellCheck={false} inputMode="url" aria-label={t("market.shopify.shop")} aria-describedby="shopify-check" className="pe-28" required />
+                <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-[11.5px] text-subtle" dir="ltr">
+                  {/[./]/.test(shop) ? "" : ".myshopify.com"}
+                </span>
+              </div>
+              <Button type="submit" disabled={check.status === "not_found" || check.status === "invalid" || check.status === "not_shopify"} data-testid="shopify-connect">
+                {t(p.shopify.connected ? "integrations.channels.reconnect" : "integrations.channels.connect")}
+              </Button>
             </div>
-            <Button type="submit" data-testid="shopify-connect">
-              {t(p.shopify.connected ? "integrations.channels.reconnect" : "integrations.channels.connect")}
-            </Button>
+            <p id="shopify-check" role="status" aria-live="polite" className={cn("min-h-[1.1rem] text-[12px]", tone)}>
+              {check.status === "checking" ? t("market.shopify.checking") : null}
+              {check.status === "found" ? `✓ ${t("market.shopify.found", { shop: check.shop ?? "" })}${check.name ? ` — ${check.name}` : ""}` : null}
+              {check.status === "unverified" ? t("market.shopify.unverified") : null}
+              {check.status === "not_found" ? t("market.shopify.notFound") : null}
+              {check.status === "not_shopify" ? t("market.shopify.notShopify") : null}
+              {check.status === "invalid" ? t("market.shopify.invalid") : null}
+            </p>
+            {check.status === "found" && handle && handle !== shop.trim().toLowerCase() ? (
+              <button type="button" className="text-[12px] font-semibold text-accent hover:underline" onClick={() => setShop(handle)}>
+                {t("market.shopify.useThis", { shop: handle })}
+              </button>
+            ) : null}
+            <p className="text-[11.5px] text-subtle">{t("market.shopify.hint")}</p>
           </form>
         ) : (
           <AdminSetup what="shopify" />

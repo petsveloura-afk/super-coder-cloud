@@ -9,7 +9,9 @@ import { CampaignActions } from "@/components/campaigns/campaign-actions";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatPercent } from "@/lib/format";
+import { campaignRates, isRecipientFilter, RECIPIENT_FILTERS } from "@/lib/campaigns/metrics";
+import { cn } from "@/lib/utils";
 import { channelsReady } from "@/lib/campaign-channels";
 
 type Params = Promise<{ locale: string; id: string }>;
@@ -19,7 +21,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return { title: t("campaigns.title") };
 }
 
-export default async function CampaignPage({ params }: { params: Params }) {
+export default async function CampaignPage({ params, searchParams }: { params: Params; searchParams?: Promise<{ r?: string }> }) {
   const locale = await resolveLocale(params);
   const { id: rawId } = await params;
   const id = uuidSchema.safeParse(rawId);
@@ -57,14 +59,23 @@ export default async function CampaignPage({ params }: { params: Params }) {
       </>
     );
   }
-  const { data: recipients } = await supabase
+  const rf = (await searchParams)?.r;
+  const recFilter = isRecipientFilter(rf) ? rf : "all";
+  let recQuery = supabase
     .from("campaign_recipients")
     .select("id, contact_id, status, error, sent_at, contacts(first_name, last_name, email, phone)")
     .eq("organization_id", ctx.org.id)
-    .eq("campaign_id", c.id)
-    .order("sent_at", { ascending: false, nullsFirst: true })
-    .limit(200);
+    .eq("campaign_id", c.id);
+  if (recFilter !== "all") recQuery = recQuery.eq("status", recFilter);
+  const [{ data: recipients }, { data: statusRows }] = await Promise.all([
+    recQuery.order("sent_at", { ascending: false, nullsFirst: true }).limit(200),
+    // wave 26: live breakdown by status (real counts, even while the send is in progress)
+    supabase.from("campaign_recipients").select("status").eq("organization_id", ctx.org.id).eq("campaign_id", c.id).limit(20000),
+  ]);
+  const counts: Record<string, number> = {};
+  for (const r of (statusRows ?? []) as { status: string }[]) counts[r.status] = (counts[r.status] ?? 0) + 1;
   const st = (c.stats as { recipients?: number; sent?: number; failed?: number }) ?? {};
+  const rates = campaignRates(st);
   return (
     <>
       {header}
@@ -83,6 +94,18 @@ export default async function CampaignPage({ params }: { params: Params }) {
           </Card>
         ))}
       </div>
+      <Card className="mb-4 p-5" data-testid="campaign-progress">
+        <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
+          <span className="font-semibold">{t("campaigns.kpi.delivery")}: {formatPercent(locale, rates.deliveryRate)}</span>
+          <span className="text-muted">{t("campaigns.progressLabel", { pct: Math.round(rates.progress * 100) })}</span>
+          {rates.failed ? <span className="text-danger">{t("campaigns.failureRate", { pct: Math.round(rates.failureRate * 100) })}</span> : null}
+          {rates.pending ? <span className="text-subtle">{t("campaigns.pending", { count: rates.pending })}</span> : null}
+        </div>
+        <div className="flex h-2.5 overflow-hidden rounded-full bg-surface-hover" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(rates.progress * 100)}>
+          <span className="block h-full bg-success" style={{ width: `${rates.recipients ? (rates.sent / rates.recipients) * 100 : 0}%` }} />
+          <span className="block h-full bg-danger" style={{ width: `${rates.recipients ? (rates.failed / rates.recipients) * 100 : 0}%` }} />
+        </div>
+      </Card>
       <Card className="mb-4 p-5">
         {c.subject ? <div className="mb-2 font-semibold">{c.subject}</div> : null}
         <p className="whitespace-pre-wrap text-sm text-muted">{c.body}</p>
@@ -90,6 +113,14 @@ export default async function CampaignPage({ params }: { params: Params }) {
       </Card>
       <Card>
         <CardHeader title={t("campaigns.recipients")} />
+        <div className="flex flex-wrap gap-1.5 border-b border-line px-5 py-3" role="tablist" data-testid="recipient-filters">
+          {RECIPIENT_FILTERS.map((f) => (
+            <Link key={f} href={f === "all" ? `/${locale}/campaigns/${c.id}` : `/${locale}/campaigns/${c.id}?r=${f}`} role="tab" aria-selected={recFilter === f} className={cn("rounded-full border px-3 py-1 text-[12.5px] font-medium transition", recFilter === f ? "border-transparent bg-accent-solid text-accent-fg" : "border-line text-muted hover:bg-surface-hover")}>
+              {f === "all" ? t("campaigns.filters.all") : t(`campaigns.recipientStatus.${f}`)}
+              <span className="ms-1.5 text-[11px] opacity-70">{f === "all" ? (statusRows ?? []).length : (counts[f] ?? 0)}</span>
+            </Link>
+          ))}
+        </div>
         <ul className="divide-y divide-line">
           {(recipients ?? []).map((r) => {
             const ct = r.contacts as unknown as { first_name: string; last_name: string; email: string | null; phone: string | null } | null;

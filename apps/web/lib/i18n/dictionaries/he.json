@@ -113,7 +113,21 @@
       "3": "טובה",
       "4": "חזקה"
     },
-    "linkExpired": "הקישור פג תוקף או אינו תקין"
+    "linkExpired": "הקישור פג תוקף או אינו תקין",
+    "trust": {
+      "secure": {
+        "title": "מאובטח",
+        "body": "הצפנה והרשאות לפי תפקיד"
+      },
+      "free": {
+        "title": "מתחילים בחינם",
+        "body": "בלי כרטיס אשראי"
+      },
+      "agents": {
+        "title": "סוכני AI",
+        "body": "עונים ללקוחות 24/7"
+      }
+    }
   },
   "onboarding": {
     "title": "בואו נקים את סביבת העבודה",
@@ -1822,7 +1836,29 @@
     "waTemplateParams": "ערכים למשתנים {{1}}, {{2}}…",
     "waTemplateParamsHint": "מופרדים ב-|. אפשר להשתמש ב-{{contact.first_name}}",
     "badTemplateName": "שם תבנית: אותיות אנגליות קטנות, ספרות וקו תחתון",
-    "badTemplateLang": "קוד שפה לא תקין (למשל he, en_US)"
+    "badTemplateLang": "קוד שפה לא תקין (למשל he, en_US)",
+    "kpi": {
+      "total": "סה״כ קמפיינים",
+      "drafts": "{count} טיוטות",
+      "sent": "הודעות שנשלחו",
+      "recipients": "מתוך {count} נמענים",
+      "delivery": "אחוז הצלחה בשליחה",
+      "failed": "{count} נכשלו",
+      "active": "פעילים כעת",
+      "activeHint": "מתוזמנים או בשליחה"
+    },
+    "filters": {
+      "all": "הכול",
+      "allChannels": "כל הערוצים",
+      "search": "חיפוש לפי שם",
+      "apply": "סינון",
+      "none": "אין קמפיינים שמתאימים לסינון"
+    },
+    "duplicate": "שכפול קמפיין",
+    "duplicated": "נוצרה טיוטה חדשה מהקמפיין",
+    "progressLabel": "{pct}% מהשליחה הושלמה",
+    "failureRate": "{pct}% כשלים",
+    "pending": "{count} ממתינים"
   },
   "inbox": {
     "title": "תיבת הודעות",
@@ -3742,7 +3778,28 @@
     "shopify": {
       "body": "הזמנות נכנסות ל-CRM (לקוח, סכום, מוצרים), אוטומציה \"הזמנה חדשה\", ותזכורת לעגלות נטושות.",
       "shop": "שם החנות ב-Shopify",
-      "setup": "בעל הפלטפורמה צריך אפליקציית Shopify (SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET)."
+      "setup": "בעל הפלטפורמה צריך אפליקציית Shopify (SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET).",
+      "placeholder": "שם החנות, כתובת האתר או my-store",
+      "checking": "בודקים את החנות…",
+      "found": "זוהתה: {shop}",
+      "unverified": "לא הצלחנו לוודא מראש — נמשיך ל-Shopify והוא יאשר.",
+      "notFound": "לא מצאנו חנות בשם הזה. נסו את הכתובת מתוך ה-Admin של Shopify (…myshopify.com) או את דומיין האתר.",
+      "notShopify": "הדומיין הזה לא נראה כחנות Shopify.",
+      "invalid": "אפשר להקליד שם חנות באנגלית, דומיין האתר, או להדביק את כתובת ה-Admin של Shopify.",
+      "useThis": "להשתמש ב-{shop}",
+      "hint": "אפשר להקליד שם חנות, דומיין (www.mystore.co.il) או להדביק קישור מה-Admin — נזהה לבד.",
+      "syncNow": "סנכרון עכשיו",
+      "syncing": "מסנכרנים…",
+      "synced": "סונכרנו {orders} הזמנות ו-{carts} עגלות",
+      "disconnect": "ניתוק החנות",
+      "disconnectConfirm": "לנתק את חנות Shopify? הזמנות חדשות יפסיקו להיכנס ל-CRM. אפשר לחבר מחדש בכל רגע.",
+      "err": {
+        "forbidden": "אין הרשאה לנהל חיבורים",
+        "not_connected": "החנות לא מחוברת",
+        "no_token": "חסר אישור גישה — חברו מחדש",
+        "token_revoked": "הגישה בוטלה ב-Shopify — חברו מחדש",
+        "unreachable": "לא הצלחנו להגיע לחנות, נסו שוב בעוד רגע"
+      }
     },
     "woo": {
       "body": "כותבים את כתובת החנות, מאשרים ב-WooCommerce — וכל הזמנה נכנסת ל-CRM ומפעילה אוטומציות.",
@@ -3776,7 +3833,9 @@
       "bad_shop": "שם חנות Shopify לא תקין",
       "bad_url": "כתובת חנות לא תקינה (צריך https)",
       "no_permissions": "לא סומנה אף הרשאה במסך של Google. נסו שוב וסמנו ✓ על התיבות (או \"Select all\").",
-      "partial": "החיבור הושלם חלקית ({detail}) — מה שנכשל אפשר לחבר שוב"
+      "partial": "החיבור הושלם חלקית ({detail}) — מה שנכשל אפשר לחבר שוב",
+      "shop_not_found": "לא מצאנו חנות Shopify בשם הזה",
+      "not_shopify": "הדומיין הזה אינו חנות Shopify"
     },
     "adminSetup": "הגדרה חד-פעמית בניהול ←",
     "adminOnly": "רק אתם רואים את זה"

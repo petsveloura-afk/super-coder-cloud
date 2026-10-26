@@ -61,3 +61,59 @@ export async function shopifyRegisterWebhooks(shop: string, token: string): Prom
   }
   return { ok, failed };
 }
+
+/**
+ * Wave 26 — first sync right after connecting (and the "sync now" button): pulls the latest orders and
+ * abandoned checkouts through the same RPCs the webhooks use, so the CRM/dashboard is populated immediately
+ * instead of waiting for the next purchase. Idempotent (record_store_* upsert by external id). Best effort.
+ */
+export async function shopifyBackfill(orgId: string, shop: string, token: string): Promise<{ orders: number; carts: number; error?: string }> {
+  const { shopifyOrder, shopifyCheckout } = await import("@/lib/stores/core");
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+  const headers = { "X-Shopify-Access-Token": token, Accept: "application/json" };
+  let orders = 0;
+  let carts = 0;
+  let error: string | undefined;
+  try {
+    const res = await fetch(`${shopBase(shop)}/admin/api/${apiVersion()}/orders.json?status=any&limit=50&order=created_at%20desc`, { headers, signal: AbortSignal.timeout(20_000), cache: "no-store" });
+    if (res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { orders?: Record<string, unknown>[] };
+      for (const raw of j.orders ?? []) {
+        const order = shopifyOrder(raw);
+        if (!order) continue;
+        const { error: e } = await admin.rpc("record_store_order", { p_org: orgId, p_source: "shopify", p_order: order });
+        if (!e) orders++;
+      }
+    } else error = `orders:${res.status}`;
+  } catch (e) {
+    error = `orders:${(e as Error).message}`;
+  }
+  try {
+    const res = await fetch(`${shopBase(shop)}/admin/api/${apiVersion()}/checkouts.json?limit=50`, { headers, signal: AbortSignal.timeout(20_000), cache: "no-store" });
+    if (res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { checkouts?: Record<string, unknown>[] };
+      for (const raw of j.checkouts ?? []) {
+        const cart = shopifyCheckout(raw);
+        if (!cart || raw.completed_at) continue;
+        const { error: e } = await admin.rpc("record_store_cart", { p_org: orgId, p_source: "shopify", p_cart: cart });
+        if (!e) carts++;
+      }
+    } else if (res.status !== 403 && res.status !== 404) error = error ?? `checkouts:${res.status}`;
+  } catch (e) {
+    error = error ?? `checkouts:${(e as Error).message}`;
+  }
+  return { orders, carts, error };
+}
+
+/** Lightweight health probe of a stored token — used by "sync now" to give a plain-words status. */
+export async function shopifyPing(shop: string, token: string): Promise<{ ok: boolean; name?: string; status: number }> {
+  try {
+    const res = await fetch(`${shopBase(shop)}/admin/api/${apiVersion()}/shop.json`, { headers: { "X-Shopify-Access-Token": token }, signal: AbortSignal.timeout(10_000), cache: "no-store" });
+    if (!res.ok) return { ok: false, status: res.status };
+    const j = (await res.json().catch(() => ({}))) as { shop?: { name?: string } };
+    return { ok: true, name: j.shop?.name, status: res.status };
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}
