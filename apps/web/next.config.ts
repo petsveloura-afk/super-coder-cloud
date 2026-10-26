@@ -70,8 +70,9 @@ const siteHeaders = [{ key: "Content-Security-Policy", value: siteCsp }];
 // Integrations: Meta "Connect WhatsApp" popup (Facebook JS SDK) is allowed on this page only.
 const integrationsCsp = csp
   .replace("script-src 'self' 'unsafe-inline'", "script-src 'self' 'unsafe-inline' https://connect.facebook.net")
-  .replace(/connect-src ([^;]*)/, "connect-src $1 https://graph.facebook.com https://www.facebook.com")
-  .replace(/frame-src ([^;]*)/, "frame-src $1 https://www.facebook.com https://web.facebook.com https://business.facebook.com");
+  // wave 26: the SDK also reads its app config from connect.facebook.net (was blocked by connect-src)
+  .replace(/connect-src ([^;]*)/, "connect-src $1 https://graph.facebook.com https://www.facebook.com https://*.facebook.com https://connect.facebook.net")
+  .replace(/frame-src ([^;]*)/, "frame-src $1 https://www.facebook.com https://web.facebook.com https://business.facebook.com https://*.facebook.com");
 const integrationsHeaders = [
   { key: "Content-Security-Policy", value: integrationsCsp },
   // wave 25: with COOP "same-origin" the Facebook popup loses its link to this page, so the SDK reports "popup blocked"
