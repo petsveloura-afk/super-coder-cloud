@@ -153,6 +153,8 @@ declare global {
   }
 }
 
+const WA_FULL_PAGE = true;
+
 function loadFacebook(appId: string, version: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (window.FB) return resolve();
@@ -198,6 +200,10 @@ export function WhatsAppOfficialCard({ p }: { p: HubProps }) {
   async function connect() {
     if (!p.meta) return;
     setBusy(true);
+    if (WA_FULL_PAGE) {
+      window.location.href = `/api/channels/meta/pages/oauth?locale=${locale}&kind=wa`;
+      return;
+    }
     try {
       await loadFacebook(p.meta.appId, p.meta.version);
       window.FB!.login(

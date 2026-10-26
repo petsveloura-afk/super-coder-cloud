@@ -39,6 +39,8 @@ declare global {
   }
 }
 
+const WA_FULL_PAGE = true;
+
 function loadFacebook(appId: string, version: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (window.FB) {
@@ -109,6 +111,11 @@ export function WhatsAppConnect(p: WaConnectProps) {
   async function connectOfficial() {
     if (!p.meta) return;
     setBusyOfficial(true);
+    if (WA_FULL_PAGE) {
+      // wave 26: the Embedded Signup popup returns a code Meta refuses to exchange; the full-page flow uses one fixed redirect_uri
+      window.location.href = `/api/channels/meta/pages/oauth?locale=${locale}&kind=wa`;
+      return;
+    }
     try {
       await loadFacebook(p.meta.appId, p.meta.version);
       window.FB!.login(
