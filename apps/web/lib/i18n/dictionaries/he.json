@@ -3781,6 +3781,7 @@
       "setup": "בעל הפלטפורמה צריך אפליקציית Shopify (SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET).",
       "placeholder": "שם החנות, כתובת האתר או my-store",
       "checking": "בודקים את החנות…",
+      "connecting": "מתחברים ל-Shopify…",
       "found": "זוהתה: {shop}",
       "unverified": "לא הצלחנו לוודא מראש — נמשיך ל-Shopify והוא יאשר.",
       "notFound": "לא מצאנו חנות בשם הזה. נסו את הכתובת מתוך ה-Admin של Shopify (…myshopify.com) או את דומיין האתר.",

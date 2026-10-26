@@ -3781,6 +3781,7 @@
       "setup": "The platform owner needs a Shopify app (SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET).",
       "placeholder": "Store name, website address or my-store",
       "checking": "Checking the store…",
+      "connecting": "Connecting to Shopify…",
       "found": "Recognised: {shop}",
       "unverified": "Couldn't verify ahead of time — we'll continue to Shopify and it will confirm.",
       "notFound": "We couldn't find a store with that name. Try the address from your Shopify admin (…myshopify.com) or your website domain.",

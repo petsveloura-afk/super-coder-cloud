@@ -3781,6 +3781,7 @@
       "setup": "يحتاج مالك المنصة إلى تطبيق Shopify.",
       "placeholder": "اسم المتجر أو عنوان الموقع أو my-store",
       "checking": "جارٍ فحص المتجر…",
+      "connecting": "جارٍ الاتصال بـ Shopify…",
       "found": "تم التعرّف: {shop}",
       "unverified": "تعذّر التحقق مسبقاً — سنتابع إلى Shopify وهو سيؤكد.",
       "notFound": "لم نجد متجراً بهذا الاسم. جرّب العنوان من لوحة Shopify (…myshopify.com) أو نطاق موقعك.",

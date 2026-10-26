@@ -377,6 +377,7 @@ function ShopifyTile({ p }: { p: MarketProps }) {
   const [shop, setShop] = useState(p.shopify.shop?.replace(/\.myshopify\.com$/, "") ?? "");
   const [result, setResult] = useState<{ forInput: string; data: ShopCheck }>({ forInput: "", data: { status: "idle" } });
   const [busy, setBusy] = useState<"sync" | "disconnect" | null>(null);
+  const [going, setGoing] = useState(false);
   const v = shop.trim();
   const active = v.length >= 2 && p.canManage && p.shopify.configured;
   // derived (no setState in the effect body): idle when inactive, "checking" until the answer for THIS text arrives
@@ -426,6 +427,16 @@ function ShopifyTile({ p }: { p: MarketProps }) {
       setBusy(null);
     }
   };
+  // wave 27: the page CSP says form-action 'self', and browsers also apply it to the redirect that follows a form submit —
+  // so the redirect to Shopify was silently blocked and the button looked dead. A normal navigation is not subject to it.
+  const goConnect = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (going || !v) return;
+    setGoing(true);
+    window.location.assign(`/api/stores/shopify/start?shop=${encodeURIComponent(v)}&locale=${encodeURIComponent(locale)}`);
+    // if the browser stays on this page (back button / bfcache), release the button again
+    window.setTimeout(() => setGoing(false), 15_000);
+  };
   const tone = check.status === "found" ? "text-success" : check.status === "not_found" || check.status === "not_shopify" || check.status === "invalid" ? "text-danger" : "text-muted";
   return (
     <Tile id="shopify" icon={ShoppingBag} title="Shopify" body={t("market.shopify.body")} gradient="from-lime-500/15 to-transparent" state={<State on={p.shopify.connected} error={p.shopify.error} />} steps={t("market.oneApproval")}>
@@ -451,7 +462,7 @@ function ShopifyTile({ p }: { p: MarketProps }) {
       ) : null}
       {p.canManage ? (
         p.shopify.configured ? (
-          <form action="/api/stores/shopify/start" method="get" className="space-y-1.5">
+          <form action="/api/stores/shopify/start" method="get" onSubmit={goConnect} className="space-y-1.5">
             <input type="hidden" name="locale" value={locale} />
             <div className="flex gap-2">
               <div className="relative min-w-0 flex-1">
@@ -460,8 +471,8 @@ function ShopifyTile({ p }: { p: MarketProps }) {
                   {/[./]/.test(shop) ? "" : ".myshopify.com"}
                 </span>
               </div>
-              <Button type="submit" disabled={check.status === "not_found" || check.status === "invalid" || check.status === "not_shopify"} data-testid="shopify-connect">
-                {t(p.shopify.connected ? "integrations.channels.reconnect" : "integrations.channels.connect")}
+              <Button type="submit" disabled={going || check.status === "not_found" || check.status === "invalid" || check.status === "not_shopify"} data-testid="shopify-connect">
+                {going ? t("market.shopify.connecting") : t(p.shopify.connected ? "integrations.channels.reconnect" : "integrations.channels.connect")}
               </Button>
             </div>
             <p id="shopify-check" role="status" aria-live="polite" className={cn("min-h-[1.1rem] text-[12px]", tone)}>
@@ -497,7 +508,17 @@ function WooTile({ p }: { p: MarketProps }) {
         </p>
       ) : null}
       {p.canManage ? (
-        <form action="/api/stores/woocommerce/start" method="get" className="flex gap-2">
+        <form
+          action="/api/stores/woocommerce/start"
+          method="get"
+          className="flex gap-2"
+          onSubmit={(e) => {
+            // wave 27: same CSP form-action issue as Shopify — navigate instead of submitting so the redirect to the store is not blocked
+            e.preventDefault();
+            const u = new FormData(e.currentTarget).get("url");
+            window.location.assign(`/api/stores/woocommerce/start?url=${encodeURIComponent(String(u ?? ""))}&locale=${encodeURIComponent(locale)}`);
+          }}
+        >
           <input type="hidden" name="locale" value={locale} />
           <Input name="url" defaultValue={p.woo.origin ?? ""} placeholder="https://my-store.co.il" dir="ltr" aria-label={t("market.woo.url")} required />
           <Button type="submit" data-testid="woo-connect">
