@@ -3,7 +3,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { getOrgContext } from "@/lib/auth";
 import { isLocale } from "@/lib/i18n/config";
 import { validShopDomain, verifyShopifyQuery } from "@/lib/stores/core";
-import { shopifyBackfill, shopifyExchange, shopifyRegisterWebhooks } from "@/lib/stores/shopify";
+import { missingScopes, shopifyBackfill, shopifyExchange, shopifyRegisterWebhooks } from "@/lib/stores/shopify";
 import { encryptionReady } from "@/lib/channels/secrets";
 
 export const dynamic = "force-dynamic";
@@ -39,9 +39,12 @@ export async function GET(request: NextRequest) {
   const { saveIntegration } = await import("@/lib/integrations/store");
   await saveIntegration(ctx.org.id, "shopify", { shop, scope: tok.scope ?? "", connected_at: new Date().toISOString(), nonce: randomBytes(4).toString("hex") }, { access_token: tok.token });
   const hooks = await shopifyRegisterWebhooks(shop, tok.token);
-  if (hooks.failed.length) {
+  // wave 29: say plainly when Shopify did not grant every scope we asked for (the usual reason for 403 on every webhook)
+  const lacking = missingScopes(tok.scope);
+  const notes = [lacking.length ? `scopes_missing: ${lacking.join(",")}` : "", hooks.failed.length ? `webhooks: ${hooks.failed.join(", ")}` : ""].filter(Boolean);
+  if (notes.length) {
     const { createAdminClient } = await import("@/lib/supabase/admin");
-    await createAdminClient().from("integrations").update({ last_error: `webhooks: ${hooks.failed.join(", ")}`.slice(0, 500) }).eq("organization_id", ctx.org.id).eq("provider", "shopify");
+    await createAdminClient().from("integrations").update({ last_error: notes.join(" | ").slice(0, 500) }).eq("organization_id", ctx.org.id).eq("provider", "shopify");
   }
   // wave 26: fill the CRM right away with the latest orders + abandoned carts (best effort, never blocks the connection)
   const filled = await shopifyBackfill(ctx.org.id, shop, tok.token).catch(() => ({ orders: 0, carts: 0 }));

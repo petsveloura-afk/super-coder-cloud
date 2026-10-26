@@ -3852,7 +3852,8 @@
         "webhooks": "Connected, but live Shopify updates are not active yet",
         "error": "There is a problem with the Shopify connection",
         "hint403": "Usually a permission issue: in Shopify Partners → your app → request Protected customer data access, then disconnect and reconnect the store to approve the permissions.",
-        "hintGeneric": "Press \"Sync now\" to retry. Recent orders still import without live updates."
+        "hintGeneric": "Press \"Sync now\" to retry. Recent orders still import without live updates.",
+        "hintScopes": "Shopify did not grant every permission we asked for. In Shopify (Dev Dashboard or Partners) → your app → Versions → add the scopes listed above (scopes_missing) → Release. Then disconnect and reconnect the store."
       }
     },
     "woo": {

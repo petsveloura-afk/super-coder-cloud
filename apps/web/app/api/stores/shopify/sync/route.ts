@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getOrgContext } from "@/lib/auth";
 import { isLocale } from "@/lib/i18n/config";
-import { shopifyBackfill, shopifyPing, shopifyRegisterWebhooks } from "@/lib/stores/shopify";
+import { missingScopes, shopifyBackfill, shopifyGrantedScopes, shopifyPing, shopifyRegisterWebhooks } from "@/lib/stores/shopify";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -34,10 +34,13 @@ export async function POST(request: NextRequest) {
   const hooks = await shopifyRegisterWebhooks(shop, token);
   const filled = await shopifyBackfill(ctx.org.id, shop, token);
   await markIntegration(integ.id, !filled.error, filled.error ?? (hooks.failed.length ? hooks.failed.join(",") : null));
-  // wave 28: orders imported fine but live webhooks failed → keep that visible as a warning (not an error)
-  if (!filled.error && hooks.failed.length) {
+  // wave 28/29: orders imported fine but something else is off → keep it visible (missing scopes / live webhooks), as a warning
+  const granted = await shopifyGrantedScopes(shop, token);
+  const lacking = granted ? missingScopes(granted.join(",")) : [];
+  const notes = [lacking.length ? `scopes_missing: ${lacking.join(",")}` : "", hooks.failed.length ? `webhooks: ${hooks.failed.join(", ")}` : ""].filter(Boolean);
+  if (!filled.error && notes.length) {
     const { createAdminClient } = await import("@/lib/supabase/admin");
-    await createAdminClient().from("integrations").update({ last_error: `webhooks: ${hooks.failed.join(", ")}`.slice(0, 500) }).eq("id", integ.id);
+    await createAdminClient().from("integrations").update({ last_error: notes.join(" | ").slice(0, 500) }).eq("id", integ.id);
   }
   return NextResponse.json({ ok: true, name: ping.name ?? null, orders: filled.orders, carts: filled.carts, webhooks: hooks.ok, webhookErrors: hooks.failed });
 }

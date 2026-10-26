@@ -454,7 +454,7 @@ function ShopifyTile({ p }: { p: MarketProps }) {
               <p dir="ltr" className="break-words text-subtle">
                 {p.shopify.error}
               </p>
-              <p className="text-muted">{t(/40[13]/.test(p.shopify.error) ? "market.shopify.warn.hint403" : "market.shopify.warn.hintGeneric")}</p>
+              <p className="text-muted">{t(p.shopify.error.includes("scopes_missing") ? "market.shopify.warn.hintScopes" : /40[13]/.test(p.shopify.error) ? "market.shopify.warn.hint403" : "market.shopify.warn.hintGeneric")}</p>
             </div>
           ) : null}
           {p.canManage ? (

@@ -30,3 +30,13 @@ describe("wave 28 — Shopify connected-with-warning", () => {
     for (const l of ["he", "en", "ar"]) expect(JSON.parse(read(`lib/i18n/dictionaries/${l}.json`)).market.shopify.warn.hint403).toBeTruthy();
   });
 });
+
+describe("wave 29 — scope diagnosis", () => {
+  it("reports which required Shopify scopes were not granted", async () => {
+    const { missingScopes } = await import("@/lib/stores/shopify");
+    expect(missingScopes("read_orders,read_customers,read_checkouts")).toEqual([]);
+    expect(missingScopes("read_orders")).toEqual(["read_customers", "read_checkouts"]);
+    expect(missingScopes("")).toEqual(["read_orders", "read_customers", "read_checkouts"]);
+    expect(missingScopes(null)).toHaveLength(3);
+  });
+});

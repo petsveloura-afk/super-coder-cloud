@@ -11,6 +11,12 @@ import { publicEnv } from "@/lib/env";
 export const SHOPIFY_SCOPES = "read_orders,read_customers,read_checkouts";
 export const SHOPIFY_TOPICS = ["orders/create", "orders/paid", "checkouts/create", "checkouts/update", "app/uninstalled"] as const;
 
+/** wave 29: which of the scopes we need did Shopify actually grant? (the token response / access_scopes list what is granted) */
+export function missingScopes(granted: string | null | undefined): string[] {
+  const have = new Set((granted ?? "").split(",").map((x) => x.trim()).filter(Boolean));
+  return SHOPIFY_SCOPES.split(",").filter((x) => !have.has(x));
+}
+
 export function shopifyConfigured(): boolean {
   return Boolean(process.env.SHOPIFY_CLIENT_ID && process.env.SHOPIFY_CLIENT_SECRET);
 }
@@ -120,5 +126,17 @@ export async function shopifyPing(shop: string, token: string): Promise<{ ok: bo
     return { ok: true, name: j.shop?.name, status: res.status };
   } catch {
     return { ok: false, status: 0 };
+  }
+}
+
+/** wave 29: the scopes the store really granted this app (authoritative; null when it could not be read). */
+export async function shopifyGrantedScopes(shop: string, token: string): Promise<string[] | null> {
+  try {
+    const res = await fetch(`${shopBase(shop)}/admin/oauth/access_scopes.json`, { headers: { "X-Shopify-Access-Token": token }, signal: AbortSignal.timeout(10_000), cache: "no-store" });
+    if (!res.ok) return null;
+    const j = (await res.json().catch(() => null)) as { access_scopes?: { handle?: string }[] } | null;
+    return Array.isArray(j?.access_scopes) ? j!.access_scopes!.map((x) => String(x.handle ?? "")).filter(Boolean) : null;
+  } catch {
+    return null;
   }
 }
