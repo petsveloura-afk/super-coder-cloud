@@ -122,20 +122,26 @@ export async function completeEmbeddedSignup(input: { code: string; phoneNumberI
       scopes.find((s) => s.scope === "whatsapp_business_management")?.target_ids?.find((id) => /^\d{5,30}$/.test(id)) ??
       scopes.find((s) => s.scope === "whatsapp_business_messaging")?.target_ids?.find((id) => /^\d{5,30}$/.test(id)) ??
       "";
-    // wave 26: the token may carry only the business (not the WABA) — look the WABA up through the business it belongs to
+    // wave 26: the token may carry the permissions but no assets — look the WABA up through the user's businesses
     const tokenInfo = (dbg.data.data as { scopes?: string[] } | undefined) ?? {};
     let note = "";
     if (!wabaId) {
-      const bizIds = scopes.filter((x) => x.scope === "business_management").flatMap((x) => x.target_ids ?? []).filter((id) => /^\d{5,30}$/.test(id));
-      const found = new Set<string>();
-      for (const b of bizIds.slice(0, 3)) {
+      let bizIds = scopes.filter((x) => x.scope === "business_management").flatMap((x) => x.target_ids ?? []).filter((id) => /^\d{5,30}$/.test(id));
+      if (bizIds.length === 0) {
+        const mb = await g("/me/businesses?fields=id,name&limit=25", { token: accessToken });
+        bizIds = ((mb.data.data as { id?: string }[] | undefined) ?? []).map((b) => b.id ?? "").filter((id) => /^\d{5,30}$/.test(id));
+        if (!mb.ok) note = `me_businesses_failed:${(mb.error ?? "").slice(0, 120)}`;
+      }
+      const found = new Map<string, string>();
+      for (const b of bizIds.slice(0, 5)) {
         for (const edge of ["owned_whatsapp_business_accounts", "client_whatsapp_business_accounts"]) {
           const r = await g(`/${encodeURIComponent(b)}/${edge}?fields=id,name`, { token: accessToken });
-          for (const w of ((r.data.data as { id?: string }[] | undefined) ?? [])) if (/^\d{5,30}$/.test(w.id ?? "")) found.add(w.id as string);
+          for (const w of ((r.data.data as { id?: string; name?: string }[] | undefined) ?? [])) if (/^\d{5,30}$/.test(w.id ?? "")) found.set(w.id as string, w.name ?? "");
         }
       }
-      if (found.size === 1) wabaId = [...found][0] ?? "";
-      else note = found.size > 1 ? `multiple_wabas:${found.size}` : "no_waba_in_business";
+      if (found.size === 1) wabaId = [...found.keys()][0] ?? "";
+      else if (found.size > 1) note = `multiple_wabas:${[...found].map(([id, n]) => `${id}(${n})`).join(";")}`.slice(0, 220);
+      else note = note || `no_waba_in_business(biz=${bizIds.length})`;
     }
     if (!wabaId) {
       const gs = scopes.map((x) => `${x.scope}[${(x.target_ids ?? []).length}]`).join(",") || "none";
