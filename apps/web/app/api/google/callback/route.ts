@@ -38,6 +38,8 @@ export async function GET(request: NextRequest) {
   const tok = await googleExchange(code);
   if (!tok.ok || !tok.refreshToken) return done("failed", tok.error ?? "token");
   const areas = grantedAreas(tok.scope ?? "");
+  // wave 25: Google shows every permission as a checkbox — if none was ticked nothing was granted, so never say "connected".
+  if (!areas.length) return done("no_permissions");
   const results: string[] = [];
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const admin = createAdminClient();
@@ -74,5 +76,9 @@ export async function GET(request: NextRequest) {
     await saveIntegration(ctx.org.id, "google_business", { email: tok.email ?? "", locations, connected_at: new Date().toISOString() }, { refresh_token: tok.refreshToken });
     results.push(locations.length ? "business" : "business:no_locations");
   }
+  // wave 25: report honestly — all failed → failed; some failed → partial; otherwise connected.
+  const okParts = results.filter((r) => !r.endsWith(":failed"));
+  if (!okParts.length) return done("failed", results.join(","));
+  if (results.some((r) => r.includes(":failed"))) return done("partial", results.join(","));
   return done("connected", results.join(","));
 }

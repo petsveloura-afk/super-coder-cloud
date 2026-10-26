@@ -72,7 +72,12 @@ const integrationsCsp = csp
   .replace("script-src 'self' 'unsafe-inline'", "script-src 'self' 'unsafe-inline' https://connect.facebook.net")
   .replace(/connect-src ([^;]*)/, "connect-src $1 https://graph.facebook.com https://www.facebook.com")
   .replace(/frame-src ([^;]*)/, "frame-src $1 https://www.facebook.com https://web.facebook.com https://business.facebook.com");
-const integrationsHeaders = [{ key: "Content-Security-Policy", value: integrationsCsp }];
+const integrationsHeaders = [
+  { key: "Content-Security-Policy", value: integrationsCsp },
+  // wave 25: with COOP "same-origin" the Facebook popup loses its link to this page, so the SDK reports "popup blocked"
+  // although nothing is blocked. "same-origin-allow-popups" keeps the popup connected (same as billing / PayPal).
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
+];
 
 // Billing: PayPal's card form (JS SDK) runs inside the page — allowed on this page only.
 const paypalExtra = (() => {

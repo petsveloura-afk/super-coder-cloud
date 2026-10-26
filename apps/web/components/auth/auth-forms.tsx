@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { useI18n } from "@/lib/i18n/client";
 import { Field, Input } from "@/components/ui/primitives";
+import { PasswordInput } from "@/components/auth/password-field";
 import { FormAlert, SubmitButton, useFieldError } from "@/components/ui/form-bits";
 import { initialState } from "@/lib/action-state";
 import {
@@ -51,7 +52,7 @@ export function SignInForm({ next, linkError }: { next?: string; linkError?: boo
           defaultValue={state.values?.email} aria-invalid={Boolean(err("email"))} />
       </Field>
       <Field label={t("auth.password")} htmlFor="password" error={err("password")}>
-        <Input id="password" name="password" type="password" dir="ltr" autoComplete="current-password" required
+        <PasswordInput id="password" name="password" autoComplete="current-password" required
           aria-invalid={Boolean(err("password"))} />
       </Field>
       <div className="flex justify-end">
@@ -89,7 +90,7 @@ export function SignUpForm() {
           defaultValue={state.values?.email} aria-invalid={Boolean(err("email"))} />
       </Field>
       <Field label={t("auth.password")} htmlFor="password" error={err("password")} hint={t("auth.passwordHint")}>
-        <Input id="password" name="password" type="password" dir="ltr" autoComplete="new-password" required minLength={10}
+        <PasswordInput meter id="password" name="password" autoComplete="new-password" required minLength={10}
           aria-invalid={Boolean(err("password"))} />
       </Field>
       <SubmitButton size="lg" className="w-full justify-center">{t("auth.signUp")}</SubmitButton>
@@ -123,7 +124,7 @@ export function ResetPasswordForm() {
       <Hidden locale={locale} />
       <FormAlert state={state} />
       <Field label={t("auth.newPassword")} htmlFor="password" error={err("password")} hint={t("auth.passwordHint")}>
-        <Input id="password" name="password" type="password" dir="ltr" autoComplete="new-password" required minLength={10}
+        <PasswordInput meter id="password" name="password" autoComplete="new-password" required minLength={10}
           aria-invalid={Boolean(err("password"))} />
       </Field>
       <SubmitButton size="lg" className="w-full justify-center">{t("auth.updatePassword")}</SubmitButton>

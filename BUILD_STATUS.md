@@ -694,3 +694,12 @@
   - נוצר `shopify.app.toml` אצל המשתמש. נרשמו compliance webhooks, ו-`embedded = false`.
 - **מדיניות פרטיות:** נוסף סעיף "גישה, גיבויים ואירועי אבטחה". הוא מכסה הצפנה במנוחה ובגיבויים, הפרדה בין סביבת בדיקות לייצור, הגבלת גישה ויומן, שימוש בנתוני Shopify, והודעה תוך 72 שעות באירוע אבטחה.
 - **בדיקות:** `engagement.spec` כולל עכשיו `bringToFront`. בלשונית ברקע `requestAnimationFrame` לא רץ, ולכן תוכן שמגיע ב-streaming נשאר מוסתר.
+
+## Wave 25 — תיקוני חיבורים (Shopify, Google, פייסבוק/אינסטגרם, טלגרם QR) + כניסה
+- **Shopify:** שדה שם החנות מקבל עכשיו כל צורה: `admin.shopify.com/store/x`, כתובת מלאה, `x.myshopify.co` (שגיאת הקלדה), אותיות גדולות ורווחים (`normalizeShopInput`).
+- **Google:** כשלא סומנה אף הרשאה לא מוצג "הושלם" אלא הודעה מסבירה (`no_permissions`); חיבור חלקי מדווח כ-`partial`; הרשאת יומן אחת מספיקה.
+- **פייסבוק/אינסטגרם:** כותרת `Cross-Origin-Opener-Policy: same-origin-allow-popups` בדף האינטגרציות (הסיבה ל"חסימת חלונות" שקרית), טעינה מוקדמת של הסקריפט, ומסלול בדף מלא `/api/channels/meta/pages/oauth` כשאי אפשר לפתוח חלון.
+  - פעולה ב-Meta: Valid OAuth Redirect URIs ← `https://<app>/api/channels/meta/pages/oauth`.
+- **טלגרם QR:** טופס סיסמת 2FA לא נעלם יותר (הסקריפט לא מחליף אותו ב-QR מתרענן, וה-polling נעצר בזמן שהטופס פתוח).
+- **כניסה:** הצגת/הסתרת סיסמה ומד חוזק בהרשמה ובאיפוס (`components/auth/password-field.tsx`).
+- **בדיקות:** `tests/unit/wave25.test.ts`.

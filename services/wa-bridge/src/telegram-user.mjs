@@ -165,6 +165,8 @@ export class TelegramUserManager {
         { apiId: this.api.apiId, apiHash: this.api.apiHash },
         {
           qrCode: async ({ token }) => {
+            // wave 25: once the account asked for its 2FA password, a refreshed QR token must not overwrite that state
+            if (s.status === "password") return;
             s.status = "qr";
             s.qr = await QRCode.toDataURL(`tg://login?token=${Buffer.from(token).toString("base64url")}`, { margin: 1, width: 320 });
           },

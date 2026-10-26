@@ -35,7 +35,8 @@ export function googleAuthorizeUrl(state: string, areas: GoogleArea[] = ["calend
 export function grantedAreas(scope: string): GoogleArea[] {
   const s = new Set(scope.split(/\s+/));
   const out: GoogleArea[] = [];
-  if (GOOGLE_SCOPES.calendar.every((x) => s.has(x)) || s.has("https://www.googleapis.com/auth/calendar")) out.push("calendar");
+  // wave 25: either calendar permission is enough (Google lets people untick one of the two)
+  if (GOOGLE_SCOPES.calendar.some((x) => s.has(x)) || s.has("https://www.googleapis.com/auth/calendar")) out.push("calendar");
   if (s.has("https://mail.google.com/")) out.push("gmail");
   if (s.has("https://www.googleapis.com/auth/business.manage")) out.push("business");
   return out;

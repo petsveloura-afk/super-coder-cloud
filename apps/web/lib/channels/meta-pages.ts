@@ -52,9 +52,11 @@ export interface MetaPage {
 }
 
 /** popup code → a user token → the Pages (with their own tokens) the business chose to share. */
-export async function pagesFromLoginCode(code: string): Promise<{ ok: boolean; error?: string; pages: MetaPage[] }> {
+export async function pagesFromLoginCode(code: string, redirectUri?: string): Promise<{ ok: boolean; error?: string; pages: MetaPage[] }> {
   if (!metaPagesConfigured()) return { ok: false, error: "not_configured", pages: [] };
   const qs = new URLSearchParams({ client_id: process.env.META_APP_ID!, client_secret: process.env.META_APP_SECRET!, code });
+  // wave 25: the full-page (no popup) flow must repeat the exact redirect_uri it used
+  if (redirectUri) qs.set("redirect_uri", redirectUri);
   const tok = await g(`/oauth/access_token?${qs.toString()}`);
   let userToken = tok.data.access_token as string | undefined;
   if (!tok.ok || !userToken) return { ok: false, error: tok.error ?? "token_failed", pages: [] };

@@ -20,7 +20,7 @@ export interface MetaPageChoice {
   instagram: string | null;
 }
 
-export async function connectMetaPagesAction(input: { locale: string; code: string }): Promise<ActionState<{ choose?: MetaPageChoice[]; sealed?: string }>> {
+export async function connectMetaPagesAction(input: { locale: string; code: string; redirectUri?: string }): Promise<ActionState<{ choose?: MetaPageChoice[]; sealed?: string }>> {
   const locale = loc(input.locale);
   const ctx = await getOrgContext(locale);
   if (!ctx.can("integrations.manage")) return { error: "errors.forbidden" };
@@ -28,9 +28,10 @@ export async function connectMetaPagesAction(input: { locale: string; code: stri
   const { encryptionReady, sealSecrets } = await import("@/lib/channels/secrets");
   if (!encryptionReady()) return { error: "integrations.channels.encryptionMissing" };
   const { pagesFromLoginCode } = await import("@/lib/channels/meta-pages");
-  const r = await pagesFromLoginCode(input.code.trim());
+  const r = await pagesFromLoginCode(input.code.trim(), input.redirectUri);
   if (!r.ok) return { error: "integrations.meta.failed", messageParams: { detail: r.error ?? "" } };
   if (!r.pages.length) return { error: "integrations.meta.noPages" };
+  if (input.redirectUri && r.pages.length > 8) r.pages = r.pages.slice(0, 8);
   if (r.pages.length === 1) return savePage<{ choose?: MetaPageChoice[]; sealed?: string }>(locale, ctx.org.id, ctx.userId, r.pages[0]!);
   const sealed = sealSecrets({ pages: JSON.stringify(r.pages), at: String(Date.now()), org: ctx.org.id });
   return { ok: true, data: { choose: r.pages.map((p) => ({ id: p.id, name: p.name, instagram: p.instagram?.username ?? (p.instagram ? "Instagram" : null) })), sealed } };

@@ -116,8 +116,23 @@ export function verifyShopifyQuery(params: URLSearchParams, secret: string): boo
   return Boolean(secret) && given.length === expected.length && timingSafeEqual(given, expected);
 }
 
+/**
+ * Wave 25 — forgiving store-name input. Accepts what people really paste:
+ * admin.shopify.com/store/my-store, https://my-store.myshopify.com/admin, my-store.myshopify.co (typo),
+ * "My Store " with capitals/spaces, a bare my-store. Always resolves to <name>.myshopify.com or null.
+ */
+export function normalizeShopInput(raw: string | null | undefined): string {
+  let s = (raw ?? "").trim().toLowerCase().replace(/[\u200e\u200f\u202a-\u202e]/g, "");
+  s = s.replace(/^[a-z][a-z0-9+.-]*:\/\//, "");
+  const admin = s.match(/^admin\.shopify\.com\/store\/([a-z0-9][a-z0-9-]*)/);
+  if (admin) return admin[1] ?? "";
+  s = s.replace(/[/?#].*$/, "").replace(/\s+/g, "");
+  s = s.replace(/\.myshopify\.(co|con|cm|comm|com\.?)$/, ".myshopify.com");
+  return s;
+}
+
 export function validShopDomain(shop: string | null | undefined): string | null {
-  const s = (shop ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  const s = normalizeShopInput(shop);
   if (/^[a-z0-9][a-z0-9-]{0,60}\.myshopify\.com$/.test(s)) return s;
   if (/^[a-z0-9][a-z0-9-]{0,60}$/.test(s)) return `${s}.myshopify.com`;
   return null;

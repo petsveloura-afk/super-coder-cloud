@@ -406,15 +406,23 @@ function TelegramUserCard({ p }: { p: HubProps }) {
   const [pw, setPw] = useState("");
   const [sending, setSending] = useState(false);
   const c = p.channels.telegram_user ?? { connected: false };
+  // wave 25: while the 2FA password form is on screen, polling pauses and the form stays — it must not
+  // disappear / re-render under the user's fingers (a QR refresh used to swap it back to the QR code).
+  const holdPw = useRef(false);
+  holdPw.current = st?.status === "password";
 
   useEffect(() => {
     if (!open) return;
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const poll = async () => {
+      if (holdPw.current) {
+        timer = setTimeout(poll, 2500);
+        return;
+      }
       const s = await telegramUserStatusAction({ locale });
       if (!alive) return;
-      setSt((prev) => (s.status === "unknown" && prev ? prev : s));
+      setSt((prev) => (prev?.status === "password" && s.status !== "connected" && s.status !== "error" ? prev : s.status === "unknown" && prev ? prev : s));
       if (s.status === "connected") {
         toast.success(t("integrations.tgUser.connected"));
         setOpen(false);
@@ -481,7 +489,7 @@ function TelegramUserCard({ p }: { p: HubProps }) {
                   }}
                 >
                   <Field label={t("integrations.tgUser.password")} htmlFor="tg-user-pw" hint={st.hint ? t("integrations.tgUser.hint", { hint: st.hint }) : undefined}>
-                    <Input id="tg-user-pw" type="password" dir="ltr" autoComplete="off" value={pw} onChange={(e) => setPw(e.target.value)} required />
+                    <Input id="tg-user-pw" name="tg-user-pw" type="password" dir="ltr" autoComplete="new-password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} required />
                   </Field>
                   <Button type="submit" loading={sending} className="w-full">
                     <KeyRound className="h-4 w-4" /> {t("integrations.tgUser.continue")}

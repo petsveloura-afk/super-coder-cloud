@@ -61,6 +61,23 @@ function loadFacebookSdk(appId: string, version: string): Promise<void> {
   });
 }
 
+/** wave 25: load the Facebook script as soon as the tile appears, so the click opens the popup instantly (Safari/iPhone only allow a popup directly inside the tap). */
+function usePreloadFacebook(cfg: { appId: string; version: string } | null) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!cfg) return;
+    let alive = true;
+    loadFacebookSdk(cfg.appId, cfg.version).then(
+      () => alive && setReady(true),
+      () => alive && setReady(false),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [cfg?.appId, cfg?.version]); // eslint-disable-line react-hooks/exhaustive-deps
+  return ready;
+}
+
 function State({ on, error, pending }: { on: boolean; error?: string | null; pending?: boolean }) {
   const { t } = useI18n();
   if (error)
@@ -143,12 +160,30 @@ function MetaTile({ p }: { p: MarketProps }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [choose, setChoose] = useState<{ pages: MetaPageChoice[]; sealed: string } | null>(null);
+  const sdkReady = usePreloadFacebook(p.metaPages);
+  // wave 25: Pages the business must pick after the full-page flow come back in a short cookie
+  useEffect(() => {
+    try {
+      const m = document.cookie.match(/(?:^|; )scc_meta_choose=([^;]*)/);
+      if (!m) return;
+      document.cookie = `scc_meta_choose=; Max-Age=0; path=/${locale}/integrations`;
+      const j = JSON.parse(decodeURIComponent(m[1]!)) as { pages?: MetaPageChoice[]; sealed?: string };
+      if (j.pages?.length && j.sealed) setChoose({ pages: j.pages, sealed: j.sealed });
+    } catch {
+      /* no pending choice */
+    }
+  }, [locale]);
+  const fullPageUrl = `/api/channels/meta/pages/oauth?locale=${locale}`;
   async function connect() {
     if (!p.metaPages) return;
+    // no popup possible (script still loading / blocked): go through the full-page flow instead of showing a false "popup blocked"
+    if (!sdkReady || !window.FB) {
+      window.location.assign(fullPageUrl);
+      return;
+    }
     setBusy(true);
     try {
-      await loadFacebookSdk(p.metaPages.appId, p.metaPages.version);
-      window.FB!.login(
+      window.FB.login(
         async (resp) => {
           const code = resp.authResponse?.code;
           if (!code) {
@@ -169,7 +204,7 @@ function MetaTile({ p }: { p: MarketProps }) {
       );
     } catch {
       setBusy(false);
-      toast.error(t("integrations.whatsapp.sdkFailed"));
+      window.location.assign(fullPageUrl);
     }
   }
   return (
@@ -235,6 +270,7 @@ function WhatsAppAppTile({ p }: { p: MarketProps }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const signup = useRef<{ phone_number_id?: string; waba_id?: string }>({});
+  const waSdkReady = usePreloadFacebook(p.metaWa);
   useEffect(() => {
     const onMsg = (event: MessageEvent) => {
       try {
@@ -252,7 +288,7 @@ function WhatsAppAppTile({ p }: { p: MarketProps }) {
     if (!p.metaWa) return;
     setBusy(true);
     try {
-      await loadFacebookSdk(p.metaWa.appId, p.metaWa.version);
+      if (!waSdkReady || !window.FB) await loadFacebookSdk(p.metaWa.appId, p.metaWa.version);
       window.FB!.login(
         (resp) => {
           const code = resp.authResponse?.code;
@@ -414,10 +450,12 @@ export function IntegrationsMarketplace(p: MarketProps) {
   useEffect(() => {
     const g = sp.get("google");
     const s = sp.get("store");
+    const m = sp.get("meta");
     const detail = sp.get("detail") ?? "";
+    if (m) (m === "connected" ? toast.success : m === "choose" ? toast : toast.error)(t(m === "choose" ? "market.meta.choose" : `market.result.${m}`, { detail }));
     if (g) (g === "connected" ? toast.success : toast.error)(t(`market.result.${g}`, { detail }));
     if (s) (s === "connected" || s === "woocommerce" ? toast.success : toast.error)(t(`market.result.${s}`, { detail }));
-    if (g || s) router.replace(`/${locale}/integrations#marketplace`, { scroll: false });
+    if (g || s || m) router.replace(`/${locale}/integrations#marketplace`, { scroll: false });
   }, [sp, t, router, locale]);
   const tiles = useMemo(
     () =>
