@@ -63,8 +63,19 @@ export interface EmbeddedResult {
  */
 export async function completeEmbeddedSignup(input: { code: string; phoneNumberId: string; wabaId: string }): Promise<EmbeddedResult> {
   if (!metaEmbeddedConfigured()) return { ok: false, error: "not_configured" };
-  const qs = new URLSearchParams({ client_id: process.env.META_APP_ID!, client_secret: process.env.META_APP_SECRET!, code: input.code });
-  const tok = await g(`/oauth/access_token?${qs.toString()}`);
+  // A code from the Facebook JS SDK popup is bound to the redirect_uri the SDK used. Depending on the
+  // app / SDK version Meta expects it omitted, empty, or the site URL — try them in that order, and only
+  // move on when Meta complains specifically about redirect_uri.
+  const site = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
+  const redirectCandidates: (string | undefined)[] = [undefined, "", ...(site && !/localhost/.test(site) ? [site, `${site}/`] : [])];
+  let tok: Awaited<ReturnType<typeof g>> = { ok: false, status: 0, data: {}, error: "token_failed" };
+  for (const redirect of redirectCandidates) {
+    const qs = new URLSearchParams({ client_id: process.env.META_APP_ID!, client_secret: process.env.META_APP_SECRET!, code: input.code });
+    if (redirect !== undefined) qs.set("redirect_uri", redirect);
+    tok = await g(`/oauth/access_token?${qs.toString()}`);
+    if (tok.ok && tok.data.access_token) break;
+    if (!/redirect_uri/i.test(tok.error ?? "")) break;
+  }
   const accessToken = tok.data.access_token as string | undefined;
   if (!tok.ok || !accessToken) return { ok: false, step: "token", error: tok.error ?? "token_failed" };
 
