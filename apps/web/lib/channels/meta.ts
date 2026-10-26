@@ -61,18 +61,19 @@ export interface EmbeddedResult {
  *   code → business token → (find the WABA + number if the popup did not report them) →
  *   subscribe the app to the WABA webhooks → register the number for Cloud API → read the display number.
  */
-export async function completeEmbeddedSignup(input: { code: string; phoneNumberId: string; wabaId: string; locale?: string }): Promise<EmbeddedResult> {
+export async function completeEmbeddedSignup(input: { code: string; phoneNumberId: string; wabaId: string; locale?: string; redirectUri?: string }): Promise<EmbeddedResult> {
   if (!metaEmbeddedConfigured()) return { ok: false, error: "not_configured" };
   // A code from the Facebook JS SDK popup is bound to the redirect_uri the SDK used. Depending on the
   // app / SDK version Meta expects it omitted, empty, or the page the popup was opened from — try them in
   // that order, and only move on while Meta complains about the redirect_uri / URL domain.
   const site = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
   const loc = input.locale === "en" || input.locale === "ar" ? input.locale : "he";
-  const redirectCandidates: (string | undefined)[] = [
-    undefined,
-    "",
-    ...(site && !/localhost/.test(site) ? [`${site}/${loc}/integrations`, site, `${site}/`] : []),
-  ];
+  // wave 26: the full-page flow (/api/channels/meta/pages/oauth?kind=wa) repeats exactly the redirect_uri it used
+  const fullPageUri = `${site}/api/channels/meta/pages/oauth`;
+  const redirectCandidates: (string | undefined)[] =
+    input.redirectUri && input.redirectUri === fullPageUri
+      ? [fullPageUri]
+      : [undefined, "", ...(site && !/localhost/.test(site) ? [`${site}/${loc}/integrations`, site, `${site}/`] : [])];
   let tok: Awaited<ReturnType<typeof g>> = { ok: false, status: 0, data: {}, error: "token_failed" };
   const attempts: string[] = [];
   for (const redirect of redirectCandidates) {

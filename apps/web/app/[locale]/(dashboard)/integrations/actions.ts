@@ -322,13 +322,15 @@ export async function disconnectChannelV2Action(fd: FormData): Promise<ActionSta
 
 const embeddedSchema = z.object({
   code: z.string().trim().min(10).max(2000),
+  // wave 26: only set by the full-page flow; meta.ts accepts it only when it equals our own callback URL
+  redirectUri: z.string().trim().max(300).optional(),
   // the popup's FINISH message can be missing (e.g. Coexistence) — the server then finds the ids from the token
   phoneNumberId: z.union([z.literal(""), z.string().trim().regex(/^\d{5,30}$/)]).default(""),
   wabaId: z.union([z.literal(""), z.string().trim().regex(/^\d{5,30}$/)]).default(""),
 });
 
 /** Official WhatsApp — finishes Meta Embedded Signup (the popup returned a code + the chosen number). */
-export async function connectWhatsAppEmbeddedAction(input: { locale: string; code: string; phoneNumberId: string; wabaId: string }): Promise<ActionState> {
+export async function connectWhatsAppEmbeddedAction(input: { locale: string; code: string; phoneNumberId: string; wabaId: string; redirectUri?: string }): Promise<ActionState> {
   const locale = input.locale === "ar" || input.locale === "en" ? input.locale : "he";
   const ctx = await getOrgContext(locale);
   if (!ctx.can("integrations.manage")) return { error: "errors.forbidden" };
