@@ -86,7 +86,14 @@ export async function completeEmbeddedSignup(input: { code: string; phoneNumberI
     const code = (tok.data.error as { code?: number } | undefined)?.code;
     if (!/redirect_uri|domain|URL/i.test(tok.error ?? "") && ![191, 36008, 100].includes(code ?? 0)) break;
   }
-  if (!tok.ok || !tok.data.access_token) return { ok: false, step: "token", error: attempts.join(" | ").slice(0, 600) || (tok.error ?? "token_failed") };
+  if (!tok.ok || !tok.data.access_token) {
+    // Diagnostics (no secrets): does the server's app id + secret pair work at all, and which app is it?
+    const appId = process.env.META_APP_ID ?? "";
+    const secret = process.env.META_APP_SECRET ?? "";
+    const chk = await g(`/${encodeURIComponent(appId)}?${new URLSearchParams({ fields: "id,name", access_token: `${appId}|${secret}` }).toString()}`);
+    const diag = `diag: app=…${appId.slice(-4)} secretLen=${secret.length} appCheck=${chk.ok ? `ok(${String(chk.data.id ?? "").slice(-4)})` : (chk.error ?? "failed").slice(0, 80)}`;
+    return { ok: false, step: "token", error: `${attempts[0] ?? tok.error ?? "token_failed"} | ${diag}`.slice(0, 600) };
+  }
   const accessToken = tok.data.access_token as string | undefined;
   if (!tok.ok || !accessToken) return { ok: false, step: "token", error: tok.error ?? "token_failed" };
 
