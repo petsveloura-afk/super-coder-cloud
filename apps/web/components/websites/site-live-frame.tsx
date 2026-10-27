@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FormField, SiteBlock } from "@scc/shared/engagement";
 import { useI18n } from "@/lib/i18n/client";
+import { safeDraft } from "@/lib/site/live-draft";
 import { SiteRenderer, type FormsMap, type RenderableSite } from "./site-renderer";
 
 /**
@@ -16,16 +17,39 @@ import { SiteRenderer, type FormsMap, type RenderableSite } from "./site-rendere
 export const LIVE_DRAFT = "scc-site-draft";
 export const LIVE_SCROLL = "scc-site-scroll";
 export const LIVE_READY = "scc-site-ready";
+/** frame → editor: "draft #seq is on screen" (the editor re-sends until it gets this) */
+export const LIVE_ACK = "scc-site-ack";
 
-const STUB_FIELDS: FormField[] = [
-  { key: "name", label: "—", type: "text", required: false },
-  { key: "phone", label: "—", type: "phone", required: false },
-  { key: "message", label: "—", type: "textarea", required: false },
-];
+/** frame inside the editor → parent; opened as its own tab → opener */
+const host = (): Window | null => (window.parent !== window ? window.parent : (window.opener as Window | null));
+
+/** keeps the last good picture on screen if one draft cannot be drawn; the next draft clears the error */
+class FrameBoundary extends Component<{ resetKey: unknown; onError: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  private last: ReactNode = null;
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidMount() {
+    this.last = this.props.children;
+  }
+  componentDidCatch() {
+    this.props.onError();
+  }
+  componentDidUpdate(prev: { resetKey: unknown }) {
+    if (!this.state.failed) this.last = this.props.children;
+    if (prev.resetKey !== this.props.resetKey && this.state.failed) this.setState({ failed: false });
+  }
+  render() {
+    return this.state.failed ? this.last : this.props.children;
+  }
+}
 
 export function SiteLiveFrame() {
   const { t, locale } = useI18n();
   const [site, setSite] = useState<RenderableSite | null>(null);
+  const [broken, setBroken] = useState(false);
+  const seqRef = useRef(0);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,7 +57,11 @@ export function SiteLiveFrame() {
       if (e.origin !== window.location.origin) return;
       const m = e.data as { type?: string; site?: RenderableSite; index?: number; flash?: boolean } | null;
       if (!m || typeof m !== "object") return;
-      if (m.type === LIVE_DRAFT && m.site && Array.isArray(m.site.blocks)) setSite(m.site);
+      if (m.type === LIVE_DRAFT && m.site && Array.isArray(m.site.blocks)) {
+        seqRef.current = typeof (m as { seq?: number }).seq === "number" ? ((m as { seq?: number }).seq as number) : seqRef.current;
+        setBroken(false);
+        setSite(safeDraft(m.site));
+      }
       if (m.type === LIVE_SCROLL && typeof m.index === "number") {
         const el = rootRef.current?.querySelector<HTMLElement>(`[data-bi="${m.index}"]`);
         if (!el) return;
@@ -47,8 +75,7 @@ export function SiteLiveFrame() {
     };
     window.addEventListener("message", onMsg);
     // inside the editor's iframe the parent asks; opened as its own tab (wave 34) the opener does
-    const host: Window | null = window.parent !== window ? window.parent : (window.opener as Window | null);
-    host?.postMessage({ type: LIVE_READY }, window.location.origin);
+    host()?.postMessage({ type: LIVE_READY }, window.location.origin);
     return () => window.removeEventListener("message", onMsg);
   }, []);
 
@@ -80,7 +107,11 @@ export function SiteLiveFrame() {
     const root = rootRef.current;
     if (!root || !site) return;
     if (!root.querySelector("[data-bi]")) root.querySelectorAll<HTMLElement>("main > section").forEach((s, i) => s.setAttribute("data-bi", String(i)));
-    const id = window.requestAnimationFrame(() => root.querySelectorAll<HTMLElement>("[data-reveal]:not(.in)").forEach((el) => el.classList.add("in")));
+    const id = window.requestAnimationFrame(() => {
+      root.querySelectorAll<HTMLElement>("[data-reveal]:not(.in)").forEach((el) => el.classList.add("in"));
+      // tell the editor this draft is really on screen (it re-sends until it hears this)
+      host()?.postMessage({ type: LIVE_ACK, seq: seqRef.current, blocks: site.blocks.length }, window.location.origin);
+    });
     return () => window.cancelAnimationFrame(id);
   }, [site]);
 
@@ -94,9 +125,22 @@ export function SiteLiveFrame() {
 
   return (
     <div ref={rootRef} data-testid="site-live-frame">
+      {broken ? (
+        <div role="alert" style={{ position: "fixed", insetInline: 12, top: 12, zIndex: 50, padding: "8px 12px", borderRadius: 10, background: "rgba(245,158,11,.95)", color: "#1f1300", fontSize: 13, fontWeight: 600 }}>
+          {t("websites.live.broken")}
+        </div>
+      ) : null}
       <style>{`.scc-flash{animation:sccFlash 1.6s ease-out 1;outline-offset:-6px}@keyframes sccFlash{0%{outline:3px solid rgba(99,102,241,.95);background-color:rgba(99,102,241,.16)}70%{outline:3px solid rgba(99,102,241,.5)}100%{outline:3px solid transparent}}@media (prefers-reduced-motion:reduce){.scc-flash{animation:none;outline:3px solid rgba(99,102,241,.7)}}`}</style>
       {site ? (
-        <SiteRenderer site={site} forms={forms} locale={locale} t={t} basePath="" />
+        <FrameBoundary
+          resetKey={site}
+          onError={() => {
+            setBroken(true);
+            host()?.postMessage({ type: LIVE_ACK, seq: seqRef.current, blocks: 0, error: true }, window.location.origin);
+          }}
+        >
+          <SiteRenderer site={site} forms={forms} locale={locale} t={t} basePath="" />
+        </FrameBoundary>
       ) : (
         <div style={{ display: "grid", placeItems: "center", minHeight: "60dvh", opacity: 0.6, fontSize: 14 }} aria-live="polite">
           {t("websites.live.loading")}

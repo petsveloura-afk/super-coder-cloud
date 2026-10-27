@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Monitor, RefreshCw, Smartphone, Tablet, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
-import { LIVE_DRAFT, LIVE_READY, LIVE_SCROLL } from "./site-live-frame";
+import { LIVE_ACK, LIVE_DRAFT, LIVE_READY, LIVE_SCROLL } from "./site-live-frame";
 
 /**
  * Wave 33 — live preview of the site INSIDE the editor.
@@ -32,6 +32,10 @@ export function SiteLivePreview({ draft, scrollTo, onClose, className }: { draft
   const [ready, setReady] = useState(false);
   const [device, setDevice] = useState<Device>("desktop");
   const [syncing, setSyncing] = useState(false);
+  const [stale, setStale] = useState(false);
+  const seq = useRef(0);
+  const acked = useRef(0);
+  const retry = useRef<number | undefined>(undefined);
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -56,32 +60,57 @@ export function SiteLivePreview({ draft, scrollTo, onClose, className }: { draft
     frame.current?.contentWindow?.postMessage(msg, window.location.origin);
   }, []);
 
+  /** wave 34: send the draft and keep re-sending until the frame confirms it is on screen (a lost message can no longer leave the preview stale) */
+  const push = useCallback(
+    (site: LiveDraft) => {
+      const mine = ++seq.current;
+      setStale(false);
+      post({ type: LIVE_DRAFT, site, seq: mine });
+      window.clearTimeout(retry.current);
+      let tries = 0;
+      const check = () => {
+        if (acked.current >= mine || seq.current !== mine) return;
+        if (++tries > 6) {
+          setSyncing(false);
+          setStale(true);
+          return;
+        }
+        post({ type: LIVE_DRAFT, site: latest.current, seq: mine });
+        retry.current = window.setTimeout(check, 900);
+      };
+      retry.current = window.setTimeout(check, 900);
+    },
+    [post],
+  );
+  useEffect(() => () => window.clearTimeout(retry.current), []);
+
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       if (e.origin !== window.location.origin || e.source !== frame.current?.contentWindow) return;
-      if ((e.data as { type?: string } | null)?.type === LIVE_READY) {
+      const m = e.data as { type?: string; seq?: number; error?: boolean } | null;
+      if (m?.type === LIVE_READY) {
         setReady(true);
-        post({ type: LIVE_DRAFT, site: latest.current });
+        acked.current = 0;
+        push(latest.current);
+      } else if (m?.type === LIVE_ACK && typeof m.seq === "number") {
+        acked.current = Math.max(acked.current, m.seq);
+        setSyncing(false);
+        setStale(false);
       }
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
-  }, [post]);
+  }, [push]);
 
   // push every change (debounced) — typing stays smooth
   useEffect(() => {
     if (!ready) return;
-    let done: number | undefined;
     const id = window.setTimeout(() => {
       setSyncing(true);
-      post({ type: LIVE_DRAFT, site: draft });
-      done = window.setTimeout(() => setSyncing(false), 350);
+      push(draft);
     }, 140);
-    return () => {
-      window.clearTimeout(id);
-      if (done) window.clearTimeout(done);
-    };
-  }, [draft, ready, post]);
+    return () => window.clearTimeout(id);
+  }, [draft, ready, push]);
 
   // scroll + flash a section (after the draft reached the frame)
   useEffect(() => {
@@ -104,7 +133,7 @@ export function SiteLivePreview({ draft, scrollTo, onClose, className }: { draft
         </span>
         <span className="text-[12.5px] font-semibold">{t("websites.live.title")}</span>
         <span className="hidden text-[12px] text-subtle sm:inline" aria-live="polite">
-          {syncing ? t("websites.live.updating") : t("websites.live.unsaved")}
+          {stale ? t("websites.live.stale") : syncing ? t("websites.live.updating") : t("websites.live.unsaved")}
         </span>
         <span className="flex-1" />
         <div role="group" aria-label={t("websites.live.device")} className="flex rounded-lg border border-line p-0.5">
@@ -144,7 +173,7 @@ export function SiteLivePreview({ draft, scrollTo, onClose, className }: { draft
             className="border-0 bg-white"
             style={{ position: "absolute", left: 0, top: 0, width: vw, height: (framed ? availH - 12 : size.h || 600) / scale, transform: `scale(${scale})`, transformOrigin: "0 0" }}
             data-testid="site-live-iframe"
-            onLoad={() => post({ type: LIVE_DRAFT, site: latest.current })}
+            onLoad={() => push(latest.current)}
           />
         </div>
         {!ready ? (

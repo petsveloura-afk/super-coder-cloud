@@ -2656,6 +2656,8 @@
       "reload": "Reload preview",
       "updating": "Updating…",
       "unsaved": "This is how the site looks now, even before saving",
+      "stale": "The preview is not responding — press reload",
+      "broken": "One section could not be drawn — showing the last good version",
       "field": {
         "name": "Name",
         "phone": "Phone",
@@ -2679,7 +2681,8 @@
       "saveAndUpdate": "Save and update the site",
       "saveAndView": "Save and view site",
       "openFullPreview": "Full preview",
-      "popupBlocked": "The browser blocked the new tab. Allow pop-ups for this site and try again."
+      "popupBlocked": "The browser blocked the new tab. Allow pop-ups for this site and try again.",
+      "adjusted": "Saved — some texts were shortened or cleaned to fit the site rules; the editor now shows exactly what is live"
     }
   },
   "admin": {

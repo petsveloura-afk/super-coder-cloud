@@ -10,13 +10,22 @@ import { formLocale, str } from "@/lib/form";
 
 const loc = (l: string) => (l === "ar" || l === "en" ? l : "he");
 
-export async function saveSiteAction(input: { locale: string; id?: string; data: unknown }): Promise<ActionState<{ id: string }>> {
+/** wave 34: the site exactly as it was stored (after validation / trimming) — the editor adopts it, so editor, preview and live site can never differ */
+export interface StoredSite {
+  name: string;
+  theme: Record<string, unknown>;
+  seo: { title: string; description: string };
+  blocks: unknown[];
+}
+
+export async function saveSiteAction(input: { locale: string; id?: string; data: unknown }): Promise<ActionState<{ id: string; site: StoredSite }>> {
   const locale = loc(input.locale);
   const ctx = await getOrgContext(locale);
   if (!ctx.can("websites.manage")) return { error: "errors.forbidden" };
   const parsed = siteSchema.safeParse(input.data);
   if (!parsed.success) return { error: "websites.invalid", fieldErrors: fieldErrors(parsed.error) };
   const s = parsed.data;
+  const stored: StoredSite = { name: s.name, theme: s.theme as Record<string, unknown>, seo: s.seo, blocks: s.blocks };
   const row = {
     name: s.name,
     slug: s.slug,
@@ -54,7 +63,7 @@ export async function saveSiteAction(input: { locale: string; id?: string; data:
     // wave 34: the public page of every language (and of the previous address, if the slug changed)
     const slugs = [...new Set([s.slug, (prev.slug as string | null) ?? s.slug])];
     for (const l of ["he", "ar", "en"]) for (const sl of slugs) revalidatePath(`/${l}/s/${sl}`);
-    return { ok: true, message: s.status === "published" ? "websites.savedPublished" : "websites.saved", data: { id: id.data } };
+    return { ok: true, message: s.status === "published" ? "websites.savedPublished" : "websites.saved", data: { id: id.data, site: stored } };
   }
   const { data, error } = await supabase
     .from("sites")
@@ -63,7 +72,7 @@ export async function saveSiteAction(input: { locale: string; id?: string; data:
     .single();
   if (error) return taken(error.code) ?? planLimit(error) ?? { error: dbErrorKey(error) };
   revalidatePath(`/${locale}/websites`);
-  return { ok: true, message: "websites.created", data: { id: data.id as string } };
+  return { ok: true, message: "websites.created", data: { id: data.id as string, site: stored } };
 }
 
 export async function deleteSiteAction(fd: FormData): Promise<ActionState> {

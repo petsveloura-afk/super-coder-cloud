@@ -18,7 +18,7 @@ import { AiEditPanel } from "./ai-edit-panel";
 import { SiteAuditPanel } from "./site-audit-panel";
 import { SiteLivePreview } from "./site-live-preview";
 import { LIVE_DRAFT, LIVE_READY } from "./site-live-frame";
-import type { SiteDiff } from "@/lib/site/diff";
+import { stableStringify, type SiteDiff } from "@/lib/site/diff";
 import { cn } from "@/lib/utils";
 
 type Item = Record<string, string>;
@@ -213,6 +213,11 @@ export function SiteBuilder({
     dispatch({ type: "redo" });
   }, []);
   const dirty = useMemo(() => JSON.stringify(v) !== savedSnap, [v, savedSnap]);
+  // wave 34: the newest editor state, readable from async callbacks (a save must never overwrite edits made while it ran)
+  const vRef = useRef(v);
+  useEffect(() => {
+    vRef.current = v;
+  });
   // leaving the page with unsaved work asks first
   useEffect(() => {
     if (!dirty) return;
@@ -312,12 +317,14 @@ export function SiteBuilder({
     w.focus();
   };
   /** "view site" never shows a stale page: unsaved work is saved (keeping the publish state) first */
+  /** a fresh address every time, so a browser or CDN copy of the old page is never shown */
+  const fresh = (u: string) => `${u}${u.includes("?") ? "&" : "?"}v=${Date.now()}`;
   const saveAndView = (target: string) => {
     const w = window.open("", "_blank");
     if (!w) return void toast.error(t("websites.editor.popupBlocked"));
     save(v.status, (ok) => {
       if (!ok) return void w.close();
-      w.location.href = target;
+      w.location.href = fresh(target);
     });
   };
   /** wave 27: add a starter kit's sections after the existing ones (never replaces anything) */
@@ -359,8 +366,22 @@ export function SiteBuilder({
         after?.(false);
         return;
       }
-      set({ status });
-      setSavedSnap(JSON.stringify({ ...v, status }));
+      // wave 34: what the server really stored is the truth — if it trimmed / limited anything, the editor and the
+      // preview adopt it, so "what I see" is always "what is live" (only when nothing was typed during the save)
+      const sent = v;
+      let final: SiteValue = { ...sent, status };
+      const stored = res.data?.site;
+      if (stored) {
+        const canon = (o: unknown) => stableStringify(JSON.parse(JSON.stringify(o)));
+        const same = canon({ n: stored.name, t: stored.theme, s: stored.seo, b: stored.blocks }) === canon({ n: sent.name, t: sent.theme, s: sent.seo, b: sent.blocks });
+        if (!same && vRef.current === sent) {
+          final = { ...final, name: stored.name, theme: stored.theme as SiteValue["theme"], seo: stored.seo, blocks: stored.blocks as unknown as BlockValue[] };
+          toast.info(t("websites.editor.adjusted"));
+        }
+      }
+      if (vRef.current === sent) setV(() => final);
+      else set({ status });
+      setSavedSnap(JSON.stringify(final));
       toast.success(t(res.message ?? "common.saved"));
       after?.(true);
       if (!id && res.data?.id) router.push(`/${locale}/websites/${res.data.id}`);
@@ -713,7 +734,7 @@ export function SiteBuilder({
               <ExternalLink className="h-4 w-4" /> {t("websites.editor.saveAndView")}
             </button>
           ) : (
-            <a href={url} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl border border-line px-4 text-sm hover:bg-surface-hover">
+            <a href={url} target="_blank" rel="noreferrer" onClick={(e) => (e.currentTarget.href = fresh(url))} className="inline-flex h-10 items-center gap-2 rounded-xl border border-line px-4 text-sm hover:bg-surface-hover">
               <ExternalLink className="h-4 w-4" /> {t("websites.view")}
             </a>
           )
