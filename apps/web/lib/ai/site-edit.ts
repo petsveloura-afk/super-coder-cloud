@@ -5,7 +5,7 @@ import type { Locale } from "@/lib/i18n/config";
 import { runAI } from "./run";
 import { extractJson, normalizeAiSite, siteJsonInstructionsPro } from "./site-json";
 import { FREE_TEMPLATES, ALL_TEMPLATES } from "@/lib/site/templates";
-import { blockTexts, detectSiteLanguage, siteEditOverrides } from "./site-edit-rules";
+import { blockTexts, detectSiteLanguage, restoreKept, siteEditOverrides } from "./site-edit-rules";
 
 /**
  * Wave 13 — edit an existing site with the AI ("make it more modern", "add pricing",
@@ -46,10 +46,12 @@ export async function editSiteWithAI(input: { orgId: string; locale: Locale; ins
       maxTokens,
       json: true,
     });
+  const t0 = Date.now();
   let out = await ask();
   if (!out.ok) return { ok: false, error: out.error };
   // wave 33: one quiet retry when the answer was not usable JSON (cut off / chatter) — never on provider errors
-  if (extractJson(out.text) === null) {
+  // (wave 34: only when there is time left — a second full call after a slow first one would run into the platform limit)
+  if (extractJson(out.text) === null && Date.now() - t0 < 25_000) {
     const again = await ask("IMPORTANT: your previous answer could not be parsed. Reply with ONE complete, valid JSON object only — no markdown, no comments — and keep texts concise.");
     if (again.ok) out = again;
   }
@@ -63,5 +65,7 @@ export async function editSiteWithAI(input: { orgId: string; locale: Locale; ins
   site.blocks.forEach((b, i) => {
     if ("image_url" in b.data && !(b.data as { image_url?: string }).image_url && prevImages.get(i) && input.site.blocks[i]?.type === b.type) (b.data as { image_url?: string }).image_url = prevImages.get(i);
   });
+  // wave 34: contact details / images the model forgot come back (matched by section type, not by position)
+  restoreKept(input.site.blocks as unknown as { type: string; data: Record<string, unknown> }[], site.blocks as unknown as { type: string; data: Record<string, unknown> }[], input.instruction);
   return { ok: true, site: { name: site.name, theme: { ...input.site.theme, ...site.theme }, seo: site.seo, blocks: site.blocks } };
 }

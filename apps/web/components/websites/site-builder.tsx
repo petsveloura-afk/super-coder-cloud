@@ -449,8 +449,8 @@ export function SiteBuilder({
           toast.success(t("websites.imageUploaded"));
         }}
       />
-      <AiEditPanel value={v} onApply={(nv) => setV(nv)} allowed={aiEditor} proTemplates={proTemplates} onApplied={onAgentApplied} onFocusBlock={(i) => focusBlock(i, { keepHighlight: true })} />
-      <SiteAuditPanel value={v} onApply={(nv) => setV(nv)} onGoTab={(k) => setTab(k)} allowed={aiEditor} proTemplates={proTemplates} />
+      <AiEditPanel value={v} onApply={(nv) => setV(nv)} allowed={aiEditor} proTemplates={proTemplates} onApplied={onAgentApplied} onFocusBlock={(i) => focusBlock(i, { keepHighlight: true })} onUndone={() => setHighlight([])} />
+      <SiteAuditPanel value={v} onApply={(nv) => setV(nv)} onGoTab={(k) => setTab(k)} allowed={aiEditor} proTemplates={proTemplates} onApplied={onAgentApplied} />
       {/* wave 33: editor toolbar — unsaved state, undo / redo, collapse all, live preview */}
       <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-line bg-surface px-2.5 py-1.5" data-testid="editor-toolbar">
         <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors", dirty ? "bg-gold-soft text-gold" : "bg-success-soft text-success")} role="status" data-testid="editor-dirty">

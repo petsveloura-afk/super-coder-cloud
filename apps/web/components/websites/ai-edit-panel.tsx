@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
-import { CheckCircle2, History, Info, Lock, Minus, Palette, Pencil, Plus, Search, Sparkles, Undo2, Wand2 } from "lucide-react";
+import { CheckCircle2, History, Info, Lock, Minus, Palette, Pencil, Plus, Search, Sparkles, TriangleAlert, Undo2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Card, Textarea } from "@/components/ui/primitives";
@@ -62,6 +62,7 @@ export function AiEditPanel({
   proTemplates,
   onApplied,
   onFocusBlock,
+  onUndone,
 }: {
   value: SiteValue;
   onApply: (v: SiteValue) => void;
@@ -71,6 +72,8 @@ export function AiEditPanel({
   onApplied?: (diff: SiteDiff, next: SiteValue) => void;
   /** wave 33: jump to a section (editor + live preview) */
   onFocusBlock?: (index: number) => void;
+  /** wave 34: the agent's edit was taken back (clear highlights) */
+  onUndone?: () => void;
 }) {
   const { t, locale } = useI18n();
   const [text, setText] = useState("");
@@ -81,6 +84,12 @@ export function AiEditPanel({
   const recentRaw = useSyncExternalStore(subscribeHistory, rawHistory, () => "[]");
   const recent = useMemo(() => parseHistory(recentRaw), [recentRaw]);
   const [empty, setEmpty] = useState(false);
+  // wave 34: the newest editor state — an answer that arrives after the owner kept typing must never silently overwrite that work
+  const latest = useRef(value);
+  useEffect(() => {
+    latest.current = value;
+  });
+  const [conflict, setConflict] = useState<{ next: SiteValue; d: SiteDiff; instruction: string } | null>(null);
   // wave 33: while the agent works, show what it is doing (a silent button feels broken)
   useEffect(() => {
     if (!pending) return;
@@ -110,26 +119,44 @@ export function AiEditPanel({
       </Card>
     );
   }
+  const finish = (next: SiteValue, d: SiteDiff, instruction: string, base: SiteValue) => {
+    setConflict(null);
+    setEmpty(false);
+    setPrev(base);
+    onApply(next);
+    setDiff(d);
+    onApplied?.(d, next);
+    setText("");
+    writeHistory([instruction.trim(), ...parseHistory(rawHistory()).filter((x) => x !== instruction.trim())].slice(0, 5));
+    toast.success(t("websites.aiEdit.applied"));
+  };
   const run = (instruction: string) =>
     start(async () => {
-      const r = await aiEditSiteAction({ locale, instruction, site: value, allowProTemplates: proTemplates });
+      const base = value;
+      setConflict(null);
+      let r: Awaited<ReturnType<typeof aiEditSiteAction>>;
+      try {
+        r = await aiEditSiteAction({ locale, instruction, site: base, allowProTemplates: proTemplates });
+      } catch {
+        // wave 34: a dropped connection / platform time-out must never crash the editor — nothing was changed
+        return void toast.error(t("websites.aiEdit.failed"));
+      }
       if (r.error || !r.data) return void toast.error(t(r.error ?? "common.error"));
-      const next = { ...value, ...(r.data.site as unknown as Partial<SiteValue>), slug: value.slug, status: value.status } as SiteValue;
-      const d = diffSites(value, next);
+      const next = { ...base, ...(r.data.site as unknown as Partial<SiteValue>), slug: base.slug, status: base.status } as SiteValue;
+      const d = diffSites(base, next);
       // wave 33: an answer identical to the current site is reported — never a silent "success"
       if (d.empty) {
         setEmpty(true);
         setDiff(null);
         return void toast.info(t("websites.aiEdit.nothing"));
       }
-      setEmpty(false);
-      setPrev(value);
-      onApply(next);
-      setDiff(d);
-      onApplied?.(d, next);
-      setText("");
-      writeHistory([instruction.trim(), ...parseHistory(rawHistory()).filter((x) => x !== instruction.trim())].slice(0, 5));
-      toast.success(t("websites.aiEdit.applied"));
+      // wave 34: the owner edited while the agent was working — ask before replacing that work
+      if (JSON.stringify(latest.current) !== JSON.stringify(base)) {
+        setDiff(null);
+        setConflict({ next, d, instruction });
+        return;
+      }
+      finish(next, d, instruction, base);
     });
   return (
     <Card className="overflow-hidden border-accent/30" data-testid="ai-edit-panel">
@@ -187,6 +214,9 @@ export function AiEditPanel({
               onClick={() => {
                 onApply(prev);
                 setPrev(null);
+                setDiff(null);
+                setConflict(null);
+                onUndone?.();
               }}
             >
               <Undo2 className="h-4 w-4" /> {t("websites.aiEdit.undo")}
@@ -217,6 +247,22 @@ export function AiEditPanel({
           <p className="flex items-start gap-2 rounded-xl border border-line bg-surface-hover/50 p-3 text-[12.5px] text-muted" role="status" data-testid="ai-edit-nothing">
             <Info className="mt-0.5 h-4 w-4 shrink-0" /> {t("websites.aiEdit.nothingHint")}
           </p>
+        ) : null}
+        {conflict && !pending ? (
+          <div className="rounded-xl border border-gold/40 bg-gold-soft/50 p-3" role="alert" data-testid="ai-edit-conflict">
+            <p className="flex items-center gap-1.5 text-[13px] font-semibold">
+              <TriangleAlert className="h-4 w-4 text-gold" /> {t("websites.aiEdit.conflictTitle")}
+            </p>
+            <p className="mt-1 text-[12.5px] text-muted">{t("websites.aiEdit.conflictBody")}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => finish(conflict.next, conflict.d, conflict.instruction, latest.current)}>
+                <Sparkles className="h-3.5 w-3.5" /> {t("websites.aiEdit.conflictApply")}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setConflict(null)}>
+                {t("websites.aiEdit.conflictDiscard")}
+              </Button>
+            </div>
+          </div>
         ) : null}
         {diff && !pending ? (
           <div className="rounded-xl border border-accent/30 bg-accent-soft/30 p-3" data-testid="ai-edit-changes">
@@ -263,6 +309,11 @@ export function AiEditPanel({
                     </li>
                   ))}
               </ul>
+            ) : null}
+            {diff.removed ? (
+              <p className="mt-2 flex items-start gap-2 rounded-lg bg-danger/10 p-2 text-[12.5px] text-danger" role="alert" data-testid="ai-edit-removed-warning">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" /> {t("websites.aiEdit.removedWarn", { n: diff.removed })}
+              </p>
             ) : null}
             {diff.blocks.some((c) => c.kind === "added") ? <p className="mt-2 text-[12px] text-subtle">{t("websites.aiEdit.fillIn")}</p> : null}
           </div>

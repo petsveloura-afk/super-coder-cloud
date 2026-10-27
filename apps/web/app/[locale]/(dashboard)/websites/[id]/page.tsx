@@ -18,6 +18,9 @@ import { siteEmbedOptions, sitePublicBase } from "@/lib/websites";
 import { aiSiteCaps } from "@/lib/ai/site-builder";
 import { formatNumber } from "@/lib/format";
 
+/** wave 34: the agent / AI site actions run from this page — a full-site answer can take well over the platform default */
+export const maxDuration = 60;
+
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
   return { title: t("websites.title") };

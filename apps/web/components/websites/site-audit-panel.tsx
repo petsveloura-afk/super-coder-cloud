@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { CheckCircle2, CircleAlert, Sparkles, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Badge, Button, Card } from "@/components/ui/primitives";
 import { aiEditSiteAction } from "@/app/[locale]/(dashboard)/websites/actions";
 import { auditSite, combinedInstruction, type AuditCheck, type AuditTab } from "@/lib/site/audit-core";
+import { diffSites, type SiteDiff } from "@/lib/site/diff";
 import type { SiteValue } from "./site-builder";
 
 /**
@@ -14,22 +15,39 @@ import type { SiteValue } from "./site-builder";
  * agent-edit engine as the quick actions (result lands in the editor, nothing is saved until
  * the owner saves; one-click undo). Manual items jump to the right tab.
  */
-export function SiteAuditPanel({ value, onApply, onGoTab, allowed, proTemplates }: { value: SiteValue; onApply: (v: SiteValue) => void; onGoTab: (tab: AuditTab) => void; allowed: boolean; proTemplates: boolean }) {
+export function SiteAuditPanel({ value, onApply, onGoTab, allowed, proTemplates, onApplied }: { value: SiteValue; onApply: (v: SiteValue) => void; onGoTab: (tab: AuditTab) => void; allowed: boolean; proTemplates: boolean; /** wave 34: highlight + live preview, exactly like the agent panel */ onApplied?: (diff: SiteDiff, next: SiteValue) => void }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const [prev, setPrev] = useState<SiteValue | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const latest = useRef(value);
+  useEffect(() => {
+    latest.current = value;
+  });
   const result = useMemo(() => auditSite(value as never), [value]);
   const tone = result.score >= 80 ? "success" : result.score >= 55 ? "warning" : "danger";
   const run = (key: string, instruction: string) => {
     setBusy(key);
     start(async () => {
-      const r = await aiEditSiteAction({ locale, instruction, site: value, allowProTemplates: proTemplates });
+      const base = value;
+      let r: Awaited<ReturnType<typeof aiEditSiteAction>>;
+      try {
+        r = await aiEditSiteAction({ locale, instruction, site: base, allowProTemplates: proTemplates });
+      } catch {
+        setBusy(null);
+        return void toast.error(t("websites.aiEdit.failed"));
+      }
       setBusy(null);
       if (r.error || !r.data) return void toast.error(t(r.error ?? "common.error"));
-      setPrev(value);
-      onApply({ ...value, ...(r.data.site as unknown as Partial<SiteValue>), slug: value.slug, status: value.status });
+      const next = { ...base, ...(r.data.site as unknown as Partial<SiteValue>), slug: base.slug, status: base.status } as SiteValue;
+      const d = diffSites(base, next);
+      if (d.empty) return void toast.info(t("websites.aiEdit.nothing"));
+      // the owner kept editing while the agent worked — never overwrite that silently
+      if (JSON.stringify(latest.current) !== JSON.stringify(base)) return void toast.error(t("websites.aiEdit.conflictTitle"), { description: t("websites.aiEdit.conflictBody") });
+      setPrev(base);
+      onApply(next);
+      onApplied?.(d, next);
       toast.success(t("websites.aiEdit.applied"));
     });
   };

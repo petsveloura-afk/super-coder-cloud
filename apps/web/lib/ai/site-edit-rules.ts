@@ -52,3 +52,36 @@ export function blockTexts(blocks: { data: unknown }[]): string[] {
   blocks.forEach((b) => walk(b.data));
   return out;
 }
+
+/** wave 34 — details the model must never wipe by forgetting them (image, phone, e-mail …) */
+type KeepBlock = { type: string; data: Record<string, unknown> };
+const KEEP_FIELDS: Record<string, string[]> = { hero: ["image_url"], about: ["image_url"], contact: ["phone", "whatsapp", "email", "address"] };
+const REMOVAL = /(remove|delete|erase|clear|הסר|תסיר|מחק|תמחק|למחוק|הוצא|حذف|احذف|إزالة|أزل)/i;
+
+/**
+ * After an edit: when the answer left a field EMPTY that the same section (matched by type and by
+ * its n-th occurrence, so inserted sections do not shift the match) had filled, the old value comes
+ * back — unless the owner asked to remove / delete something. Mutates `next`; returns how many fields it restored.
+ */
+export function restoreKept(prev: KeepBlock[], next: KeepBlock[], instruction = ""): number {
+  if (REMOVAL.test(instruction)) return 0;
+  const before: Record<string, KeepBlock[]> = {};
+  for (const b of prev) (before[b.type] ??= []).push(b);
+  const seen: Record<string, number> = {};
+  let restored = 0;
+  for (const b of next) {
+    seen[b.type] = (seen[b.type] ?? -1) + 1;
+    const fields = KEEP_FIELDS[b.type];
+    const old = before[b.type]?.[seen[b.type]!];
+    if (!fields || !old || !b.data || typeof b.data !== "object") continue;
+    for (const f of fields) {
+      const was = old.data?.[f];
+      const now = b.data[f];
+      if (typeof was === "string" && was.trim() && (typeof now !== "string" || !now.trim())) {
+        b.data[f] = was;
+        restored++;
+      }
+    }
+  }
+  return restored;
+}
