@@ -44,14 +44,16 @@ export async function saveSiteAction(input: { locale: string; id?: string; data:
   if (input.id) {
     const id = uuidSchema.safeParse(input.id);
     if (!id.success) return { error: "validation.invalidId" };
-    const { data: prev } = await supabase.from("sites").select("status, published_at").eq("id", id.data).eq("organization_id", ctx.org.id).maybeSingle();
+    const { data: prev } = await supabase.from("sites").select("status, published_at, slug").eq("id", id.data).eq("organization_id", ctx.org.id).maybeSingle();
     if (!prev) return { error: "errors.notFound" };
     const published_at = s.status === "published" ? ((prev.published_at as string | null) ?? new Date().toISOString()) : prev.published_at;
     const { error } = await supabase.from("sites").update({ ...row, published_at }).eq("id", id.data).eq("organization_id", ctx.org.id);
     if (error) return taken(error.code) ?? planLimit(error) ?? { error: dbErrorKey(error) };
     revalidatePath(`/${locale}/websites`);
     revalidatePath(`/${locale}/websites/${id.data}`);
-    revalidatePath(`/${locale}/s/${s.slug}`);
+    // wave 34: the public page of every language (and of the previous address, if the slug changed)
+    const slugs = [...new Set([s.slug, (prev.slug as string | null) ?? s.slug])];
+    for (const l of ["he", "ar", "en"]) for (const sl of slugs) revalidatePath(`/${l}/s/${sl}`);
     return { ok: true, message: s.status === "published" ? "websites.savedPublished" : "websites.saved", data: { id: id.data } };
   }
   const { data, error } = await supabase

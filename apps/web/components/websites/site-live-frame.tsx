@@ -46,7 +46,9 @@ export function SiteLiveFrame() {
       }
     };
     window.addEventListener("message", onMsg);
-    window.parent?.postMessage({ type: LIVE_READY }, window.location.origin);
+    // inside the editor's iframe the parent asks; opened as its own tab (wave 34) the opener does
+    const host: Window | null = window.parent !== window ? window.parent : (window.opener as Window | null);
+    host?.postMessage({ type: LIVE_READY }, window.location.origin);
     return () => window.removeEventListener("message", onMsg);
   }, []);
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Briefcase, ChevronsDownUp, ChevronsUpDown, ChevronDown, Copy, ExternalLink, Eye, Globe, GripVertical, ImageIcon, LayoutTemplate, ListTree, PanelRightClose, Plus, Redo2, Save, Trash2, Undo2, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, Briefcase, ChevronsDownUp, ChevronsUpDown, ChevronDown, Copy, ExternalLink, Eye, Globe, Maximize2, ShieldAlert, GripVertical, ImageIcon, LayoutTemplate, ListTree, PanelRightClose, Plus, Redo2, Save, Trash2, Undo2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { SITE_BLOCK_TYPES, type SiteBlockType } from "@scc/shared/engagement";
 import { StarterKits } from "./starter-kits";
@@ -17,6 +17,7 @@ import { BusinessPanel, type SitePages, type SiteSettings } from "./business-pan
 import { AiEditPanel } from "./ai-edit-panel";
 import { SiteAuditPanel } from "./site-audit-panel";
 import { SiteLivePreview } from "./site-live-preview";
+import { LIVE_DRAFT, LIVE_READY } from "./site-live-frame";
 import type { SiteDiff } from "@/lib/site/diff";
 import { cn } from "@/lib/utils";
 
@@ -248,8 +249,10 @@ export function SiteBuilder({
       hlTimer.current = window.setTimeout(() => setHighlight([]), 9000);
       togglePreview(true);
       if (diff.touched.length) focusBlock(diff.touched[0]!, { keepHighlight: true });
+      // wave 34: the agent edits the EDITOR, not the live site — say so, so "view site" is never a surprise
+      if (v.status === "published") toast.info(t("websites.editor.unsavedLiveTitle"), { description: t("websites.editor.unsavedLiveBody") });
     },
-    [focusBlock, togglePreview],
+    [focusBlock, togglePreview, v.status, t],
   );
   const duplicateBlock = (i: number) => {
     if (v.blocks.length >= 40) return void toast.error(t("websites.kits.full"));
@@ -286,6 +289,37 @@ export function SiteBuilder({
     return [first?.trim().slice(0, 70), n ? `${n} ×` : ""].filter(Boolean).join(" · ");
   };
   const livePreviewDraft = useMemo(() => ({ name: v.name, slug: v.slug, theme: v.theme as Record<string, unknown>, blocks: v.blocks, settings: v.settings ?? {}, pages: v.pages ?? {} }), [v.name, v.slug, v.theme, v.blocks, v.settings, v.pages]);
+  // ---- wave 34: full-page preview of the CURRENT (unsaved) state in its own tab ------------
+  const liveRef = useRef(livePreviewDraft);
+  const fullWin = useRef<Window | null>(null);
+  useEffect(() => {
+    liveRef.current = livePreviewDraft;
+    const w = fullWin.current;
+    if (w && !w.closed) w.postMessage({ type: LIVE_DRAFT, site: livePreviewDraft }, window.location.origin);
+  }, [livePreviewDraft]);
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || !fullWin.current || e.source !== fullWin.current) return;
+      if ((e.data as { type?: string } | null)?.type === LIVE_READY) fullWin.current.postMessage({ type: LIVE_DRAFT, site: liveRef.current }, window.location.origin);
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+  const openFullPreview = () => {
+    const w = window.open(`/${locale}/site-live`, "scc-site-full-preview");
+    if (!w) return void toast.error(t("websites.editor.popupBlocked"));
+    fullWin.current = w;
+    w.focus();
+  };
+  /** "view site" never shows a stale page: unsaved work is saved (keeping the publish state) first */
+  const saveAndView = (target: string) => {
+    const w = window.open("", "_blank");
+    if (!w) return void toast.error(t("websites.editor.popupBlocked"));
+    save(v.status, (ok) => {
+      if (!ok) return void w.close();
+      w.location.href = target;
+    });
+  };
   /** wave 27: add a starter kit's sections after the existing ones (never replaces anything) */
   function addKit(kit: StarterKit) {
     const room = 40 - v.blocks.length;
@@ -314,18 +348,21 @@ export function SiteBuilder({
     });
   const err = (k: string) => (errors[k] ? t(errors[k]!) : undefined);
 
-  function save(status: SiteValue["status"]) {
+  /** `after` (wave 34) runs when the save finished — true on success; used by "save and view site" */
+  function save(status: SiteValue["status"], after?: (ok: boolean) => void) {
     setErrors({});
     start(async () => {
       const res = await saveSiteAction({ locale, id, data: { ...v, status } });
       if (res.error) {
         setErrors(res.fieldErrors ?? {});
         toast.error(t(res.fieldErrors?.blocks ?? res.error));
+        after?.(false);
         return;
       }
       set({ status });
       setSavedSnap(JSON.stringify({ ...v, status }));
       toast.success(t(res.message ?? "common.saved"));
+      after?.(true);
       if (!id && res.data?.id) router.push(`/${locale}/websites/${res.data.id}`);
       else router.refresh();
     });
@@ -412,10 +449,27 @@ export function SiteBuilder({
             <span className="hidden sm:inline">{t(collapsed.length ? "websites.editor.expandAll" : "websites.editor.collapseAll")}</span>
           </Button>
         ) : null}
+        <Button variant="ghost" size="sm" onClick={openFullPreview} title={t("websites.editor.openFullPreview")} data-testid="editor-full-preview">
+          <Maximize2 className="h-4 w-4" />
+          <span className="hidden sm:inline">{t("websites.editor.openFullPreview")}</span>
+        </Button>
         <Button variant={showPreview ? "primary" : "secondary"} size="sm" aria-pressed={showPreview} onClick={() => togglePreview(!showPreview)} data-testid="editor-preview-toggle">
           {showPreview ? <PanelRightClose className="h-4 w-4" /> : <Eye className="h-4 w-4" />} {t(showPreview ? "websites.editor.hidePreview" : "websites.editor.showPreview")}
         </Button>
       </div>
+      {/* wave 34: edits (the agent's too) live in the editor until saved — a published site keeps its last saved version */}
+      {id && v.status === "published" && dirty ? (
+        <div role="status" className="flex flex-wrap items-center gap-3 rounded-2xl border border-gold/40 bg-gold-soft/60 px-3.5 py-2.5" data-testid="editor-not-live">
+          <ShieldAlert className="h-4 w-4 shrink-0 text-gold" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold">{t("websites.editor.unsavedLiveTitle")}</p>
+            <p className="text-[12.5px] text-muted">{t("websites.editor.unsavedLiveBody")}</p>
+          </div>
+          <Button size="sm" loading={saving} onClick={() => save(v.status)} data-testid="editor-save-live">
+            <Save className="h-4 w-4" /> {t("websites.editor.saveAndUpdate")}
+          </Button>
+        </div>
+      ) : null}
       <div role="tablist" aria-label={t("websites.tabs.label")} className="sticky top-14 z-10 -mx-1 flex gap-1 overflow-x-auto rounded-2xl border border-line bg-surface/95 p-1 backdrop-blur lg:top-2" data-testid="site-tabs">
         {tabs.map((x) => (
           <button key={x.k} type="button" role="tab" aria-selected={tab === x.k} data-tab={x.k} onClick={() => setTab(x.k)} className={cn("flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition", tab === x.k ? "bg-accent-solid text-accent-fg" : "text-muted hover:bg-surface-hover hover:text-fg")}>
@@ -654,9 +708,15 @@ export function SiteBuilder({
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">
         {id && v.status === "published" ? (
-          <a href={url} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl border border-line px-4 text-sm hover:bg-surface-hover">
-            <ExternalLink className="h-4 w-4" /> {t("websites.view")}
-          </a>
+          dirty ? (
+            <button type="button" disabled={saving} onClick={() => saveAndView(url)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-gold/50 bg-gold-soft/50 px-4 text-sm hover:bg-gold-soft disabled:opacity-60" data-testid="editor-save-and-view">
+              <ExternalLink className="h-4 w-4" /> {t("websites.editor.saveAndView")}
+            </button>
+          ) : (
+            <a href={url} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl border border-line px-4 text-sm hover:bg-surface-hover">
+              <ExternalLink className="h-4 w-4" /> {t("websites.view")}
+            </a>
+          )
         ) : null}
         <Button variant="secondary" loading={saving} onClick={() => save("draft")}>
           <Save className="h-4 w-4" /> {t(v.status === "published" ? "websites.unpublish" : "websites.saveDraft")}
