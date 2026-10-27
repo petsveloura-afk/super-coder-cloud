@@ -2423,7 +2423,21 @@
         "trust": "Add trust elements: a numbers section and a testimonials section using only facts from the content, with placeholders where facts are missing",
         "arabic": "Translate every text on the site to Arabic",
         "hebrew": "Translate every text on the site to Hebrew"
-      }
+      },
+      "stage0": "Reading your current site…",
+      "stage1": "Planning the changes…",
+      "stage2": "Writing and designing…",
+      "stage3": "Checking and tidying the result…",
+      "recent": "Recent:",
+      "shortcut": "Ctrl+Enter to run",
+      "nothing": "The agent did not change anything.",
+      "nothingHint": "The answer is identical to the current site. Try being more specific, for example which section to add and where, or exactly what to change.",
+      "changes": "What the agent changed",
+      "added": "{n} added",
+      "changed": "{n} updated",
+      "removed": "{n} removed",
+      "design": "Design",
+      "fillIn": "New sections without real data were added with sample text. Replace it with your own details before publishing."
     },
     "site": {
       "skip": "Skip to content",
@@ -2631,6 +2645,35 @@
       "templateBody": "Pick a ready design for your industry",
       "campaign": "Landing page from a campaign",
       "campaignBody": "Open a campaign and let the agent build its page"
+    },
+    "live": {
+      "title": "Live preview",
+      "loading": "Loading the site…",
+      "desktop": "Desktop",
+      "tablet": "Tablet",
+      "phone": "Phone",
+      "device": "Screen size",
+      "reload": "Reload preview",
+      "updating": "Updating…",
+      "unsaved": "This is how the site looks now, even before saving",
+      "field": {
+        "name": "Name",
+        "phone": "Phone",
+        "message": "Message"
+      }
+    },
+    "editor": {
+      "unsaved": "Unsaved changes",
+      "allSaved": "All saved",
+      "undo": "Undo",
+      "redo": "Redo",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all",
+      "showPreview": "Live preview",
+      "hidePreview": "Hide preview",
+      "drag": "Drag to reorder",
+      "showInPreview": "Show in preview",
+      "duplicate": "Duplicate section"
     }
   },
   "admin": {

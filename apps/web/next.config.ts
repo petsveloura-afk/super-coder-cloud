@@ -67,6 +67,13 @@ const embeddableHeaders = [{ key: "Content-Security-Policy", value: embeddableCs
 const siteCsp = csp.replace("img-src 'self'", "img-src 'self' https:");
 const siteHeaders = [{ key: "Content-Security-Policy", value: siteCsp }];
 
+// wave 33: the editor's live preview (/site-live) is shown in an iframe of the SAME origin only
+const liveCsp = siteCsp.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
+const liveHeaders = [
+  { key: "Content-Security-Policy", value: liveCsp },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+];
+
 // Integrations: Meta "Connect WhatsApp" popup (Facebook JS SDK) is allowed on this page only.
 const integrationsCsp = csp
   .replace("script-src 'self' 'unsafe-inline'", "script-src 'self' 'unsafe-inline' https://connect.facebook.net")
@@ -118,6 +125,7 @@ const nextConfig: NextConfig = {
       { source: "/:locale(he|ar|en)/f/:slug*", headers: embeddableHeaders },
       { source: "/:locale(he|ar|en)/book/:slug*", headers: embeddableHeaders },
       { source: "/:locale(he|ar|en)/s/:slug*", headers: siteHeaders },
+      { source: "/:locale(he|ar|en)/site-live", headers: liveHeaders },
       // embeddable website chat (iframe from /widget.js on customers' sites)
       { source: "/:locale(he|ar|en)/chat/:org*", headers: embeddableHeaders },
       { source: "/:locale(he|ar|en)/integrations", headers: integrationsHeaders },

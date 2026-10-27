@@ -120,7 +120,7 @@ export function ProSite({
     .filter((x) => x.href && x.href.startsWith("https://"));
 
   const sec = (key: string, id: string, inner: ReactNode, cls = "") => (
-    <section key={key} id={id} className={`sec ${cls}`.trim()}>
+    <section key={key} id={id} data-bi={key.slice(key.lastIndexOf("-") + 1)} className={`sec ${cls}`.trim()}>
       {inner}
     </section>
   );

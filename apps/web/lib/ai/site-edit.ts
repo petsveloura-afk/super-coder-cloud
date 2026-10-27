@@ -5,6 +5,7 @@ import type { Locale } from "@/lib/i18n/config";
 import { runAI } from "./run";
 import { extractJson, normalizeAiSite, siteJsonInstructionsPro } from "./site-json";
 import { FREE_TEMPLATES, ALL_TEMPLATES } from "@/lib/site/templates";
+import { blockTexts, detectSiteLanguage, siteEditOverrides } from "./site-edit-rules";
 
 /**
  * Wave 13 — edit an existing site with the AI ("make it more modern", "add pricing",
@@ -28,17 +29,30 @@ export async function editSiteWithAI(input: { orgId: string; locale: Locale; ins
     "If asked to change the language, translate every visible text. If asked to change the style, you may change template / accent / accent2 / font / radius / mode.",
     "",
     siteJsonInstructionsPro("full", input.locale, ctx, ordered),
+    "",
+    // wave 33: edit-specific rules (keep language + every section, add requested sections even without data)
+    siteEditOverrides(detectSiteLanguage([input.site.name, ...blockTexts(input.site.blocks)])),
   ].join("\n");
-  const out = await runAI({
-    orgId: input.orgId,
-    feature: "site_builder",
-    system,
-    messages: [{ role: "user", content: `Instruction: ${input.instruction}\n\nCurrent website JSON:\n${JSON.stringify(current).slice(0, 60000)}` }],
-    temperature: 0.4,
-    maxTokens: 8000,
-    json: true,
-  });
+  const currentJson = JSON.stringify(current);
+  // wave 33: big sites need more room for the full JSON answer (a cut-off answer was reported as "invalid")
+  const maxTokens = Math.min(12000, Math.max(8000, Math.ceil(currentJson.length / 2.2) + 3000));
+  const ask = (extra = "") =>
+    runAI({
+      orgId: input.orgId,
+      feature: "site_builder",
+      system: extra ? `${system}\n${extra}` : system,
+      messages: [{ role: "user", content: `Instruction: ${input.instruction}\n\nCurrent website JSON:\n${currentJson.slice(0, 60000)}` }],
+      temperature: 0.4,
+      maxTokens,
+      json: true,
+    });
+  let out = await ask();
   if (!out.ok) return { ok: false, error: out.error };
+  // wave 33: one quiet retry when the answer was not usable JSON (cut off / chatter) — never on provider errors
+  if (extractJson(out.text) === null) {
+    const again = await ask("IMPORTANT: your previous answer could not be parsed. Reply with ONE complete, valid JSON object only — no markdown, no comments — and keep texts concise.");
+    if (again.ok) out = again;
+  }
   const site = normalizeAiSite(extractJson(out.text), "full", ctx, input.site.name, { maxBlocks: 40, templates: ordered, keepOrder: true });
   if (!site) {
     console.error("ai site edit unusable", out.text.slice(0, 300));

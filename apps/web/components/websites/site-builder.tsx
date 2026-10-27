@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Briefcase, ExternalLink, Globe, ImageIcon, LayoutTemplate, ListTree, Plus, Save, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, Briefcase, ChevronsDownUp, ChevronsUpDown, ChevronDown, Copy, ExternalLink, Eye, Globe, GripVertical, ImageIcon, LayoutTemplate, ListTree, PanelRightClose, Plus, Redo2, Save, Trash2, Undo2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { SITE_BLOCK_TYPES, type SiteBlockType } from "@scc/shared/engagement";
 import { StarterKits } from "./starter-kits";
@@ -16,6 +16,8 @@ import { DesignPanel } from "./design-panel";
 import { BusinessPanel, type SitePages, type SiteSettings } from "./business-panel";
 import { AiEditPanel } from "./ai-edit-panel";
 import { SiteAuditPanel } from "./site-audit-panel";
+import { SiteLivePreview } from "./site-live-preview";
+import type { SiteDiff } from "@/lib/site/diff";
 import { cn } from "@/lib/utils";
 
 type Item = Record<string, string>;
@@ -69,6 +71,58 @@ const SPEC: Record<SiteBlockType, { fields: FieldSpec[]; items?: { key: "items";
   video: { fields: [{ key: "title" }, { key: "url", ltr: true }, { key: "text", multiline: true }] },
 };
 
+/**
+ * wave 33 — editor state with history. A burst of typing (< 0.7 s apart) is ONE undo step;
+ * undo / redo restore whole sections / design / SEO; the agent's edit is one step too.
+ */
+interface EditorState {
+  v: SiteValue;
+  past: SiteValue[];
+  future: SiteValue[];
+  at: number;
+}
+type EditorAction = { type: "set"; u: SiteValue | ((x: SiteValue) => SiteValue); now: number } | { type: "undo" } | { type: "redo" };
+function editorReducer(s: EditorState, a: EditorAction): EditorState {
+  if (a.type === "set") {
+    const nv = typeof a.u === "function" ? a.u(s.v) : a.u;
+    if (nv === s.v) return s;
+    const push = a.now - s.at > 700;
+    return { v: nv, past: push ? [...s.past, s.v].slice(-60) : s.past, future: [], at: a.now };
+  }
+  if (a.type === "undo") {
+    const p = s.past[s.past.length - 1];
+    return p ? { v: p, past: s.past.slice(0, -1), future: [...s.future, s.v], at: 0 } : s;
+  }
+  const n = s.future[s.future.length - 1];
+  return n ? { v: n, past: [...s.past, s.v], future: s.future.slice(0, -1), at: 0 } : s;
+}
+/** the live preview opens by default on wide screens; the choice is remembered per browser */
+const PREVIEW_KEY = "scc-site-preview";
+const PREVIEW_EVENT = "scc-site-preview-change";
+let memPreview: boolean | null = null; // used when storage is blocked
+const previewSubscribe = (cb: () => void) => {
+  window.addEventListener(PREVIEW_EVENT, cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener(PREVIEW_EVENT, cb);
+    window.removeEventListener("storage", cb);
+  };
+};
+const previewSnapshot = (): boolean => {
+  if (memPreview !== null) return memPreview;
+  try {
+    const pref = window.localStorage.getItem(PREVIEW_KEY);
+    if (pref) return pref === "1";
+  } catch {
+    /* storage blocked */
+  }
+  try {
+    return window.matchMedia("(min-width: 1280px)").matches;
+  } catch {
+    return false;
+  }
+};
+
 export function newBlock(type: SiteBlockType): BlockValue {
   const spec = SPEC[type];
   const data: BlockValue["data"] = Object.fromEntries(spec.fields.map((f) => [f.key, ""]));
@@ -108,13 +162,24 @@ export function SiteBuilder({
 }) {
   const { t, locale } = useI18n();
   const router = useRouter();
-  const [v, setV] = useState<SiteValue>(initial);
+  const [editor, dispatch] = useReducer(editorReducer, { v: initial, past: [], future: [], at: 0 });
+  const v = editor.v;
+  const setV = useCallback((u: SiteValue | ((x: SiteValue) => SiteValue)) => dispatch({ type: "set", u, now: Date.now() }), []);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState<SiteBlockType>("hero");
   const [saving, start] = useTransition();
   const [imaging, startImage] = useTransition();
   const [tab, setTab] = useState<"content" | "design" | "business" | "domain">("content");
   const [uploading, setUploading] = useState<string | null>(null);
+  // wave 33: live preview, highlight of what changed, collapsed sections, drag & drop, undo / redo
+  const showPreview = useSyncExternalStore(previewSubscribe, previewSnapshot, () => false);
+  const [scrollTo, setScrollTo] = useState<{ index: number; nonce: number } | null>(null);
+  const [highlight, setHighlight] = useState<number[]>([]);
+  const [collapsed, setCollapsed] = useState<number[]>([]);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+  const [savedSnap, setSavedSnap] = useState(() => JSON.stringify(initial));
+  const hlTimer = useRef<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const uploadTarget = useRef<((url: string) => void) | null>(null);
   function pickImage(key: string, apply: (url: string) => void) {
@@ -135,6 +200,92 @@ export function SiteBuilder({
     });
   }
   const set = (patch: Partial<SiteValue>) => setV((x) => ({ ...x, ...patch }));
+  // ---- wave 33 -------------------------------------------------------------------------
+  const canUndo = editor.past.length > 0;
+  const canRedo = editor.future.length > 0;
+  const undo = useCallback(() => {
+    setCollapsed([]);
+    dispatch({ type: "undo" });
+  }, []);
+  const redo = useCallback(() => {
+    setCollapsed([]);
+    dispatch({ type: "redo" });
+  }, []);
+  const dirty = useMemo(() => JSON.stringify(v) !== savedSnap, [v, savedSnap]);
+  // leaving the page with unsaved work asks first
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+  const togglePreview = useCallback((on: boolean) => {
+    memPreview = on;
+    try {
+      window.localStorage.setItem(PREVIEW_KEY, on ? "1" : "0");
+    } catch {
+      /* private mode — fine */
+    }
+    window.dispatchEvent(new Event(PREVIEW_EVENT));
+  }, []);
+  /** scroll the editor AND the live preview to a section and flash it */
+  const focusBlock = useCallback((index: number, opts?: { keepHighlight?: boolean }) => {
+    setTab("content");
+    setCollapsed((c) => c.filter((x) => x !== index));
+    setScrollTo({ index, nonce: Date.now() });
+    if (!opts?.keepHighlight) setHighlight([index]);
+    window.setTimeout(() => document.getElementById(`blk-${index}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+  }, []);
+  /** after the agent's edit: show it — highlight the touched sections, open the preview, jump to the first */
+  const onAgentApplied = useCallback(
+    (diff: SiteDiff) => {
+      setCollapsed([]);
+      setHighlight(diff.touched);
+      if (hlTimer.current) window.clearTimeout(hlTimer.current);
+      hlTimer.current = window.setTimeout(() => setHighlight([]), 9000);
+      togglePreview(true);
+      if (diff.touched.length) focusBlock(diff.touched[0]!, { keepHighlight: true });
+    },
+    [focusBlock, togglePreview],
+  );
+  const duplicateBlock = (i: number) => {
+    if (v.blocks.length >= 40) return void toast.error(t("websites.kits.full"));
+    setCollapsed([]);
+    setV((x) => {
+      const copy = JSON.parse(JSON.stringify(x.blocks[i])) as BlockValue;
+      const b = [...x.blocks];
+      b.splice(i + 1, 0, copy);
+      return { ...x, blocks: b };
+    });
+    setHighlight([i + 1]);
+    window.setTimeout(() => setHighlight([]), 2500);
+  };
+  const dropBlock = (to: number) => {
+    const from = dragFrom;
+    setDragFrom(null);
+    setDragOver(null);
+    if (from === null || from === to) return;
+    setCollapsed([]);
+    setV((x) => {
+      const b = [...x.blocks];
+      const [m] = b.splice(from, 1);
+      b.splice(to, 0, m!);
+      return { ...x, blocks: b };
+    });
+    setHighlight([to]);
+    window.setTimeout(() => setHighlight([]), 2500);
+  };
+  /** first readable text of a section — shown when it is collapsed */
+  const blockSummary = (b: BlockValue) => {
+    const d = b.data as Record<string, unknown>;
+    const first = ["title", "subtitle", "body", "text", "quote", "label"].map((k) => d[k]).find((x) => typeof x === "string" && x.trim()) as string | undefined;
+    const n = Array.isArray(d.items) ? (d.items as unknown[]).length : 0;
+    return [first?.trim().slice(0, 70), n ? `${n} ×` : ""].filter(Boolean).join(" · ");
+  };
+  const livePreviewDraft = useMemo(() => ({ name: v.name, slug: v.slug, theme: v.theme as Record<string, unknown>, blocks: v.blocks, settings: v.settings ?? {}, pages: v.pages ?? {} }), [v.name, v.slug, v.theme, v.blocks, v.settings, v.pages]);
   /** wave 27: add a starter kit's sections after the existing ones (never replaces anything) */
   function addKit(kit: StarterKit) {
     const room = 40 - v.blocks.length;
@@ -173,11 +324,39 @@ export function SiteBuilder({
         return;
       }
       set({ status });
+      setSavedSnap(JSON.stringify({ ...v, status }));
       toast.success(t(res.message ?? "common.saved"));
       if (!id && res.data?.id) router.push(`/${locale}/websites/${res.data.id}`);
       else router.refresh();
     });
   }
+
+  // wave 33: Ctrl/Cmd+S saves (keeps the current publish state); Ctrl/Cmd+Z / Y outside text fields = undo / redo
+  const saveRef = useRef(save);
+  useEffect(() => {
+    saveRef.current = save;
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      const el = e.target as HTMLElement | null;
+      const typing = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+      if (k === "s") {
+        e.preventDefault();
+        saveRef.current(v.status);
+      } else if (!typing && k === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (!typing && k === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo, v.status]);
 
   const url = liveUrl ?? `${publicBase}/${v.slug}`;
   const tabs = [
@@ -187,7 +366,8 @@ export function SiteBuilder({
     ...(domainSlot ? [{ k: "domain" as const, icon: Globe, label: t("websites.tabs.domain") }] : []),
   ];
   return (
-    <div className="space-y-4">
+    <div className={showPreview ? "xl:grid xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] xl:items-start xl:gap-4" : ""} data-preview={showPreview ? "on" : "off"}>
+    <div className="min-w-0 space-y-4">
       {/* wave 13: image upload for image fields (sections, gallery, team, logo) */}
       <input
         ref={fileRef}
@@ -211,8 +391,31 @@ export function SiteBuilder({
           toast.success(t("websites.imageUploaded"));
         }}
       />
-      <AiEditPanel value={v} onApply={(nv) => setV(nv)} allowed={aiEditor} proTemplates={proTemplates} />
+      <AiEditPanel value={v} onApply={(nv) => setV(nv)} allowed={aiEditor} proTemplates={proTemplates} onApplied={onAgentApplied} onFocusBlock={(i) => focusBlock(i, { keepHighlight: true })} />
       <SiteAuditPanel value={v} onApply={(nv) => setV(nv)} onGoTab={(k) => setTab(k)} allowed={aiEditor} proTemplates={proTemplates} />
+      {/* wave 33: editor toolbar — unsaved state, undo / redo, collapse all, live preview */}
+      <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-line bg-surface px-2.5 py-1.5" data-testid="editor-toolbar">
+        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors", dirty ? "bg-gold-soft text-gold" : "bg-success-soft text-success")} role="status" data-testid="editor-dirty">
+          <span className={cn("h-1.5 w-1.5 rounded-full", dirty ? "animate-pulse bg-gold" : "bg-success")} />
+          {t(dirty ? "websites.editor.unsaved" : "websites.editor.allSaved")}
+        </span>
+        <span className="flex-1" />
+        <Button variant="ghost" size="sm" aria-label={t("websites.editor.undo")} title={`${t("websites.editor.undo")} (Ctrl+Z)`} disabled={!canUndo} onClick={undo} data-testid="editor-undo">
+          <Undo2 className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" aria-label={t("websites.editor.redo")} title={`${t("websites.editor.redo")} (Ctrl+Y)`} disabled={!canRedo} onClick={redo} data-testid="editor-redo">
+          <Redo2 className="h-4 w-4" />
+        </Button>
+        {tab === "content" && v.blocks.length > 1 ? (
+          <Button variant="ghost" size="sm" onClick={() => setCollapsed(collapsed.length ? [] : v.blocks.map((_, i) => i))} data-testid="editor-collapse-all">
+            {collapsed.length ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronsDownUp className="h-4 w-4" />}
+            <span className="hidden sm:inline">{t(collapsed.length ? "websites.editor.expandAll" : "websites.editor.collapseAll")}</span>
+          </Button>
+        ) : null}
+        <Button variant={showPreview ? "primary" : "secondary"} size="sm" aria-pressed={showPreview} onClick={() => togglePreview(!showPreview)} data-testid="editor-preview-toggle">
+          {showPreview ? <PanelRightClose className="h-4 w-4" /> : <Eye className="h-4 w-4" />} {t(showPreview ? "websites.editor.hidePreview" : "websites.editor.showPreview")}
+        </Button>
+      </div>
       <div role="tablist" aria-label={t("websites.tabs.label")} className="sticky top-14 z-10 -mx-1 flex gap-1 overflow-x-auto rounded-2xl border border-line bg-surface/95 p-1 backdrop-blur lg:top-2" data-testid="site-tabs">
         {tabs.map((x) => (
           <button key={x.k} type="button" role="tab" aria-selected={tab === x.k} data-tab={x.k} onClick={() => setTab(x.k)} className={cn("flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition", tab === x.k ? "bg-accent-solid text-accent-fg" : "text-muted hover:bg-surface-hover hover:text-fg")}>
@@ -266,11 +469,56 @@ export function SiteBuilder({
           const spec = SPEC[b.type];
           const items = (b.data.items as Item[] | undefined) ?? [];
           return (
-            <li key={i}>
+            <li
+              key={i}
+              id={`blk-${i}`}
+              className={cn("scroll-mt-24 rounded-2xl transition-all duration-500", highlight.includes(i) && "ring-2 ring-accent/70 ring-offset-2 ring-offset-bg", dragOver === i && dragFrom !== null && dragFrom !== i && "translate-y-1 ring-2 ring-dashed ring-accent/60", dragFrom === i && "opacity-50")}
+              onDragOver={(e) => {
+                if (dragFrom === null) return;
+                e.preventDefault();
+                if (dragOver !== i) setDragOver(i);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                dropBlock(i);
+              }}
+            >
               <Card className="p-4" data-block={b.type}>
                 <div className="mb-3 flex items-center gap-2">
-                  <span className="rounded-lg bg-accent-soft px-2 py-0.5 text-[12px] font-semibold text-accent">{t(`websites.blocks.${b.type}`)}</span>
+                  <button
+                    type="button"
+                    draggable
+                    aria-label={t("websites.editor.drag")}
+                    title={t("websites.editor.drag")}
+                    className="grid h-8 w-6 shrink-0 cursor-grab place-items-center rounded-md text-subtle transition hover:bg-surface-hover hover:text-fg active:cursor-grabbing"
+                    onDragStart={(e) => {
+                      setDragFrom(i);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", String(i));
+                      const li = (e.currentTarget as HTMLElement).closest("li");
+                      if (li) e.dataTransfer.setDragImage(li, 24, 24);
+                    }}
+                    onDragEnd={() => {
+                      setDragFrom(null);
+                      setDragOver(null);
+                    }}
+                  >
+                    <GripVertical className="h-4 w-4" />
+                  </button>
+                  <button type="button" className="flex min-w-0 items-center gap-2 text-start" aria-expanded={!collapsed.includes(i)} onClick={() => setCollapsed((c) => (c.includes(i) ? c.filter((x) => x !== i) : [...c, i]))}>
+                    <ChevronDown className={cn("h-4 w-4 shrink-0 text-subtle transition-transform", collapsed.includes(i) && "-rotate-90 rtl:rotate-90")} />
+                    <span className="shrink-0 rounded-lg bg-accent-soft px-2 py-0.5 text-[12px] font-semibold text-accent">{t(`websites.blocks.${b.type}`)}</span>
+                    {collapsed.includes(i) ? <span className="truncate text-[12.5px] text-muted">{blockSummary(b)}</span> : null}
+                  </button>
                   <span className="flex-1" />
+                  {showPreview ? (
+                    <Button variant="ghost" size="sm" aria-label={t("websites.editor.showInPreview")} title={t("websites.editor.showInPreview")} onClick={() => setScrollTo({ index: i, nonce: Date.now() })}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                  <Button variant="ghost" size="sm" aria-label={t("websites.editor.duplicate")} title={t("websites.editor.duplicate")} onClick={() => duplicateBlock(i)}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="sm" aria-label={t("websites.moveUp")} disabled={i === 0} onClick={() => move(i, -1)}>
                     <ArrowUp className="h-4 w-4" />
                   </Button>
@@ -281,6 +529,8 @@ export function SiteBuilder({
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+                {collapsed.includes(i) ? null : (
+                <>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {spec.fields.map((f) => {
                     const fid = `bl-${i}-${f.key}`;
@@ -373,6 +623,8 @@ export function SiteBuilder({
                     </Button>
                   </div>
                 ) : null}
+                </>
+                )}
               </Card>
             </li>
           );
@@ -413,6 +665,12 @@ export function SiteBuilder({
           {t(v.status === "published" ? "websites.update" : "websites.publish")}
         </Button>
       </div>
+    </div>
+    {showPreview ? (
+      <div className="order-first mb-4 h-[62dvh] xl:sticky xl:top-2 xl:order-none xl:mb-0 xl:h-[calc(100dvh-1.5rem)]">
+        <SiteLivePreview draft={livePreviewDraft} scrollTo={scrollTo} onClose={() => togglePreview(false)} className="h-full" />
+      </div>
+    ) : null}
     </div>
   );
 }
