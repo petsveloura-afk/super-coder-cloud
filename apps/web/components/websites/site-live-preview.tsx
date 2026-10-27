@@ -134,7 +134,7 @@ export function SiteLivePreview({ draft, scrollTo, onClose, className }: { draft
       </div>
       <div ref={box} className="relative min-h-0 flex-1 overflow-hidden bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(127,127,127,.05)_10px,rgba(127,127,127,.05)_20px)]">
         <div
-          className={cn("absolute overflow-hidden transition-[width,left,top,height] duration-300 ease-out", framed ? "rounded-[1.6rem] border-[6px] border-line bg-bg shadow-card" : "")}
+          dir="ltr" className={cn("absolute overflow-hidden transition-[width,left,top,height] duration-300 ease-out", framed ? "rounded-[1.6rem] border-[6px] border-line bg-bg shadow-card" : "")}
           style={{ width: vw * scale + (framed ? 12 : 0), height: framed ? availH : "100%", left: Math.max(0, (size.w - (vw * scale + (framed ? 12 : 0))) / 2), top: framed ? 18 : 0 }}
         >
           <iframe
@@ -142,7 +142,7 @@ export function SiteLivePreview({ draft, scrollTo, onClose, className }: { draft
             src={`/${locale}/site-live`}
             title={t("websites.live.title")}
             className="border-0 bg-white"
-            style={{ width: vw, height: (framed ? availH - 12 : size.h || 600) / scale, transform: `scale(${scale})`, transformOrigin: "0 0" }}
+            style={{ position: "absolute", left: 0, top: 0, width: vw, height: (framed ? availH - 12 : size.h || 600) / scale, transform: `scale(${scale})`, transformOrigin: "0 0" }}
             data-testid="site-live-iframe"
             onLoad={() => post({ type: LIVE_DRAFT, site: latest.current })}
           />
