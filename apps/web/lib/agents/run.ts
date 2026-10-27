@@ -364,6 +364,11 @@ export async function runAgentsCron(budgetMs = 50_000): Promise<Record<string, u
     collections: runCollections,
     marketing: runMarketing,
   };
+  // wave 35: due posts go out FIRST — they are time-critical and cheap, and must not wait behind slow agents
+  if (left() > 6000) {
+    const { publishDuePosts } = await import("@/lib/social/publish");
+    out.socialPostsFirst = await publishDuePosts(Math.min(20_000, left() - 3000)).catch((e) => ({ error: (e as Error).message }));
+  }
   for (const key of ["collections", "sales_manager", "analyst", "marketing"] as AgentKey[]) {
     if (left() < 8000) break;
     // morning agents: only in the morning (Israel time for the claim; each org's zone is checked again)

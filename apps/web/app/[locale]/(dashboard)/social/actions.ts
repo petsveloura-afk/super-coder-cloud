@@ -6,6 +6,7 @@ import { uuidSchema } from "@scc/shared/validators";
 import { getOrgContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { dbErrorKey, type ActionState } from "@/lib/action-state";
+import { classifyPublishError, publishHintKey } from "@/lib/social/errors";
 
 /** Wave 19 — comments board, scheduled posts, Google reviews, social settings. */
 const loc = (l: string) => (l === "ar" || l === "en" ? l : "he");
@@ -105,9 +106,23 @@ export async function postStatusAction(input: { locale: string; id: string; acti
   if (input.action === "now") {
     const { publishDuePosts } = await import("@/lib/social/publish");
     await publishDuePosts(20_000).catch(() => undefined);
+    // wave 35: report what really happened instead of always saying "publishing"
+    const { data: after } = await supabase.from("social_posts").select("status, results").eq("id", input.id).eq("organization_id", ctx.org.id).maybeSingle();
+    revalidatePath(`/${locale}/social`);
+    const res = (after?.results ?? {}) as Record<string, { ok?: boolean; error?: string }>;
+    if (after?.status === "published") return { ok: true, message: "social.publishedNow" };
+    if (after?.status === "partial") return { ok: true, message: "social.postStatus.partial" };
+    if (after?.status === "failed" || (after?.status === "scheduled" && Object.values(res).some((r) => r && r.ok === false))) {
+      const bad = Object.values(res).find((r) => r && r.ok === false);
+      const kind = classifyPublishError(bad?.error);
+      if (after?.status === "scheduled") return { ok: true, message: "social.retrying" };
+      const key = publishHintKey(kind);
+      return key ? { error: key } : { error: "social.replyFailed", messageParams: { detail: String(bad?.error ?? "").slice(0, 200) } };
+    }
+    return { ok: true, message: "social.publishing" };
   }
   revalidatePath(`/${locale}/social`);
-  return { ok: true, message: input.action === "cancel" ? "social.canceled" : input.action === "now" ? "social.publishing" : "social.scheduled" };
+  return { ok: true, message: input.action === "cancel" ? "social.canceled" : "social.scheduled" };
 }
 
 const settingsSchema = z.object({

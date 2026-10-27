@@ -2688,7 +2688,9 @@
       "saveAndView": "Save and view site",
       "openFullPreview": "Full preview",
       "popupBlocked": "The browser blocked the new tab. Allow pop-ups for this site and try again.",
-      "adjusted": "Saved — some texts were shortened or cleaned to fit the site rules; the editor now shows exactly what is live"
+      "adjusted": "Saved — some texts were shortened or cleaned to fit the site rules; the editor now shows exactly what is live",
+      "draftRestored": "Restored your unsaved changes from before — press Save to update the site",
+      "draftUndo": "Undo restore"
     }
   },
   "admin": {
@@ -3903,6 +3905,12 @@
     "ignore": "Ignore",
     "replied": "Reply published",
     "replyFailed": "Publishing failed: {detail}",
+    "errPermission": "Facebook has no permission to publish to the Page. Reconnect Facebook, pick the Page and approve every permission shown (including managing posts and reading Page activity).",
+    "errToken": "The Facebook connection has expired. Reconnect to keep publishing.",
+    "errTransient": "Temporary problem on Facebook's side. The system will retry automatically in a few minutes.",
+    "publishedNow": "The post was published",
+    "retrying": "Publishing hit a temporary problem — the system will retry automatically in a few minutes",
+    "reconnect": "Connections → reconnect",
     "notConnected": "Facebook / Instagram is not connected",
     "googleNotConnected": "Google Business is not connected",
     "noComments": "No comments yet. When someone comments on a Facebook or Instagram post it shows up here with a reply draft.",

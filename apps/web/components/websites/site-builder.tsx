@@ -99,6 +99,9 @@ function editorReducer(s: EditorState, a: EditorAction): EditorState {
 }
 /** the live preview opens by default on wide screens; the choice is remembered per browser */
 const PREVIEW_KEY = "scc-site-preview";
+/** unsaved work survives a reload / tab switch / coming back from "view site" (kept in this browser only) */
+const DRAFT_PREFIX = "scc-site-unsaved:";
+const DRAFT_MAX_AGE = 7 * 24 * 3600 * 1000;
 const PREVIEW_EVENT = "scc-site-preview-change";
 let memPreview: boolean | null = null; // used when storage is blocked
 const previewSubscribe = (cb: () => void) => {
@@ -218,6 +221,49 @@ export function SiteBuilder({
   useEffect(() => {
     vRef.current = v;
   });
+  // wave 34e: unsaved work (the agent's too) is kept in this browser and restored if the page is reloaded
+  const draftKey = `${DRAFT_PREFIX}${id ?? "new"}`;
+  const draftOnce = useRef(false);
+  useEffect(() => {
+    if (draftOnce.current) return;
+    draftOnce.current = true;
+    try {
+      const raw = window.localStorage.getItem(draftKey);
+      if (!raw) return;
+      const d = JSON.parse(raw) as { v?: SiteValue; at?: number } | null;
+      if (!d?.v || !Array.isArray(d.v.blocks) || typeof d.at !== "number" || Date.now() - d.at > DRAFT_MAX_AGE) return void window.localStorage.removeItem(draftKey);
+      if (JSON.stringify(d.v) === JSON.stringify(initial)) return void window.localStorage.removeItem(draftKey);
+      setV(() => d.v as SiteValue);
+      toast.info(t("websites.editor.draftRestored"), { duration: 12000, action: { label: t("websites.editor.draftUndo"), onClick: () => undo() } });
+    } catch {
+      /* storage blocked or damaged draft — ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const writeDraft = useCallback(() => {
+    try {
+      if (dirty) window.localStorage.setItem(draftKey, JSON.stringify({ v: vRef.current, at: Date.now() }));
+      else window.localStorage.removeItem(draftKey);
+    } catch {
+      /* storage full or blocked — the leave-page warning still applies */
+    }
+  }, [dirty, draftKey]);
+  useEffect(() => {
+    if (!draftOnce.current) return;
+    const h = window.setTimeout(writeDraft, 400);
+    return () => window.clearTimeout(h);
+  }, [v, writeDraft]);
+  useEffect(() => {
+    const flush = () => {
+      if (document.visibilityState === "hidden") writeDraft();
+    };
+    document.addEventListener("visibilitychange", flush);
+    window.addEventListener("pagehide", writeDraft);
+    return () => {
+      document.removeEventListener("visibilitychange", flush);
+      window.removeEventListener("pagehide", writeDraft);
+    };
+  }, [writeDraft]);
   // leaving the page with unsaved work asks first
   useEffect(() => {
     if (!dirty) return;

@@ -4,7 +4,7 @@ import ar from "@/lib/i18n/dictionaries/ar.json";
 import en from "@/lib/i18n/dictionaries/en.json";
 
 /** Wave 34 — "view site" must never show a stale page: unsaved edits (the agent's too) are called out and saved first. */
-const KEYS = ["unsavedLiveTitle", "unsavedLiveBody", "saveAndUpdate", "saveAndView", "openFullPreview", "popupBlocked", "adjusted"] as const;
+const KEYS = ["draftRestored", "draftUndo", "unsavedLiveTitle", "unsavedLiveBody", "saveAndUpdate", "saveAndView", "openFullPreview", "popupBlocked", "adjusted"] as const;
 const LIVE_KEYS = ["stale", "broken"] as const;
 const AI_KEYS = ["failed", "conflictTitle", "conflictBody", "conflictApply", "conflictDiscard", "removedWarn"] as const;
 type Dict = { websites: { editor: Record<string, string>; live: Record<string, string>; aiEdit: Record<string, string> } };

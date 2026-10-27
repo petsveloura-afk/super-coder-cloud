@@ -1,5 +1,6 @@
 "use client";
 
+import { classifyPublishError, publishHintKey } from "@/lib/social/errors";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Camera, CheckCircle2, EyeOff, MessageSquareReply, MessagesSquare, Send, Settings2, Sparkles, Star, ThumbsUp, Trash2 } from "lucide-react";
@@ -208,7 +209,23 @@ function PostCard({ p, onEdit }: { p: PostRow; onEdit: () => void }) {
       <p className="mt-2 line-clamp-6 whitespace-pre-wrap text-sm" dir="auto">
         {p.body}
       </p>
-      {Object.values(p.results ?? {}).some((r) => r && r.ok === false) ? <p className="mt-2 text-[12px] text-danger">{Object.entries(p.results).filter(([, r]) => r && r.ok === false).map(([k, r]) => `${k}: ${r.error ?? ""}`).join(" · ")}</p> : null}
+      {Object.values(p.results ?? {}).some((r) => r && r.ok === false) ? (
+        <div className="mt-2 space-y-1 text-[12px]">
+          <p className="text-danger">{Object.entries(p.results).filter(([, r]) => r && r.ok === false).map(([k, r]) => `${k}: ${r.error ?? ""}`).join(" · ")}</p>
+          {[...new Set(Object.values(p.results).filter((r) => r && r.ok === false).map((r) => publishHintKey(classifyPublishError(r.error))))]
+            .filter((k): k is string => Boolean(k))
+            .map((k) => (
+              <p key={k} className="text-muted" data-testid="post-hint">
+                {t(k)}{" "}
+                {k === "social.errPermission" || k === "social.errToken" || k === "social.notConnected" ? (
+                  <a href={`/${locale}/integrations#marketplace`} className="font-semibold text-accent hover:underline">
+                    {t("social.reconnect")}
+                  </a>
+                ) : null}
+              </p>
+            ))}
+        </div>
+      ) : null}
       {editable ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {p.status === "draft" ? (
