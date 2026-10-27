@@ -3,12 +3,14 @@
 import { classifyPublishError, publishHintKey } from "@/lib/social/errors";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, Camera, CheckCircle2, EyeOff, MessageSquareReply, MessagesSquare, Send, Settings2, Sparkles, Star, ThumbsUp, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarDays, Camera, CheckCircle2, Copy, EyeOff, LayoutDashboard, MessageSquareReply, MessagesSquare, Send, Settings2, Sparkles, Star, ThumbsUp, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Badge, Button, Input, Textarea } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
-import { commentStatusAction, postStatusAction, replyCommentAction, replyReviewAction, reviewSettingsAction, savePostAction, saveSocialSettingsAction } from "@/app/[locale]/(dashboard)/social/actions";
+import { Chips, CalendarPanel, ComposerExtras, ExportButton, OverviewPanel, SearchBox, downloadCsv } from "@/components/social/social-extras";
+import { filterComments, filterPosts, filterReviews, type CommentFilter, type PostFilter, type ReviewFilter } from "@/lib/social/insights";
+import { approveAllDraftsAction, commentStatusAction, duplicatePostAction, postStatusAction, replyCommentAction, replyReviewAction, reviewSettingsAction, savePostAction, saveSocialSettingsAction } from "@/app/[locale]/(dashboard)/social/actions";
 
 /** Wave 19 — comments (with AI drafts), the content calendar, Google reviews, settings. */
 export interface CommentRow {
@@ -52,7 +54,7 @@ export interface SocialSettingsView {
   brand_voice: string;
 }
 
-type Tab = "comments" | "posts" | "reviews" | "settings";
+type Tab = "comments" | "posts" | "reviews" | "settings" | "calendar" | "insights";
 
 function when(locale: string, iso: string | null) {
   if (!iso) return "";
@@ -124,7 +126,7 @@ function CommentCard({ c, canReply }: { c: CommentRow; canReply: boolean }) {
   );
 }
 
-function PostEditor({ initial, onDone }: { initial?: PostRow | null; onDone: () => void }) {
+function PostEditor({ initial, onDone, presetAt }: { initial?: PostRow | null; onDone: () => void; presetAt?: string | null }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [body, setBody] = useState(initial?.body ?? "");
@@ -136,7 +138,7 @@ function PostEditor({ initial, onDone }: { initial?: PostRow | null; onDone: () 
     const p = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
   };
-  const [at, setAt] = useState(() => local(initial?.scheduled_at ?? new Date(Date.now() + 3_600_000).toISOString()));
+  const [at, setAt] = useState(() => (!initial && presetAt ? presetAt : local(initial?.scheduled_at ?? new Date(Date.now() + 3_600_000).toISOString())));
   const [pending, start] = useTransition();
   const save = (draft: boolean) =>
     start(async () => {
@@ -153,6 +155,7 @@ function PostEditor({ initial, onDone }: { initial?: PostRow | null; onDone: () 
     <div className="space-y-3 rounded-2xl border border-accent/30 bg-accent-soft/30 p-4" data-testid="post-editor">
       <Textarea rows={5} value={body} onChange={(e) => setBody(e.target.value)} placeholder={t("social.postPlaceholder")} dir="auto" aria-label={t("social.postText")} />
       <Input value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://…/image.jpg" dir="ltr" aria-label={t("social.imageUrl")} />
+      <ComposerExtras body={body} setBody={setBody} fb={fb} ig={ig} image={image} setAt={setAt} />
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <label className="inline-flex items-center gap-2">
           <input type="checkbox" checked={fb} onChange={(e) => setFb(e.target.checked)} /> Facebook
@@ -194,6 +197,15 @@ function PostCard({ p, onEdit }: { p: PostRow; onEdit: () => void }) {
       }
     });
   const editable = ["draft", "scheduled", "failed"].includes(p.status);
+  const duplicate = () =>
+    start(async () => {
+      const r = await duplicatePostAction({ locale, id: p.id });
+      if (r.error) toast.error(t(r.error));
+      else {
+        toast.success(t(r.message ?? "common.saved"));
+        router.refresh();
+      }
+    });
   return (
     <li className="rounded-2xl border border-line bg-surface p-4" data-post={p.status}>
       <div className="flex flex-wrap items-center gap-2 text-[12px]">
@@ -239,11 +251,20 @@ function PostCard({ p, onEdit }: { p: PostRow; onEdit: () => void }) {
           <Button size="sm" variant="ghost" disabled={pending} onClick={onEdit}>
             {t("common.edit")}
           </Button>
+          <Button size="sm" variant="ghost" disabled={pending} onClick={duplicate}>
+            <Copy className="h-3.5 w-3.5" /> {t("social.pro.duplicate")}
+          </Button>
           <Button size="sm" variant="ghost" disabled={pending} onClick={() => act("cancel")}>
             <Trash2 className="h-3.5 w-3.5" /> {t("social.cancelPost")}
           </Button>
         </div>
-      ) : null}
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button size="sm" variant="ghost" disabled={pending} onClick={duplicate}>
+            <Copy className="h-3.5 w-3.5" /> {t("social.pro.duplicate")}
+          </Button>
+        </div>
+      )}
     </li>
   );
 }
@@ -368,11 +389,22 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
   const { t, locale } = useI18n();
   const [tab, setTab] = useState<Tab>("comments");
   const [editing, setEditing] = useState<PostRow | null | "new">(null);
+  const [presetAt, setPresetAt] = useState<string | null>(null);
+  const [pf, setPf] = useState<PostFilter>({ status: "all", platform: "all", q: "" });
+  const [cf, setCf] = useState<CommentFilter>({ status: "all", sentiment: "all", platform: "all", q: "" });
+  const [rf, setRf] = useState<ReviewFilter>({ stars: "all", unanswered: false, q: "" });
+  const [bulk, startBulk] = useTransition();
+  const router = useRouter();
+  const shownPosts = filterPosts(p.posts, pf);
+  const shownComments = filterComments(p.comments, cf);
+  const shownReviews = filterReviews(p.reviews, rf);
   const open = p.comments.filter((c) => c.status === "new" || c.status === "dm_sent").length;
   const tabs: { key: Tab; label: string; count?: number; show: boolean }[] = [
     { key: "comments", label: t("social.tabs.comments"), count: open, show: true },
     { key: "posts", label: t("social.tabs.posts"), show: p.canPost },
+    { key: "calendar", label: t("social.tabs.calendar"), show: p.canPost },
     { key: "reviews", label: t("social.tabs.reviews"), count: p.reviews.filter((r) => !r.reply).length, show: true },
+    { key: "insights", label: t("social.tabs.insights"), show: true },
     { key: "settings", label: t("social.tabs.settings"), show: p.canSettings },
   ];
   const notConnected = !p.facebook && !p.instagram;
@@ -399,7 +431,7 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
           .filter((x) => x.show)
           .map((x) => (
             <button key={x.key} role="tab" aria-selected={tab === x.key} onClick={() => setTab(x.key)} className={cn("inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium transition", tab === x.key ? "bg-accent-solid text-accent-fg shadow-sm" : "text-muted hover:bg-surface-hover")} data-tab={x.key}>
-              {x.key === "settings" ? <Settings2 className="h-4 w-4" /> : null}
+              {x.key === "settings" ? <Settings2 className="h-4 w-4" /> : x.key === "calendar" ? <CalendarDays className="h-4 w-4" /> : x.key === "insights" ? <LayoutDashboard className="h-4 w-4" /> : null}
               {x.label}
               {x.count ? <span className="rounded-full bg-danger px-1.5 text-[11px] text-white">{x.count}</span> : null}
             </button>
@@ -407,11 +439,25 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
       </div>
       {tab === "comments" ? (
         p.comments.length ? (
-          <ul className="grid gap-3 lg:grid-cols-2">
-            {p.comments.map((c) => (
-              <CommentCard key={c.id} c={c} canReply={p.canReply} />
-            ))}
-          </ul>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Chips label={t("social.pro.filters")} value={cf.status} onChange={(v) => setCf({ ...cf, status: v })} options={[{ key: "all", label: t("social.pro.all"), count: p.comments.length }, { key: "open", label: t("social.pro.open"), count: open }, { key: "done", label: t("social.pro.done") }]} />
+              <div className="flex flex-wrap items-center gap-2">
+                <SearchBox value={cf.q} onChange={(q) => setCf({ ...cf, q })} />
+                <ExportButton onClick={() => downloadCsv("comments.csv", [["date", "platform", "author", "sentiment", "status", "text"], ...shownComments.map((c) => [c.created_at, c.platform, c.author_name, c.sentiment, c.status, c.body])])} />
+              </div>
+            </div>
+            <Chips label={t("social.pro.filters")} value={cf.sentiment} onChange={(v) => setCf({ ...cf, sentiment: v })} options={[{ key: "all", label: t("social.pro.all") }, ...(["negative", "lead", "question", "positive", "spam"] as const).map((k) => ({ key: k, label: t(`social.pro.sentiment.${k}`) }))]} />
+            {shownComments.length ? (
+              <ul className="grid gap-3 lg:grid-cols-2">
+                {shownComments.map((c) => (
+                  <CommentCard key={c.id} c={c} canReply={p.canReply} />
+                ))}
+              </ul>
+            ) : (
+              <p className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-muted">{t("social.noComments")}</p>
+            )}
+          </div>
         ) : (
           <p className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-muted">{t("social.noComments")}</p>
         )
@@ -419,30 +465,91 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
       {tab === "posts" ? (
         <div className="space-y-3">
           {editing ? (
-            <PostEditor initial={editing === "new" ? null : editing} onDone={() => setEditing(null)} />
+            <PostEditor initial={editing === "new" ? null : editing} presetAt={presetAt} onDone={() => { setEditing(null); setPresetAt(null); }} />
           ) : (
-            <Button onClick={() => setEditing("new")} data-testid="post-new">
-              <Sparkles className="h-4 w-4" /> {t("social.newPost")}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={() => setEditing("new")} data-testid="post-new">
+                <Sparkles className="h-4 w-4" /> {t("social.newPost")}
+              </Button>
+              {p.posts.some((x) => x.status === "draft") ? (
+                <Button
+                  variant="secondary"
+                  loading={bulk}
+                  onClick={() =>
+                    startBulk(async () => {
+                      const r = await approveAllDraftsAction({ locale });
+                      if (r.error) toast.error(t(r.error));
+                      else {
+                        toast.success(t(r.message ?? "common.saved", r.messageParams));
+                        router.refresh();
+                      }
+                    })
+                  }
+                >
+                  <ThumbsUp className="h-4 w-4" /> {t("social.pro.approveAll")}
+                </Button>
+              ) : null}
+              <ExportButton onClick={() => downloadCsv("posts.csv", [["scheduled_at", "status", "platforms", "text"], ...shownPosts.map((x) => [x.scheduled_at, x.status, x.platforms.join("+"), x.body])])} />
+            </div>
           )}
           {p.posts.length ? (
-            <ul className="grid gap-3 lg:grid-cols-2">
-              {p.posts.map((x) => (
-                <PostCard key={x.id} p={x} onEdit={() => setEditing(x)} />
-              ))}
-            </ul>
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Chips label={t("social.pro.filters")} value={pf.status} onChange={(v) => setPf({ ...pf, status: v })} options={[{ key: "all", label: t("social.pro.all"), count: p.posts.length }, ...(["draft", "scheduled", "published", "failed"] as const).map((k) => ({ key: k, label: t(`social.pro.status.${k}`), count: filterPosts(p.posts, { ...pf, status: k, platform: "all", q: "" }).length }))]} />
+                <SearchBox value={pf.q} onChange={(q) => setPf({ ...pf, q })} />
+              </div>
+              <Chips label="platform" value={pf.platform} onChange={(v) => setPf({ ...pf, platform: v })} options={[{ key: "all", label: t("social.pro.all") }, { key: "facebook", label: "Facebook" }, { key: "instagram", label: "Instagram" }]} />
+              {shownPosts.length ? (
+                <ul className="grid gap-3 lg:grid-cols-2">
+                  {shownPosts.map((x) => (
+                    <PostCard key={x.id} p={x} onEdit={() => setEditing(x)} />
+                  ))}
+                </ul>
+              ) : (
+                <p className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-muted">{t("social.noPosts")}</p>
+              )}
+            </>
           ) : (
             <p className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-muted">{t("social.noPosts")}</p>
           )}
         </div>
       ) : null}
+      {tab === "calendar" ? (
+        <CalendarPanel
+          posts={p.posts}
+          canPost={p.canPost}
+          onNew={(at) => {
+            setPresetAt(at);
+            setEditing("new");
+            setTab("posts");
+          }}
+          onEdit={(id) => {
+            const x = p.posts.find((r) => r.id === id);
+            if (x && ["draft", "scheduled", "failed"].includes(x.status)) setEditing(x);
+            setTab("posts");
+          }}
+        />
+      ) : null}
+      {tab === "insights" ? <OverviewPanel posts={p.posts} comments={p.comments} reviews={p.reviews} canPost={p.canPost} onGo={(x) => setTab(x)} /> : null}
       {tab === "reviews" ? (
         p.reviews.length ? (
-          <ul className="grid gap-3 lg:grid-cols-2">
-            {p.reviews.map((r) => (
-              <ReviewCard key={r.id} r={r} canReply={p.canReply} />
-            ))}
-          </ul>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Chips label={t("social.pro.filters")} value={rf.stars} onChange={(v) => setRf({ ...rf, stars: v })} options={[{ key: "all", label: t("social.pro.anyStars") }, ...(["5", "4", "3", "2", "1"] as const).map((k) => ({ key: k, label: `${k} ★` }))]} />
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-1.5 text-[13px]">
+                  <input type="checkbox" checked={rf.unanswered} onChange={(e) => setRf({ ...rf, unanswered: e.target.checked })} /> {t("social.pro.unanswered")}
+                </label>
+                <SearchBox value={rf.q} onChange={(q) => setRf({ ...rf, q })} />
+                <ExportButton onClick={() => downloadCsv("reviews.csv", [["date", "author", "rating", "replied", "text"], ...shownReviews.map((r) => [r.reviewed_at, r.author, r.rating, r.reply ? "yes" : "no", r.body])])} />
+              </div>
+            </div>
+            <ul className="grid gap-3 lg:grid-cols-2">
+              {shownReviews.map((r) => (
+                <ReviewCard key={r.id} r={r} canReply={p.canReply} />
+              ))}
+            </ul>
+          </div>
         ) : (
           <p className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-muted">{t(p.google.connected ? "social.noReviews" : "social.reviewsConnect")}</p>
         )

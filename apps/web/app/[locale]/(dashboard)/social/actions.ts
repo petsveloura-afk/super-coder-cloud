@@ -179,3 +179,92 @@ export async function reviewSettingsAction(input: { locale: string; autoReplyPos
   revalidatePath(`/${locale}/social`);
   return { ok: true, message: "common.saved" };
 }
+
+/* ------------------------------------------------------------------ wave 36 */
+
+/** a copy of a post as a new draft (tomorrow, same time) — the original is untouched */
+export async function duplicatePostAction(input: { locale: string; id: string }): Promise<ActionState> {
+  const locale = loc(input.locale);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("campaigns.manage")) return { error: "errors.forbidden" };
+  if (!uuidSchema.safeParse(input.id).success) return { error: "validation.invalidId" };
+  const supabase = await createClient();
+  const { data: src } = await supabase.from("social_posts").select("body, platforms, image_url, scheduled_at").eq("id", input.id).eq("organization_id", ctx.org.id).maybeSingle();
+  if (!src) return { error: "validation.invalidId" };
+  const base = Math.max(new Date(src.scheduled_at as string).getTime(), Date.now());
+  const { error } = await supabase.from("social_posts").insert({
+    organization_id: ctx.org.id,
+    created_by: ctx.userId,
+    source: "manual",
+    status: "draft",
+    body: src.body,
+    platforms: src.platforms,
+    image_url: src.image_url,
+    scheduled_at: new Date(base + 86_400_000).toISOString(),
+  });
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}/social`);
+  return { ok: true, message: "social.pro.duplicated" };
+}
+
+/** approve every draft at once; drafts whose time has passed go out in 10 minutes instead of immediately */
+export async function approveAllDraftsAction(input: { locale: string }): Promise<ActionState<{ count: number }>> {
+  const locale = loc(input.locale);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("campaigns.manage")) return { error: "errors.forbidden" };
+  const supabase = await createClient();
+  const nowIso = new Date().toISOString();
+  const { data: late } = await supabase.from("social_posts").update({ status: "scheduled", scheduled_at: new Date(Date.now() + 10 * 60_000).toISOString(), updated_at: nowIso }).eq("organization_id", ctx.org.id).eq("status", "draft").lt("scheduled_at", nowIso).select("id");
+  const { data: future } = await supabase.from("social_posts").update({ status: "scheduled", updated_at: nowIso }).eq("organization_id", ctx.org.id).eq("status", "draft").gte("scheduled_at", nowIso).select("id");
+  const count = (late?.length ?? 0) + (future?.length ?? 0);
+  revalidatePath(`/${locale}/social`);
+  return { ok: true, message: count ? "social.pro.approvedAll" : "social.pro.noDrafts", messageParams: { count }, data: { count } };
+}
+
+const aiPostSchema = z.object({
+  topic: z.string().trim().min(2).max(400),
+  tone: z.enum(["friendly", "professional", "playful", "premium"]),
+  platform: z.enum(["facebook", "instagram"]),
+});
+
+/** "Write it for me": one post in the business's voice, from its own agent instructions — never invents prices */
+export async function aiWritePostAction(input: { locale: string; topic: string; tone: string; platform: string }): Promise<ActionState<{ text: string }>> {
+  const locale = loc(input.locale);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("campaigns.manage")) return { error: "errors.forbidden" };
+  const p = aiPostSchema.safeParse(input);
+  if (!p.success) return { error: "validation.invalid" };
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "errors.generic" };
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+  const { data: allowed } = await admin.rpc("public_rate_limit", { p_bucket: `socialai:${ctx.org.id}`, p_limit: 8, p_window_seconds: 60 });
+  if (allowed === false) return { error: "ai.busy" };
+  const [{ data: org }, { data: agent }, { data: social }] = await Promise.all([
+    admin.from("organizations").select("name").eq("id", ctx.org.id).maybeSingle(),
+    admin.from("ai_agents").select("id, instructions, provider, model").eq("organization_id", ctx.org.id).eq("enabled", true).order("created_at").limit(1).maybeSingle(),
+    admin.from("social_settings").select("brand_voice").eq("organization_id", ctx.org.id).maybeSingle(),
+  ]);
+  const lang = locale === "en" ? "English" : locale === "ar" ? "Arabic" : "Hebrew";
+  const isIg = p.data.platform === "instagram";
+  const { runAISystem } = await import("@/lib/ai/run-system");
+  const out = await runAISystem({
+    orgId: ctx.org.id,
+    feature: "social",
+    agentId: (agent?.id as string | undefined) ?? null,
+    provider: (agent?.provider as "openai" | "anthropic" | "gemini" | null) ?? undefined,
+    model: (agent?.model as string | null) ?? undefined,
+    system: [
+      `You are the social media manager of "${String(org?.name ?? "").slice(0, 120)}". Business information:\n${String(agent?.instructions ?? "").slice(0, 4000)}`,
+      social?.brand_voice ? `Brand voice: ${String(social.brand_voice).slice(0, 800)}` : "",
+      `Write ONE ${isIg ? "Instagram" : "Facebook"} post in ${lang}, tone: ${p.data.tone}. ${isIg ? "Up to 6 short lines, 4-8 relevant hashtags at the end." : "2-5 short lines, 1-3 relevant hashtags at the end."} Emojis sparingly. End with one clear call to action (message us / book / call). NEVER invent prices, discounts, dates or facts that are not in the business information. Answer with the post text only — no quotes, no explanations.`,
+    ].filter(Boolean).join("\n\n"),
+    messages: [{ role: "user", content: p.data.topic }],
+    temperature: 0.7,
+    maxTokens: 600,
+    patienceMs: 15_000,
+  });
+  if (!out.ok) return { error: out.error };
+  const text = out.text.trim().replace(/^["“«]+|["”»]+$/g, "").slice(0, isIg ? 2200 : 5000);
+  if (!text) return { error: "ai.failed" };
+  return { ok: true, data: { text } };
+}

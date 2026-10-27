@@ -3894,7 +3894,9 @@
       "comments": "Comments",
       "posts": "Posts",
       "reviews": "Reviews",
-      "settings": "Settings"
+      "settings": "Settings",
+      "calendar": "Calendar",
+      "insights": "Overview"
     },
     "someone": "Someone",
     "aiDraft": "AI draft — edit as you like",
@@ -3975,6 +3977,105 @@
       "brand_voice": "Brand voice",
       "brandVoiceHint": "e.g. warm and family-like, second person, no slang, light humour",
       "autoReviews": "Auto-reply to 4-5 star reviews"
+    },
+    "pro": {
+      "search": "Search…",
+      "all": "All",
+      "open": "Open",
+      "done": "Handled",
+      "unanswered": "Unanswered",
+      "exportCsv": "Export to Excel",
+      "filters": "Filters",
+      "status": {
+        "draft": "Drafts",
+        "scheduled": "Scheduled",
+        "published": "Published",
+        "failed": "Failed"
+      },
+      "sentiment": {
+        "negative": "Negative",
+        "lead": "Leads",
+        "question": "Questions",
+        "positive": "Positive",
+        "spam": "Spam"
+      },
+      "stars": "{n} stars",
+      "anyStars": "All ratings",
+      "kpi": {
+        "openComments": "Open comments",
+        "responseRate": "Response rate",
+        "scheduled": "Scheduled",
+        "nextWeek": "Going out this week",
+        "published": "Published",
+        "failed": "Failed",
+        "avgRating": "Average rating",
+        "unansweredReviews": "Unanswered reviews"
+      },
+      "attentionTitle": "Needs attention",
+      "allGood": "All good — nothing needs attention right now.",
+      "attention": {
+        "failedPost": "A post failed to publish",
+        "pastDue": "A scheduled post is overdue",
+        "negativeComment": "An open negative comment",
+        "lowReview": "A 1–2 star review without a reply",
+        "draftWaiting": "Drafts waiting for approval"
+      },
+      "sentimentTitle": "Comment mix",
+      "ratingTitle": "Rating distribution",
+      "noData": "No data yet",
+      "agentTitle": "Content agent",
+      "agentHint": "The agent writes a week of posts and prepares them as drafts for your approval.",
+      "agentRun": "Plan my week",
+      "agentRan": "The agent is done — drafts are in the Posts tab",
+      "calToday": "Today",
+      "calPrev": "Previous month",
+      "calNext": "Next month",
+      "calAdd": "New post on this day",
+      "calMore": "{n} more",
+      "calEmpty": "No posts on this day",
+      "approveAll": "Approve all drafts",
+      "approvedAll": "{count} drafts approved and scheduled",
+      "noDrafts": "No drafts to approve",
+      "duplicate": "Duplicate",
+      "duplicated": "A copy was created as a draft for tomorrow",
+      "composer": {
+        "templates": "Templates",
+        "slots": "Suggested times",
+        "preview": "Preview",
+        "previewEmpty": "Your text will appear here",
+        "chars": "{n} characters",
+        "limit": "limit {n}",
+        "tooLong": "The text is too long for {net}",
+        "tooManyTags": "More than 30 hashtags — Instagram will not publish it",
+        "imageNeeded": "Instagram needs an image",
+        "aiTitle": "Write it with AI",
+        "aiTopic": "What is the post about? (e.g. end-of-month sale)",
+        "aiWrite": "Write",
+        "aiDone": "Text written — feel free to edit",
+        "aiOverwrite": "Replace the existing text?",
+        "tone": {
+          "friendly": "Friendly",
+          "professional": "Professional",
+          "playful": "Playful",
+          "premium": "Premium"
+        }
+      },
+      "tpl": {
+        "offer": "Offer",
+        "tip": "Tip",
+        "testimonial": "Testimonial",
+        "question": "Question",
+        "announce": "Announcement"
+      },
+      "wd": {
+        "0": "Sun",
+        "1": "Mon",
+        "2": "Tue",
+        "3": "Wed",
+        "4": "Thu",
+        "5": "Fri",
+        "6": "Sat"
+      }
     }
   },
   "market": {

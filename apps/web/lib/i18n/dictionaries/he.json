@@ -3894,7 +3894,9 @@
       "comments": "תגובות",
       "posts": "לוח פרסומים",
       "reviews": "ביקורות",
-      "settings": "הגדרות"
+      "settings": "הגדרות",
+      "calendar": "לוח שנה",
+      "insights": "סקירה"
     },
     "someone": "מישהו",
     "aiDraft": "טיוטה מה-AI — אפשר לערוך",
@@ -3975,6 +3977,105 @@
       "brand_voice": "הקול של המותג",
       "brandVoiceHint": "למשל: חם ומשפחתי, פונים בגוף שני, בלי סלנג, הומור עדין",
       "autoReviews": "לענות אוטומטית לביקורות של 4-5 כוכבים"
+    },
+    "pro": {
+      "search": "חיפוש…",
+      "all": "הכול",
+      "open": "פתח",
+      "done": "טופלו",
+      "unanswered": "ללא תגובה",
+      "exportCsv": "ייצוא ל-Excel",
+      "filters": "סינון",
+      "status": {
+        "draft": "טיוטות",
+        "scheduled": "מתוזמנים",
+        "published": "פורסמו",
+        "failed": "נכשלו"
+      },
+      "sentiment": {
+        "negative": "שליליות",
+        "lead": "לידים",
+        "question": "שאלות",
+        "positive": "חיוביות",
+        "spam": "ספאם"
+      },
+      "stars": "{n} כוכבים",
+      "anyStars": "כל הדירוגים",
+      "kpi": {
+        "openComments": "תגובות פתוחות",
+        "responseRate": "אחוז מענה",
+        "scheduled": "מתוזמנים",
+        "nextWeek": "מתפרסמים בשבוע הקרוב",
+        "published": "פורסמו",
+        "failed": "נכשלו",
+        "avgRating": "דירוג ממוצע",
+        "unansweredReviews": "ביקורות ללא מענה"
+      },
+      "attentionTitle": "דורש טיפול",
+      "allGood": "הכול תקין — אין משהו שדורש טיפול כרגע.",
+      "attention": {
+        "failedPost": "פוסט נכשל בפרסום",
+        "pastDue": "פוסט מתוזמן שהזמן שלו עבר",
+        "negativeComment": "תגובה שלילית פתוחה",
+        "lowReview": "ביקורת של 1–2 כוכבים ללא מענה",
+        "draftWaiting": "טיוטות ממתינות לאישור"
+      },
+      "sentimentTitle": "הרכב התגובות",
+      "ratingTitle": "התפלגות דירוגים",
+      "noData": "אין עדיין נתונים",
+      "agentTitle": "סוכן התוכן",
+      "agentHint": "הסוכן כותב תוכנית פוסטים לשבוע ומכין אותם כטיוטות לאישור שלך.",
+      "agentRun": "הכן לי תוכנית לשבוע",
+      "agentRan": "הסוכן סיים — הטיוטות בלשונית הפרסומים",
+      "calToday": "היום",
+      "calPrev": "חודש קודם",
+      "calNext": "חודש הבא",
+      "calAdd": "פוסט חדש ליום זה",
+      "calMore": "עוד {n}",
+      "calEmpty": "אין פוסטים ביום זה",
+      "approveAll": "אשר את כל הטיוטות",
+      "approvedAll": "{count} טיוטות אושרו ותוזמנו",
+      "noDrafts": "אין טיוטות לאישור",
+      "duplicate": "שכפל",
+      "duplicated": "נוצר עותק כטיוטה ליום המחרת",
+      "composer": {
+        "templates": "תבניות",
+        "slots": "זמנים מומלצים",
+        "preview": "תצוגה מקדימה",
+        "previewEmpty": "הטקסט שלך יופיע כאן",
+        "chars": "{n} תווים",
+        "limit": "מגבלה {n}",
+        "tooLong": "הטקסט ארוך מדי ל-{net}",
+        "tooManyTags": "יותר מ-30 האשטגים — אינסטגרם לא יפרסם",
+        "imageNeeded": "אינסטגרם דורש תמונה",
+        "aiTitle": "כתוב לי עם AI",
+        "aiTopic": "על מה הפוסט? (למשל: מבצע סוף חודש)",
+        "aiWrite": "כתוב",
+        "aiDone": "הטקסט נכתב — אפשר לערוך",
+        "aiOverwrite": "להחליף את הטקסט הקיים?",
+        "tone": {
+          "friendly": "ידידותי",
+          "professional": "מקצועי",
+          "playful": "שובב",
+          "premium": "יוקרתי"
+        }
+      },
+      "tpl": {
+        "offer": "מבצע",
+        "tip": "טיפ",
+        "testimonial": "המלצה",
+        "question": "שאלה",
+        "announce": "הודעה"
+      },
+      "wd": {
+        "0": "א׳",
+        "1": "ב׳",
+        "2": "ג׳",
+        "3": "ד׳",
+        "4": "ה׳",
+        "5": "ו׳",
+        "6": "ש׳"
+      }
     }
   },
   "market": {
