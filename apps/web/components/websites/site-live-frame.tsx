@@ -20,27 +20,34 @@ export const LIVE_READY = "scc-site-ready";
 /** frame → editor: "draft #seq is on screen" (the editor re-sends until it gets this) */
 export const LIVE_ACK = "scc-site-ack";
 
+/** inert stand-in fields so a form section looks right in the preview (labels come from websites.live.field.*) */
+const STUB_FIELDS: Array<Pick<FormField, "key" | "type" | "required">> = [
+  { key: "name", type: "text", required: true },
+  { key: "phone", type: "phone", required: true },
+  { key: "message", type: "textarea", required: false },
+];
+
 /** frame inside the editor → parent; opened as its own tab → opener */
 const host = (): Window | null => (window.parent !== window ? window.parent : (window.opener as Window | null));
 
 /** keeps the last good picture on screen if one draft cannot be drawn; the next draft clears the error */
 class FrameBoundary extends Component<{ resetKey: unknown; onError: () => void; children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
+  override state = { failed: false };
   private last: ReactNode = null;
   static getDerivedStateFromError() {
     return { failed: true };
   }
-  componentDidMount() {
+  override componentDidMount() {
     this.last = this.props.children;
   }
-  componentDidCatch() {
+  override componentDidCatch() {
     this.props.onError();
   }
-  componentDidUpdate(prev: { resetKey: unknown }) {
+  override componentDidUpdate(prev: { resetKey: unknown }) {
     if (!this.state.failed) this.last = this.props.children;
     if (prev.resetKey !== this.props.resetKey && this.state.failed) this.setState({ failed: false });
   }
-  render() {
+  override render() {
     return this.state.failed ? this.last : this.props.children;
   }
 }
