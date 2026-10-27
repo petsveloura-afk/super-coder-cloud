@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { Locale } from "@/lib/i18n/config";
 import { runAI } from "./run";
 import { generateAndStoreImage, imagesConfigured } from "./images";
-import { extractJson, normalizeAiSite, siteJsonInstructionsPro, siteSlug, type SiteMode } from "./site-json";
+import { extractJson, normalizeAiSite, siteJsonInstructionsPro, siteSlug, SITE_LIMITS, type SiteMode } from "./site-json";
+import { parseBuildDirectives, polishBuiltSite, siteBuildOverrides } from "./site-build-rules";
 import { FREE_TEMPLATES, ALL_TEMPLATES } from "@/lib/site/templates";
 import type { AIMessage, AIProviderName } from "./providers";
 
@@ -64,12 +65,15 @@ export async function buildSiteWithAI(input: {
     transcript ? `\nConversation so far (use every concrete detail the customer gave):\n${transcript}` : "",
   ].join("");
 
+  const ownerText = [input.brief, ...(input.conversation ?? []).filter((m) => m.role === "user").map((m) => m.content)].join("\n");
+  const directives = parseBuildDirectives(ownerText);
   const out = await runAI({
     orgId: input.orgId,
     feature: "site_builder",
     agentId: input.agentId ?? null,
     provider: input.provider,
-    system: siteJsonInstructionsPro(mode, input.locale, ctx, caps.proTemplates ? ALL_TEMPLATES.map((t) => t.key) : FREE_TEMPLATES),
+    // wave 36: the owner's instructions (brief + what they said in the conversation) drive the result
+    system: [siteJsonInstructionsPro(mode, input.locale, ctx, caps.proTemplates ? ALL_TEMPLATES.map((t) => t.key) : FREE_TEMPLATES), "", siteBuildOverrides(directives, mode)].join("\n"),
     messages: [{ role: "user", content: userPrompt }],
     temperature: 0.6,
     maxTokens: mode === "full" ? 6000 : 3500,
@@ -81,6 +85,11 @@ export async function buildSiteWithAI(input: {
     console.error("ai site json unusable", out.text.slice(0, 300));
     return { ok: false, error: "websites.aiInvalid" };
   }
+  // wave 36: make the site follow the instructions and a consistent professional structure
+  const polished = polishBuiltSite(site, directives, { locale: input.locale, templates: caps.proTemplates ? ALL_TEMPLATES.map((t) => t.key) : FREE_TEMPLATES, maxBlocks: SITE_LIMITS[mode].max, template: input.template });
+  site.theme = polished.site.theme;
+  site.seo = polished.site.seo;
+  site.blocks = polished.site.blocks;
 
   // hero image (paid plans) — a failure never blocks the site
   let image = false;

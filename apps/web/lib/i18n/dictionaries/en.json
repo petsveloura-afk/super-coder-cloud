@@ -2691,6 +2691,36 @@
       "adjusted": "Saved — some texts were shortened or cleaned to fit the site rules; the editor now shows exactly what is live",
       "draftRestored": "Restored your unsaved changes from before — press Save to update the site",
       "draftUndo": "Undo restore"
+    },
+    "aiPrefs": {
+      "title": "Tell the agent exactly what you want",
+      "style": "Style",
+      "sections": "Sections it must include",
+      "modeAuto": "Mode: auto",
+      "animated": "Animated",
+      "styles": {
+        "luxury": "Luxury",
+        "minimal": "Minimal",
+        "warm": "Warm",
+        "bold": "Bold",
+        "playful": "Playful",
+        "corporate": "Corporate",
+        "tech": "Tech",
+        "natural": "Natural",
+        "clean": "Fresh & clean"
+      },
+      "secs": {
+        "gallery": "Gallery",
+        "pricing": "Pricing",
+        "testimonials": "Testimonials",
+        "faq": "FAQ",
+        "team": "Team",
+        "video": "Video",
+        "steps": "How it works",
+        "stats": "Numbers",
+        "about": "About",
+        "logos": "Client logos"
+      }
     }
   },
   "admin": {

@@ -773,7 +773,7 @@ export function SiteBuilder({
       <StarterKits onPick={addKit} />
 
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2 max-lg:sticky max-lg:bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px)+0.5rem)] max-lg:z-30 max-lg:rounded-2xl max-lg:border max-lg:border-line max-lg:bg-surface/95 max-lg:p-2 max-lg:shadow-lg max-lg:backdrop-blur" data-testid="editor-actions">
         {id && v.status === "published" ? (
           dirty ? (
             <button type="button" disabled={saving} onClick={() => saveAndView(url)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-gold/50 bg-gold-soft/50 px-4 text-sm hover:bg-gold-soft disabled:opacity-60" data-testid="editor-save-and-view">
