@@ -64,7 +64,7 @@ export async function stopAbTestAction(input: { locale: string; siteId: string; 
 }
 
 /** AI writes variant B of the hero (a different angle, same facts). */
-export async function aiAbVariantAction(input: { locale: string; siteId: string }): Promise<ActionState<{ title: string; subtitle: string; cta_label: string }>> {
+export async function aiAbVariantAction(input: { locale: string; siteId: string; angle?: string }): Promise<ActionState<{ title: string; subtitle: string; cta_label: string }>> {
   const locale = loc(input.locale);
   const ctx = await getOrgContext(locale);
   if (!ctx.can("websites.manage") || !ctx.can("ai.use")) return { error: "errors.forbidden" };
@@ -76,6 +76,16 @@ export async function aiAbVariantAction(input: { locale: string; siteId: string 
   const { data: site } = await supabase.from("sites").select("name, blocks").eq("id", id.data).eq("organization_id", ctx.org.id).maybeSingle();
   const hero = ((site?.blocks ?? []) as { type: string; data: Record<string, string> }[]).find((b) => b.type === "hero");
   if (!hero) return { error: "abtest.needHero" };
+  // wave 32: the owner can pick the angle (default keeps the original behaviour)
+  const { isAngle } = await import("@/lib/site/ab-core");
+  const ANGLES: Record<string, string> = {
+    benefit: "a clear benefit-led angle",
+    urgency: "an urgency angle (never invent deadlines or limited stock)",
+    trust: "a trust / social-proof angle (never invent reviews, clients or awards)",
+    price: "a value and affordability angle (never invent prices or discounts)",
+    curiosity: "a curiosity-driven angle that makes the visitor want to read on",
+  };
+  const angleText = isAngle(input.angle) ? ANGLES[input.angle]! : "a different angle (benefit, urgency or social proof)";
   const { runAI } = await import("@/lib/ai/run");
   const { baseSystem } = await import("@/lib/ai/prompt");
   const { extractJsonObject } = await import("@/lib/crm/insights-core");
@@ -86,7 +96,7 @@ export async function aiAbVariantAction(input: { locale: string; siteId: string 
     messages: [
       {
         role: "user",
-        content: `Write ONE alternative version of this website hero to A/B test against the original: a different angle (benefit, urgency or social proof) with the SAME facts — never invent prices, numbers, awards or reviews. Keep the original language. JSON: {"title":"≤ 80 chars","subtitle":"≤ 220 chars","cta_label":"≤ 30 chars"}\n\nBusiness: ${String(site?.name ?? "").slice(0, 120)}\nOriginal title: ${hero.data.title ?? ""}\nOriginal subtitle: ${hero.data.subtitle ?? ""}\nOriginal button: ${hero.data.cta_label ?? ""}`,
+        content: `Write ONE alternative version of this website hero to A/B test against the original: ${angleText} with the SAME facts — never invent prices, numbers, awards or reviews. Keep the original language. JSON: {"title":"≤ 80 chars","subtitle":"≤ 220 chars","cta_label":"≤ 30 chars"}\n\nBusiness: ${String(site?.name ?? "").slice(0, 120)}\nOriginal title: ${hero.data.title ?? ""}\nOriginal subtitle: ${hero.data.subtitle ?? ""}\nOriginal button: ${hero.data.cta_label ?? ""}`,
       },
     ],
     temperature: 0.8,

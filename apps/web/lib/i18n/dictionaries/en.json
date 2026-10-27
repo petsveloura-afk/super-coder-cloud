@@ -1858,7 +1858,12 @@
     "duplicated": "A new draft was created from the campaign",
     "progressLabel": "{pct}% of the send is done",
     "failureRate": "{pct}% failed",
-    "pending": "{count} waiting"
+    "pending": "{count} waiting",
+    "landing": {
+      "button": "Landing page",
+      "creating": "Building the page…",
+      "done": "A draft landing page was created from the campaign"
+    }
   },
   "inbox": {
     "title": "Inbox",
@@ -2395,7 +2400,13 @@
         "luxury": "Luxury look",
         "stats": "Add numbers",
         "steps": "Add how it works",
-        "english": "Translate to English"
+        "english": "Translate to English",
+        "faq": "Add FAQ",
+        "seo": "Improve SEO",
+        "cta": "Stronger call to action",
+        "trust": "Add trust",
+        "arabic": "Translate to Arabic",
+        "hebrew": "Translate to Hebrew"
       },
       "quick": {
         "modern": "Make the site more modern and impressive: a stronger headline, sharper copy and a current design template that fits the business",
@@ -2405,7 +2416,13 @@
         "luxury": "Switch to a luxurious, elegant design (the luxe template if available) and adapt the copy to a premium tone",
         "stats": "Add a numbers section after the hero, only with numbers found in the content",
         "steps": "Add a 'how it works' section with 3–4 clear steps",
-        "english": "Translate every text on the site to English"
+        "english": "Translate every text on the site to English",
+        "faq": "Add a FAQ section with 5 realistic questions and answers for this business, before the closing call to action. Do not invent prices",
+        "seo": "Improve the SEO title and description (keyword, benefit, call to action) and make headings clearer. Do not change the design",
+        "cta": "Make every call to action stronger and more specific: action-oriented button labels, one clear next step per section",
+        "trust": "Add trust elements: a numbers section and a testimonials section using only facts from the content, with placeholders where facts are missing",
+        "arabic": "Translate every text on the site to Arabic",
+        "hebrew": "Translate every text on the site to Hebrew"
       }
     },
     "site": {
@@ -2516,6 +2533,104 @@
       "hint": "Add a ready set of sections for your business type. Added at the end — nothing you wrote is changed.",
       "added": "Added {n} sections",
       "full": "The site already has the maximum number of sections"
+    },
+    "duplicate": "Duplicate",
+    "duplicated": "Draft copy created",
+    "list": {
+      "total": "Sites",
+      "published": "Published",
+      "drafts": "Drafts",
+      "visits": "Total visits",
+      "search": "Search by name or address",
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "apply": "Filter",
+      "noMatch": "No site matches the filter"
+    },
+    "audit": {
+      "title": "Site health",
+      "summary": "{count} things to improve",
+      "allGood": "Everything important is in place",
+      "fix": "Fix with the agent",
+      "goFix": "Go to fix",
+      "fixAll": "Let the agent fix everything it can",
+      "level": {
+        "success": "Strong",
+        "warning": "Good start",
+        "danger": "Needs work"
+      },
+      "checks": {
+        "seo_title": {
+          "label": "Search-engine title",
+          "hint": "A title of 30-70 characters with the main keyword helps Google and clicks."
+        },
+        "seo_description": {
+          "label": "Search-engine description",
+          "hint": "70-160 characters explaining what you offer and what to do next."
+        },
+        "hero_cta": {
+          "label": "Clear button in the top section",
+          "hint": "Visitors should see one obvious action right away."
+        },
+        "hero_image": {
+          "label": "Image in the top section",
+          "hint": "A real image raises trust and time on the page."
+        },
+        "lead_capture": {
+          "label": "A way to leave details or book",
+          "hint": "Add a form or booking section and pick one in the section settings."
+        },
+        "contact": {
+          "label": "Contact details",
+          "hint": "A phone, WhatsApp or email in a contact section or the business details."
+        },
+        "social_proof": {
+          "label": "Proof: testimonials, numbers or logos",
+          "hint": "Customers decide faster when they see others trusted you."
+        },
+        "faq": {
+          "label": "Frequently asked questions",
+          "hint": "At least 3 answers remove doubts before they contact you."
+        },
+        "structure": {
+          "label": "A complete page structure",
+          "hint": "Strong pages have 5+ sections: benefits, process, proof, FAQ and a closing action."
+        },
+        "section_titles": {
+          "label": "Every section has a title",
+          "hint": "Titles help visitors scan and help search engines."
+        },
+        "brand": {
+          "label": "Logo or tagline",
+          "hint": "Add a logo or a short tagline in the business details."
+        },
+        "legal": {
+          "label": "Business details for the legal pages",
+          "hint": "Add the legal business name and a phone or email in the business details."
+        }
+      }
+    },
+    "bulk": {
+      "hint": "Tick sites to manage several at once",
+      "selectAll": "Select all",
+      "clear": "Clear selection",
+      "selected": "{count} selected",
+      "selectOne": "Select {name}",
+      "publish": "Publish",
+      "unpublish": "Unpublish",
+      "duplicate": "Duplicate",
+      "delete": "Delete",
+      "confirmDelete": "Delete {count} sites? This cannot be undone.",
+      "done": "Done for {count} sites",
+      "partial": "Done for {done}; {failed} could not be changed (plan limit or error)"
+    },
+    "quick": {
+      "ai": "Build with the agent",
+      "aiBody": "Describe the business and get a full draft site",
+      "template": "Start from a template",
+      "templateBody": "Pick a ready design for your industry",
+      "campaign": "Landing page from a campaign",
+      "campaignBody": "Open a campaign and let the agent build its page"
     }
   },
   "admin": {
@@ -3437,7 +3552,19 @@
     "invalid": "Invalid details",
     "needChange": "Change at least the title, text or button in variant B",
     "needHero": "An A/B test needs a hero block on the site",
-    "decidedNotification": "🏆 A/B test on {site}: variant {winner} won"
+    "decidedNotification": "🏆 A/B test on {site}: variant {winner} won",
+    "angleLabel": "Angle for the agent",
+    "angles": {
+      "benefit": "Benefit",
+      "urgency": "Urgency",
+      "trust": "Trust",
+      "price": "Value",
+      "curiosity": "Curiosity"
+    },
+    "forecast": {
+      "need": "Still needed: {a} visitors on A and {b} on B",
+      "uplift": "B vs A: {pct}%"
+    }
   },
   "cmd": {
     "title": "Quick actions",

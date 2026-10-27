@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Card, Field, Input, Textarea } from "@/components/ui/primitives";
 import { aiAbVariantAction, improveCopyAction, saveAbTestAction, stopAbTestAction } from "@/app/[locale]/(dashboard)/websites/growth-actions";
-import { abWinner, confidence, rate, zScore, type AbStats, type SiteAb } from "@/lib/site/ab-core";
+import { AB_ANGLES, abForecast, abWinner, confidence, rate, zScore, type AbAngle, type AbStats, type SiteAb } from "@/lib/site/ab-core";
 
 /** Wave 17 — "✨ improve" under a text field of the site editor (AI copywriting, review before saving). */
 export function ImproveCopyButton({ value, field, onChange }: { value: string; field: string; onChange: (v: string) => void }) {
@@ -57,6 +57,7 @@ export function AbTestCard({ siteId, ab, stats, hero, allowed, aiAllowed }: { si
   const [v, setV] = useState({ title: ab?.title ?? "", subtitle: ab?.subtitle ?? "", cta_label: ab?.cta_label ?? "", min_views: String(ab?.min_views ?? 100) });
   const [pending, start] = useTransition();
   const [aiPending, startAi] = useTransition();
+  const [angle, setAngle] = useState<AbAngle | "">("");
   const running = Boolean(ab?.active && !ab?.winner);
   const s = stats ?? { a_views: 0, b_views: 0, a_conv: 0, b_conv: 0 };
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -116,7 +117,7 @@ export function AbTestCard({ siteId, ab, stats, hero, allowed, aiAllowed }: { si
                   loading={aiPending}
                   onClick={() =>
                     startAi(async () => {
-                      const res = await aiAbVariantAction({ locale, siteId });
+                      const res = await aiAbVariantAction({ locale, siteId, ...(angle ? { angle } : {}) });
                       if (res.error || !res.data) toast.error(t(res.error ?? "errors.generic"));
                       else setV({ ...v, ...res.data });
                     })
@@ -124,6 +125,15 @@ export function AbTestCard({ siteId, ab, stats, hero, allowed, aiAllowed }: { si
                 >
                   <Sparkles className="h-4 w-4" /> {t("abtest.aiVariant")}
                 </Button>
+              ) : null}
+              {aiAllowed && !running ? (
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("abtest.angleLabel")} data-testid="ab-angles">
+                  {AB_ANGLES.map((a) => (
+                    <button key={a} type="button" aria-pressed={angle === a} onClick={() => setAngle(angle === a ? "" : a)} className={`rounded-full border px-2.5 py-0.5 text-[12px] ${angle === a ? "border-accent bg-accent-soft text-accent" : "border-line text-muted hover:border-accent"}`}>
+                      {t(`abtest.angles.${a}`)}
+                    </button>
+                  ))}
+                </div>
               ) : null}
             </div>
           </div>
@@ -158,6 +168,14 @@ export function AbTestCard({ siteId, ab, stats, hero, allowed, aiAllowed }: { si
               <p className="mt-2 text-[12px] text-subtle">
                 {ab.winner ? t("abtest.decided", { winner: ab.winner.toUpperCase() }) : w ? t("abtest.leading", { winner: w.toUpperCase(), conf }) : t("abtest.collecting")}
               </p>
+              {!ab.winner ? (
+                <p className="mt-1 text-[12px] text-subtle" data-testid="ab-forecast">
+                  {(() => {
+                    const f = abForecast(s, Number(v.min_views) || 100);
+                    return [f.done ? "" : t("abtest.forecast.need", { a: f.needA, b: f.needB }), f.upliftPct !== null ? t("abtest.forecast.uplift", { pct: f.upliftPct }) : ""].filter(Boolean).join(" · ");
+                  })()}
+                </p>
+              ) : null}
             </div>
           ) : null}
 

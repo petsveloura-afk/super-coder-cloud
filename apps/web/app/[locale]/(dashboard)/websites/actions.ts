@@ -148,3 +148,82 @@ export async function aiEditSiteAction(input: { locale: string; instruction: str
   if (!r.ok) return { error: r.error };
   return { ok: true, data: { site: r.site } };
 }
+
+/** Wave 31 — duplicate a site as a new DRAFT (same content/design/settings; nothing is published, no leads/visits copied). */
+export async function duplicateSiteAction(fd: FormData): Promise<ActionState<{ id: string }>> {
+  const locale = formLocale(fd);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("websites.manage")) return { error: "errors.forbidden" };
+  const id = uuidSchema.safeParse(str(fd, "id"));
+  if (!id.success) return { error: "validation.invalidId" };
+  const { cloneSiteDraft } = await import("@/lib/site/clone");
+  const r = await cloneSiteDraft(await createClient(), { orgId: ctx.org.id, userId: ctx.userId, locale, id: id.data });
+  if (!r.ok) return { error: r.error };
+  revalidatePath(`/${locale}/websites`);
+  return { ok: true, message: "websites.duplicated", data: { id: r.id } };
+}
+
+/** Wave 32 — manage many sites at once (max 50): publish, unpublish, duplicate, delete. Plan limits are respected per site. */
+export async function bulkSitesAction(input: { locale: string; ids: string[]; op: "publish" | "unpublish" | "duplicate" | "delete" }): Promise<ActionState<{ done: number; failed: number; limited: number }>> {
+  const locale = loc(input.locale);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("websites.manage")) return { error: "errors.forbidden" };
+  if (!["publish", "unpublish", "duplicate", "delete"].includes(input.op)) return { error: "validation.invalidId" };
+  const ids = [...new Set((Array.isArray(input.ids) ? input.ids : []).map((x) => uuidSchema.safeParse(x)).filter((x) => x.success).map((x) => x.data as string))].slice(0, 50);
+  if (!ids.length) return { error: "validation.invalidId" };
+  const supabase = await createClient();
+  let done = 0;
+  let failed = 0;
+  let limited = 0;
+  if (input.op === "delete") {
+    const { data, error } = await supabase.from("sites").delete().in("id", ids).eq("organization_id", ctx.org.id).select("id");
+    if (error) return { error: dbErrorKey(error) };
+    done = data?.length ?? 0;
+    failed = ids.length - done;
+  } else if (input.op === "duplicate") {
+    const { cloneSiteDraft } = await import("@/lib/site/clone");
+    for (const id of ids) {
+      const r = await cloneSiteDraft(supabase, { orgId: ctx.org.id, userId: ctx.userId, locale, id });
+      if (r.ok) done++;
+      else failed++;
+    }
+  } else {
+    const { data: rows } = await supabase.from("sites").select("id, published_at").in("id", ids).eq("organization_id", ctx.org.id);
+    failed += ids.length - (rows?.length ?? 0);
+    for (const row of (rows ?? []) as { id: string; published_at: string | null }[]) {
+      const patch = input.op === "publish" ? { status: "published", published_at: row.published_at ?? new Date().toISOString(), updated_at: new Date().toISOString() } : { status: "draft", updated_at: new Date().toISOString() };
+      const { error } = await supabase.from("sites").update(patch).eq("id", row.id).eq("organization_id", ctx.org.id);
+      if (!error) done++;
+      else if (error.message?.includes("plan_limit:sites_published")) limited++;
+      else failed++;
+    }
+  }
+  revalidatePath(`/${locale}/websites`);
+  return { ok: true, data: { done, failed, limited } };
+}
+
+/** Wave 32 — a landing page built by the agent from a campaign (its goal and message); saved as a DRAFT, nothing is published. */
+export async function landingFromCampaignAction(input: { locale: string; campaignId: string }): Promise<ActionState<{ id: string }>> {
+  const locale = loc(input.locale);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("websites.manage") || !ctx.can("ai.use")) return { error: "errors.forbidden" };
+  const cid = uuidSchema.safeParse(input.campaignId);
+  if (!cid.success) return { error: "validation.invalidId" };
+  const supabase = await createClient();
+  const { data: c } = await supabase.from("campaigns").select("name, channel, subject, body").eq("id", cid.data).eq("organization_id", ctx.org.id).maybeSingle();
+  if (!c) return { error: "errors.notFound" };
+  const { data: ok } = await supabase.rpc("check_rate_limit", { p_key: "landing-from-campaign", p_limit: 10, p_window_seconds: 3600 });
+  if (ok !== true) return { error: "errors.rateLimited" };
+  const brief = [
+    `Build a focused landing page for the marketing campaign "${String(c.name).slice(0, 120)}" (${String(c.channel)}).`,
+    `Goal: turn visitors from this campaign into leads - one clear offer, one main action (leave details / book / WhatsApp), minimal distractions.`,
+    c.subject ? `Campaign subject line: ${String(c.subject).slice(0, 200)}` : "",
+    `The campaign message the visitors came from (keep the same offer, tone and language - never invent prices, discounts or deadlines that are not in it):`,
+    String(c.body ?? "").slice(0, 1800),
+  ].filter(Boolean).join("\n");
+  const { buildSiteWithAI } = await import("@/lib/ai/site-builder");
+  const r = await buildSiteWithAI({ orgId: ctx.org.id, userId: ctx.userId, locale, brief, wantFull: false });
+  if (!r.ok) return { error: r.error };
+  revalidatePath(`/${locale}/websites`);
+  return { ok: true, message: "ai.siteBuilt", data: { id: r.site.id } };
+}

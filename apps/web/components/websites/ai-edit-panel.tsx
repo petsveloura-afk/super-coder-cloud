@@ -14,7 +14,7 @@ import type { SiteValue } from "./site-builder";
  * restyles the site or switches the template. The result lands in the editor (not
  * saved) so the business reviews it and saves / publishes; one-click undo.
  */
-const QUICK = ["modern", "testimonials", "pricing", "shorter", "luxury", "stats", "steps", "english"] as const;
+const QUICK = ["modern", "testimonials", "pricing", "shorter", "luxury", "stats", "steps", "english", "faq", "seo", "cta", "trust", "arabic", "hebrew"] as const;
 
 export function AiEditPanel({ value, onApply, allowed, proTemplates }: { value: SiteValue; onApply: (v: SiteValue) => void; allowed: boolean; proTemplates: boolean }) {
   const { t, locale } = useI18n();

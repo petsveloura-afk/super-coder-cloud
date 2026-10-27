@@ -93,3 +93,17 @@ export function confidence(z: number): number {
   const erf = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
   return Math.round(Math.max(0, Math.min(1, erf)) * 1000) / 10;
 }
+
+/** Wave 32 — the angles the agent can write variant B in. */
+export const AB_ANGLES = ["benefit", "urgency", "trust", "price", "curiosity"] as const;
+export type AbAngle = (typeof AB_ANGLES)[number];
+export const isAngle = (v: unknown): v is AbAngle => typeof v === "string" && (AB_ANGLES as readonly string[]).includes(v);
+
+/** Wave 32 — how far the test is: visitors still needed per variant and the uplift of B over A (null until A has conversions). */
+export function abForecast(s: AbStats, minViews = 100): { needA: number; needB: number; done: boolean; upliftPct: number | null } {
+  const needA = Math.max(0, minViews - s.a_views);
+  const needB = Math.max(0, minViews - s.b_views);
+  const ra = rate(s.a_conv, s.a_views);
+  const rb = rate(s.b_conv, s.b_views);
+  return { needA, needB, done: needA === 0 && needB === 0, upliftPct: ra > 0 ? Math.round(((rb - ra) / ra) * 1000) / 10 : null };
+}

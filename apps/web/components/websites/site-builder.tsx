@@ -15,6 +15,7 @@ import { heroImageAIAction, saveSiteAction, uploadSiteImageAction } from "@/app/
 import { DesignPanel } from "./design-panel";
 import { BusinessPanel, type SitePages, type SiteSettings } from "./business-panel";
 import { AiEditPanel } from "./ai-edit-panel";
+import { SiteAuditPanel } from "./site-audit-panel";
 import { cn } from "@/lib/utils";
 
 type Item = Record<string, string>;
@@ -211,6 +212,7 @@ export function SiteBuilder({
         }}
       />
       <AiEditPanel value={v} onApply={(nv) => setV(nv)} allowed={aiEditor} proTemplates={proTemplates} />
+      <SiteAuditPanel value={v} onApply={(nv) => setV(nv)} onGoTab={(k) => setTab(k)} allowed={aiEditor} proTemplates={proTemplates} />
       <div role="tablist" aria-label={t("websites.tabs.label")} className="sticky top-14 z-10 -mx-1 flex gap-1 overflow-x-auto rounded-2xl border border-line bg-surface/95 p-1 backdrop-blur lg:top-2" data-testid="site-tabs">
         {tabs.map((x) => (
           <button key={x.k} type="button" role="tab" aria-selected={tab === x.k} data-tab={x.k} onClick={() => setTab(x.k)} className={cn("flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition", tab === x.k ? "bg-accent-solid text-accent-fg" : "text-muted hover:bg-surface-hover hover:text-fg")}>
