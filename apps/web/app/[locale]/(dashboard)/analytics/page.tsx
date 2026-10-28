@@ -1,9 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, CalendarCheck, CheckCircle2, Gauge, Layers, ListChecks, Percent, Sparkles, Target, Timer, TrendingUp, Trophy, UserCheck, UserPlus, Wallet } from "lucide-react";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/primitives";
-import { ForecastChart, HBarChart, MonthlyChart } from "@/components/analytics/charts";
+import { ForecastChart, HBarChart } from "@/components/analytics/charts";
 import { GrowthInsight, SpendCard, type SpendRow } from "@/components/analytics/growth";
+import { FunnelPanel, HighlightsStrip, KpiCard } from "@/components/analytics/kpi";
+import { ExportCsvButton, PrintButton, RevenueTrendChart, WinLossDonut } from "@/components/analytics/pro-charts";
+import { StatusDonut, WeeklyTrend } from "@/components/appointments/insights-charts";
+import { buildHighlights, cumulative, delta, funnelSteps, movingAverage, previousWindow, sparkSeries, type Highlight } from "@/lib/analytics/insights";
+import { computeApptStats, safeZone, type ApptRow } from "@/lib/appointments/insights";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -65,6 +70,18 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
   const { data, error } = await supabase.rpc("crm_analytics", { p_org: ctx.org.id, p_days: days });
   if (error || !data) throw new Error("analytics query failed");
   const a = data as Analytics;
+  // previous window of the same length: the RPC with 2N days minus the N-day result (additive metrics only)
+  const doubledRes = await supabase.rpc("crm_analytics", { p_org: ctx.org.id, p_days: days * 2 });
+  const d2 = !doubledRes.error && doubledRes.data ? (doubledRes.data as Analytics) : null;
+  const prev = d2
+    ? {
+        won: previousWindow(Number(a.won), Number(d2.won)),
+        wonValue: previousWindow(Number(a.won_value), Number(d2.won_value)),
+        lost: previousWindow(Number(a.lost), Number(d2.lost)),
+        contactsNew: previousWindow(Number(a.contacts_new), Number(d2.contacts_new)),
+        tasksDone: previousWindow(Number(a.tasks_done), Number(d2.tasks_done)),
+      }
+    : null;
   const currency = ctx.org.currency || "ILS";
   const money = (v: number) => formatCurrency(locale, Number(v), currency);
   const closed = Number(a.won) + Number(a.lost);
@@ -91,15 +108,104 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
   const ratio = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${Number(v).toFixed(2)}×`);
   const ltvCac = g?.ltv?.ltv && g.totals?.cac ? Number(g.ltv.ltv) / Number(g.totals.cac) : null;
 
+  const pctFmt = (v: number) => formatPercent(locale, v);
+  const prevClosed = prev ? prev.won + prev.lost : 0;
+  const prevWinRate = prev && prevClosed ? prev.won / prevClosed : null;
+  const prevAvgDeal = prev && prev.won ? prev.wonValue / prev.won : null;
+  const spark = sparkSeries(months);
+  const vs = t("analytics.pro.vsPrev");
+
+  // meetings (appointments module) — shown only to people who may read it
+  const canMeetings = ctx.can("appointments.read");
+  let meetings: ReturnType<typeof computeApptStats> | null = null;
+  let meetingsUpcoming = 0;
+  let meetingContacts = 0;
+  let meetingContactsWon = 0;
+  if (canMeetings) {
+    const nowDate = new Date();
+    const nowIso = nowDate.toISOString();
+    const sinceIso = new Date(nowDate.getTime() - days * 86_400_000).toISOString();
+    const [{ data: orgRow }, { data: apptData }, upc] = await Promise.all([
+      supabase.from("organizations").select("timezone").eq("id", ctx.org.id).maybeSingle(),
+      supabase.from("appointments").select("id, title, starts_at, ends_at, status, host_id, type_id, contact_id, created_at").eq("organization_id", ctx.org.id).gte("starts_at", sinceIso).lte("starts_at", nowIso).order("starts_at").limit(2000),
+      supabase.from("appointments").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).in("status", ["scheduled", "confirmed"]).gte("ends_at", nowIso),
+    ]);
+    const rowsA = (apptData ?? []) as unknown as ApptRow[];
+    meetings = computeApptStats(rowsA, safeZone((orgRow?.timezone as string | undefined) || "Asia/Jerusalem"));
+    meetingsUpcoming = upc.count ?? 0;
+    const held = Array.from(new Set(rowsA.filter((r) => r.status === "completed" && r.contact_id).map((r) => r.contact_id as string))).slice(0, 300);
+    meetingContacts = held.length;
+    if (held.length) {
+      const { data: wonRows } = await supabase.from("deals").select("contact_id").eq("organization_id", ctx.org.id).eq("status", "won").in("contact_id", held);
+      meetingContactsWon = new Set((wonRows ?? []).map((r) => r.contact_id as string)).size;
+    }
+  }
+
   const kpis = [
-    { label: t("analytics.openPipeline"), value: money(a.open_value), sub: t("deals.openCount", { count: a.open_deals }) },
-    { label: t("analytics.weighted"), value: money(a.weighted_value) },
-    { label: t("analytics.wonValue"), value: money(a.won_value), sub: t("analytics.wonCount", { count: a.won }) },
-    { label: t("analytics.winRate"), value: winRate === null ? "—" : formatPercent(locale, winRate), sub: t("analytics.closedCount", { count: closed }) },
-    { label: t("analytics.avgDeal"), value: avgDeal === null ? "—" : money(avgDeal) },
-    { label: t("analytics.newContacts"), value: formatNumber(locale, a.contacts_new) },
-    { label: t("analytics.openTasks"), value: formatNumber(locale, a.tasks_open), sub: t("analytics.overdueCount", { count: a.tasks_overdue }), danger: a.tasks_overdue > 0 },
-    { label: t("analytics.tasksDone"), value: formatNumber(locale, a.tasks_done) },
+    { id: "open", label: t("analytics.openPipeline"), value: money(a.open_value), sub: t("deals.openCount", { count: a.open_deals }), icon: <Layers className="h-4 w-4" />, tone: "accent" as const },
+    { id: "weighted", label: t("analytics.weighted"), value: money(a.weighted_value), icon: <Target className="h-4 w-4" />, tone: "teal" as const },
+    { id: "won", label: t("analytics.wonValue"), value: money(a.won_value), sub: t("analytics.wonCount", { count: a.won }), icon: <Trophy className="h-4 w-4" />, tone: "success" as const, delta: prev ? delta(Number(a.won_value), prev.wonValue) : null, spark },
+    { id: "winrate", label: t("analytics.winRate"), value: winRate === null ? "—" : formatPercent(locale, winRate), sub: t("analytics.closedCount", { count: closed }), icon: <Percent className="h-4 w-4" />, tone: "gold" as const, delta: prev && winRate !== null && prevWinRate !== null ? delta(winRate, prevWinRate) : null },
+    { id: "avgdeal", label: t("analytics.avgDeal"), value: avgDeal === null ? "—" : money(avgDeal), icon: <Wallet className="h-4 w-4" />, tone: "accent" as const, delta: prev && avgDeal !== null && prevAvgDeal !== null ? delta(avgDeal, prevAvgDeal) : null },
+    { id: "contacts", label: t("analytics.newContacts"), value: formatNumber(locale, a.contacts_new), icon: <UserPlus className="h-4 w-4" />, tone: "teal" as const, delta: prev ? delta(Number(a.contacts_new), prev.contactsNew) : null },
+    { id: "tasks", label: t("analytics.openTasks"), value: formatNumber(locale, a.tasks_open), sub: t("analytics.overdueCount", { count: a.tasks_overdue }), danger: a.tasks_overdue > 0, icon: <ListChecks className="h-4 w-4" />, tone: "warning" as const },
+    { id: "done", label: t("analytics.tasksDone"), value: formatNumber(locale, a.tasks_done), icon: <CheckCircle2 className="h-4 w-4" />, tone: "success" as const, delta: prev ? delta(Number(a.tasks_done), prev.tasksDone) : null },
+  ];
+
+  // funnel per pipeline (default pipeline first, as the RPC orders it)
+  const pipelines = new Map<string, { name: string; value: number; deals: number }[]>();
+  for (const st of a.stages) pipelines.set(st.pipeline, [...(pipelines.get(st.pipeline) ?? []), { name: stageLabel(t, st.name), value: Number(st.value), deals: Number(st.deals) }]);
+  const funnels = Array.from(pipelines.entries()).slice(0, 3);
+  const trendRows = (() => {
+    const vals = months.map((m) => m.value);
+    const avg = movingAverage(vals);
+    const cum = cumulative(vals);
+    return months.map((m, i) => ({ month: m.month, value: m.value, trend: Math.round(avg[i] ?? 0), total: cum[i] ?? 0 }));
+  })();
+  const sourceName = (s: string) => t(`crm.sources.${s}`);
+  const withSpend = (g?.by_source ?? []).filter((r) => r.roas !== null && Number(r.spend) > 0);
+  const bestRoas = withSpend.length ? withSpend.reduce((x, y) => (Number(y.roas) > Number(x.roas) ? y : x)) : null;
+  const worstRoas = withSpend.length ? withSpend.reduce((x, y) => (Number(y.roas) < Number(x.roas) ? y : x)) : null;
+  const highlights: Highlight[] = buildHighlights(
+    {
+      winRate,
+      closed,
+      wonValue: Number(a.won_value),
+      prevWonValue: prev?.wonValue ?? 0,
+      contactsNew: Number(a.contacts_new),
+      prevContactsNew: prev?.contactsNew ?? 0,
+      tasksOverdue: Number(a.tasks_overdue),
+      openDeals: Number(a.open_deals),
+      openValue: Number(a.open_value),
+      weightedValue: Number(a.weighted_value),
+      bestSource: a.sources[0] ? { source: sourceName(a.sources[0].source), count: Number(a.sources[0].count) } : null,
+      topSeller: a.owners[0] ? { name: a.owners[0].name, value: Number(a.owners[0].value) } : null,
+      bestRoasSource: bestRoas ? { source: sourceName(bestRoas.source), roas: Number(bestRoas.roas) } : null,
+      worstRoasSource: worstRoas ? { source: sourceName(worstRoas.source), roas: Number(worstRoas.roas) } : null,
+      ltvCac,
+      biggestDrop: null, // open value per stage is a distribution, not a conversion — never claimed as a drop-off
+      meetings: meetings ? { showRate: meetings.showRate, noShowRate: meetings.noShowRate, upcoming: meetingsUpcoming } : null,
+    },
+    { pct: pctFmt, money },
+  );
+
+  const csvRows: (string | number | null)[][] = [
+    [t("analytics.title"), t("analytics.lastDays", { days })],
+    [],
+    ...kpis.map((k) => [k.label, k.value]),
+    [],
+    [t("analytics.revenueByMonth")],
+    ...months.map((m) => [m.month, m.value]),
+    [],
+    [t("analytics.leadSources")],
+    ...a.sources.map((x) => [sourceName(x.source), Number(x.count)]),
+    [],
+    [t("analytics.funnel")],
+    ...a.stages.map((x) => [`${x.pipeline} / ${stageLabel(t, x.name)}`, Number(x.value), Number(x.deals)]),
+    [],
+    [t("analytics.topSellers")],
+    ...a.owners.map((o) => [o.name, Number(o.deals), Number(o.value)]),
+    ...(g ? [[], [t("growth.bySource")], [t("crm.source"), t("growth.leads"), t("growth.customers"), t("growth.revenue"), t("growth.spend"), t("growth.cac"), t("growth.roas")], ...g.by_source.map((r) => [sourceName(r.source), Number(r.leads), Number(r.customers), Number(r.revenue), Number(r.spend), r.cac === null ? null : Number(r.cac), r.roas === null ? null : Number(r.roas)])] : []),
   ];
 
   return (
@@ -108,6 +214,9 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
         title={t("analytics.title")}
         description={t("analytics.subtitle")}
         actions={
+          <>
+          <ExportCsvButton rows={csvRows} filename={`analytics-${days}d`} />
+          <PrintButton />
           <div className="flex gap-1 rounded-xl border border-line bg-surface p-1" role="tablist" aria-label={t("analytics.period")}>
             {PERIODS.map((p) => (
               <Link
@@ -121,26 +230,25 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
               </Link>
             ))}
           </div>
+          </>
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="analytics-kpis">
         {kpis.map((k) => (
-          <Card key={k.label} className="p-4">
-            <div className="text-[12.5px] text-muted">{k.label}</div>
-            <div className={cn("mt-1.5 text-xl font-bold sm:text-2xl", k.danger && "text-danger")}>
-              <bdi dir="ltr">{k.value}</bdi>
-            </div>
-            {k.sub ? <div className="mt-0.5 text-[12px] text-subtle">{k.sub}</div> : null}
-          </Card>
+          <KpiCard key={k.id} id={k.id} label={k.label} value={k.value} sub={k.sub} icon={k.icon} tone={k.tone} danger={"danger" in k ? k.danger : undefined} delta={"delta" in k ? k.delta : null} deltaFormat={pctFmt} vs={vs} spark={"spark" in k ? k.spark : undefined} />
         ))}
+      </div>
+
+      <div className="mt-4">
+        <HighlightsStrip items={highlights} title={t("analytics.pro.highlightsTitle")} text={(h) => t(`analytics.pro.hl.${h.key}`, h.params)} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader title={t("analytics.revenueByMonth")} />
           <div className="p-4">
-            <MonthlyChart data={months} label={t("analytics.wonValue")} currency={currency} />
+            <RevenueTrendChart data={trendRows} label={t("analytics.wonValue")} currency={currency} labels={{ revenue: t("analytics.wonValue"), trend: t("analytics.pro.trend"), cumulative: t("analytics.pro.cumulative") }} />
           </div>
         </Card>
         <Card>
@@ -149,7 +257,14 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
             {a.stages.length === 0 || a.stages.every((s) => Number(s.value) === 0) ? (
               <EmptyState icon={<BarChart3 className="h-6 w-6" />} title={t("analytics.noData")} />
             ) : (
-              <HBarChart data={a.stages.map((s) => ({ name: stageLabel(t, s.name), value: Number(s.value) }))} label={t("analytics.funnel")} currency={currency} />
+              <div className="space-y-5">
+                {funnels.map(([name, steps]) => (
+                  <div key={name}>
+                    {funnels.length > 1 ? <div className="mb-2 text-[12.5px] font-semibold text-muted">{name}</div> : null}
+                    <FunnelPanel steps={funnelSteps(steps)} money={money} pct={pctFmt} labels={{ ofFirst: t("analytics.pro.ofFirst"), fromPrev: t("analytics.pro.fromPrev"), deals: (n) => t("deals.openCount", { count: n }) }} />
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </Card>
@@ -184,7 +299,58 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
             </ol>
           )}
         </Card>
+        <Card>
+          <CardHeader title={t("analytics.pro.winLoss")} description={t("analytics.pro.winLossHint")} />
+          <div className="p-5">
+            {closed === 0 ? <EmptyState icon={<Trophy className="h-6 w-6" />} title={t("analytics.noData")} /> : <WinLossDonut won={Number(a.won)} lost={Number(a.lost)} center={winRate === null ? "—" : formatPercent(locale, winRate)} labels={{ won: t("analytics.pro.wonDeals"), lost: t("analytics.pro.lostDeals"), aria: t("analytics.pro.winLoss") }} />}
+          </div>
+          {Number(a.lost_value) > 0 ? <div className="border-t border-line px-5 py-3 text-[12.5px] text-muted">{t("analytics.pro.lostValue", { value: money(a.lost_value) })}</div> : null}
+        </Card>
       </div>
+
+      {meetings ? (
+        <section className="mt-8 space-y-4" aria-labelledby="meetings-title" data-testid="meetings-section">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 id="meetings-title" className="text-lg font-bold">
+                {t("analytics.pro.meetingsTitle")}
+              </h2>
+              <p className="text-[13px] text-muted">{t("analytics.pro.meetingsSubtitle")}</p>
+            </div>
+            <Link href={`/${locale}/appointments?tab=insights`} className="text-[13px] font-medium text-accent hover:underline">
+              {t("analytics.pro.meetingsMore")}
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-6">
+            <KpiCard id="m-total" label={t("analytics.pro.meetings.total")} value={formatNumber(locale, meetings.total)} icon={<CalendarCheck className="h-4 w-4" />} tone="accent" />
+            <KpiCard id="m-held" label={t("analytics.pro.meetings.held")} value={formatNumber(locale, meetings.completed)} icon={<UserCheck className="h-4 w-4" />} tone="success" />
+            <KpiCard id="m-show" label={t("appointments.pro.kpi.showRate")} value={meetings.showRate === null ? "—" : pctFmt(meetings.showRate)} icon={<Gauge className="h-4 w-4" />} tone="teal" />
+            <KpiCard id="m-noshow" label={t("appointments.pro.kpi.noShowRate")} value={meetings.noShowRate === null ? "—" : pctFmt(meetings.noShowRate)} icon={<Timer className="h-4 w-4" />} tone="warning" danger={meetings.noShowRate !== null && meetings.noShowRate > 0.3} />
+            <KpiCard id="m-upcoming" label={t("appointments.pro.kpi.upcoming")} value={formatNumber(locale, meetingsUpcoming)} icon={<TrendingUp className="h-4 w-4" />} tone="gold" />
+            <KpiCard id="m-deal" label={t("analytics.pro.meetings.toDeal")} value={meetingContacts ? pctFmt(meetingContactsWon / meetingContacts) : "—"} sub={meetingContacts ? t("analytics.pro.meetings.toDealSub", { won: meetingContactsWon, total: meetingContacts }) : undefined} icon={<Sparkles className="h-4 w-4" />} tone="success" />
+          </div>
+          {meetings.total > 0 ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader title={t("appointments.pro.insights.weekly")} />
+                <div className="p-4">
+                  <WeeklyTrend data={meetings.weekly} label={t("appointments.pro.insights.weekly")} />
+                </div>
+              </Card>
+              <Card>
+                <CardHeader title={t("appointments.pro.insights.statusMix")} />
+                <div className="p-5">
+                  <StatusDonut data={meetings.byStatus} total={meetings.total} label={t("appointments.pro.insights.statusMix")} />
+                </div>
+              </Card>
+            </div>
+          ) : (
+            <Card>
+              <EmptyState icon={<CalendarCheck className="h-6 w-6" />} title={t("appointments.pro.insights.empty")} />
+            </Card>
+          )}
+        </section>
+      ) : null}
 
       {g ? (
         <section className="mt-8 space-y-4" aria-labelledby="growth-title" data-testid="growth-section">
@@ -194,7 +360,7 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
             </h2>
             <p className="text-[13px] text-muted">{t("growth.subtitle")}</p>
           </div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             {[
               { label: t("growth.revenue"), value: money(g.totals.revenue) },
               { label: t("growth.spend"), value: money(g.totals.spend) },
@@ -204,6 +370,8 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
               { label: t("growth.ltvCac"), value: ltvCac === null ? "—" : `${ltvCac.toFixed(1)}:1`, sub: ltvCac === null ? undefined : t(ltvCac >= 3 ? "growth.ltvCacGood" : "growth.ltvCacLow"), danger: ltvCac !== null && ltvCac < 1 },
               { label: t("growth.runRate"), value: money(g.run_rate), sub: t("growth.perMonth") },
               { label: t("growth.forecast3"), value: money(g.forecast.reduce((a, f) => a + Number(f.forecast), 0)) },
+              { label: t("analytics.pro.leadToCustomer"), value: g.totals.leads ? pctFmt(Number(g.totals.customers) / Number(g.totals.leads)) : "—", sub: t("analytics.pro.leadToCustomerSub", { customers: g.totals.customers, leads: g.totals.leads }) },
+              { label: t("analytics.pro.revenuePerCustomer"), value: g.totals.customers ? money(Number(g.totals.revenue) / Number(g.totals.customers)) : "—" },
             ].map((k) => (
               <Card key={k.label} className="p-4">
                 <div className="text-[12.5px] text-muted">{k.label}</div>

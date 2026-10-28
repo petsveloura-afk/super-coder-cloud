@@ -103,3 +103,55 @@ export async function setAppointmentStatusAction(fd: FormData): Promise<ActionSt
   revalidatePath(`/${locale}/appointments`);
   return { ok: true, message: `appointments.status_${status}` };
 }
+
+/* ------------------------------------------------------------------ pro additions (additive) */
+const rescheduleSchema = z.object({
+  id: uuidSchema,
+  start: z.string().refine((v) => !Number.isNaN(Date.parse(v)), { message: "validation.date" }),
+  duration: z.coerce.number().int().min(5).max(720).optional(),
+});
+
+/** Move an appointment to a new time. The DB exclusion constraint still guards against double booking. */
+export async function rescheduleAppointmentAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const locale = formLocale(fd);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("appointments.manage")) return { error: "errors.forbidden" };
+  const parsed = rescheduleSchema.safeParse({ id: str(fd, "id"), start: str(fd, "start"), duration: str(fd, "duration") || undefined });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error), error: "validation.invalidId" };
+  const supabase = await createClient();
+  const { data: cur } = await supabase.from("appointments").select("starts_at, ends_at, status").eq("id", parsed.data.id).eq("organization_id", ctx.org.id).maybeSingle();
+  if (!cur) return { error: "validation.invalidId" };
+  if (cur.status === "canceled" || cur.status === "completed" || cur.status === "no_show") return { error: "appointments.pro.cannotReschedule" };
+  const minutes = parsed.data.duration ?? Math.max(5, Math.round((new Date(cur.ends_at as string).getTime() - new Date(cur.starts_at as string).getTime()) / 60_000));
+  const starts = new Date(parsed.data.start);
+  const ends = new Date(starts.getTime() + minutes * 60_000);
+  const { error } = await supabase
+    .from("appointments")
+    .update({ starts_at: starts.toISOString(), ends_at: ends.toISOString(), reminded_24_at: null, reminded_1_at: null })
+    .eq("id", parsed.data.id)
+    .eq("organization_id", ctx.org.id);
+  if (error) return { error: error.message.includes("appointments_no_overlap") ? "booking.taken" : dbErrorKey(error) };
+  kickJobs();
+  revalidatePath(`/${locale}/appointments`);
+  return { ok: true, message: "appointments.pro.rescheduled" };
+}
+
+/** Edit the internal notes / meeting link of an appointment. */
+export async function updateAppointmentNotesAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const locale = formLocale(fd);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("appointments.manage")) return { error: "errors.forbidden" };
+  const id = uuidSchema.safeParse(str(fd, "id"));
+  if (!id.success) return { error: "validation.invalidId" };
+  const notes = str(fd, "notes").trim().slice(0, 4000);
+  const location = str(fd, "location").trim().slice(0, 300);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("appointments")
+    .update({ notes: notes || null, location: location || null })
+    .eq("id", id.data)
+    .eq("organization_id", ctx.org.id);
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}/appointments`);
+  return { ok: true, message: "appointments.pro.notesSaved" };
+}

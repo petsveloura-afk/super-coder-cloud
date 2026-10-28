@@ -261,7 +261,7 @@ export function BookingTypeEditor({ id, initial, members, hostId, trigger }: { i
   );
 }
 
-export function BookingTypeCard({ id, value, url, members, hostId, hostName }: { id: string; value: TypeValue; url: string; members: Opt[]; hostId: string; hostName: string }) {
+export function BookingTypeCard({ id, value, url, members, hostId, hostName, stats }: { id: string; value: TypeValue; url: string; members: Opt[]; hostId: string; hostName: string; stats?: { bookings: number; held: number; noShow: number } }) {
   const { t } = useI18n();
   return (
     <div className="space-y-3 rounded-xl border border-line p-4" data-booking-type={value.slug}>
@@ -271,6 +271,20 @@ export function BookingTypeCard({ id, value, url, members, hostId, hostName }: {
           {t("booking.minutes", { count: value.duration_min })} · {hostName}
         </span>
       </div>
+      {stats ? (
+        <div className="grid grid-cols-3 gap-2 text-center" data-testid="booking-type-stats">
+          {[
+            { k: "bookings", v: stats.bookings, tone: "text-accent" },
+            { k: "held", v: stats.held, tone: "text-success" },
+            { k: "noShow", v: stats.noShow, tone: stats.noShow > 0 ? "text-warning" : "text-muted" },
+          ].map((x) => (
+            <div key={x.k} className="rounded-xl border border-line bg-elevated px-2 py-2">
+              <div className={`text-lg font-bold tabular-nums ${x.tone}`}>{x.v}</div>
+              <div className="text-[11.5px] text-muted">{t(`appointments.pro.typeStats.${x.k}`)}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <ShareBox url={url} height={820} />
       <div className="flex gap-2">
         <BookingTypeEditor
