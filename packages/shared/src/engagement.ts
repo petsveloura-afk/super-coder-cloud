@@ -154,7 +154,9 @@ export function zonedToUtc(ymd: string, minutes: number, timeZone: string): numb
 }
 
 /* -------------------------------------------------------------- campaigns */
-export const CAMPAIGN_CHANNELS = ["email", "whatsapp", "sms", "telegram"] as const;
+export const CAMPAIGN_CHANNELS = ["email", "whatsapp", "sms", "telegram", "messenger", "instagram"] as const;
+/** Wave 40 — Meta channels (Facebook Messenger / Instagram Direct): only reach people who already messaged the page. */
+export const META_CAMPAIGN_CHANNELS = ["messenger", "instagram"] as const;
 
 export const campaignSchema = z
   .object({

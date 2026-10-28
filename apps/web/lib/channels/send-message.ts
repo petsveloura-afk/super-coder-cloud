@@ -141,6 +141,8 @@ export async function sendToContact(kind: Kind, orgId: string, contactId: string
   const { data: contact } = await admin.from("contacts").select("id, first_name, last_name, phone, email, custom_fields").eq("id", contactId).eq("organization_id", orgId).maybeSingle();
   if (!contact) return { ok: false, error: "contact_not_found", permanent: true };
   let externalId: string | null = null;
+  // Meta channels cannot start a chat: the person must have messaged the page / account first (a conversation exists above)
+  if (kind === "messenger" || kind === "instagram") return { ok: false, error: "contact_has_not_messaged_first", permanent: true };
   if (kind === "telegram") externalId = ((contact.custom_fields as Record<string, string> | null)?.telegram_id as string | undefined) ?? null;
   else if (kind === "email") externalId = ((contact.email as string | null) ?? "").toLowerCase() || null;
   else {

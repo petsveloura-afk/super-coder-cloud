@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, MessageCircle, Save, Send, Smartphone, Sparkles, Users } from "lucide-react";
+import { Camera, Info, Mail, MessageCircle, MessagesSquare, Save, Send, Smartphone, Sparkles, Users } from "lucide-react";
 import { toast } from "sonner";
 import { CAMPAIGN_CHANNELS } from "@scc/shared/engagement";
 import { CONTACT_STATUSES, LEAD_SOURCES } from "@scc/shared/validators";
@@ -39,7 +39,7 @@ const SENTIMENTS = ["positive", "neutral", "negative"] as const;
 const STAGES = ["new", "interested", "considering", "ready", "customer", "lost"] as const;
 const num = (v: string) => (v.trim() === "" || Number.isNaN(Number(v)) ? undefined : Number(v));
 
-const ICON = { email: Mail, whatsapp: MessageCircle, sms: Smartphone, telegram: Send } as const;
+const ICON = { email: Mail, whatsapp: MessageCircle, sms: Smartphone, telegram: Send, messenger: MessagesSquare, instagram: Camera } as const;
 
 function toLocalInput(iso?: string) {
   if (!iso) return "";
@@ -121,7 +121,7 @@ export function CampaignEditor({ id, initial, tags, channelsReady }: { id?: stri
         </Field>
         <fieldset>
           <legend className="mb-2 text-[13px] font-medium text-muted">{t("campaigns.channel")}</legend>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" role="radiogroup">
             {CAMPAIGN_CHANNELS.map((c) => {
               const Icon = ICON[c];
               return (
@@ -140,6 +140,11 @@ export function CampaignEditor({ id, initial, tags, channelsReady }: { id?: stri
               );
             })}
           </div>
+          {v.channel === "messenger" || v.channel === "instagram" ? (
+            <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-accent-soft px-3 py-2 text-[12px] text-muted" data-testid="meta-channel-hint">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {t("campaigns.metaHint")}
+            </p>
+          ) : null}
         </fieldset>
         {v.channel === "email" ? (
           <Field label={t("automations.cfg.subject")} htmlFor="cp-subject" error={err("subject")}>

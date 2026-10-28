@@ -181,7 +181,7 @@ export async function aiWriteCampaignAction(input: { locale: string; channel: st
   const { CAMPAIGN_CHANNELS } = await import("@scc/shared/engagement");
   if (!(CAMPAIGN_CHANNELS as readonly string[]).includes(input.channel)) return { error: "campaigns.invalid" };
   const { buildWriterPrompt, parseVariants, isGoal, isTone } = await import("@/lib/campaigns/ai-core");
-  const channel = input.channel as "email" | "whatsapp" | "sms" | "telegram";
+  const channel = input.channel as (typeof CAMPAIGN_CHANNELS)[number];
   const goal = isGoal(input.goal) ? input.goal : "promo";
   const tone = isTone(input.tone) ? input.tone : "friendly";
   const { runAI } = await import("@/lib/ai/run");
@@ -211,7 +211,7 @@ export async function aiImproveMessageAction(input: { locale: string; mode: stri
   if (body.length < 3) return { error: "validation.required" };
   const { buildImprovePrompt, parseImproved, keepsVariables, isImproveMode } = await import("@/lib/campaigns/ai-core");
   if (!isImproveMode(input.mode)) return { error: "campaigns.invalid" };
-  const channel = input.channel as "email" | "whatsapp" | "sms" | "telegram";
+  const channel = input.channel as (typeof CAMPAIGN_CHANNELS)[number];
   const { runAI } = await import("@/lib/ai/run");
   const { baseSystem } = await import("@/lib/ai/prompt");
   const out = await runAI({
@@ -272,7 +272,7 @@ export async function aiCampaignAgentAction(input: { locale: string; goal: strin
     import("@/lib/ai/prompt"),
   ]);
   const tagNames = ((tags ?? []) as { name: string }[]).map((x) => x.name);
-  const connected = (["email", "whatsapp", "sms", "telegram"] as const).filter((c) => ready[c]);
+  const connected = mod.AGENT_CHANNELS.filter((c) => ready[c]);
   const out = await runAI({
     orgId: g.ctx.org.id,
     feature: "copilot",

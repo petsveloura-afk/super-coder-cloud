@@ -5,7 +5,7 @@ import "server-only";
  * Each adapter returns { ok } or { ok:false, error, permanent } — permanent errors
  * (channel not connected, contact has no number) are not retried by the job queue.
  */
-export type ChannelKind = "whatsapp" | "telegram" | "sms";
+export type ChannelKind = "whatsapp" | "telegram" | "sms" | "messenger" | "instagram";
 
 export interface SendResult {
   ok: boolean;

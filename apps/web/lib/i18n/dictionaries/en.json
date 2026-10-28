@@ -2170,7 +2170,8 @@
       "trendHint": "Delivered vs. recipients per month",
       "insights": "Insights",
       "allGood": "All good. Nothing needs attention right now."
-    }
+    },
+    "metaHint": "Facebook Messenger and Instagram Direct only reach people who already messaged your page or account. Outside Meta's 24-hour window some messages may be rejected, and those show as failed in the report."
   },
   "inbox": {
     "title": "Inbox",

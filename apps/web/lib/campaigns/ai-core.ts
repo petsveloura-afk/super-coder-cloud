@@ -3,7 +3,7 @@
  * The model only ever returns JSON; everything is validated/clamped here, and the audience goes through the same
  * segment parser as wave 17, so the AI can never widen consent rules or invent filters.
  */
-import { campaignSchema, CAMPAIGN_CHANNELS } from "@scc/shared/engagement";
+import { campaignSchema } from "@scc/shared/engagement";
 import { extractJsonObject } from "@/lib/crm/insights-core";
 import { parseSegment } from "./segment-core";
 import type { Channel } from "./brain";
@@ -24,7 +24,12 @@ const CHANNEL_RULES: Record<Channel, string> = {
   whatsapp: "WhatsApp: conversational, 15-60 words, at most 2 emoji, one clear call to action, no long links lists.",
   sms: "SMS: at most 220 characters, no emoji, one link or one action, end with a short opt-out hint.",
   telegram: "Telegram: friendly, 20-80 words, light formatting only (no markdown tables), one clear call to action.",
+  messenger: "Facebook Messenger: conversational, 15-70 words, at most 2 emoji, plain text only (no markdown), one clear call to action.",
+  instagram: "Instagram Direct: short and casual, 10-50 words, a couple of emoji are fine, plain text only, one clear call to action.",
 };
+
+/** Channels the campaign agent may choose on its own (it can auto-send). Meta channels stay a manual choice: they only reach people who messaged first. */
+export const AGENT_CHANNELS = ["email", "whatsapp", "sms", "telegram"] as const satisfies readonly Channel[];
 
 const clean = (v: unknown, max: number) =>
   typeof v === "string"
@@ -164,8 +169,8 @@ export interface AgentPlan {
 export function buildAgentPrompt(i: { goal: string; business?: string; tags: string[]; connected: Channel[] }): string {
   return [
     "You are a campaign strategist. Turn the owner's goal into ONE complete campaign draft.",
-    `Channels you may choose (the workspace has these connected): ${i.connected.join(", ") || CAMPAIGN_CHANNELS.join(", ")}. Pick the one that fits the goal best.`,
-    ...Object.values(CHANNEL_RULES).map((x) => `- ${x}`),
+    `Channels you may choose (the workspace has these connected): ${i.connected.join(", ") || AGENT_CHANNELS.join(", ")}. Pick the one that fits the goal best.`,
+    ...AGENT_CHANNELS.map((c) => `- ${CHANNEL_RULES[c]}`),
     "Audience filters — use ONLY these keys, omit what the goal does not ask for:",
     "status, source, tags (existing tags only), min_score, max_score (0-100), sentiment (positive|neutral|negative), stage (new|interested|considering|ready|customer|lost), active_days, inactive_days, purchases_min.",
     `Existing tags: ${i.tags.slice(0, 200).join(", ") || "(none)"}`,
@@ -183,7 +188,7 @@ export function parseAgentPlan(raw: string, opts: { tags: string[]; allowed?: Ch
   const o = extractJsonObject(raw);
   if (!o) return null;
   const ch = typeof o.channel === "string" ? (o.channel as string) : "";
-  if (!(CAMPAIGN_CHANNELS as readonly string[]).includes(ch)) return null;
+  if (!(AGENT_CHANNELS as readonly string[]).includes(ch)) return null;
   const channel = ch as Channel;
   if (opts.allowed && opts.allowed.length && !opts.allowed.includes(channel)) return null;
   const body = clean(o.body, channel === "sms" ? 480 : 4000);

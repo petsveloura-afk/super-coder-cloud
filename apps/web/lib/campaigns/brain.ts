@@ -5,7 +5,7 @@
  */
 import { campaignRates, type CampaignStats } from "./metrics";
 
-export type Channel = "email" | "whatsapp" | "sms" | "telegram";
+export type Channel = "email" | "whatsapp" | "sms" | "telegram" | "messenger" | "instagram";
 export type CheckLevel = "ok" | "warn" | "bad";
 export type ScoreLevel = "excellent" | "good" | "fair" | "weak";
 
@@ -94,7 +94,7 @@ export interface MessageAnalysis {
   spamHits: string[];
 }
 
-const IDEAL_WORDS: Record<Channel, [number, number]> = { email: [40, 200], whatsapp: [12, 70], sms: [8, 30], telegram: [12, 90] };
+const IDEAL_WORDS: Record<Channel, [number, number]> = { email: [40, 200], whatsapp: [12, 70], sms: [8, 30], telegram: [12, 90], messenger: [10, 70], instagram: [8, 50] };
 
 export function levelOf(score: number): ScoreLevel {
   return score >= 85 ? "excellent" : score >= 70 ? "good" : score >= 50 ? "fair" : "weak";
@@ -291,6 +291,16 @@ export function suggestSendTimes(channel: Channel, from: Date = new Date(), coun
       { day: 4, hour: 12, reason: "lunch" },
       { day: 0, hour: 19, reason: "evening" },
     ],
+    messenger: [
+      { day: 2, hour: 19, reason: "evening" },
+      { day: 4, hour: 12, reason: "lunch" },
+      { day: 0, hour: 20, reason: "evening" },
+    ],
+    instagram: [
+      { day: 3, hour: 20, reason: "evening" },
+      { day: 2, hour: 12, reason: "lunch" },
+      { day: 0, hour: 19, reason: "evening" },
+    ],
   };
   const out: { at: Date; reason: SendSlot["reason"] }[] = [];
   for (const slot of plan[channel]) {
@@ -434,6 +444,8 @@ export function suggestSendInstants(channel: Channel, nowMs: number, tzOffsetMin
     whatsapp: [{ day: 2, hour: 12, reason: "lunch" }, { day: 3, hour: 19, reason: "evening" }, { day: 0, hour: 18, reason: "evening" }],
     sms: [{ day: 1, hour: 11, reason: "midweek_morning" }, { day: 3, hour: 12, reason: "lunch" }, { day: 4, hour: 10, reason: "midweek_morning" }],
     telegram: [{ day: 2, hour: 20, reason: "evening" }, { day: 4, hour: 12, reason: "lunch" }, { day: 0, hour: 19, reason: "evening" }],
+    messenger: [{ day: 2, hour: 19, reason: "evening" }, { day: 4, hour: 12, reason: "lunch" }, { day: 0, hour: 20, reason: "evening" }],
+    instagram: [{ day: 3, hour: 20, reason: "evening" }, { day: 2, hour: 12, reason: "lunch" }, { day: 0, hour: 19, reason: "evening" }],
   };
   const out = plan[channel].map((slot) => {
     const d = new Date(wallNow);

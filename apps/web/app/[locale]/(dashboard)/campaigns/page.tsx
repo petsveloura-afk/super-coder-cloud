@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDateTime, formatNumber, formatPercent } from "@/lib/format";
 import { campaignRates, isStatusFilter, summarizeCampaigns, CAMPAIGN_STATUS_FILTERS } from "@/lib/campaigns/metrics";
 import { cn } from "@/lib/utils";
+import { CAMPAIGN_CHANNELS } from "@scc/shared/engagement";
 import { CampaignOverview } from "@/components/campaigns/campaign-overview";
 import { CampaignAgent } from "@/components/campaigns/campaign-agent";
 
@@ -39,7 +40,9 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
   const q = (sp.q ?? "").trim().toLowerCase().slice(0, 80);
   const rows = all.filter((c) => (statusF === "all" || c.status === statusF) && (channelF === "all" || c.channel === channelF) && (!q || String(c.name).toLowerCase().includes(q)));
   const sum = summarizeCampaigns(all.map((c) => ({ status: c.status as string, channel: c.channel as string, stats: c.stats as never })));
-  const channelsUsed = [...new Set(all.map((c) => c.channel as string))];
+  // wave 40: every platform is offered in the filter (not only the ones already used), with a per-channel count
+  const channelList = [...new Set<string>([...CAMPAIGN_CHANNELS, ...all.map((c) => c.channel as string)])];
+  const channelCount = (ch: string) => all.filter((c) => c.channel === ch).length;
   const href = (over: Record<string, string>) => {
     const u = new URLSearchParams();
     const cur: Record<string, string> = { status: statusF, channel: channelF, q, ...over };
@@ -82,13 +85,21 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
                 </Link>
               ))}
             </div>
+            <div className="flex w-full flex-wrap gap-1.5" role="tablist" aria-label={t("campaigns.channel")} data-testid="campaign-channel-chips">
+              {["all", ...channelList].map((ch) => (
+                <Link key={ch} href={href({ channel: ch })} role="tab" aria-selected={channelF === ch} className={cn("rounded-full border px-3 py-1 text-[12.5px] font-medium transition", channelF === ch ? "border-transparent bg-accent-solid text-accent-fg" : "border-line text-muted hover:bg-surface-hover")}>
+                  {ch === "all" ? t("campaigns.filters.allChannels") : t(`campaigns.channels.${ch}`)}
+                  <span className="ms-1.5 text-[11px] opacity-70">{ch === "all" ? all.length : channelCount(ch)}</span>
+                </Link>
+              ))}
+            </div>
             <form action={`/${locale}/campaigns`} method="get" className="ms-auto flex flex-wrap items-center gap-2">
               {statusF !== "all" ? <input type="hidden" name="status" value={statusF} /> : null}
               <select name="channel" defaultValue={channelF} aria-label={t("campaigns.channel")} className="h-9 rounded-xl border border-line bg-surface px-3 text-[13px]">
                 <option value="all">{t("campaigns.filters.allChannels")}</option>
-                {channelsUsed.map((c) => (
+                {channelList.map((c) => (
                   <option key={c} value={c}>
-                    {t(`campaigns.channels.${c}`)}
+                    {t(`campaigns.channels.${c}`)} ({channelCount(c)})
                   </option>
                 ))}
               </select>
