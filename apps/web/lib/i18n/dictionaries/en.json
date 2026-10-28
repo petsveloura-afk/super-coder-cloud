@@ -885,6 +885,8 @@
     "view": "View",
     "views": {
       "board": "Open",
+      "list": "Smart list",
+      "insights": "Sales brain",
       "won": "Won",
       "lost": "Lost"
     },
@@ -927,6 +929,115 @@
       "search": "Search deals…",
       "overdueBadge": "⏰ Late",
       "staleBadge": "⏸ {days} days unchanged"
+    },
+    "brain": {
+      "levels": {
+        "hot": "Hot",
+        "healthy": "Healthy",
+        "cooling": "Cooling",
+        "risk": "At risk"
+      },
+      "reasons": {
+        "fresh": "Touched recently",
+        "stale": "Untouched for 14+ days",
+        "veryStale": "Untouched for 30+ days",
+        "overdue": "Close date has passed",
+        "closesSoon": "Closing within a week",
+        "noDate": "No close date",
+        "noOwner": "No owner",
+        "noContact": "No contact attached",
+        "slowInStage": "Stuck longer than usual in this stage",
+        "highValue": "Unusually large deal",
+        "lateStage": "Late stage"
+      },
+      "actions": {
+        "setCloseDate": "Set an expected close date",
+        "assignOwner": "Assign an owner",
+        "attachContact": "Attach a contact to the deal",
+        "rescheduleClose": "Close date passed — update or close it",
+        "reviveNow": "Dormant deal — reach out now",
+        "followUp": "Time to follow up with the customer",
+        "pushToClose": "Close to the finish — push for signature",
+        "unblockStage": "Stuck in stage — what is blocking it?",
+        "keepGoing": "On track"
+      },
+      "healthLabel": "Health score {score} out of 100",
+      "winChance": "{pct}% win chance",
+      "winChanceHint": "The stage probability, adjusted by the deal's health",
+      "days": "{count} days",
+      "collapse": "Collapse column",
+      "weighted": "Weighted",
+      "weightedHint": "Value of the deals in this stage by their adjusted win chance",
+      "avgInStage": "Avg in stage: {days} days",
+      "velocity": "Sales velocity",
+      "velocitySub": "Expected per month from pace and win odds",
+      "cycle": "Sales cycle length",
+      "cycleSub": "Creation to win (average)",
+      "winRate": "Win rate",
+      "winRateSub": "Of all closed deals (180 days)",
+      "healthSpread": "Pipeline health",
+      "adaptiveValue": "Smart value",
+      "ownerFilter": "Filter by owner",
+      "allOwners": "All owners",
+      "apply": "Apply",
+      "sort": {
+        "label": "Sort",
+        "position": "Manual",
+        "value": "Value",
+        "health": "Needs attention",
+        "close": "Close date",
+        "age": "Time untouched"
+      },
+      "flags": {
+        "hot": "🔥 Hot",
+        "risk": "⚠ At risk",
+        "unassigned": "No owner",
+        "nodate": "No date"
+      },
+      "banner": {
+        "title": "Pipeline brain",
+        "urgent": "{count} deals need urgent action right now",
+        "calm": "The pipeline looks good — see forecast, funnel and team performance",
+        "open": "Full insights ›"
+      },
+      "focus": {
+        "title": "Work on these first",
+        "subtitle": "The deals most worth your time right now, by value, odds and urgency",
+        "allGood": "No deals need attention — great job!"
+      },
+      "funnel": {
+        "title": "Funnel and stage speed",
+        "subtitle": "How many deals went through each stage, how many moved on and how long it took",
+        "noData": "Stage history starts building up every time a deal moves between stages.",
+        "avgDays": "Avg {days} days",
+        "moved": "moved to the next stage",
+        "bottleneck_slow": "Bottleneck — deals get stuck here",
+        "bottleneck_leaky": "Leak — most deals do not continue from here"
+      },
+      "forecast": {
+        "title": "Revenue forecast",
+        "subtitle": "Three scenarios for this month and a 6-month outlook",
+        "commit": "Commit",
+        "commitSub": "Late stage, healthy and closing this month",
+        "expected": "Expected",
+        "expectedSub": "Weighted by health-adjusted odds",
+        "bestCase": "Best case",
+        "bestCaseSub": "Everything planned to close this month",
+        "outlook": "6-month outlook",
+        "legendWeighted": "Weighted",
+        "legendTotal": "Full value",
+        "undated": "{count} deals without a close date ({value}) are not in the forecast"
+      },
+      "owners": {
+        "title": "Team performance",
+        "subtitle": "Load, weighted value and risk per owner",
+        "empty": "No data yet",
+        "unassigned": "No owner",
+        "open": "{count} open",
+        "atRisk": "{count} at risk",
+        "noClosed": "No closed deals yet",
+        "winRate": "{pct}% won · {won} won · {lost} lost"
+      }
     }
   },
   "companies": {
