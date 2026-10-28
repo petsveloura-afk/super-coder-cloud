@@ -86,7 +86,7 @@ test("booking page: customer books a free slot, team sees it, customer cancels",
 
   await page.bringToFront(); // a background tab never runs requestAnimationFrame, so streamed content would stay hidden
   await page.goto("/he/appointments");
-  await expect(page.getByText(/שיחת היכרות — עמית לקוח/)).toBeVisible({ timeout: 30_000 }); // streamed page on slow CI browsers
+  await expect(page.getByText(/שיחת היכרות — עמית לקוח/).first()).toBeVisible({ timeout: 30_000 }); // streamed page on slow CI browsers
 
   await p.goto(cancelHref!);
   await p.getByRole("button", { name: "כן, בטלו" }).click();
