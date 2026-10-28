@@ -23,8 +23,8 @@ describe("wave 41 — Facebook in the campaign agent (additive)", () => {
 
   it("the campaigns UI names Facebook in all languages", () => {
     for (const d of [he, en, ar] as const) {
-      expect((d.campaigns.channels as Record<string, string>).messenger).toMatch(/Facebook/);
-      const a = d.campaigns.agent as Record<string, string>;
+      expect((d.campaigns.channels as unknown as Record<string, string>).messenger).toMatch(/Facebook/);
+      const a = d.campaigns.agent as unknown as Record<string, string>;
       expect(a.channelPick && a.channelAuto && a.channelNotConnected).toBeTruthy();
     }
   });

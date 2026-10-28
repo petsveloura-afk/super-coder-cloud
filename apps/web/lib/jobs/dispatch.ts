@@ -17,7 +17,7 @@ import "@/lib/channels/register";
 interface JobRow {
   id: number;
   organization_id: string;
-  kind: "email" | "webhook" | "http" | "whatsapp" | "telegram" | "sms" | "action" | "invoice" | "conversion" | "push" | "calendar" | "reminder" | "call";
+  kind: "email" | "webhook" | "http" | "whatsapp" | "telegram" | "sms" | "action" | "invoice" | "conversion" | "push" | "calendar" | "reminder" | "call" | "messenger" | "instagram";
   webhook_id: string | null;
   payload: Record<string, unknown>;
   attempts: number;
