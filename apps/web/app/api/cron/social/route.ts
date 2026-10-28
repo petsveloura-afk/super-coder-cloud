@@ -23,7 +23,18 @@ async function handle(request: NextRequest) {
   // (runs only in the time that is left; never delays or blocks the posts above)
   const left = 56_000 - (Date.now() - t0);
   const metaSync = left > 9_000 ? await import("@/lib/channels/meta-sync").then((m) => m.syncMetaInbound(Math.min(20_000, left - 8_000))).catch((e) => ({ error: (e as Error).message })) : { skipped: true };
-  return NextResponse.json({ ok: true, socialPosts: result, metaSync }, { headers: { "Cache-Control": "no-store" } });
+  // wave 43: is the Meta app's own webhook (Page + Instagram) delivering? Reported here (visible in the Actions log)
+  // and repaired when it is clearly broken — the real reason messages arrive minutes or hours late
+  const metaWebhook = await (async () => {
+    try {
+      const { publicEnv } = await import("@/lib/env");
+      const { checkMetaAppWebhooks } = await import("@/lib/channels/meta-webhook-health");
+      return await checkMetaAppWebhooks({ callbackBase: publicEnv.appUrl });
+    } catch (e) {
+      return { checked: false, error: (e as Error).message };
+    }
+  })();
+  return NextResponse.json({ ok: true, socialPosts: result, metaSync, metaWebhook }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export const GET = handle;

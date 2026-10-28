@@ -66,12 +66,17 @@ async function alreadyStored(orgId: string, m: PolledMessage): Promise<boolean> 
   return Boolean(byText);
 }
 
-export async function syncMetaInbound(budgetMs = 25_000): Promise<MetaSyncResult> {
+/**
+ * opts.orgId — only this business (the inbox asks for its own, every ~20s while it is open);
+ * opts.fast  — direct messages only (1 Graph call per account): comments and the subscription check stay on the 5-minute sweep.
+ */
+export async function syncMetaInbound(budgetMs = 25_000, opts: { orgId?: string; fast?: boolean } = {}): Promise<MetaSyncResult> {
   const started = Date.now();
   const result: MetaSyncResult = { accounts: 0, resubscribed: 0, comments: 0, messages: 0, errors: 0 };
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return result;
   const admin = createAdminClient();
-  const { data } = await admin.from("channel_accounts").select("id, organization_id, kind, config, webhook_token, last_error").in("kind", ["messenger", "instagram"]).neq("status", "disabled").order("updated_at", { ascending: true }).limit(60);
+  const accQuery = admin.from("channel_accounts").select("id, organization_id, kind, config, webhook_token, last_error").in("kind", ["messenger", "instagram"]).neq("status", "disabled");
+  const { data } = await (opts.orgId ? accQuery.eq("organization_id", opts.orgId) : accQuery).order("updated_at", { ascending: true }).limit(60);
   const rows = (data ?? []) as AccRow[];
   const appId = process.env.META_APP_ID ?? "";
   const { handleSocialComment } = await import("@/lib/social/comments");
@@ -117,6 +122,7 @@ export async function syncMetaInbound(budgetMs = 25_000): Promise<MetaSyncResult
 
     try {
       if (acc.kind === "messenger") {
+        if (!opts.fast) {
         // 1. the Page must be subscribed to messages + feed — heal it when it is not
         const subs = await graphGet(`/${encodeURIComponent(pageId)}/subscribed_apps`, token);
         if (!subs.ok) note("subscribed_apps", subs);
@@ -129,14 +135,17 @@ export async function syncMetaInbound(budgetMs = 25_000): Promise<MetaSyncResult
         const posts = await graphGet(`/${encodeURIComponent(pageId)}/posts`, token, { fields: "id,created_time,comments.filter(stream).order(reverse_chronological).limit(40){id,message,created_time,from,parent}", limit: "10" });
         if (!posts.ok) note("comments", posts);
         else await handleComments(acc, commentsFromPosts(pageId, posts.data, Date.now() - POLL_COMMENT_WINDOW_MS));
+        }
         // 3. unanswered Messenger messages
         const convs = await graphGet(`/${encodeURIComponent(pageId)}/conversations`, token, { platform: "messenger", fields: "id,updated_time,messages.limit(8){id,message,created_time,from}", limit: "15" });
         if (!convs.ok) note("messages", convs);
         else await handleMessages(acc, messagesFromConversations("messenger", pageId, [], convs.data, Date.now() - POLL_MESSAGE_WINDOW_MS));
       } else if (igId) {
+        if (!opts.fast) {
         const media = await graphGet(`/${encodeURIComponent(igId)}/media`, token, { fields: "id,timestamp,comments.limit(40){id,text,timestamp,username,parent_id}", limit: "10" });
         if (!media.ok) note("instagram comments", media);
         else await handleComments(acc, commentsFromIgMedia(igId, cfg.username, media.data, Date.now() - POLL_COMMENT_WINDOW_MS));
+        }
         const convs = await graphGet(`/${encodeURIComponent(pageId)}/conversations`, token, { platform: "instagram", fields: "id,updated_time,messages.limit(8){id,message,created_time,from}", limit: "15" });
         if (!convs.ok) note("instagram messages", convs);
         else await handleMessages(acc, messagesFromConversations("instagram", igId, [pageId], convs.data, Date.now() - POLL_MESSAGE_WINDOW_MS));

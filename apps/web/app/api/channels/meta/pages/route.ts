@@ -30,9 +30,11 @@ export async function GET(request: NextRequest) {
 type Acc = { id: string; organization_id: string; webhook_token: string; secret_enc: string | null; config: Record<string, string> } | null;
 
 export async function POST(request: NextRequest) {
-  const secret = process.env.META_APP_SECRET ?? "";
+  // the Page webhook is signed with the app secret; Instagram-login apps have their own secret — either one is accepted
+  const secrets = [process.env.META_APP_SECRET, process.env.META_IG_APP_SECRET, process.env.META_PAGES_APP_SECRET].filter((v): v is string => Boolean(v));
   const raw = await request.text();
-  if (!secret || !verifyMetaSignature(raw, request.headers.get("x-hub-signature-256"), secret)) {
+  const signature = request.headers.get("x-hub-signature-256");
+  if (!secrets.length || !secrets.some((secret) => verifyMetaSignature(raw, signature, secret))) {
     console.error("meta pages webhook rejected: bad or missing signature (META_APP_SECRET must be the secret of the app that sends the webhook)");
     return NextResponse.json({ ok: false }, { status: 401 });
   }

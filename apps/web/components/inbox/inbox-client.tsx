@@ -20,6 +20,28 @@ export function LiveRefresh({ ms = 8000 }: { ms?: number }) {
     }, ms);
     return () => clearInterval(id);
   }, [router, ms]);
+  // wave 43: customers' Facebook / Instagram messages that Meta's webhook did not deliver are fetched every ~20s
+  // while the inbox is open (the 5-minute server sweep can run hours late) — never throws, never blocks the page
+  useEffect(() => {
+    let stopped = false;
+    const pull = async () => {
+      if (stopped || document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch("/api/channels/meta/sync", { method: "POST", cache: "no-store" });
+        const j = (await res.json().catch(() => ({}))) as { messages?: number };
+        if (!stopped && (j.messages ?? 0) > 0) router.refresh();
+      } catch {
+        /* offline / signed out: try again later */
+      }
+    };
+    const first = setTimeout(() => void pull(), 1500);
+    const id = setInterval(() => void pull(), 20_000);
+    return () => {
+      stopped = true;
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [router]);
   return null;
 }
 
