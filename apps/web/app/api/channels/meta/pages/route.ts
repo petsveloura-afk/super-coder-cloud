@@ -55,6 +55,14 @@ export async function POST(request: NextRequest) {
     }
     return cache.get(key) ?? null;
   };
+  const agentCache = new Map<string, boolean>();
+  const orgHasAgent = async (orgId: string): Promise<boolean> => {
+    if (!agentCache.has(orgId)) {
+      const { count } = await admin.from("ai_agents").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("enabled", true);
+      agentCache.set(orgId, (count ?? 0) > 0);
+    }
+    return agentCache.get(orgId) ?? false;
+  };
   const { openSecrets } = await import("@/lib/channels/secrets");
   const { ingest } = await import("@/lib/channels/ingest");
 
@@ -96,15 +104,28 @@ export async function POST(request: NextRequest) {
     }
     // the customer's name once (new conversations only)
     let name: string | null = null;
-    const { data: existing } = await admin.from("conversations").select("id").eq("organization_id", acc.organization_id).eq("channel", m.platform).eq("external_id", m.senderId).maybeSingle();
-    if (!existing) {
-      const secrets = acc.secret_enc ? openSecrets(acc.secret_enc) : {};
-      if (secrets.page_token) {
-        const { metaProfileName } = await import("@/lib/channels/meta-pages");
-        name = await metaProfileName(m.platform, m.senderId, secrets.page_token).catch(() => null);
-      }
+    const { data: existing } = await admin.from("conversations").select("id, ai_mode, opt_out").eq("organization_id", acc.organization_id).eq("channel", m.platform).eq("external_id", m.senderId).maybeSingle();
+    const secrets = acc.secret_enc ? openSecrets(acc.secret_enc) : {};
+    const pageToken = secrets.page_token ?? "";
+    // speed: the customer sees "seen" + "typing…" at once — before anything is stored or the agent is loaded.
+    // Only when the agent is really going to answer (conversation in auto mode, not opted out, an agent exists).
+    if (pageToken && (!existing || (existing.ai_mode === "auto" && existing.opt_out !== true)) && (await orgHasAgent(acc.organization_id))) {
+      const { metaSenderAction } = await import("@/lib/channels/meta-pages");
+      void metaSenderAction(pageToken, m.senderId, "mark_seen")
+        .then(() => metaSenderAction(pageToken, m.senderId, "typing_on"))
+        .catch(() => undefined);
     }
-    await ingest({
+    // the profile name must never hold the answer back: wait for it at most ~1.2s; when it is slower the
+    // conversation starts with a neutral title and the real name is filled in right after
+    let latePatch: Promise<string | null> | null = null;
+    if (!existing && pageToken) {
+      const { metaProfileName } = await import("@/lib/channels/meta-pages");
+      const { withSoftDeadline } = await import("@/lib/ai/speed-core");
+      const lookup = metaProfileName(m.platform, m.senderId, pageToken).catch(() => null);
+      name = await withSoftDeadline(lookup, 1200, null);
+      if (!name) latePatch = lookup;
+    }
+    const res = await ingest({
       kind: m.platform,
       token: acc.webhook_token,
       chatId: m.senderId,
@@ -114,6 +135,27 @@ export async function POST(request: NextRequest) {
       media: m.media,
       meta: { ...(m.postback ? { postback: m.postback } : {}), ...(m.referral ? { referral: m.referral } : {}) },
     });
+    if (latePatch) {
+      const convId = (res?.data as { conversation_id?: string; contact_id?: string } | null)?.conversation_id;
+      const contactId = (res?.data as { conversation_id?: string; contact_id?: string } | null)?.contact_id;
+      const fallbackName = m.platform === "instagram" ? "Instagram" : "Messenger";
+      const patch = async () => {
+        const real = await latePatch;
+        if (!real || !convId) return;
+        await admin.from("conversations").update({ title: real }).eq("id", convId).eq("title", fallbackName);
+        if (contactId) {
+          const first = real.split(" ")[0]!.slice(0, 80);
+          const last = real.slice(first.length).trim().slice(0, 80);
+          await admin.from("contacts").update({ first_name: first, last_name: last }).eq("id", contactId).eq("first_name", fallbackName);
+        }
+      };
+      try {
+        const { after } = await import("next/server");
+        after(() => patch().catch(() => undefined));
+      } catch {
+        void patch().catch(() => undefined);
+      }
+    }
     } catch (e) {
       // never answer 500 to Meta because of one message: it retries the whole batch and finally turns the webhook off
       console.error("meta pages webhook message failed", (e as Error).message);

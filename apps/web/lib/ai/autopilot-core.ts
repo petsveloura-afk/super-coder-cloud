@@ -139,6 +139,33 @@ const CHANNEL_NAMES: Record<AutopilotChannel, string> = {
   instagram: "Instagram Direct",
 };
 
+/**
+ * A customer name the agent may use in a greeting. Placeholder titles ("Messenger", "Instagram", a bare id,
+ * "Telegram 123…") are not names — the agent must never say "Hi Messenger".
+ */
+export function cleanCustomerName(name: string | null | undefined): string | null {
+  const n = (name ?? "").replace(/\s+/g, " ").trim();
+  if (!n) return null;
+  if (/^(messenger|instagram|facebook|telegram|whatsapp|sms|web|website|visitor|guest)(\s+\S*)?$/i.test(n) && !/[\u0590-\u05FF\u0600-\u06FF]/.test(n)) return null;
+  if (/^[+@\d\s().:_-]+$/.test(n)) return null;
+  return n.slice(0, 80);
+}
+
+/** Extra professional-style rules for Facebook Messenger / Instagram Direct (appended to the existing prompt). */
+export function socialStyleRules(channel: AutopilotChannel): string {
+  if (channel !== "messenger" && channel !== "instagram") return "";
+  return [
+    "Facebook / Instagram messaging style (professional and fast):",
+    "- These apps do not render Markdown: never use **bold**, # headings, tables or bullet syntax. Short separate lines are fine.",
+    "- Answer the customer's actual question in the first sentence. No filler openings (\"Thank you for contacting us, we are happy to…\"), no repeating the question back.",
+    "- Only greet by name when a real first name is known; otherwise a simple friendly greeting. Never use the words Messenger, Instagram or Facebook as the customer's name.",
+    "- A bare greeting (\"hi\", \"שלום\") gets a short warm welcome and one open question about what the customer needs — nothing long.",
+    "- If the customer's message is unclear or has several questions, answer what you can from the business data and ask ONE short clarifying question.",
+    "- Never promise a callback time, price or availability that is not in the business data; if you do not know, say you will check and hand off with [[HANDOFF]].",
+    "- Match the customer's language and register (Hebrew, Arabic or English). In Hebrew write natural, correct, polite Hebrew.",
+  ].join("\n");
+}
+
 export function autopilotInstructions(input: {
   agentName: string;
   orgName: string;
@@ -170,6 +197,7 @@ export function autopilotInstructions(input: {
       input.channel === "messenger" || input.channel === "instagram"
         ? "- This is a social-media direct message: greet the customer by first name once at the start of the conversation (when known), sound like a friendly professional person from the business, answer the actual question first, and end with one clear next step or question. Never send an empty or generic reply."
         : "",
+      socialStyleRules(input.channel),
       "- Answer questions using only the business instructions and this conversation. Never invent prices, availability, policies or promises.",
       "- Move the conversation forward: understand the need, recommend the right option, and offer a next step (booking link, call back, quote).",
       "- When it helps, politely ask for the customer's name and phone or e-mail so the team can follow up (only once, never pushy).",

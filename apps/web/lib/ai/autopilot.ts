@@ -18,6 +18,7 @@ import {
   wantsHuman,
   welcomeMessage,
   busyMessage,
+  cleanCustomerName,
   commandIntent,
   pickMedia,
   DEFAULT_RESUME_MINUTES,
@@ -399,11 +400,11 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   }
 
   // customer details — and fill in a phone / e-mail the customer just typed
-  let customer: { name?: string | null; phone?: string | null; email?: string | null } = { name: (conv.title as string | null) ?? null };
+  let customer: { name?: string | null; phone?: string | null; email?: string | null } = { name: cleanCustomerName(conv.title as string | null) };
   if (conv.contact_id) {
     const { data: c } = (await contactP) as { data: { id: string; first_name: string | null; last_name: string | null; phone: string | null; email: string | null } | null };
     if (c) {
-      customer = { name: `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || null, phone: (c.phone as string | null) ?? null, email: (c.email as string | null) ?? null };
+      customer = { name: cleanCustomerName(`${c.first_name ?? ""} ${c.last_name ?? ""}`) ?? customer.name ?? null, phone: (c.phone as string | null) ?? null, email: (c.email as string | null) ?? null };
       const info = extractContactInfo(lastIn);
       const patch: Record<string, string> = {};
       if (info.phone && !c.phone) patch.phone = info.phone;
@@ -532,7 +533,8 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
           temperature: Math.min(0.5, Number(agent.temperature ?? 0.4) + 0.1),
           maxTokens: ch === "email" ? 1200 : 600,
         }),
-        selfCheckBudgetMs(process.env),
+        // Facebook / Instagram: people expect an answer within seconds — a shorter correction budget there
+        ch === "messenger" || ch === "instagram" ? Math.min(selfCheckBudgetMs(process.env), 4500) : selfCheckBudgetMs(process.env),
         { ok: false, error: "ai.self_check_timeout" } as Awaited<ReturnType<typeof runAISystem>>,
       );
       timing.mark("self_check");
