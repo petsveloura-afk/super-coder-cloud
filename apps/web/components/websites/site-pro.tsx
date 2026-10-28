@@ -5,6 +5,7 @@ import { PublicForm } from "@/components/public/public-form";
 import { LEGAL_TITLES, legalText, parseLegal, type LegalKey } from "@/lib/site/legal";
 import { FONTS, fontsHref, onColor, resolveTheme } from "@/lib/site/templates";
 import { A11yMenu, CookieBanner, SiteMotion } from "./site-client";
+import { SiteCountdown } from "./site-countdown";
 import type { FormsMap } from "./site-renderer";
 import "./site-pro.css";
 
@@ -30,6 +31,8 @@ const waNumber = (s: string) => {
   const d = digits(s).replace(/^\+/, "");
   return d.startsWith("0") ? `972${d.slice(1)}` : d;
 };
+/** wave 37: an offer date that is already over (module-level so the render stays pure) */
+const offerEnded = (ymd: string) => new Date(`${ymd}T23:59:59`).getTime() < Date.now();
 const sstr = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 const anchorFor = (b: SiteBlock, i: number) => (["contact", "form", "faq", "about", "pricing", "gallery", "testimonials"].includes(b.type) ? b.type : `s${i}`);
 const initials = (s: string) =>
@@ -436,6 +439,138 @@ export function ProSite({
             {head(b.data.title, b.data.text)}
             <div className="video" data-reveal>
               <iframe src={src} title={b.data.title || site.name} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+            </div>
+          </div>,
+        );
+      }
+      // wave 37 — more sections
+      case "banner": {
+        if (!b.data.text) return null;
+        return sec(
+          key,
+          id,
+          <div className="wrap bnr">
+            <span>{b.data.text}</span>
+            {b.data.label ? (
+              <a href={safeHref(b.data.href) ?? "#contact"} className="bnr-a">
+                {b.data.label} <Arrow className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+            ) : null}
+          </div>,
+          "sec-bnr",
+        );
+      }
+      case "trust": {
+        const items = b.data.items.filter((it) => it.title);
+        if (!items.length) return null;
+        return sec(
+          key,
+          id,
+          <div className="wrap">
+            {head(b.data.title)}
+            <ul className="trust" style={{ "--n": Math.min(4, Math.max(2, items.length)) } as CSSProperties}>
+              {items.map((it, k) => {
+                const Ico = ICONS[(k * 5 + 1) % ICONS.length]!;
+                return (
+                  <li key={k} className="trust-i" data-reveal>
+                    <span className="trust-ic" aria-hidden="true">
+                      <Ico className="h-5 w-5" />
+                    </span>
+                    <span>
+                      <b>{it.title}</b>
+                      {it.text ? <span>{it.text}</span> : null}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>,
+        );
+      }
+      case "timeline": {
+        const items = b.data.items.filter((it) => it.title || it.text);
+        if (!items.length) return null;
+        return sec(
+          key,
+          id,
+          <div className="wrap narrow" style={{ maxWidth: "50rem" }}>
+            {head(b.data.title)}
+            <ol className="tl">
+              {items.map((it, k) => (
+                <li key={k} className="tl-i" data-reveal>
+                  <span className="tl-dot" aria-hidden="true" />
+                  <div>
+                    {it.when ? <span className="tl-when">{it.when}</span> : null}
+                    {it.title ? <h3>{it.title}</h3> : null}
+                    {it.text ? <p>{it.text}</p> : null}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>,
+        );
+      }
+      case "comparison": {
+        const items = b.data.items.filter((it) => it.feature);
+        if (!items.length) return null;
+        const mark = (v: string) =>
+          v === "yes" ? (
+            <span className="cmp-y" role="img" aria-label={t("common.yes")}>
+              <Check className="h-4 w-4" aria-hidden="true" />
+            </span>
+          ) : (
+            <span className="cmp-n" role="img" aria-label={t("common.no")}>
+              —
+            </span>
+          );
+        return sec(
+          key,
+          id,
+          <div className="wrap narrow" style={{ maxWidth: "52rem" }}>
+            {head(b.data.title)}
+            <div className="cmp-wrap" data-reveal>
+              <table className="cmp">
+                <thead>
+                  <tr>
+                    <th scope="col">
+                      <span className="sr-only">{b.data.title || site.name}</span>
+                    </th>
+                    <th scope="col" className="cmp-us">
+                      {b.data.us_label || site.name}
+                    </th>
+                    <th scope="col">{b.data.them_label || t("websites.site.cmpOthers")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((it, k) => (
+                    <tr key={k}>
+                      <th scope="row">{it.feature}</th>
+                      <td className="cmp-us">{mark(it.us)}</td>
+                      <td>{mark(it.them)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>,
+        );
+      }
+      case "countdown": {
+        // an offer that already ended never shows a dead clock
+        if (!b.data.ends_at || offerEnded(b.data.ends_at)) return null;
+        return sec(
+          key,
+          id,
+          <div className="wrap">
+            <div className="cd-band" data-reveal>
+              {b.data.title ? <h2>{b.data.title}</h2> : null}
+              {b.data.text ? <p>{b.data.text}</p> : null}
+              <SiteCountdown endsAt={b.data.ends_at} labels={{ d: t("websites.site.cdDays"), h: t("websites.site.cdHours"), m: t("websites.site.cdMin"), s: t("websites.site.cdSec") }} />
+              {b.data.label ? (
+                <a href={safeHref(b.data.href) ?? "#contact"} className="btn btn-a">
+                  {b.data.label} <Arrow className="h-4 w-4" aria-hidden="true" />
+                </a>
+              ) : null}
             </div>
           </div>,
         );

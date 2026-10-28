@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  * restyles the site or switches the template. The result lands in the editor (not
  * saved) so the business reviews it and saves / publishes; one-click undo.
  */
-const QUICK = ["modern", "testimonials", "pricing", "shorter", "luxury", "stats", "steps", "english", "faq", "seo", "cta", "trust", "arabic", "hebrew"] as const;
+const QUICK = ["modern", "testimonials", "pricing", "shorter", "luxury", "stats", "steps", "english", "faq", "seo", "cta", "trust", "arabic", "hebrew", "trustBadges", "timeline", "comparison", "countdown", "banner", "polish"] as const;
 
 /** wave 33: the last instructions, remembered in this browser (a convenience — works without storage) */
 const HISTORY_KEY = "scc-ai-edit-history";

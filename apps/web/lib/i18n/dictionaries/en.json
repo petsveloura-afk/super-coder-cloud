@@ -2273,7 +2273,12 @@
       "steps": "How it works",
       "team": "Team",
       "logos": "Clients & partners",
-      "video": "Video"
+      "video": "Video",
+      "banner": "Announcement bar",
+      "trust": "Trust badges",
+      "timeline": "Timeline",
+      "comparison": "Comparison: us vs. others",
+      "countdown": "Offer countdown"
     },
     "fields": {
       "title": "Title",
@@ -2304,7 +2309,14 @@
       "period": "Per (e.g. month)",
       "features": "What's included (one per line)",
       "highlight": "Highlight",
-      "statLabel": "What it counts"
+      "statLabel": "What it counts",
+      "when": "When",
+      "us_label": "Our column title",
+      "them_label": "Others column title",
+      "feature": "Comparison point",
+      "us": "Us",
+      "them": "Others",
+      "ends_at": "End date"
     },
     "previewTitle": "Preview",
     "aiTitle": "Build with AI",
@@ -2406,7 +2418,13 @@
         "cta": "Stronger call to action",
         "trust": "Add trust",
         "arabic": "Translate to Arabic",
-        "hebrew": "Translate to Hebrew"
+        "hebrew": "Translate to Hebrew",
+        "trustBadges": "Trust badges",
+        "timeline": "Timeline",
+        "comparison": "Comparison table",
+        "countdown": "Countdown",
+        "banner": "Announcement bar",
+        "polish": "Pro polish"
       },
       "quick": {
         "modern": "Make the site more modern and impressive: a stronger headline, sharper copy and a current design template that fits the business",
@@ -2422,7 +2440,13 @@
         "cta": "Make every call to action stronger and more specific: action-oriented button labels, one clear next step per section",
         "trust": "Add trust elements: a numbers section and a testimonials section using only facts from the content, with placeholders where facts are missing",
         "arabic": "Translate every text on the site to Arabic",
-        "hebrew": "Translate every text on the site to Hebrew"
+        "hebrew": "Translate every text on the site to Hebrew",
+        "trustBadges": "Add a trust-badges section (3-5 badges such as guarantee, fast service, free quote) using only what is in the content or generic true points, right after the hero",
+        "timeline": "Add a timeline that explains the process step by step (3-5 steps with a short title and a sentence), without invented dates",
+        "comparison": "Add an 'us vs. others' comparison table with 5-6 honest rows about general advantages, no competitor names and no invented numbers",
+        "countdown": "Add an offer countdown section ONLY if the content has an end date; if not, do not add it and do not invent a date",
+        "banner": "Add a slim announcement bar at the top ONLY if the content has a real offer or news",
+        "polish": "Do a full professional polish: sharp short headlines, concrete benefits, a clear call to action in every part, a logical section order and consistent language. Keep all existing content and details and do not delete sections"
       },
       "stage0": "Reading your current site…",
       "stage1": "Planning the changes…",
@@ -2463,7 +2487,12 @@
         "contrast": "High contrast",
         "links": "Highlight links",
         "still": "Stop animations"
-      }
+      },
+      "cmpOthers": "Others",
+      "cdDays": "Days",
+      "cdHours": "Hours",
+      "cdMin": "Min",
+      "cdSec": "Sec"
     },
     "domain": {
       "publicTitle": "The site's public link",
@@ -2720,6 +2749,29 @@
         "stats": "Numbers",
         "about": "About",
         "logos": "Client logos"
+      }
+    },
+    "pro37": {
+      "quick": {
+        "phone": "Phone",
+        "email": "E-mail",
+        "tagline": "Short tagline",
+        "logo": "Logo link",
+        "legalName": "Legal business name",
+        "imageUrl": "Image link (https)",
+        "pickLead": "Form or booking page to add",
+        "noForms": "There is no form or booking page yet.",
+        "createForm": "Create a form",
+        "apply": "Apply fix",
+        "applied": "Fix applied — press Save to update the site",
+        "err": {
+          "invalid_phone": "The phone number is not valid",
+          "invalid_email": "The e-mail address is not valid",
+          "invalid_url": "The link must start with https://",
+          "empty": "Please fill in a value",
+          "no_hero": "The site has no hero section",
+          "no_choice": "Choose a form or booking page"
+        }
       }
     }
   },

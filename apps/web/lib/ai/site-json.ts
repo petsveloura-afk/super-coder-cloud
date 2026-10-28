@@ -151,6 +151,27 @@ function coerceBlock(raw: unknown, ctx: SiteContext): SiteBlock | null {
       if (!data.url) return null;
       break;
     }
+    // wave 37 — more sections
+    case "banner":
+      data = { text: str(d.text, 200), label: str(d.label, 60), href: safeHref(d.href) || "#contact" };
+      if (!data.text) return null;
+      break;
+    case "trust":
+      data = { title: str(d.title, 160), items: items(d.items).slice(0, 8).map((i) => ({ title: str((i as Record<string, unknown>)?.title, 80), text: str((i as Record<string, unknown>)?.text, 200) })).filter((i) => i.title) };
+      break;
+    case "timeline":
+      data = { title: str(d.title, 160), items: items(d.items).slice(0, 10).map((i) => ({ when: str((i as Record<string, unknown>)?.when, 40), title: str((i as Record<string, unknown>)?.title, 120), text: str((i as Record<string, unknown>)?.text, 400) })).filter((i) => i.title || i.text) };
+      break;
+    case "comparison": {
+      const yes = (v: unknown) => (v === true || v === "yes" || v === "true" ? "yes" : "");
+      data = { title: str(d.title, 160), us_label: str(d.us_label, 40), them_label: str(d.them_label, 40), items: items(d.items).slice(0, 12).map((i) => ({ feature: str((i as Record<string, unknown>)?.feature, 120), us: yes((i as Record<string, unknown>)?.us), them: yes((i as Record<string, unknown>)?.them) })).filter((i) => i.feature) };
+      break;
+    }
+    case "countdown": {
+      const ends = str(d.ends_at, 10);
+      data = { title: str(d.title, 160), text: str(d.text, 300), ends_at: /^\d{4}-\d{2}-\d{2}$/.test(ends) ? ends : "", label: str(d.label, 60), href: safeHref(d.href) || "#contact" };
+      break;
+    }
     default:
       return null;
   }
@@ -237,6 +258,12 @@ export function siteJsonInstructionsPro(mode: SiteMode, locale: "he" | "ar" | "e
     `{"type":"testimonials","data":{"title","items":[{"name","role","quote","rating":"5"}]}} ONLY quotes the customer actually gave — never invent reviews; otherwise skip this block`,
     `{"type":"pricing","data":{"title","items":[{"name","price","period","features":"one per line","highlight":"yes"|"" ,"cta_label","cta_href":"#contact"}]}} ONLY with prices the customer gave`,
     `{"type":"logos","data":{"title","items":[{"name"}]}} ONLY real client / partner names the customer gave`,
+    "MORE BLOCK TYPES (wave 37 — use when they fit; never invent facts):",
+    `{"type":"banner","data":{"text","label","href":"#contact"}} (one slim announcement strip at the very top — only for a real offer/news the customer gave)`,
+    `{"type":"trust","data":{"title","items":[{"title","text"}] (3-6 items)}} (guarantees / why trust us: licence, warranty, response time, free quote — only what is true or generic like "clear pricing")`,
+    `{"type":"timeline","data":{"title","items":[{"when","title","text"}] (3-6 items)}} (the process over time, or the business story with real dates only)`,
+    `{"type":"comparison","data":{"title","us_label","them_label","items":[{"feature","us":"yes"|"","them":"yes"|""}] (4-8 rows)}} (us vs. the usual alternative — rows must be honest, generic benefits, no named competitors)`,
+    `{"type":"countdown","data":{"title","text","ends_at":"YYYY-MM-DD","label","href":"#contact"}} ONLY when the customer gave a real offer end date`,
     "Write copy that sounds like this specific business (its city, audience, tone), short sentences, concrete benefits. Vary section titles — no generic 'Our services' unless it fits.",
     mode === "full" ? "A full site should use about, features, steps, (stats/testimonials/pricing only with real data), faq, cta and contact." : "A landing page: hero, features or about, steps, faq, cta, contact.",
   ].join("\n");

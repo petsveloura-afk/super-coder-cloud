@@ -6,6 +6,7 @@ import { runAI } from "./run";
 import { extractJson, normalizeAiSite, siteJsonInstructionsPro } from "./site-json";
 import { FREE_TEMPLATES, ALL_TEMPLATES } from "@/lib/site/templates";
 import { blockTexts, detectSiteLanguage, restoreKept, siteEditOverrides } from "./site-edit-rules";
+import { siteBrain } from "./site-brain";
 
 /**
  * Wave 13 — edit an existing site with the AI ("make it more modern", "add pricing",
@@ -32,6 +33,9 @@ export async function editSiteWithAI(input: { orgId: string; locale: Locale; ins
     "",
     // wave 33: edit-specific rules (keep language + every section, add requested sections even without data)
     siteEditOverrides(detectSiteLanguage([input.site.name, ...blockTexts(input.site.blocks)])),
+    "",
+    // wave 37: design principles, industry playbook and what this site lacks (advisory)
+    siteBrain([input.site.name, input.site.seo.title, input.site.seo.description, ...blockTexts(input.site.blocks)], input.site.blocks as unknown as { type: string; data?: Record<string, unknown> }[]),
   ].join("\n");
   const currentJson = JSON.stringify(current);
   // wave 33: big sites need more room for the full JSON answer (a cut-off answer was reported as "invalid")

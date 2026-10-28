@@ -70,6 +70,12 @@ const SPEC: Record<SiteBlockType, { fields: FieldSpec[]; items?: { key: "items";
   team: { fields: [{ key: "title" }], items: { key: "items", fields: [{ key: "name" }, { key: "role" }, { key: "image_url", ltr: true, image: true }] } },
   logos: { fields: [{ key: "title" }], items: { key: "items", fields: [{ key: "name" }] } },
   video: { fields: [{ key: "title" }, { key: "url", ltr: true }, { key: "text", multiline: true }] },
+  // wave 37 — more sections
+  banner: { fields: [{ key: "text", multiline: true }, { key: "label" }, { key: "href", ltr: true }] },
+  trust: { fields: [{ key: "title" }], items: { key: "items", fields: [{ key: "title" }, { key: "text", multiline: true }] } },
+  timeline: { fields: [{ key: "title" }], items: { key: "items", fields: [{ key: "when" }, { key: "title" }, { key: "text", multiline: true }] } },
+  comparison: { fields: [{ key: "title" }, { key: "us_label" }, { key: "them_label" }], items: { key: "items", fields: [{ key: "feature" }, { key: "us", labelKey: "websites.fields.us", options: ["", "yes"] }, { key: "them", labelKey: "websites.fields.them", options: ["", "yes"] }] } },
+  countdown: { fields: [{ key: "title" }, { key: "text", multiline: true }, { key: "ends_at", ltr: true }, { key: "label" }, { key: "href", ltr: true }] },
 };
 
 /**
@@ -496,7 +502,7 @@ export function SiteBuilder({
         }}
       />
       <AiEditPanel value={v} onApply={(nv) => setV(nv)} allowed={aiEditor} proTemplates={proTemplates} onApplied={onAgentApplied} onFocusBlock={(i) => focusBlock(i, { keepHighlight: true })} onUndone={() => setHighlight([])} />
-      <SiteAuditPanel value={v} onApply={(nv) => setV(nv)} onGoTab={(k) => setTab(k)} allowed={aiEditor} proTemplates={proTemplates} onApplied={onAgentApplied} />
+      <SiteAuditPanel value={v} onApply={(nv) => setV(nv)} onGoTab={(k) => setTab(k)} forms={forms} bookings={bookings} allowed={aiEditor} proTemplates={proTemplates} onApplied={onAgentApplied} />
       {/* wave 33: editor toolbar — unsaved state, undo / redo, collapse all, live preview */}
       <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-line bg-surface px-2.5 py-1.5" data-testid="editor-toolbar">
         <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium transition-colors", dirty ? "bg-gold-soft text-gold" : "bg-success-soft text-success")} role="status" data-testid="editor-dirty">
@@ -698,7 +704,7 @@ export function SiteBuilder({
                           </div>
                         ) : (
                           <>
-                            <Input id={fid} dir={f.ltr ? "ltr" : undefined} value={value} onChange={(e) => onChange(e.target.value)} />
+                            <Input id={fid} dir={f.ltr ? "ltr" : undefined} type={f.key === "ends_at" ? "date" : undefined} value={value} onChange={(e) => onChange(e.target.value)} />
                             {aiCopy && !f.ltr && (f.key === "title" || f.key === "cta_label" || f.key === "label") && value.trim().length > 1 ? <ImproveCopyButton value={value} field={f.key} onChange={onChange} /> : null}
                           </>
                         )}

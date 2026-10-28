@@ -321,7 +321,7 @@ export const financeSettingsSchema = z.object({
 });
 
 /* ---------------------------------------------------------------- websites */
-export const SITE_BLOCK_TYPES = ["hero", "features", "text", "form", "booking", "cta", "faq", "contact", "about", "gallery", "testimonials", "stats", "pricing", "steps", "team", "logos", "video"] as const;
+export const SITE_BLOCK_TYPES = ["hero", "features", "text", "form", "booking", "cta", "faq", "contact", "about", "gallery", "testimonials", "stats", "pricing", "steps", "team", "logos", "video", "banner", "trust", "timeline", "comparison", "countdown"] as const;
 export type SiteBlockType = (typeof SITE_BLOCK_TYPES)[number];
 
 const shortText = (max: number) => z.string().trim().max(max, { message: "validation.tooLong" }).optional().default("");
@@ -352,6 +352,20 @@ export const siteBlockSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("team"), data: z.object({ title: shortText(160), items: z.array(z.object({ name: shortText(80), role: shortText(80), image_url: httpsOrPath })).max(16).default([]) }) }),
   z.object({ type: z.literal("logos"), data: z.object({ title: shortText(160), items: z.array(z.object({ name: shortText(60) })).max(20).default([]) }) }),
   z.object({ type: z.literal("video"), data: z.object({ title: shortText(160), url: z.string().trim().max(500).regex(/^(https:\/\/(www\.)?(youtube\.com|youtu\.be|player\.vimeo\.com|vimeo\.com)\/\S+)?$/, { message: "validation.httpsUrl" }).optional().default(""), text: shortText(500) }) }),
+  // wave 37 — more sections: announcement strip, trust badges, timeline, us-vs-others table, offer countdown
+  z.object({ type: z.literal("banner"), data: z.object({ text: shortText(200), label: shortText(60), href: httpsOrPath }) }),
+  z.object({ type: z.literal("trust"), data: z.object({ title: shortText(160), items: z.array(z.object({ title: shortText(80), text: shortText(200) })).max(8).default([]) }) }),
+  z.object({ type: z.literal("timeline"), data: z.object({ title: shortText(160), items: z.array(z.object({ when: shortText(40), title: shortText(120), text: shortText(400) })).max(10).default([]) }) }),
+  z.object({
+    type: z.literal("comparison"),
+    data: z.object({
+      title: shortText(160),
+      us_label: shortText(40),
+      them_label: shortText(40),
+      items: z.array(z.object({ feature: shortText(120), us: z.string().trim().regex(/^(yes|)$/).optional().default(""), them: z.string().trim().regex(/^(yes|)$/).optional().default("") })).max(12).default([]),
+    }),
+  }),
+  z.object({ type: z.literal("countdown"), data: z.object({ title: shortText(160), text: shortText(300), ends_at: z.string().trim().regex(/^(\d{4}-\d{2}-\d{2})?$/, { message: "validation.date" }).optional().default(""), label: shortText(60), href: httpsOrPath }) }),
 ]);
 
 /* wave 13 — design templates, site settings (business details for the footer and legal pages) */

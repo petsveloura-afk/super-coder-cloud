@@ -2,7 +2,7 @@
  * Wave 34 — pure helpers of the live preview (no React, unit-tested).
  * A half-filled section (missing items / data) must never blank the whole preview.
  */
-const ITEM_TYPES = new Set(["features", "faq", "gallery", "testimonials", "stats", "pricing", "steps", "team", "logos"]);
+const ITEM_TYPES = new Set(["features", "faq", "gallery", "testimonials", "stats", "pricing", "steps", "team", "logos", "trust", "timeline", "comparison"]);
 
 export function safeDraft<T extends { blocks: unknown[] }>(site: T): T {
   const blocks = (Array.isArray(site.blocks) ? site.blocks : [])

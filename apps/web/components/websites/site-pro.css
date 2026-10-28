@@ -299,3 +299,46 @@
 }
 /* line-style cards: the highlighted plan gets inner space for its outline and badge */
 .scs[data-cards="line"] .plan.hl { padding: 1.4rem; }
+
+/* =============================================================================
+   Wave 37 — more sections (banner, trust, timeline, comparison, countdown) and polish
+   ============================================================================= */
+.scs .sec-bnr { padding-block: 0.7rem; background: linear-gradient(90deg, var(--a), color-mix(in srgb, var(--a2) 75%, var(--a))); color: var(--on-a); }
+.scs .bnr { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.4rem 1.1rem; font-size: 0.95rem; font-weight: 600; text-align: center; }
+.scs .bnr-a { display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+.scs .trust { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 0.9rem; }
+@media (min-width: 640px) { .scs .trust { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 980px) { .scs .trust { grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); } }
+.scs .trust-i { display: flex; gap: 0.85rem; align-items: flex-start; padding: 1.1rem 1.2rem; border-radius: var(--r); border: 1px solid var(--line); background: var(--card); transition: transform 0.25s ease, border-color 0.25s ease; }
+.scs .trust-i:hover { transform: translateY(-3px); border-color: var(--a); }
+.scs .trust-ic { display: grid; place-items: center; width: 2.6rem; height: 2.6rem; flex: none; border-radius: calc(var(--r) * 0.8); background: color-mix(in srgb, var(--a) 16%, transparent); color: var(--a); }
+.scs .trust-i b { display: block; font-family: var(--fd); font-size: 1.02rem; line-height: 1.3; }
+.scs .trust-i span span { display: block; margin-top: 0.2rem; font-size: 0.92rem; color: var(--mu); line-height: 1.55; }
+.scs .tl { list-style: none; margin: 0; padding: 0; position: relative; }
+.scs .tl::before { content: ""; position: absolute; top: 0.4rem; bottom: 0.4rem; inset-inline-start: 0.62rem; width: 2px; background: linear-gradient(var(--a), var(--a2)); opacity: 0.55; border-radius: 2px; }
+.scs .tl-i { position: relative; display: flex; gap: 1.2rem; padding-bottom: 1.9rem; }
+.scs .tl-i:last-child { padding-bottom: 0; }
+.scs .tl-dot { position: relative; z-index: 1; flex: none; width: 1.3rem; height: 1.3rem; margin-top: 0.3rem; border-radius: 99px; background: var(--bg); border: 3px solid var(--a); box-shadow: 0 0 0 5px color-mix(in srgb, var(--a) 18%, transparent); }
+.scs .tl-when { display: inline-block; margin-bottom: 0.25rem; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--a); }
+.scs .tl-i h3 { font-size: 1.2rem; }
+.scs .tl-i p { margin: 0.35rem 0 0; color: var(--mu); }
+.scs .cmp-wrap { overflow-x: auto; border-radius: var(--r); border: 1px solid var(--line); background: var(--card); }
+.scs .cmp { width: 100%; border-collapse: collapse; min-width: 28rem; }
+.scs .cmp th, .scs .cmp td { padding: 0.9rem 1rem; text-align: center; border-bottom: 1px solid var(--line); }
+.scs .cmp tbody tr:last-child th, .scs .cmp tbody tr:last-child td { border-bottom: 0; }
+.scs .cmp thead th { font-family: var(--fd); font-size: 0.95rem; color: var(--mu); }
+.scs .cmp tbody th { text-align: start; font-weight: 600; }
+.scs .cmp .cmp-us { background: color-mix(in srgb, var(--a) 10%, transparent); }
+.scs .cmp thead .cmp-us { color: var(--a); font-weight: 800; }
+.scs .cmp-y { display: inline-grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 99px; background: var(--a); color: var(--on-a); }
+.scs .cmp-n { color: var(--mu); opacity: 0.7; }
+.scs .cd-band { text-align: center; padding: clamp(2rem, 5vw, 3.4rem) clamp(1.2rem, 4vw, 3rem); border-radius: calc(var(--r) * 1.4); border: 1px solid var(--line); background: radial-gradient(120% 140% at 50% 0%, color-mix(in srgb, var(--a) 18%, var(--card)), var(--card)); }
+.scs .cd-band p { margin: 0.7rem auto 0; max-width: 36rem; color: var(--mu); }
+.scs .cd { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.7rem; margin: 1.6rem 0 0.4rem; }
+.scs .cd-c { min-width: 4.6rem; padding: 0.8rem 0.6rem; border-radius: var(--r); background: var(--bg); border: 1px solid var(--line); }
+.scs .cd-c b { display: block; font-family: var(--fd); font-size: clamp(1.7rem, 4vw, 2.5rem); line-height: 1; font-variant-numeric: tabular-nums; background: linear-gradient(120deg, var(--a), var(--a2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.scs .cd-c span { display: block; margin-top: 0.35rem; font-size: 0.75rem; color: var(--mu); }
+.scs .cd-band .btn { margin-top: 1.4rem; }
+/* polish: calmer motion for people who ask for it, smoother anchors under the sticky header */
+html:has(.scs) { scroll-padding-top: 5rem; }
+@media (prefers-reduced-motion: reduce) { .scs .trust-i, .scs .cd-c { transition: none; } .scs .trust-i:hover { transform: none; } }

@@ -4,6 +4,7 @@
  * Every AI-fixable check carries a ready instruction for the existing "edit with the agent" engine.
  */
 export type AuditTab = "content" | "design" | "business";
+export type QuickKind = "hero_image" | "lead" | "contact" | "brand" | "legal";
 export interface AuditBlock {
   type: string;
   data: Record<string, unknown>;
@@ -24,6 +25,8 @@ export interface AuditCheck {
   fix: "ai" | "manual";
   instruction?: string;
   tab?: AuditTab;
+  /** wave 37: the manual fix can be done right inside the health panel (see QuickFix) */
+  quick?: QuickKind;
 }
 export interface AuditResult {
   score: number;
@@ -45,20 +48,20 @@ export function auditSite(site: AuditSite): AuditResult {
   const proof = filled(items(by("testimonials")[0]), "quote") >= 2 || filled(items(by("stats")[0]), "value") >= 2 || filled(items(by("logos")[0]), "name") >= 3;
   const hasContact = by("contact").some((b) => s(b.data.phone) || s(b.data.whatsapp) || s(b.data.email)) || Boolean(s(st.phone) || s(st.whatsapp_button) || s(st.email));
   const untitled = site.blocks.filter((b) => !["hero", "cta"].includes(b.type) && !s(b.data.title)).length;
-  const c = (id: string, ok: boolean, weight: number, fix: "ai" | "manual", extra: { instruction?: string; tab?: AuditTab } = {}): AuditCheck => ({ id, ok, weight, fix, ...extra });
+  const c = (id: string, ok: boolean, weight: number, fix: "ai" | "manual", extra: { instruction?: string; tab?: AuditTab; quick?: QuickKind } = {}): AuditCheck => ({ id, ok, weight, fix, ...extra });
   const checks: AuditCheck[] = [
     c("seo_title", titleLen >= 30 && titleLen <= 70, 10, "ai", { instruction: "Rewrite the SEO title to 40-60 characters: main keyword + business type + a benefit. Do not change anything else." }),
     c("seo_description", descLen >= 70 && descLen <= 160, 10, "ai", { instruction: "Rewrite the SEO description to 120-155 characters: what the business does, for whom, and a clear call to action. Do not change anything else." }),
     c("hero_cta", Boolean(hero && s(hero.data.cta_label) && s(hero.data.cta_href)), 12, "ai", { instruction: "Give the hero a clear action button: a short action label and a link that scrolls to the contact form or booking section (use an existing #anchor or the booking/form section)." }),
-    c("hero_image", Boolean(hero && s(hero.data.image_url)), 6, "manual", { tab: "content" }),
-    c("lead_capture", leadBlocks.length > 0, 14, "manual", { tab: "content" }),
-    c("contact", hasContact, 8, "manual", { tab: "business" }),
+    c("hero_image", Boolean(hero && s(hero.data.image_url)), 6, "manual", { tab: "content", quick: "hero_image" }),
+    c("lead_capture", leadBlocks.length > 0, 14, "manual", { tab: "content", quick: "lead" }),
+    c("contact", hasContact, 8, "manual", { tab: "business", quick: "contact" }),
     c("social_proof", proof, 12, "ai", { instruction: "Add a social-proof section (testimonials, or a numbers/stats section) right after the hero. Use only facts found in the content; never invent clients, reviews or numbers - leave placeholders to fill in." }),
     c("faq", filled(items(by("faq")[0]), "q") >= 3, 8, "ai", { instruction: "Add or complete a FAQ section with 4-5 realistic questions customers ask this kind of business (pricing, process, timing, guarantees). Do not invent specific prices." }),
     c("structure", site.blocks.length >= 5, 6, "ai", { instruction: "The page is too thin. Add the missing sections a strong landing page has (benefits, how it works, FAQ, a closing call to action) without changing existing sections." }),
     c("section_titles", untitled === 0, 4, "ai", { instruction: "Give every section that has no title a short, clear title. Do not change existing titles." }),
-    c("brand", Boolean(s(st.logo_url) || s(st.tagline)), 5, "manual", { tab: "business" }),
-    c("legal", Boolean(s(st.legal_name) && (s(st.email) || s(st.phone))), 5, "manual", { tab: "business" }),
+    c("brand", Boolean(s(st.logo_url) || s(st.tagline)), 5, "manual", { tab: "business", quick: "brand" }),
+    c("legal", Boolean(s(st.legal_name) && (s(st.email) || s(st.phone))), 5, "manual", { tab: "business", quick: "legal" }),
   ];
   const total = checks.reduce((a, x) => a + x.weight, 0);
   const got = checks.filter((x) => x.ok).reduce((a, x) => a + x.weight, 0);
