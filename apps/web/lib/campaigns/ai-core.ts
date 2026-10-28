@@ -166,17 +166,18 @@ export interface AgentPlan {
   rationale: string;
 }
 
-export function buildAgentPrompt(i: { goal: string; business?: string; tags: string[]; connected: Channel[] }): string {
+export function buildAgentPrompt(i: { goal: string; business?: string; tags: string[]; connected: Channel[]; force?: Channel }): string {
   return [
     "You are a campaign strategist. Turn the owner's goal into ONE complete campaign draft.",
-    `Channels you may choose (the workspace has these connected): ${i.connected.join(", ") || AGENT_CHANNELS.join(", ")}. Pick the one that fits the goal best.`,
-    ...AGENT_CHANNELS.map((c) => `- ${CHANNEL_RULES[c]}`),
+    // wave 41: the owner may pick the channel themselves (incl. Facebook Messenger / Instagram) — then the agent must use it
+    i.force ? `The owner chose the channel: ${i.force}. You MUST use exactly this channel.` : `Channels you may choose (the workspace has these connected): ${i.connected.join(", ") || AGENT_CHANNELS.join(", ")}. Pick the one that fits the goal best.`,
+    ...(i.force ? [`- ${CHANNEL_RULES[i.force]}`] : AGENT_CHANNELS.map((c) => `- ${CHANNEL_RULES[c]}`)),
     "Audience filters — use ONLY these keys, omit what the goal does not ask for:",
     "status, source, tags (existing tags only), min_score, max_score (0-100), sentiment (positive|neutral|negative), stage (new|interested|considering|ready|customer|lost), active_days, inactive_days, purchases_min.",
     `Existing tags: ${i.tags.slice(0, 200).join(", ") || "(none)"}`,
     i.business ? `Business name: ${i.business.slice(0, 80)}` : "",
     ...SHARED_RULES,
-    'Shape: {"name":"internal campaign name","channel":"email|whatsapp|sms|telegram","subject":"","body":"...","audience":{},"send_hint":"midweek_morning|lunch|evening|sunday_start","rationale":"one sentence why"}',
+    `Shape: {"name":"internal campaign name","channel":"${i.force ?? "email|whatsapp|sms|telegram"}","subject":"","body":"...","audience":{},"send_hint":"midweek_morning|lunch|evening|sunday_start","rationale":"one sentence why"}`,
     "",
     `<goal>\n${i.goal.replace(/[<>]/g, "").slice(0, 700)}\n</goal>`,
   ]
@@ -184,11 +185,14 @@ export function buildAgentPrompt(i: { goal: string; business?: string; tags: str
     .join("\n");
 }
 
-export function parseAgentPlan(raw: string, opts: { tags: string[]; allowed?: Channel[] }): AgentPlan | null {
+export function parseAgentPlan(raw: string, opts: { tags: string[]; allowed?: Channel[]; force?: Channel }): AgentPlan | null {
   const o = extractJsonObject(raw);
   if (!o) return null;
   const ch = typeof o.channel === "string" ? (o.channel as string) : "";
-  if (!(AGENT_CHANNELS as readonly string[]).includes(ch)) return null;
+  // Meta channels are never picked by the agent itself — only when the owner explicitly chose them (opts.force)
+  if (opts.force) {
+    if (ch !== opts.force) return null;
+  } else if (!(AGENT_CHANNELS as readonly string[]).includes(ch)) return null;
   const channel = ch as Channel;
   if (opts.allowed && opts.allowed.length && !opts.allowed.includes(channel)) return null;
   const body = clean(o.body, channel === "sms" ? 480 : 4000);

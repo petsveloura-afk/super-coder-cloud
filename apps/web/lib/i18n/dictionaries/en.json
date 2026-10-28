@@ -636,7 +636,7 @@
         "sms": "SMS",
         "telegram_user": "Telegram (personal account)",
         "messenger": "Facebook Messenger",
-        "instagram": "Instagram Direct"
+        "instagram": "Instagram"
       }
     },
     "templates": {
@@ -1881,8 +1881,8 @@
       "web": "Website chat",
       "whatsapp_qr": "WhatsApp (QR)",
       "telegram_user": "Telegram (personal account)",
-      "messenger": "Messenger",
-      "instagram": "Instagram"
+      "messenger": "Facebook Messenger",
+      "instagram": "Instagram Direct"
     },
     "notConnected": "Not connected",
     "message": "Message",
@@ -2129,6 +2129,9 @@
         "feedback": "Reviews"
       },
       "afterBuild": "After building",
+      "channelPick": "Channel",
+      "channelAuto": "Agent decides",
+      "channelNotConnected": "The channel you chose is not connected",
       "modes": {
         "off": "Draft only, I will approve",
         "best": "Send automatically at the best time",

@@ -6,6 +6,7 @@ import { Bot, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Card, Textarea } from "@/components/ui/primitives";
+import { CAMPAIGN_CHANNELS } from "@scc/shared/engagement";
 import { aiCampaignAgentAction, type AgentSendMode } from "@/app/[locale]/(dashboard)/campaigns/actions";
 
 const EXAMPLES = ["winback", "launch", "event", "feedback"] as const;
@@ -20,12 +21,14 @@ export function CampaignAgent({ compact = false }: { compact?: boolean }) {
   const [goal, setGoal] = useState("");
   const [pending, start] = useTransition();
   const [mode, setMode] = useState<AgentSendMode>("off");
+  // wave 41: "" = the agent picks (email / WhatsApp / SMS / Telegram); or the owner chooses, Facebook Messenger / Instagram included
+  const [channel, setChannel] = useState<string>("");
 
   function build() {
     // sending is never a surprise: an explicit, separate confirmation is required for the auto-send modes
     if (mode !== "off" && !window.confirm(t("campaigns.agent.confirmAuto"))) return;
     start(async () => {
-      const res = await aiCampaignAgentAction({ locale, goal, autoSend: mode, tzOffsetMin: new Date().getTimezoneOffset() });
+      const res = await aiCampaignAgentAction({ locale, goal, autoSend: mode, channel: channel || undefined, tzOffsetMin: new Date().getTimezoneOffset() });
       if (res.error || !res.data) {
         toast.error(t(res.error ?? "errors.generic"));
         return;
@@ -47,6 +50,17 @@ export function CampaignAgent({ compact = false }: { compact?: boolean }) {
           <h2 className="font-semibold">{t("campaigns.agent.title")}</h2>
           {!compact ? <p className="mt-0.5 text-[12.5px] text-subtle">{t("campaigns.agent.hint")}</p> : null}
           <Textarea rows={compact ? 2 : 3} className="mt-3" value={goal} onChange={(e) => setGoal(e.target.value.slice(0, 700))} placeholder={t("campaigns.agent.placeholder")} aria-label={t("campaigns.agent.title")} />
+          <fieldset className="mt-3" data-testid="agent-channel">
+            <legend className="mb-1.5 text-[12.5px] font-medium text-muted">{t("campaigns.agent.channelPick")}</legend>
+            <div className="flex flex-wrap gap-1.5" role="radiogroup">
+              {(["", ...CAMPAIGN_CHANNELS] as const).map((c) => (
+                <button key={c || "auto"} type="button" role="radio" aria-checked={channel === c} onClick={() => setChannel(c)} className={`rounded-full border px-3 py-1 text-[12.5px] font-medium transition ${channel === c ? "border-transparent bg-accent-solid text-accent-fg" : "border-line bg-surface text-muted hover:bg-surface-hover"}`}>
+                  {c ? t(`campaigns.channels.${c}`) : t("campaigns.agent.channelAuto")}
+                </button>
+              ))}
+            </div>
+            {channel === "messenger" || channel === "instagram" ? <p className="mt-1.5 text-[11.5px] text-subtle">{t("campaigns.metaHint")}</p> : null}
+          </fieldset>
           <fieldset className="mt-3">
             <legend className="mb-1.5 text-[12.5px] font-medium text-muted">{t("campaigns.agent.afterBuild")}</legend>
             <div className="flex flex-wrap gap-1.5" role="radiogroup">

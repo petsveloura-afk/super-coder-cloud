@@ -1881,7 +1881,7 @@
       "web": "دردشة الموقع",
       "whatsapp_qr": "WhatsApp (QR)",
       "telegram_user": "Telegram (حساب شخصي)",
-      "messenger": "ماسنجر",
+      "messenger": "Facebook Messenger",
       "instagram": "إنستغرام"
     },
     "notConnected": "غير متصل",
@@ -2129,6 +2129,9 @@
         "feedback": "تقييمات"
       },
       "afterBuild": "بعد الإنشاء",
+      "channelPick": "القناة",
+      "channelAuto": "الوكيل يختار",
+      "channelNotConnected": "القناة التي اخترتموها غير متصلة",
       "modes": {
         "off": "مسودة فقط، سأوافق بنفسي",
         "best": "أرسلوا تلقائيًا في أفضل موعد",

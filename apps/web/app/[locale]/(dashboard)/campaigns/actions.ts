@@ -259,7 +259,7 @@ export async function aiSubjectIdeasAction(input: { locale: string; body: string
  * (name, channel, message, audience, suggested send window). Saved as a draft only — the owner reviews and launches.
  */
 export type AgentSendMode = "off" | "now" | "best";
-export async function aiCampaignAgentAction(input: { locale: string; goal: string; autoSend?: AgentSendMode; tzOffsetMin?: number }): Promise<ActionState<{ id: string; rationale: string; sendHint: string | null; launched?: boolean; scheduledAt?: string | null; recipients?: number; blocked?: string }>> {
+export async function aiCampaignAgentAction(input: { locale: string; goal: string; autoSend?: AgentSendMode; tzOffsetMin?: number; channel?: string }): Promise<ActionState<{ id: string; rationale: string; sendHint: string | null; launched?: boolean; scheduledAt?: string | null; recipients?: number; blocked?: string }>> {
   const g = await aiGate(input.locale, "ai_campaign_agent", 20);
   if ("error" in g) return { error: g.error };
   const goal = String(input.goal ?? "").trim().slice(0, 700);
@@ -273,17 +273,21 @@ export async function aiCampaignAgentAction(input: { locale: string; goal: strin
   ]);
   const tagNames = ((tags ?? []) as { name: string }[]).map((x) => x.name);
   const connected = mod.AGENT_CHANNELS.filter((c) => ready[c]);
+  // wave 41: the owner can pick the channel (Facebook Messenger / Instagram included); it must be a campaign channel AND connected
+  const { CAMPAIGN_CHANNELS: ALL_CHANNELS } = await import("@scc/shared/engagement");
+  const picked = typeof input.channel === "string" && (ALL_CHANNELS as readonly string[]).includes(input.channel) ? (input.channel as (typeof ALL_CHANNELS)[number]) : undefined;
+  if (picked && !ready[picked]) return { error: "campaigns.agent.channelNotConnected" };
   const out = await runAI({
     orgId: g.ctx.org.id,
     feature: "copilot",
     system: baseSystem(g.locale, "You plan marketing campaigns for small businesses. Reply with JSON only."),
-    messages: [{ role: "user", content: mod.buildAgentPrompt({ goal, business: g.ctx.org.name, tags: tagNames, connected: [...connected] }) }],
+    messages: [{ role: "user", content: mod.buildAgentPrompt({ goal, business: g.ctx.org.name, tags: tagNames, connected: [...connected], force: picked }) }],
     temperature: 0.6,
     maxTokens: 1000,
     json: true,
   });
   if (!out.ok) return { error: out.error };
-  const plan = mod.parseAgentPlan(out.text, { tags: tagNames, allowed: connected.length ? [...connected] : undefined });
+  const plan = mod.parseAgentPlan(out.text, { tags: tagNames, allowed: picked ? undefined : connected.length ? [...connected] : undefined, force: picked });
   if (!plan) return { error: "campaigns.ai.failed" };
   const { data, error } = await g.supabase
     .from("campaigns")

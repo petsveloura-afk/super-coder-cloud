@@ -1881,7 +1881,7 @@
       "web": "צ׳אט באתר",
       "whatsapp_qr": "WhatsApp (QR)",
       "telegram_user": "Telegram (חשבון אישי)",
-      "messenger": "Messenger",
+      "messenger": "Facebook Messenger",
       "instagram": "Instagram"
     },
     "notConnected": "לא מחובר",
@@ -2129,6 +2129,9 @@
         "feedback": "ביקורות"
       },
       "afterBuild": "אחרי היצירה",
+      "channelPick": "ערוץ",
+      "channelAuto": "הסוכן בוחר",
+      "channelNotConnected": "הערוץ שבחרתם לא מחובר",
       "modes": {
         "off": "טיוטה בלבד, אני אאשר",
         "best": "שלחו אוטומטית במועד המומלץ",

@@ -136,7 +136,9 @@ async function runJob(admin: ReturnType<typeof createAdminClient>, job: JobRow):
     }
     case "whatsapp":
     case "telegram":
-    case "sms": {
+    case "sms":
+    case "messenger":
+    case "instagram": {
       const p = job.payload as { contact_id: string; text: string };
       // conversation guard: automations never message a customer who opted out
       {
