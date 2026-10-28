@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
   const secret = process.env.META_APP_SECRET ?? "";
   const raw = await request.text();
   if (!secret || !verifyMetaSignature(raw, request.headers.get("x-hub-signature-256"), secret)) {
+    console.error("meta pages webhook rejected: bad or missing signature (META_APP_SECRET must be the secret of the app that sends the webhook)");
     return NextResponse.json({ ok: false }, { status: 401 });
   }
   let body: RawPagesWebhook;
@@ -58,8 +59,12 @@ export async function POST(request: NextRequest) {
   const { ingest } = await import("@/lib/channels/ingest");
 
   for (const m of messages) {
+    try {
     const acc = await account(m.platform, m.accountId);
-    if (!acc) continue;
+    if (!acc) {
+      console.error(`meta pages webhook: no connected ${m.platform} account for id ${m.accountId} — message dropped`);
+      continue;
+    }
     if (m.echo) {
       // our own sends come back as echoes from our app — they are already stored
       if (m.echoAppId && m.echoAppId === (process.env.META_APP_ID ?? "")) continue;
@@ -109,13 +114,20 @@ export async function POST(request: NextRequest) {
       media: m.media,
       meta: { ...(m.postback ? { postback: m.postback } : {}), ...(m.referral ? { referral: m.referral } : {}) },
     });
+    } catch (e) {
+      // never answer 500 to Meta because of one message: it retries the whole batch and finally turns the webhook off
+      console.error("meta pages webhook message failed", (e as Error).message);
+    }
   }
 
   if (comments.length) {
     const { handleSocialComment } = await import("@/lib/social/comments");
     for (const c of comments) {
       const acc = await account(c.platform === "instagram" ? "instagram" : "messenger", c.accountId);
-      if (!acc) continue;
+      if (!acc) {
+        console.error(`meta pages webhook: no connected ${c.platform} account for id ${c.accountId} — comment dropped`);
+        continue;
+      }
       await handleSocialComment(acc.organization_id, acc.id, c).catch((e) => console.error("social comment failed", (e as Error).message));
     }
   }

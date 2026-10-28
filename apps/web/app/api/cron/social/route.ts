@@ -16,9 +16,14 @@ function authorized(request: NextRequest): boolean {
 async function handle(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ ok: false, reason: "service_role_missing" }, { status: 503 });
+  const t0 = Date.now();
   const { publishDuePosts } = await import("@/lib/social/publish");
   const result = await publishDuePosts(45_000).catch((e) => ({ error: (e as Error).message }));
-  return NextResponse.json({ ok: true, socialPosts: result }, { headers: { "Cache-Control": "no-store" } });
+  // wave 41: customers' Facebook / Instagram comments and messages that Meta's webhook did not deliver
+  // (runs only in the time that is left; never delays or blocks the posts above)
+  const left = 56_000 - (Date.now() - t0);
+  const metaSync = left > 9_000 ? await import("@/lib/channels/meta-sync").then((m) => m.syncMetaInbound(Math.min(20_000, left - 8_000))).catch((e) => ({ error: (e as Error).message })) : { skipped: true };
+  return NextResponse.json({ ok: true, socialPosts: result, metaSync }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export const GET = handle;
