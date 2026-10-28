@@ -209,7 +209,7 @@ export async function createQuickAgentAction(input: {
     language: locale,
     enabled: true,
     allowed_tools: ["crm_lookup", "draft_message", "site_builder", "image_gen"],
-    autopilot_channels: ["web", "whatsapp", "whatsapp_qr", "telegram", "telegram_user", "email"],
+    autopilot_channels: ["web", "whatsapp", "whatsapp_qr", "telegram", "telegram_user", "email", "messenger", "instagram"],
     lead_goal: "lead",
     followup_hours: 3,
   });

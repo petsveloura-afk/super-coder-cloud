@@ -12,6 +12,7 @@ import type { AutopilotChannel } from "./autopilot-core";
  *  whatsapp_qr    the bridge: presence "composing" / "paused"
  */
 const active = new Map<string, () => void>();
+const seen = new Set<string>();
 
 export function stopTyping(conversationId: string): void {
   const stop = active.get(conversationId);
@@ -27,7 +28,7 @@ export function stopTyping(conversationId: string): void {
 
 export async function startTyping(input: { orgId: string; conversationId: string; channel: AutopilotChannel; externalId: string }): Promise<void> {
   if (active.has(input.conversationId)) return;
-  if (!["telegram", "whatsapp", "whatsapp_qr"].includes(input.channel)) return;
+  if (!["telegram", "whatsapp", "whatsapp_qr", "messenger", "instagram"].includes(input.channel)) return;
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const until = Date.now() + 75_000; // never "typing" for more than ~75s
@@ -36,7 +37,7 @@ export async function startTyping(input: { orgId: string; conversationId: string
     if (timer) clearTimeout(timer);
     if (input.channel === "whatsapp_qr") void pulse(input, false).catch(() => undefined);
   });
-  const every = input.channel === "telegram" ? 4500 : input.channel === "whatsapp" ? 20_000 : 9000;
+  const every = input.channel === "telegram" ? 4500 : input.channel === "whatsapp" ? 20_000 : input.channel === "messenger" || input.channel === "instagram" ? 15_000 : 9000;
   const loop = async () => {
     if (stopped || Date.now() > until) return;
     await pulse(input, true).catch(() => undefined);
@@ -59,6 +60,20 @@ async function pulse(input: { orgId: string; conversationId: string; channel: Au
       return;
     }
     await telegramCall(acc.secrets.bot_token, "sendChatAction", { chat_id: input.externalId, action: "typing" });
+    return;
+  }
+  if (input.channel === "messenger" || input.channel === "instagram") {
+    // Meta sender actions: "seen" first, then "typing…" (lasts ~20s, renewed by the loop)
+    if (!on) return;
+    const acc = await loadAccount(input.orgId, input.channel);
+    if (!acc?.secrets.page_token) return;
+    const { metaSenderAction } = await import("@/lib/channels/meta-pages");
+    if (!seen.has(input.conversationId)) {
+      seen.add(input.conversationId);
+      if (seen.size > 500) seen.clear();
+      await metaSenderAction(acc.secrets.page_token, input.externalId, "mark_seen");
+    }
+    await metaSenderAction(acc.secrets.page_token, input.externalId, "typing_on");
     return;
   }
   if (input.channel === "whatsapp") {

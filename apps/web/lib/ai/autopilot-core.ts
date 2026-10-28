@@ -167,6 +167,9 @@ export function autopilotInstructions(input: {
       email
         ? "- This is an e-mail: write a complete, polite e-mail body (greeting, clear answer, sign-off with the business name). No subject line."
         : "- Keep replies short and chat-friendly (1–4 short sentences, at most ~90 words). Plain text, emoji only sparingly, no Markdown tables or headings.",
+      input.channel === "messenger" || input.channel === "instagram"
+        ? "- This is a social-media direct message: greet the customer by first name once at the start of the conversation (when known), sound like a friendly professional person from the business, answer the actual question first, and end with one clear next step or question. Never send an empty or generic reply."
+        : "",
       "- Answer questions using only the business instructions and this conversation. Never invent prices, availability, policies or promises.",
       "- Move the conversation forward: understand the need, recommend the right option, and offer a next step (booking link, call back, quote).",
       "- When it helps, politely ask for the customer's name and phone or e-mail so the team can follow up (only once, never pushy).",

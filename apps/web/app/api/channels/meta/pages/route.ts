@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const key = `${kind}:${id}`;
     if (!cache.has(key)) {
       const field = kind === "instagram" ? "ig_id" : "page_id";
-      const { data } = await admin.from("channel_accounts").select("id, organization_id, webhook_token, secret_enc, config").eq("kind", kind).eq(`config->>${field}`, id).neq("status", "disabled").maybeSingle();
+      const { data } = await admin.from("channel_accounts").select("id, organization_id, webhook_token, secret_enc, config").eq("kind", kind).eq(`config->>${field}`, id).neq("status", "disabled").order("created_at").limit(1).maybeSingle();
       cache.set(key, (data as Acc) ?? null);
     }
     return cache.get(key) ?? null;
@@ -63,6 +63,26 @@ export async function POST(request: NextRequest) {
     if (m.echo) {
       // our own sends come back as echoes from our app — they are already stored
       if (m.echoAppId && m.echoAppId === (process.env.META_APP_ID ?? "")) continue;
+      // the echo of a reply our agent / inbox just sent can arrive before its message id is stored (or without our app id):
+      // it must never switch the conversation to "a person answered" — compare with what we sent in the last minutes
+      {
+        const { data: c } = await admin.from("conversations").select("id").eq("organization_id", acc.organization_id).eq("channel", m.platform).eq("external_id", m.senderId).maybeSingle();
+        if (c?.id) {
+          const { data: recent } = await admin
+            .from("messages")
+            .select("body, external_id, meta")
+            .eq("conversation_id", c.id as string)
+            .eq("direction", "out")
+            .gte("created_at", new Date(Date.now() - 3 * 60_000).toISOString())
+            .order("created_at", { ascending: false })
+            .limit(15);
+          const probe = m.text.trim().slice(0, 80);
+          const ours = ((recent ?? []) as { body: string | null; external_id: string | null; meta: { owner?: boolean } | null }[]).some(
+            (r) => r.meta?.owner !== true && ((r.external_id && r.external_id === m.mid) || (probe.length > 0 && (r.body ?? "").includes(probe))),
+          );
+          if (ours) continue;
+        }
+      }
       await admin.rpc("ingest_owner_message_meta", { p_token: acc.webhook_token, p_kind: m.platform, p_chat: m.senderId, p_text: m.text, p_message: m.mid, p_media: m.media ?? null }).then(
         () => undefined,
         (e: unknown) => console.error("meta owner echo failed", (e as Error).message),

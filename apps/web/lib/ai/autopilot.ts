@@ -202,7 +202,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   // conversation guard (one state for all channels): opted out, a person owns it / already answered
   // speed upgrade: the guard, the agent and the latest customer line load in parallel (one round trip)
   const { checkGuard } = await import("@/lib/conversations/guard");
-  const [g, { data: agent }, { data: lastInRow }] = await Promise.all([
+  const [g, { data: agentRow }, { data: lastInRow }] = await Promise.all([
     checkGuard(conv.id as string, "ai_reply"),
     admin
       .from("ai_agents")
@@ -216,6 +216,27 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     admin.from("messages").select("id, body").eq("conversation_id", conv.id).eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (!g.allowed) return { replied: false, handoff: false, reason: `guard:${g.reason}` };
+  let agent = agentRow;
+  // Facebook Messenger / Instagram: an agent created before these channels existed (or by the quick-create
+  // button) does not list them — the business's first enabled agent answers there too, and the channel is added to it
+  if (!agent && (channel === "messenger" || channel === "instagram")) {
+    const { data: fallback } = await admin
+      .from("ai_agents")
+      .select("id, name, instructions, provider, model, temperature, language, handoff_rules, greeting, profile, lead_goal, autopilot_channels")
+      .eq("organization_id", orgId)
+      .eq("enabled", true)
+      .order("created_at")
+      .limit(10);
+    const pick = ((fallback ?? []) as { id: string; autopilot_channels?: string[] | null }[]).find((a) => (a.autopilot_channels ?? []).length > 0) ?? null;
+    if (pick) {
+      agent = pick as unknown as NonNullable<typeof agentRow>;
+      await admin
+        .from("ai_agents")
+        .update({ autopilot_channels: Array.from(new Set([...(pick.autopilot_channels ?? []), channel])) })
+        .eq("id", pick.id)
+        .then(() => undefined, () => undefined);
+    }
+  }
   if (!agent) return { replied: false, handoff: false, reason: "no_agent" };
   timing.mark("load");
   // speed upgrade: "typing…" from now until the answer is sent (stopped by handleInboundWithAI)

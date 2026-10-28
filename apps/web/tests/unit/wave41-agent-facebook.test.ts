@@ -34,3 +34,16 @@ describe("wave 41 — Facebook in the campaign agent (additive)", () => {
     expect(src).toMatch(/case "messenger":\s*case "instagram": \{/);
   });
 });
+
+describe("Messenger agent answers (additive fix)", () => {
+  const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
+  it("quick-created agents answer on Messenger and Instagram", () => {
+    expect(read("../../app/[locale]/(dashboard)/ai-agents/actions.ts")).toMatch(/"email", "messenger", "instagram"\]/);
+  });
+  it("the autopilot falls back to the first enabled agent for the Meta channels", () => {
+    expect(read("../../lib/ai/autopilot.ts")).toMatch(/channel === "messenger" \|\| channel === "instagram"\)/);
+  });
+  it("shows seen / typing in Messenger", () => {
+    expect(read("../../lib/ai/typing.ts")).toMatch(/metaSenderAction/);
+  });
+});

@@ -108,8 +108,14 @@ export async function metaSendText(platform: SocialPlatform, pageToken: string, 
       ...(opts.humanAgent && platform === "messenger" ? { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" } : { messaging_type: "RESPONSE" }),
       message: { text: parts[i], ...(qr ? { quick_replies: qr } : {}) },
     };
-    const r = await g(`/me/messages`, { method: "POST", token: pageToken, body });
+    let r = await g(`/me/messages`, { method: "POST", token: pageToken, body });
+    // a temporary Meta / network hiccup (5xx, timeout, code 1 / 2 / 4 / 17 / 32 / 613): one more try before giving up
+    if (!r.ok && (r.status === 0 || r.status >= 500 || [1, 2, 4, 17, 32, 613].includes(Number(r.code)))) {
+      await new Promise((res) => setTimeout(res, 1200));
+      r = await g(`/me/messages`, { method: "POST", token: pageToken, body });
+    }
     if (!r.ok) {
+      console.error("meta send failed", JSON.stringify({ platform, status: r.status, code: r.code, error: (r.error ?? "").slice(0, 300) }));
       // outside the window: one retry as a person's reply (Messenger only)
       if (!opts.humanAgent && platform === "messenger" && (r.code === 10 || /window|24 hour|outside/i.test(r.error ?? ""))) {
         return metaSendText(platform, pageToken, recipientId, parts.slice(i).join("\n\n"), { ...opts, humanAgent: true });
@@ -119,6 +125,12 @@ export async function metaSendText(platform: SocialPlatform, pageToken: string, 
     last = { ok: true, status: r.status, externalId: (r.data.message_id as string | undefined) ?? undefined };
   }
   return last;
+}
+
+/** "seen" / "typing…" in the customer's Messenger / Instagram while the agent answers. Cosmetic: never throws. */
+export async function metaSenderAction(pageToken: string, recipientId: string, action: "typing_on" | "typing_off" | "mark_seen"): Promise<void> {
+  if (!pageToken) return;
+  await g(`/me/messages`, { method: "POST", token: pageToken, body: { recipient: { id: recipientId }, sender_action: action } }).catch(() => undefined);
 }
 
 export async function metaSendImage(platform: SocialPlatform, pageToken: string, recipientId: string, url: string): Promise<ProviderResult> {
