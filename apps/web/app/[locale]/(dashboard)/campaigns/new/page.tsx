@@ -7,6 +7,7 @@ import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { channelsReady } from "@/lib/campaign-channels";
+import { CampaignAgent } from "@/components/campaigns/campaign-agent";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -33,6 +34,7 @@ export default async function NewCampaignPage({ params }: { params: Promise<{ lo
         <Back className="h-4 w-4" /> {t("campaigns.title")}
       </Link>
       <PageHeader title={t("campaigns.new")} description={t("campaigns.newHint")} />
+      {ctx.can("ai.use") ? <CampaignAgent /> : null}
       <CampaignEditor initial={{ name: "", channel: "email", subject: "", body: "", audience: {} }} tags={(tags ?? []).map((x) => x.name as string)} channelsReady={ready} />
     </>
   );

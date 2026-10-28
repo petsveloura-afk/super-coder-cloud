@@ -13,6 +13,9 @@ import { formatDateTime, formatPercent } from "@/lib/format";
 import { campaignRates, isRecipientFilter, RECIPIENT_FILTERS } from "@/lib/campaigns/metrics";
 import { cn } from "@/lib/utils";
 import { channelsReady } from "@/lib/campaign-channels";
+import { CampaignCoach } from "@/components/campaigns/campaign-coach";
+import { InsightList } from "@/components/campaigns/campaign-overview";
+import { campaignInsights } from "@/lib/campaigns/brain";
 
 type Params = Promise<{ locale: string; id: string }>;
 
@@ -106,6 +109,8 @@ export default async function CampaignPage({ params, searchParams }: { params: P
           <span className="block h-full bg-danger" style={{ width: `${rates.recipients ? (rates.failed / rates.recipients) * 100 : 0}%` }} />
         </div>
       </Card>
+      <InsightList className="mb-4" items={campaignInsights({ status: c.status as string, channel: c.channel as string, stats: c.stats as never, launched_at: c.launched_at as string | null, scheduled_at: c.scheduled_at as string | null })} t={t} />
+      {ctx.can("ai.use") && st.recipients ? <CampaignCoach id={c.id as string} /> : null}
       <Card className="mb-4 p-5">
         {c.subject ? <div className="mb-2 font-semibold">{c.subject}</div> : null}
         <p className="whitespace-pre-wrap text-sm text-muted">{c.body}</p>

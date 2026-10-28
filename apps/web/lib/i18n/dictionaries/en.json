@@ -1974,6 +1974,202 @@
       "button": "Landing page",
       "creating": "Building the page…",
       "done": "A draft landing page was created from the campaign"
+    },
+    "ai": {
+      "failed": "The AI did not return a usable result. Try again or rephrase.",
+      "writerReady": "3 variants ready",
+      "improved": "Message improved. You can undo.",
+      "subjectsReady": "Subject ideas ready",
+      "agentDone": "The agent created a campaign draft. Review it before sending.",
+      "coachReady": "Analysis ready",
+      "lostVariables": "The AI removed merge variables from the message, so the change was not applied.",
+      "agentBlocked": "A draft was created but not sent automatically. Details in the next message.",
+      "agentLaunched": "The campaign was sent to {count} recipients.",
+      "agentScheduled": "The campaign is scheduled for {count} recipients at the recommended time."
+    },
+    "studio": {
+      "writer": "Write with AI",
+      "writerHint": "3 variants, different angles",
+      "goal": "Goal",
+      "tone": "Tone",
+      "offer": "Offer or key message",
+      "offerPlaceholder": "e.g. 15% off everything until Thursday",
+      "writeThree": "Write 3 variants",
+      "undo": "Undo last change",
+      "use": "Use this variant",
+      "applied": "Applied. You can undo.",
+      "insert": "Insert:",
+      "varFirstName": "First name",
+      "varOrg": "Business name",
+      "optOutLine": "To unsubscribe, reply \"STOP\".",
+      "addOptOut": "Opt-out line",
+      "improve": "Improve with AI:",
+      "translate": "Translate",
+      "subjectIdeas": "Subject ideas",
+      "scoreLabel": "Quality score {score} of 100",
+      "quality": "Message quality",
+      "stats": "{words} words · {chars} characters · about {secs} s to read",
+      "segments": "{count} SMS segments ({per} characters each)",
+      "preview": "Preview",
+      "noSubject": "(no subject)",
+      "emptyPreview": "Your message appears here as you type",
+      "previewNote": "The preview uses a sample name. Each customer gets their own.",
+      "sampleOrg": "Your business",
+      "quickAudience": "Quick audience:",
+      "bestTimes": "Best times:",
+      "readiness": "Launch readiness",
+      "ready": "Ready to launch",
+      "blockers": "{count} to fix",
+      "almost": "Almost ready",
+      "goals": {
+        "promo": "Promotion / sale",
+        "winback": "Win back quiet customers",
+        "launch": "Product / service launch",
+        "reminder": "Reminder",
+        "event": "Event invitation",
+        "feedback": "Ask for feedback or a review",
+        "upsell": "Offer to existing customers",
+        "welcome": "Welcome a new customer"
+      },
+      "tones": {
+        "friendly": "Friendly",
+        "professional": "Professional",
+        "urgent": "Urgent",
+        "playful": "Playful",
+        "luxury": "Premium",
+        "caring": "Caring"
+      },
+      "modes": {
+        "shorter": "Shorter",
+        "friendlier": "Friendlier",
+        "urgent": "Add urgency",
+        "formal": "More formal",
+        "add_cta": "Add a call to action",
+        "fix_spam": "Remove spammy wording",
+        "translate_he": "Translate to Hebrew",
+        "translate_ar": "Translate to Arabic",
+        "translate_en": "Translate to English",
+        "personalize": "Personalize with name"
+      },
+      "levels": {
+        "excellent": "Excellent",
+        "good": "Good",
+        "fair": "Fair",
+        "weak": "Weak"
+      },
+      "checks": {
+        "length": "Length suits the channel",
+        "personal": "Personalized with a name",
+        "cta": "Clear call to action",
+        "subject": "Good subject length",
+        "spam": "No spammy wording",
+        "shout": "No shouting (caps and !!!)",
+        "links": "Reasonable number of links",
+        "emoji": "Reasonable emoji use",
+        "sms_segments": "Fits in few SMS segments",
+        "optout": "Tells people how to opt out",
+        "template": "WhatsApp template is set"
+      },
+      "hints": {
+        "length_short": "Message is short ({count} words, aim for at least {min})",
+        "length_long": "Message is long ({count} words, aim for up to {max})",
+        "personal": "Add the customer's name (first-name variable)",
+        "cta": "Add a clear call to action: a link, a phone number or \"reply\"",
+        "subject": "The e-mail subject should be 12 to 70 characters",
+        "spam": "{count} phrases may trigger spam filters",
+        "shout": "Reduce caps and exclamation marks ({count})",
+        "links": "There are {count} links. Prefer 2 or fewer",
+        "emoji": "There are {count} emoji. Prefer 6 or fewer",
+        "sms_segments": "This sends as {count} SMS segments and costs more. Shorten it",
+        "optout": "Add a line explaining how to opt out",
+        "template": "Set an approved WhatsApp template to reach customers who did not write in the last 24 hours"
+      },
+      "presets": {
+        "hot": "Hot leads",
+        "warm": "Warm leads",
+        "inactive30": "Quiet for 30 days",
+        "inactive90": "Quiet for 90 days",
+        "active7": "Active this week",
+        "customers": "Customers",
+        "big_spenders": "Spent over 1,000",
+        "ready": "Ready to buy"
+      },
+      "sendReasons": {
+        "midweek_morning": "Midweek morning: strong open rates",
+        "lunch": "Lunchtime: customers are on their phones",
+        "evening": "Evening: free time to read",
+        "sunday_start": "Start of the work week"
+      },
+      "ready_name": "Campaign has a name",
+      "ready_message": "Message is complete",
+      "ready_channel": "Channel is connected",
+      "ready_audience": "The audience has {count} recipients",
+      "ready_schedule": "Send time is valid",
+      "ready_quality": "Message quality: {score} of 100",
+      "ready_template": "WhatsApp template is set",
+      "ready_saved": "Unsaved changes. Save the draft before sending"
+    },
+    "agent": {
+      "title": "Campaign agent",
+      "hint": "Describe what you want to achieve. The agent builds a full draft: channel, message, audience and a suggested send time.",
+      "placeholder": "e.g. win back customers who have not bought in six months with a 10% offer",
+      "build": "Build my campaign draft",
+      "building": "The agent is working...",
+      "safe": "The agent only saves a draft. Nothing is sent until you approve.",
+      "examples": {
+        "winback": "Win back customers who have not bought in six months with a 10% offer",
+        "launch": "Announce a new service to hot leads and invite them to an intro call",
+        "event": "Invite existing customers to a customer event at the end of the month",
+        "feedback": "Ask recent buyers for a short review"
+      },
+      "examplesShort": {
+        "winback": "Win-back",
+        "launch": "Launch",
+        "event": "Event",
+        "feedback": "Reviews"
+      },
+      "afterBuild": "After building",
+      "modes": {
+        "off": "Draft only, I will approve",
+        "best": "Send automatically at the best time",
+        "now": "Send automatically now"
+      },
+      "autoWarn": "By choosing this I approve in advance. The message goes to recipients without another review.",
+      "buildAndSend": "Build and send",
+      "safeAuto": "Sending happens only if the channel is connected, there are recipients and quality is sufficient. Otherwise a draft is saved and the reason is shown.",
+      "confirmAuto": "The agent will create the campaign and send it automatically to the audience it chose, with no further approval. Continue?",
+      "blocked": {
+        "channel": "The chosen channel is not connected, so only a draft was saved. Connect it and send from the editor.",
+        "quality": "Message quality is too low to send automatically. A draft was saved for review.",
+        "template": "WhatsApp needs an approved template. A draft was saved. Set a template and send from the editor.",
+        "audience": "No eligible recipients (consent applied), so nothing was sent. A draft was saved.",
+        "demo": "Demo mode blocks sending. A draft was saved.",
+        "launch": "Sending could not start. A draft was saved; you can try from the editor."
+      }
+    },
+    "coach": {
+      "title": "AI results coach",
+      "hint": "3 tips for the next campaign, based on the real numbers and errors",
+      "run": "Analyze this campaign",
+      "again": "Analyze again"
+    },
+    "insights": {
+      "high_failure": "{pct}% of sends failed. Check the channel connection and the contact details.",
+      "low_delivery": "Only {pct}% were delivered. Clean the list before the next campaign.",
+      "great_delivery": "Excellent delivery: {pct}% of recipients got the message.",
+      "stuck_sending": "Sending for over {hours} hours with little progress. Check the channel connection.",
+      "small_audience": "Small audience ({count} recipients). Consider widening the filters.",
+      "scheduled_soon": "This campaign goes out in {mins} minutes.",
+      "draft_waiting": "{count} drafts have been waiting over a week. Send or delete them.",
+      "channel_best": "Best delivery so far: {channel} ({pct}%)."
+    },
+    "overview": {
+      "byChannel": "Delivery by channel",
+      "noData": "No campaigns sent yet",
+      "trend": "Sends in the last 6 months",
+      "trendHint": "Delivered vs. recipients per month",
+      "insights": "Insights",
+      "allGood": "All good. Nothing needs attention right now."
     }
   },
   "inbox": {

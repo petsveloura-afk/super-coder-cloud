@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDateTime, formatNumber, formatPercent } from "@/lib/format";
 import { campaignRates, isStatusFilter, summarizeCampaigns, CAMPAIGN_STATUS_FILTERS } from "@/lib/campaigns/metrics";
 import { cn } from "@/lib/utils";
+import { CampaignOverview } from "@/components/campaigns/campaign-overview";
+import { CampaignAgent } from "@/components/campaigns/campaign-agent";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -53,6 +55,7 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
   return (
     <>
       <PageHeader title={t("campaigns.title")} description={t("campaigns.subtitle")} actions={newLink} />
+      {ctx.can("ai.use") ? <CampaignAgent compact /> : null}
       {all.length > 0 ? (
         <>
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="campaign-kpis">
@@ -69,6 +72,7 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
               </Card>
             ))}
           </div>
+          <CampaignOverview rows={all.map((c) => ({ status: c.status as string, channel: c.channel as string, stats: c.stats as never, launched_at: c.launched_at as string | null, scheduled_at: c.scheduled_at as string | null, created_at: c.created_at as string }))} t={t} locale={locale} />
           <div className="mb-4 flex flex-wrap items-center gap-2" data-testid="campaign-filters">
             <div className="flex flex-wrap gap-1.5" role="tablist">
               {CAMPAIGN_STATUS_FILTERS.map((s) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Mail, MessageCircle, Save, Send, Smartphone, Sparkles, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { Button, Card, Field, Input, Select, Textarea } from "@/components/ui/pr
 import { ConfirmActionButton } from "@/components/ui/form-dialog";
 import { aiSegmentAction, launchCampaignAction, previewAudienceAction, saveCampaignAction } from "@/app/[locale]/(dashboard)/campaigns/actions";
 import { cn } from "@/lib/utils";
+import { AudiencePresets, MessageStudio, ReadinessPanel, SendTimeChips } from "./campaign-studio";
 
 export interface CampaignValue {
   name: string;
@@ -60,10 +61,21 @@ export function CampaignEditor({ id, initial, tags, channelsReady }: { id?: stri
   const [segmenting, startSeg] = useTransition();
   const set = (patch: Partial<CampaignValue>) => {
     setV((x) => ({ ...x, ...patch }));
-    setCount(null);
+    // wave 39: only audience / channel changes invalidate the recipient count (typing the message keeps it)
+    if ("audience" in patch || "channel" in patch) setCount(null);
     setDirty(true);
   };
   const err = (k: string) => (errors[k] ? t(errors[k]!) : undefined);
+
+  // wave 39: the recipient count updates by itself shortly after the audience / channel changes (the button still works)
+  const audienceKey = JSON.stringify(clean(v.audience));
+  useEffect(() => {
+    const h = setTimeout(async () => {
+      const res = await previewAudienceAction({ locale, channel: v.channel, audience: JSON.parse(audienceKey) });
+      if (!res.error) setCount(res.data?.count ?? 0);
+    }, 650);
+    return () => clearTimeout(h);
+  }, [audienceKey, v.channel, locale]);
 
   function save() {
     setErrors({});
@@ -141,6 +153,7 @@ export function CampaignEditor({ id, initial, tags, channelsReady }: { id?: stri
           {t("automations.variablesHint")} <code dir="ltr">{"{{contact.first_name}}"}</code> <code dir="ltr">{"{{org.name}}"}</code>
           {v.channel === "sms" ? ` · ${t("campaigns.smsLength", { count: v.body.length })}` : ""}
         </p>
+        <MessageStudio channel={v.channel} subject={v.subject} body={v.body} hasTemplate={Boolean(v.wa_template?.name)} onChange={(patch) => set(patch)} />
         {v.channel === "whatsapp" ? (
           <div className="space-y-3 rounded-xl border border-line p-3">
             <p className="text-[13px] font-medium">{t("campaigns.waTemplate")}</p>
@@ -165,6 +178,7 @@ export function CampaignEditor({ id, initial, tags, channelsReady }: { id?: stri
           <Users className="h-4 w-4 text-accent" /> {t("campaigns.audience")}
         </h2>
         <p className="text-[12.5px] text-subtle">{t("campaigns.consentNote")}</p>
+        <AudiencePresets audience={clean(v.audience) as Record<string, unknown>} onPick={(next) => set({ audience: next as CampaignValue["audience"] })} />
         {/* wave 17: describe the audience in words → filters */}
         <div className="flex flex-col gap-2 rounded-xl border border-accent/30 bg-accent-soft/40 p-3 sm:flex-row sm:items-end">
           <Field label={t("campaigns.aiSegment")} htmlFor="cp-seg" className="flex-1">
@@ -255,10 +269,20 @@ export function CampaignEditor({ id, initial, tags, channelsReady }: { id?: stri
             </span>
           ) : null}
         </div>
+        <SendTimeChips
+          channel={v.channel}
+          onPick={(iso) => {
+            const el = document.getElementById("cp-schedule") as HTMLInputElement | null;
+            if (el) el.value = toLocalInput(iso);
+            set({ scheduled_at: iso });
+          }}
+        />
         <Field label={t("campaigns.schedule")} htmlFor="cp-schedule" error={err("scheduled_at")}>
           <Input id="cp-schedule" type="datetime-local" dir="ltr" className="max-w-xs" defaultValue={toLocalInput(v.scheduled_at)} onChange={(e) => set({ scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : undefined })} />
         </Field>
       </Card>
+
+      <ReadinessPanel channel={v.channel} channelConnected={Boolean(channelsReady[v.channel])} name={v.name} subject={v.subject} body={v.body} audienceCount={count} scheduledAt={v.scheduled_at ?? null} hasTemplate={Boolean(v.wa_template?.name)} dirty={Boolean(id && dirty)} />
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button variant="secondary" onClick={save} loading={saving}>
