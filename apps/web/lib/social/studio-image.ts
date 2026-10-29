@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { limitErrorKey } from "@scc/shared/billing";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateAndStoreImage, imagesConfigured } from "@/lib/ai/images";
-import { PRIMARY_COOLDOWN_MS, buildFallbackUrl, isQuotaError, primaryAvailable, type StudioPlatform } from "./studio-core";
+import { generateRouted } from "@/lib/ai/router";
+import { PRIMARY_COOLDOWN_MS, buildFallbackUrl, cleanTranslation, isQuotaError, needsEnglishTopic, primaryAvailable, type StudioPlatform } from "./studio-core";
 
 /**
  * Wave 45 / stage A — metered image generation for the post studio (images.ts is not modified).
@@ -76,5 +77,27 @@ export async function generateMeteredImage(orgId: string, prompt: string, platfo
     const msg = (e as Error).message;
     console.error("studio image failed", msg);
     return { ok: false, error: isQuotaError(msg) ? "social.studio.quota" : "social.studio.imageFailed" };
+  }
+}
+
+/**
+ * Hebrew/Arabic topic → short English picture description for the image model (free text call through the
+ * AI router, no credit). Any failure returns the original topic, so generation is never blocked by this step.
+ */
+export async function topicForImage(topic: string): Promise<string> {
+  if (!needsEnglishTopic(topic)) return topic;
+  try {
+    const r = await generateRouted({
+      system: "Translate the user's text into a short, concrete English description of a photograph (max 25 words). Output only the translation: no quotes, no explanations.",
+      messages: [{ role: "user", content: topic.slice(0, 400) }],
+      temperature: 0.2,
+      maxTokens: 120,
+      budgetMs: 8000,
+      maxCalls: 2,
+    });
+    return cleanTranslation(r.text, topic);
+  } catch (e) {
+    console.error("studio topic translation failed", (e as Error).message);
+    return topic;
   }
 }

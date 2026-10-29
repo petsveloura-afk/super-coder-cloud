@@ -97,3 +97,16 @@ export const PRIMARY_COOLDOWN_MS = 10 * 60_000;
 export function primaryAvailable(coolUntil: number, now: number): boolean {
   return now >= coolUntil;
 }
+
+/* ---------------------------------------------------------------- topic translation for image prompts */
+
+/** True when the topic contains Hebrew or Arabic letters (image models handle those poorly). */
+export function needsEnglishTopic(topic: string): boolean {
+  return /[\u0590-\u05FF\u0600-\u06FF]/.test(topic);
+}
+
+/** Cleans a translation answer: one line, no quotes, bounded; falls back to the original topic when empty. */
+export function cleanTranslation(raw: string | null | undefined, fallback: string): string {
+  const t = (raw ?? "").replace(/\s+/g, " ").replace(/^["'“”«»\s]+|["'“”«»\s]+$/g, "").trim().slice(0, 300);
+  return t.length >= 2 ? t : fallback;
+}
