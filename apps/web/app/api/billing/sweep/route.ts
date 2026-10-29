@@ -30,7 +30,7 @@ async function handle(request: NextRequest) {
       const { data: prof } = await admin.from("profiles").select("email").eq("id", owner.user_id).maybeSingle();
       if (!prof?.email) continue;
       const link = `${publicEnv.appUrl.replace(/\/$/, "")}/he/billing`;
-      const date = new Date(d.period_end).toLocaleDateString("he-IL");
+      const date = new Date(d.period_end).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" });
       await sendEmail({
         to: prof.email as string,
         subject: "תזכורת: המסלול שלכם מסתיים בקרוב",

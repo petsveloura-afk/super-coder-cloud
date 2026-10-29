@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Badge, Button, Input, Textarea } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
+import { DEFAULT_TIME_ZONE } from "@/lib/format";
 import { Chips, CalendarPanel, ComposerExtras, ExportButton, OverviewPanel, SearchBox, downloadCsv } from "@/components/social/social-extras";
 import { StudioPanel } from "@/components/social/social-studio";
 import { filterComments, filterPosts, filterReviews, type CommentFilter, type PostFilter, type ReviewFilter } from "@/lib/social/insights";
@@ -59,7 +60,7 @@ type Tab = "comments" | "posts" | "reviews" | "settings" | "calendar" | "insight
 
 function when(locale: string, iso: string | null) {
   if (!iso) return "";
-  return new Date(iso).toLocaleString(locale === "en" ? "en-GB" : locale === "ar" ? "ar" : "he-IL", { dateStyle: "short", timeStyle: "short" });
+  return new Date(iso).toLocaleString(locale === "en" ? "en-GB" : locale === "ar" ? "ar" : "he-IL", { dateStyle: "short", timeStyle: "short", timeZone: DEFAULT_TIME_ZONE });
 }
 
 const SENT_TONE: Record<string, "success" | "warning" | "danger" | "neutral" | "accent"> = { lead: "success", question: "accent", negative: "danger", spam: "warning", positive: "success", neutral: "neutral" };

@@ -73,7 +73,7 @@ async function emailReceipt(p: PaymentInput, r: { id: string; receipt_number: nu
   const plan = p.plan ? p.plan.charAt(0).toUpperCase() + p.plan.slice(1) : "";
   const rows = [
     ["מספר קבלה", `#${r.receipt_number}`],
-    ["תאריך", new Date().toLocaleDateString("he-IL")],
+    ["תאריך", new Date().toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })],
     ["מסלול", `${plan}${p.interval ? ` · ${p.interval === "year" ? "שנתי" : "חודשי"}` : ""}`],
     ["סכום", amount],
     ["אמצעי תשלום", { paypal: "PayPal / כרטיס אשראי", lemonsqueezy: "כרטיס אשראי (Lemon Squeezy)", nowpayments: "מטבע דיגיטלי", stripe: "כרטיס אשראי (Stripe)", manual: "ידני" }[p.provider]],

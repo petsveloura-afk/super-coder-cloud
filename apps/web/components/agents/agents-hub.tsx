@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Badge, Button, Input } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
+import { DEFAULT_TIME_ZONE } from "@/lib/format";
 import { runAgentNowAction, saveAgentAction } from "@/app/[locale]/(dashboard)/agents/actions";
 
 /**
@@ -149,7 +150,7 @@ function AgentCard({ a, canManage }: { a: AgentView; canManage: boolean }) {
                   <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed" dir="auto">
                     {r.summary}
                   </p>
-                  <p className="mt-1 text-[11px] text-subtle">{new Date(r.created_at).toLocaleString(locale === "en" ? "en-GB" : locale === "ar" ? "ar" : "he-IL", { dateStyle: "short", timeStyle: "short" })}</p>
+                  <p className="mt-1 text-[11px] text-subtle">{new Date(r.created_at).toLocaleString(locale === "en" ? "en-GB" : locale === "ar" ? "ar" : "he-IL", { dateStyle: "short", timeStyle: "short", timeZone: DEFAULT_TIME_ZONE })}</p>
                 </li>
               ))}
             </ol>

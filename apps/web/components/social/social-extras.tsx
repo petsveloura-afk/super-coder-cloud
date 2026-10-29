@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Badge, Button, Input } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
+import { DEFAULT_TIME_ZONE } from "@/lib/format";
 import { runAgentNowAction } from "@/app/[locale]/(dashboard)/agents/actions";
 import { aiWritePostAction } from "@/app/[locale]/(dashboard)/social/actions";
 import { POST_TEMPLATES, TEMPLATE_KEYS, charInfo, computeStats, dayKey, localInput, monthGrid, postsByDay, suggestedSlots, toCsv, type CommentLite, type PostLite, type ReviewLite } from "@/lib/social/insights";
@@ -263,7 +264,7 @@ export function CalendarPanel({ posts, canPost, onNew, onEdit }: { posts: (PostL
                   <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", DOT[p.status] ?? "bg-line")} />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[11px] text-muted">
-                      {new Date(p.scheduled_at).toLocaleTimeString(locale === "en" ? "en-GB" : locale === "ar" ? "ar" : "he-IL", { hour: "2-digit", minute: "2-digit" })} · {p.platforms.map((x) => (x === "instagram" ? "Instagram" : "Facebook")).join(" · ")}
+                      {new Date(p.scheduled_at).toLocaleTimeString(locale === "en" ? "en-GB" : locale === "ar" ? "ar" : "he-IL", { hour: "2-digit", minute: "2-digit", timeZone: DEFAULT_TIME_ZONE })} · {p.platforms.map((x) => (x === "instagram" ? "Instagram" : "Facebook")).join(" · ")}
                     </span>
                     <span className="line-clamp-2" dir="auto">
                       {p.body}
@@ -290,7 +291,7 @@ export function ComposerExtras({ body, setBody, fb, ig, image, setAt }: { body: 
   const lang = locale === "en" || locale === "ar" ? locale : "he";
   const slots = useMemo(() => suggestedSlots(), []);
   const nets = [...(fb ? (["facebook"] as const) : []), ...(ig ? (["instagram"] as const) : [])];
-  const fmt = (d: Date) => d.toLocaleString(locale === "en" ? "en-GB" : locale === "ar" ? "ar" : "he-IL", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  const fmt = (d: Date) => d.toLocaleString(locale === "en" ? "en-GB" : locale === "ar" ? "ar" : "he-IL", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: DEFAULT_TIME_ZONE });
   const local = (d: Date) => localInput(dayKey(d), d.getHours(), d.getMinutes());
   const put = (text: string) => {
     if (body.trim() && !window.confirm(t("social.pro.composer.aiOverwrite"))) return;
