@@ -27,7 +27,7 @@ export default async function SocialPage({ params }: { params: Promise<{ locale:
   const [{ data: comments }, { data: posts }, { data: reviews }, { data: settings }, { data: accounts }] = await Promise.all([
     supabase.from("social_comments").select("id, platform, author_name, body, sentiment, ai_draft, reply_text, status, created_at").eq("organization_id", ctx.org.id).order("created_at", { ascending: false }).limit(100),
     ctx.can("campaigns.manage")
-      ? supabase.from("social_posts").select("id, platforms, body, image_url, scheduled_at, status, source, results").eq("organization_id", ctx.org.id).neq("status", "canceled").order("scheduled_at", { ascending: false }).limit(60)
+      ? supabase.from("social_posts").select("id, platforms, body, image_url, scheduled_at, status, source, results, link_url, video_url, cta_type, cta_value, first_comment").eq("organization_id", ctx.org.id).neq("status", "canceled").order("scheduled_at", { ascending: false }).limit(60)
       : Promise.resolve({ data: [] }),
     supabase.from("reviews").select("id, source, author, rating, body, reply, ai_draft, status, reviewed_at").eq("organization_id", ctx.org.id).order("reviewed_at", { ascending: false, nullsFirst: false }).limit(60),
     supabase.from("social_settings").select("comment_drafts, comment_auto_reply, comment_private_reply, hide_spam, posts_per_week, brand_voice").eq("organization_id", ctx.org.id).maybeSingle(),

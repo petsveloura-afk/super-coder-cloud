@@ -296,6 +296,7 @@ export function ComposerExtras({
   setAt,
   setImage,
   onSendToImage,
+  onFullPost,
 }: {
   body: string;
   setBody: (v: string) => void;
@@ -307,6 +308,8 @@ export function ComposerExtras({
   setImage?: (v: string) => void;
   /** stage B — hands the written text to the image panel (and optionally creates the image there) */
   onSendToImage?: (seed: Omit<StudioSeed, "nonce">) => void;
+  /** wave 51 — the full post also fills the first comment and suggests a button */
+  onFullPost?: (result: FullPostResult & { goal: StudioGoal }) => void;
 }) {
   const { t, locale } = useI18n();
   const [topic, setTopic] = useState("");
@@ -351,6 +354,7 @@ export function ComposerExtras({
       if (!d?.text) return void toast.error(t("ai.failed"));
       if (!put(d.text)) return;
       setExtra(d);
+      onFullPost?.({ ...d, goal });
       setWritten(false);
       if (d.imageUrl && setImage) {
         setImage(d.imageUrl);

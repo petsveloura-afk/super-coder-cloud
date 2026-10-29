@@ -180,3 +180,96 @@ export async function publishPost(input: { platform: "facebook" | "instagram"; p
   }
   return { ok: false, error: "instagram_media_not_ready" };
 }
+
+/* ---------------------------------------------------------------- wave 51 — rich posts: link card, button, video, first comment (additive) */
+
+export interface RichPostInput {
+  platform: "facebook" | "instagram";
+  pageId: string;
+  igId?: string | null;
+  igUsername?: string | null;
+  pageToken: string;
+  text: string;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
+  linkUrl?: string | null;
+  cta?: { type: string; value?: string | null } | null;
+  firstComment?: string | null;
+  lang: string;
+}
+
+/**
+ * Publishes a post with the extras. Facebook: video (/videos), photo (/photos) or a link post (/feed with link +
+ * call_to_action — retried without the native button, then as plain text, so the post always goes out).
+ * Instagram: Reels for video (waits for processing), photo otherwise. Then the first comment (best effort).
+ */
+export async function publishRichPost(input: RichPostInput): Promise<{ ok: boolean; id?: string; error?: string; comment?: { ok: boolean; error?: string }; mode?: string }> {
+  const { composeCaption, fbCallToAction, isCtaType, ctaUrl } = await import("@/lib/social/post-core");
+  const cta = input.cta && isCtaType(input.cta.type) ? { type: input.cta.type, value: input.cta.value ?? null } : null;
+  const link = (input.linkUrl ?? "").trim() || null;
+  const base = { body: input.text, link, cta, lang: input.lang, pageId: input.pageId, igUsername: input.igUsername ?? null };
+  let result: { ok: boolean; id?: string; error?: string; mode?: string };
+
+  if (input.platform === "facebook") {
+    const page = encodeURIComponent(input.pageId);
+    if (input.videoUrl) {
+      const r = await g(`/${page}/videos`, { method: "POST", token: input.pageToken, body: { file_url: input.videoUrl, description: composeCaption({ ...base, platform: "facebook" }) } });
+      result = { ok: r.ok, id: r.data.id as string | undefined, error: r.error, mode: "video" };
+    } else if (input.imageUrl) {
+      const r = await g(`/${page}/photos`, { method: "POST", token: input.pageToken, body: { url: input.imageUrl, caption: composeCaption({ ...base, platform: "facebook" }) } });
+      result = { ok: r.ok, id: (r.data.post_id as string | undefined) ?? (r.data.id as string | undefined), error: r.error, mode: "photo" };
+    } else {
+      const ctaLink = cta ? ctaUrl(cta, { pageId: input.pageId, platform: "facebook" }) : null;
+      const cardLink = link ?? (ctaLink && /^https?:/.test(ctaLink) ? ctaLink : null);
+      const native = cta ? fbCallToAction(cta, cardLink, input.pageId) : null;
+      // 1) link card + native button
+      let r = cardLink && native
+        ? await g(`/${page}/feed`, { method: "POST", token: input.pageToken, body: { message: composeCaption({ ...base, platform: "facebook", linkAttached: Boolean(link), ctaAttached: true }), link: cardLink, call_to_action: native } })
+        : null;
+      let mode = "link+cta";
+      // 2) link card, button as text
+      if (!r?.ok && cardLink) {
+        mode = "link";
+        r = await g(`/${page}/feed`, { method: "POST", token: input.pageToken, body: { message: composeCaption({ ...base, platform: "facebook", linkAttached: Boolean(link) }), link: cardLink } });
+      }
+      // 3) plain text with everything written in
+      if (!r?.ok) {
+        mode = "text";
+        r = await g(`/${page}/feed`, { method: "POST", token: input.pageToken, body: { message: composeCaption({ ...base, platform: "facebook" }) } });
+      }
+      result = { ok: r.ok, id: (r.data.post_id as string | undefined) ?? (r.data.id as string | undefined), error: r.error, mode };
+    }
+  } else {
+    if (!input.igId) return { ok: false, error: "instagram_not_connected" };
+    const ig = encodeURIComponent(input.igId);
+    const caption = composeCaption({ ...base, platform: "instagram" });
+    if (input.videoUrl) {
+      const c = await g(`/${ig}/media`, { method: "POST", token: input.pageToken, body: { media_type: "REELS", video_url: input.videoUrl, caption, share_to_feed: true } });
+      const creation = c.data.id as string | undefined;
+      if (!c.ok || !creation) return { ok: false, error: c.error ?? "media_failed" };
+      // videos need processing on Meta's side: wait up to ~50s
+      let status = "IN_PROGRESS";
+      for (let i = 0; i < 17 && status === "IN_PROGRESS"; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const s = await g(`/${encodeURIComponent(creation)}?fields=status_code`, { token: input.pageToken });
+        status = String(s.data.status_code ?? (s.ok ? "IN_PROGRESS" : "ERROR"));
+      }
+      if (status !== "FINISHED") return { ok: false, error: status === "IN_PROGRESS" ? "instagram_media_not_ready" : `instagram_video_${status.toLowerCase()}` };
+      const p = await g(`/${ig}/media_publish`, { method: "POST", token: input.pageToken, body: { creation_id: creation } });
+      result = { ok: p.ok, id: p.data.id as string | undefined, error: p.error, mode: "reel" };
+    } else if (input.imageUrl) {
+      const r = await publishPost({ platform: "instagram", pageId: input.pageId, igId: input.igId, pageToken: input.pageToken, text: caption, imageUrl: input.imageUrl });
+      result = { ...r, mode: "photo" };
+    } else {
+      return { ok: false, error: "instagram_needs_image" };
+    }
+  }
+
+  // first comment (best effort — the post itself already succeeded)
+  const comment = (input.firstComment ?? "").trim();
+  if (result.ok && result.id && comment) {
+    const c = await g(`/${encodeURIComponent(result.id)}/comments`, { method: "POST", token: input.pageToken, body: { message: comment.slice(0, input.platform === "instagram" ? 2200 : 8000) } });
+    return { ...result, comment: { ok: c.ok, error: c.error } };
+  }
+  return result;
+}
