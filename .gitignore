@@ -14,3 +14,8 @@ test-results
 *.tsbuildinfo
 next-env.d.ts
 supabase/.temp/
+.env.production
+.env.production.local
+services/wa-bridge/data/
+services/wa-bridge/.wa-data/
+services/wa-bridge/sessions/

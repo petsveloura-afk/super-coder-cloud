@@ -9,10 +9,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: Typecheck · Lint · Unit · RLS · Build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:17
@@ -38,6 +42,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Permission matrix SQL is in sync with TypeScript
         run: pnpm gen:permissions && git diff --exit-code supabase/migrations
+      - run: pnpm check:consistency
       - run: pnpm typecheck
       - run: pnpm lint
       - name: Unit + RLS/tenant-isolation tests (real Postgres)
@@ -47,6 +52,7 @@ jobs:
   e2e:
     name: Playwright E2E (Supabase local stack)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: verify
     env:
       NEXT_TELEMETRY_DISABLED: "1"

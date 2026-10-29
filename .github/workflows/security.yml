@@ -7,9 +7,13 @@ on:
   schedule:
     - cron: "17 3 * * 1"
 
+permissions:
+  contents: read
+
 jobs:
   dependencies:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -25,6 +29,7 @@ jobs:
 
   secrets:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:

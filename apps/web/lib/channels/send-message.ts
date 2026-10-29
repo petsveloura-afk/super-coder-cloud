@@ -22,9 +22,12 @@ export interface RichMessage {
   menu?: string[];
 }
 
-async function providerSend(kind: Kind | "web", orgId: string, externalId: string, text: string, conversationId?: string, rich?: RichMessage): Promise<ProviderResult & { accountId?: string }> {
+async function providerSend(channel: Kind | "web" | "voice", orgId: string, externalId: string, text: string, conversationId?: string, rich?: RichMessage): Promise<ProviderResult & { accountId?: string }> {
   // website chat: the visitor's browser reads the message from the conversation — nothing to deliver
-  if (kind === "web") return { ok: true };
+  if (channel === "web") return { ok: true };
+  // phone calls have no text transport: a written reply from the inbox goes to the caller as an SMS
+  // (needs a connected SMS account, otherwise the message is marked failed with a clear reason)
+  const kind: Kind = channel === "voice" ? "sms" : channel;
   const acc = await loadAccount(orgId, kind);
   if (!acc) return { ok: false, error: "channel_not_connected", permanent: true };
   let r: ProviderResult;
@@ -112,7 +115,7 @@ export async function sendToConversation(orgId: string, conversationId: string, 
     .select("id")
     .single();
   if (error || !msg) return { ok: false, error: "store_failed" };
-  const r = await providerSend(conv.channel as Kind | "web", orgId, conv.external_id as string, body, conv.id as string, opts?.rich);
+  const r = await providerSend(conv.channel as Kind | "web" | "voice", orgId, conv.external_id as string, body, conv.id as string, opts?.rich);
   await admin
     .from("messages")
     .update({ status: r.ok ? "sent" : "failed", external_id: r.externalId ?? null, error: r.ok ? null : (r.error ?? "send_failed").slice(0, 500) })

@@ -3,7 +3,7 @@ import { latencyLabel } from "@/lib/ai/speed-core";
 import { aiNoteKey, resumeInMinutes, type AiNoteKey } from "@/lib/inbox/ai-note";
 import { DEFAULT_RESUME_MINUTES } from "@/lib/ai/resume";
 import type { Metadata } from "next";
-import { ArrowLeft, ArrowRight, Bot, Camera, Globe, Inbox, Mail, MessageCircle, MessagesSquare, Plug, QrCode, Send, Smartphone, User, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Camera, Globe, Inbox, Mail, MessageCircle, MessagesSquare, Phone, Plug, QrCode, Send, Smartphone, User, UserRound } from "lucide-react";
 import { uuidSchema } from "@scc/shared/validators";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { AiModeToggle, ConversationControls, LiveRefresh, MarkRead, ReplyBox } from "@/components/inbox/inbox-client";
@@ -13,7 +13,7 @@ import { SavedReplies } from "@/components/inbox/saved-replies";
 import { INBOX_CHANNELS, INBOX_FLAGS, searchTerm, slaTone, waitingMinutes, waitLabel, type InboxChannel, type InboxFlag } from "@/lib/inbox/sla";
 
 // icons resolved on the server (objects exported from client modules are only references here)
-const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone, whatsapp_qr: QrCode, email: Mail, web: Globe, telegram_user: UserRound, messenger: MessagesSquare, instagram: Camera } as const;
+const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone, whatsapp_qr: QrCode, email: Mail, web: Globe, telegram_user: UserRound, messenger: MessagesSquare, instagram: Camera, voice: Phone } as const;
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -31,7 +31,7 @@ const FILTERS = ["open", "mine", "unassigned", "closed"] as const;
 
 interface ConvRow {
   id: string;
-  channel: "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email" | "web" | "telegram_user" | "messenger" | "instagram";
+  channel: "whatsapp" | "telegram" | "sms" | "whatsapp_qr" | "email" | "web" | "telegram_user" | "messenger" | "instagram" | "voice";
   title: string | null;
   ai_mode?: "auto" | "human";
   subject?: string | null;
@@ -203,7 +203,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
           ) : (
             <ul className="max-h-[70dvh] divide-y divide-line overflow-y-auto">
               {list.map((c) => {
-                const Icon = CHANNEL_ICON[c.channel];
+                const Icon = CHANNEL_ICON[c.channel] ?? MessageCircle;
                 const wait = waitingMinutes(c, nowMs);
                 const tone = slaTone(wait);
                 return (
@@ -335,6 +335,9 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
               <ConversationTools conversationId={selected.id} currency={ctx.org.currency || "ILS"} canAI={ctx.can("ai.use")} canFinance={ctx.can("finance.write")} canWriteContacts={ctx.can("contacts.write")} />
             ) : null}
             {ctx.can("inbox.reply") ? <SavedReplies conversationId={selected.id} locale={locale} customerName={selected.title} businessName={ctx.org.name} /> : null}
+            {selected.channel === "voice" && ctx.can("inbox.reply") ? (
+              <p className="border-t border-line px-4 py-2 text-[12px] text-muted" data-testid="voice-reply-note">📞 {t("inbox.voiceReplyNote")}</p>
+            ) : null}
             {ctx.can("inbox.reply") ? <ReplyBox conversationId={selected.id} /> : null}
           </Card>
         ) : (
