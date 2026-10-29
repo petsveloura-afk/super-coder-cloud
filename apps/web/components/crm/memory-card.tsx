@@ -64,7 +64,7 @@ export function MemoryCard({ contactId, items, canWrite }: { contactId: string; 
       )}
       {canWrite ? (
         <div className="flex gap-2">
-          <Input value={fact} onChange={(e) => setFact(e.target.value)} maxLength={300} placeholder={t("memory.placeholder")} aria-label={t("memory.add")} dir="auto" className="h-9 flex-1" onKeyDown={(e) => e.key === "Enter" && fact.trim().length >= 2 && add()} />
+          <Input value={fact} onChange={(e) => setFact(e.target.value)} maxLength={300} placeholder={t("memory.placeholder")} aria-label={t("memory.placeholder")} dir="auto" className="h-9 flex-1" onKeyDown={(e) => e.key === "Enter" && fact.trim().length >= 2 && add()} />
           <Button size="sm" variant="secondary" onClick={add} loading={pending} disabled={fact.trim().length < 2}>
             <Plus className="h-4 w-4" aria-hidden /> {t("memory.add")}
           </Button>
