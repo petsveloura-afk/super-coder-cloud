@@ -50,7 +50,7 @@ describe("resolveInstallMode", () => {
 });
 
 describe("install translations", () => {
-  const keys = ["install", "iosTitle", "iosStep1", "iosStep2", "iosStep3", "iosNote", "installBenefit", "installedOk"] as const;
+  const keys = ["install", "iosTitle", "iosStep1", "iosStep2", "iosStep3", "iosNote", "iosShareBtn", "installBenefit", "installedOk"] as const;
   for (const [name, d] of Object.entries({ he, ar, en })) {
     it(`${name} has every pwa key`, () => {
       for (const k of keys) expect((d.pwa as Record<string, string>)[k], `${name}:pwa.${k}`).toBeTruthy();
