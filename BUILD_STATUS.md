@@ -776,3 +776,9 @@
 - **הרשאות:** ללא הרשאה חדשה (משתמשים ב-`campaigns.manage` וב-`ai.use` הקיימות), ולכן אין צורך ב-`pnpm gen:permissions`.
 - **קבצים חדשים:** `lib/social/studio-core.ts`, `lib/social/studio-image.ts`, `app/[locale]/(dashboard)/social/studio-actions.ts`, `components/social/social-studio.tsx`, מיגרציה, ושתי בדיקות (`tests/unit/wave45-social-studio.test.ts`, `packages/database/tests/wave45-social-assets.test.ts`). **קבצים שהורחבו:** `components/social/social-client.tsx` (שתי שורות), שלושת מילוני התרגום (`social.studio`, 22 מפתחות זהים).
 - **מצב אימות (יושר מלא):** נבדק בסביבה ללא רשת, ללא `pnpm` וללא Postgres. **לא הורצו:** typecheck, lint, vitest, build ובדיקות ה-RLS. כן הורצו: בדיקת שפיות ב-Node על לוגיקת הליבה (וריאציות, פרומפט, פיצול טקסט, נרמול נכסים), זהות מפתחות התרגום בשלוש השפות ושכל מפתח שנמצא בשימוש קיים, ו-diff מול הארכיון המקורי (כל השינויים הם הוספות). **לא נבדק מול שירות אמיתי:** יצירת תמונה ב-Gemini, אחסון ב-Supabase.
+
+
+### תיקון שלב א' — ספק גיבוי לתמונות (גל 45)
+- **הבעיה בפרודקשן:** מכסת תמונות Gemini נגמרה (429 `RESOURCE_EXHAUSTED`), ולכן כל יצירה נכשלה (כ-6 קריאות בכל לחיצה).
+- **התיקון (תוספתי, `images.ts` לא שונה):** ב-`studio-image.ts`: Gemini קודם; ב-429 עוברים למחולל גיבוי ללא מפתח (Pollinations; ניתן לכיבוי או להחלפה במשתני `STUDIO_IMAGE_FALLBACK*`). התמונה מורדת ונשמרת באותו bucket ציבורי, ועולה קרדיט אחד. אחרי 429 מדלגים על Gemini ל-10 דקות. אם גם הגיבוי נכשל: הודעה ברורה על מכסה (`social.studio.quota`) ולא נגבה קרדיט.
+- **לא נבדק:** קריאה אמיתית לספק הגיבוי (אין רשת בסביבת הפיתוח). זמינות ומגבלות השירות החיצוני בצד הספק.
