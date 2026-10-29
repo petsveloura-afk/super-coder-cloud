@@ -13,6 +13,7 @@ import { cn, initials } from "@/lib/utils";
 import { BrandLockup, BrandMark } from "./brand";
 import { NAV_ICONS } from "./nav-icons";
 import { LanguageSwitcher, ThemeToggle } from "./locale-theme";
+import { InstallAppButton, InstallAppMenuItem } from "./install-app";
 import { Dialog } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/primitives";
 import { signOutAction } from "@/app/[locale]/(auth)/actions";
@@ -211,6 +212,7 @@ function UserMenu({ user, role, isPlatformAdmin }: { user: ShellProps["user"]; r
           <div className="px-1.5 py-1.5">
             <LanguageSwitcher />
           </div>
+          <InstallAppMenuItem />
           <DM.Separator className="my-1 h-px bg-line" />
           <form action={signOutAction}>
             <input type="hidden" name="locale" value={locale} />
@@ -414,6 +416,7 @@ export function AppShell(props: ShellProps) {
               <button type="button" onClick={() => setMoreOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl text-muted hover:bg-surface-hover hover:text-fg md:hidden" aria-label={t("common.search")}>
                 <Search className="h-[18px] w-[18px]" />
               </button>
+              <InstallAppButton className="hidden sm:grid" />
               <ThemeToggle />
               <NotificationBell count={props.unreadNotifications} />
               <UserMenu user={props.user} role={props.role} isPlatformAdmin={props.isPlatformAdmin} />

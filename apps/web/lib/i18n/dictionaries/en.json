@@ -333,7 +333,14 @@
   },
   "pwa": {
     "install": "Install app",
-    "installIos": "On iPhone: tap Share, then \"Add to Home Screen\"."
+    "installIos": "On iPhone: tap Share, then \"Add to Home Screen\".",
+    "iosTitle": "Add to Home Screen",
+    "iosStep1": "Tap the Share button in Safari's toolbar",
+    "iosStep2": "Scroll down and choose \"Add to Home Screen\"",
+    "iosStep3": "Tap \"Add\" and the app will appear on your home screen",
+    "iosNote": "If you don't see the option, open this page in Safari.",
+    "installBenefit": "Quick access from your home screen, full-screen experience and notifications.",
+    "installedOk": "App installed successfully"
   },
   "audit": {
     "contacts_insert": "Contact created",

@@ -7,6 +7,7 @@ import { I18nProvider } from "@/lib/i18n/client";
 import { LOCALES, LOCALE_META } from "@/lib/i18n/config";
 import { getDictionary, resolveLocale } from "@/lib/i18n/server";
 import { ServiceWorkerRegistrar } from "@/components/layout/sw-registrar";
+import { InstallAppCapture } from "@/components/layout/install-app";
 import { THEME_COOKIE } from "@/lib/theme";
 
 export function generateStaticParams() {
@@ -65,6 +66,7 @@ export default async function LocaleLayout({
             theme={theme}
             toastOptions={{ className: "!rounded-xl !border-line !bg-elevated !text-fg" }}
           />
+          <InstallAppCapture />
         </I18nProvider>
         <ServiceWorkerRegistrar />
       </body>
