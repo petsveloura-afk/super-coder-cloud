@@ -47,8 +47,10 @@ export async function aiImageAction(input: { locale: string; topic: string; plat
     admin.from("organizations").select("name").eq("id", ctx.org.id).maybeSingle(),
     admin.from("social_settings").select("brand_voice").eq("organization_id", ctx.org.id).maybeSingle(),
   ]);
-  const prompt = buildImagePrompt({ topic: p.data.topic, platform: p.data.platform, brandVoice: (social?.brand_voice as string | null) ?? null, business: (org?.name as string | null) ?? null });
-  const { generateMeteredImage } = await import("@/lib/social/studio-image");
+  const { generateMeteredImage, topicForImage } = await import("@/lib/social/studio-image");
+  // image models understand English far better than Hebrew/Arabic: translate the topic first (free text call, no credit)
+  const topicEn = await topicForImage(p.data.topic);
+  const prompt = buildImagePrompt({ topic: topicEn, platform: p.data.platform, brandVoice: (social?.brand_voice as string | null) ?? null, business: (org?.name as string | null) ?? null });
   const supabase = await createClient();
   const images: { url: string }[] = [];
   let partialError: string | undefined;
