@@ -4621,6 +4621,30 @@
         "5": "Fri",
         "6": "Sat"
       }
+    },
+    "studio": {
+      "title": "Image & more options",
+      "topic": "What is the image about? (e.g. fresh bread on a wooden table)",
+      "tone": "Tone",
+      "makeImage": "Create an image",
+      "moreImages": "More image options",
+      "moreText": "More text options",
+      "library": "Image library",
+      "costNote": "One image = 1 AI credit. More options are only created when you click.",
+      "results": "Generated images",
+      "imageAlt": "Image for the post",
+      "imageChosen": "Image added to the post",
+      "useText": "Use this text",
+      "assetUrl": "Image link",
+      "saveAsset": "Save to library",
+      "libraryEmpty": "No saved images yet. Generated images are saved here automatically.",
+      "deleteAsset": "Remove from library",
+      "assetSaved": "Saved to the library",
+      "assetExists": "This image is already in the library",
+      "badUrl": "The link must start with https://",
+      "notConfigured": "AI images are not connected (an image key is missing in the server settings)",
+      "imageFailed": "The image could not be created — try again in a moment. No credit was charged.",
+      "maxVariations": "You already have the maximum number of options"
     }
   },
   "market": {
