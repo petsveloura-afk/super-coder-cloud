@@ -22,12 +22,27 @@ export function formatPercent(locale: Locale, ratio: number) {
   return new Intl.NumberFormat(LOCALE_META[locale].intl, { style: "percent", maximumFractionDigits: 1 }).format(ratio);
 }
 
+/**
+ * wave 44: the server renders in UTC, so message times showed 2 hours early (5:50 instead of 7:50). Without an explicit
+ * time zone the platform's own zone is used — the same on the server and in the browser (no hydration mismatch).
+ * Change it with NEXT_PUBLIC_APP_TIMEZONE (an IANA name such as "Europe/London").
+ */
+export const DEFAULT_TIME_ZONE = ((): string => {
+  const tz = process.env.NEXT_PUBLIC_APP_TIMEZONE || "Asia/Jerusalem";
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: tz });
+    return tz;
+  } catch {
+    return "Asia/Jerusalem";
+  }
+})();
+
 export function formatDate(locale: Locale, value: string | Date, timeZone?: string) {
-  return new Intl.DateTimeFormat(LOCALE_META[locale].intl, { dateStyle: "medium", timeZone }).format(new Date(value));
+  return new Intl.DateTimeFormat(LOCALE_META[locale].intl, { dateStyle: "medium", timeZone: timeZone ?? DEFAULT_TIME_ZONE }).format(new Date(value));
 }
 
 export function formatDateTime(locale: Locale, value: string | Date, timeZone?: string) {
-  return new Intl.DateTimeFormat(LOCALE_META[locale].intl, { dateStyle: "medium", timeStyle: "short", timeZone }).format(
+  return new Intl.DateTimeFormat(LOCALE_META[locale].intl, { dateStyle: "medium", timeStyle: "short", timeZone: timeZone ?? DEFAULT_TIME_ZONE }).format(
     new Date(value),
   );
 }

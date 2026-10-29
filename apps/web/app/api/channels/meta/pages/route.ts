@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get("x-hub-signature-256");
   if (!secrets.length || !secrets.some((secret) => verifyMetaSignature(raw, signature, secret))) {
     console.error("meta pages webhook rejected: bad or missing signature (META_APP_SECRET must be the secret of the app that sends the webhook)");
+    void import("@/lib/channels/meta-webhook-log").then((m) => m.logMetaWebhook("bad_signature", { detail: `signature header ${signature ? "present" : "missing"}; secrets configured: ${secrets.length}` }));
     return NextResponse.json({ ok: false }, { status: 401 });
   }
   let body: RawPagesWebhook;
@@ -46,6 +47,7 @@ export async function POST(request: NextRequest) {
   }
   const { messages, comments } = parsePagesWebhook(body);
   if (!messages.length && !comments.length) return NextResponse.json({ ok: true });
+  void import("@/lib/channels/meta-webhook-log").then((m) => m.logMetaWebhook("received", { object: body.object, entry: body.entry?.[0]?.id, detail: `messages=${messages.length} (echoes=${messages.filter((x) => x.echo).length}) comments=${comments.length}` }));
   const admin = createAdminClient();
   const cache = new Map<string, Acc>();
   const account = async (kind: "messenger" | "instagram", id: string): Promise<Acc> => {
@@ -73,6 +75,7 @@ export async function POST(request: NextRequest) {
     const acc = await account(m.platform, m.accountId);
     if (!acc) {
       console.error(`meta pages webhook: no connected ${m.platform} account for id ${m.accountId} — message dropped`);
+      void import("@/lib/channels/meta-webhook-log").then((x) => x.logMetaWebhook("no_account", { object: m.platform, entry: m.accountId, detail: "message dropped: no connected account with this id" }));
       continue;
     }
     if (m.echo) {
@@ -161,6 +164,7 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       // never answer 500 to Meta because of one message: it retries the whole batch and finally turns the webhook off
       console.error("meta pages webhook message failed", (e as Error).message);
+      void import("@/lib/channels/meta-webhook-log").then((x) => x.logMetaWebhook("error", { object: m.platform, entry: m.accountId, detail: (e as Error).message }));
     }
   }
 

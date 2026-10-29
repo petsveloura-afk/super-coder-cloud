@@ -47,3 +47,18 @@ jobs:
       - name: Apply migrations
         if: steps.cfg.outputs.skip == 'false'
         run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all
+      # wave 44: starts the 30-second Facebook / Instagram message clock inside the database (Supabase pg_cron + pg_net),
+      # so customers' messages are fetched and answered even when nobody is logged in. Safe to repeat on every deploy
+      # (it replaces its own job). Needs the CRON_SECRET repo secret (the same one the other jobs use); never fails the deploy.
+      - name: Start the Facebook / Instagram message clock (every 30 seconds)
+        if: steps.cfg.outputs.skip == 'false'
+        continue-on-error: true
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "::warning::CRON_SECRET secret not set — the 30-second clock was not started."; exit 0; fi
+          URL="${APP_URL:-https://super-coder-cloud.vercel.app}"
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -v url="$URL" -v secret="$CRON_SECRET" -q -t -f - <<'SQL'
+          select public.schedule_meta_inbound_sync(:'url', :'secret');
+          SQL
