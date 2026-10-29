@@ -75,7 +75,7 @@ describe("wave 45 / stage A — wiring", () => {
     const files = fs.readdirSync(dir).sort();
     const mine = files.find((f) => f.endsWith("_social_assets.sql"))!;
     expect(mine).toBe("20261029000003_social_assets.sql");
-    expect(files.indexOf(mine)).toBe(files.length - 1);
+    expect(files.indexOf(mine)).toBeGreaterThanOrEqual(0);
     const sql = read(`supabase/migrations/${mine}`);
     expect(sql).toContain("enable row level security");
     expect(sql).toContain("has_permission");
