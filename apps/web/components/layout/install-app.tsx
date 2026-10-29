@@ -57,6 +57,18 @@ function readEnv(): InstallEnv {
   };
 }
 
+/**
+ * iPhone / iPad: Apple has no API that adds an app to the home screen, so the closest thing is opening the
+ * system share sheet directly (where "Add to Home Screen" is one tap away). Used by the button in the steps dialog.
+ */
+async function openIosShare() {
+  try {
+    await navigator.share({ url: window.location.href, title: document.title });
+  } catch {
+    /* cancelled, or the browser refused — the steps stay visible in the dialog */
+  }
+}
+
 /** Opens the native prompt when the browser offered one, otherwise the iPhone steps. */
 async function requestInstall() {
   const d = snap.deferred;
@@ -124,6 +136,16 @@ export function InstallAppCapture() {
         </li>
       </ol>
       <p className="mt-4 text-[12.5px] text-muted">{t("pwa.iosNote")}</p>
+      {typeof navigator !== "undefined" && typeof navigator.share === "function" ? (
+        <button
+          type="button"
+          onClick={() => void openIosShare()}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-[14px] font-semibold text-white"
+          data-testid="install-ios-share-button"
+        >
+          <Share className="h-4 w-4" aria-hidden /> {t("pwa.iosShareBtn")}
+        </button>
+      ) : null}
     </Dialog>
   );
 }
