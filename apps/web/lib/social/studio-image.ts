@@ -4,7 +4,7 @@ import { limitErrorKey } from "@scc/shared/billing";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateAndStoreImage, imagesConfigured } from "@/lib/ai/images";
 import { generateRouted } from "@/lib/ai/router";
-import { PRIMARY_COOLDOWN_MS, buildFallbackUrl, cleanTranslation, isQuotaError, needsEnglishTopic, primaryAvailable, type StudioPlatform } from "./studio-core";
+import { PRIMARY_COOLDOWN_MS, buildFallbackUrl, cleanTranslation, isQuotaError, needsEnglishTopic, postToSceneSeed, primaryAvailable, type StudioPlatform } from "./studio-core";
 
 /**
  * Wave 45 / stage A — metered image generation for the post studio (images.ts is not modified).
@@ -100,4 +100,29 @@ export async function topicForImage(topic: string): Promise<string> {
     console.error("studio topic translation failed", (e as Error).message);
     return topic;
   }
+}
+
+/**
+ * Stage B — a finished post (any language) → one concrete English photo scene for the image model
+ * (free text call through the AI router, no credit). Falls back to translating a short seed of the post,
+ * so image generation is never blocked by this step.
+ */
+export async function sceneForImage(postText: string): Promise<string> {
+  const seed = postToSceneSeed(postText) || postText.slice(0, 400);
+  try {
+    const r = await generateRouted({
+      system:
+        "You are an art director. Read the social media post and describe ONE concrete, photographable scene in English that visually matches its message (max 45 words): subject, setting, mood, colors, lighting. No text, letters, logos, prices or numbers in the scene. Output only the description: no quotes, no explanations.",
+      messages: [{ role: "user", content: postText.slice(0, 1500) }],
+      temperature: 0.4,
+      maxTokens: 160,
+      budgetMs: 9000,
+      maxCalls: 2,
+    });
+    const scene = cleanTranslation(r.text, "");
+    if (scene.length >= 8) return scene;
+  } catch (e) {
+    console.error("studio scene from post failed", (e as Error).message);
+  }
+  return topicForImage(seed);
 }

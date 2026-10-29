@@ -149,3 +149,143 @@ export function validateVariants(variants: string[], topic: string, current?: st
   }
   return out;
 }
+
+/* ---------------------------------------------------------------- stage B — text → image bridge & full post (additive) */
+
+/** Visual styles the person can pick for a generated image. "auto" keeps the original stage-A prompt. */
+export const STUDIO_STYLES = ["auto", "photo", "cinematic", "illustration", "3d", "minimal", "flatlay"] as const;
+export type StudioStyle = (typeof STUDIO_STYLES)[number];
+
+/** Post goals for the full-post generator — each steers the angle and the call to action. */
+export const STUDIO_GOALS = ["engage", "sell", "inform", "brand", "event"] as const;
+export type StudioGoal = (typeof STUDIO_GOALS)[number];
+
+const STYLE_DIRECTION: Record<Exclude<StudioStyle, "auto">, string> = {
+  photo: "Editorial commercial photography, shot on a full-frame camera with a 50mm lens, shallow depth of field, soft natural window light, true-to-life colors, crisp focus on the subject",
+  cinematic: "Cinematic still, dramatic directional lighting, rich contrast, subtle film grain, anamorphic depth, color graded teal and warm highlights",
+  illustration: "Modern premium vector-style illustration, clean shapes, harmonious limited palette, soft gradients, friendly and polished, editorial magazine quality",
+  "3d": "High-end 3D render, soft studio lighting, smooth materials, gentle global illumination, playful yet premium, octane-like quality",
+  minimal: "Minimalist composition, generous negative space, one clear subject, soft pastel background, calm and elegant, premium brand aesthetic",
+  flatlay: "Top-down flat lay, neatly arranged objects on a textured surface, soft even daylight, styled like a premium lifestyle brand shoot",
+};
+
+/** Human-readable art direction for a style (empty for "auto"). */
+export function styleDirection(style: StudioStyle | null | undefined): string {
+  if (!style || style === "auto") return "";
+  return STYLE_DIRECTION[style] ?? "";
+}
+
+/**
+ * Advanced image prompt built from a concrete visual scene (already in English).
+ * Same safety rule as stage A: never text, prices or logos inside the picture.
+ */
+export function buildSceneImagePrompt(input: { scene: string; platform: StudioPlatform; style?: StudioStyle | null; brandVoice?: string | null; business?: string | null }): string {
+  const scene = input.scene.replace(/\s+/g, " ").trim().slice(0, 500);
+  const shape = input.platform === "instagram" ? "square 1:1 composition, subject centered with breathing room for a feed crop" : "landscape 1.91:1 composition, subject on the rule-of-thirds, works as a Facebook link/feed image";
+  const brand = input.brandVoice?.replace(/\s+/g, " ").trim().slice(0, 200);
+  const biz = input.business?.replace(/\s+/g, " ").trim().slice(0, 100);
+  const dir = styleDirection(input.style) || "Professional, high quality, natural light, scroll-stopping, magazine-grade aesthetic";
+  return [
+    `Social media visual for ${biz ? `the business "${biz}"` : "a small business"}: ${scene}.`,
+    `${dir}.`,
+    `${shape}.`,
+    "Strong focal point, clean uncluttered background, balanced colors, high detail, sharp, no distortions.",
+    brand ? `Visual mood: ${brand}.` : "",
+    NO_TEXT,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+/**
+ * Turns a finished post into a short seed for the image box: drops hashtags, links, mentions, emojis
+ * and the call-to-action tail, keeps the first meaningful sentences (bounded to 400 chars, the topic limit).
+ */
+export function postToSceneSeed(text: string): string {
+  const cleaned = (text ?? "")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/[#@][\p{L}\p{N}_]+/gu, " ")
+    .replace(/[\p{Extended_Pictographic}‍️]/gu, " ")
+    .replace(/[➡️➜→⬅️👉👈]/gu, " ");
+  const lines = cleaned
+    .split(/\n+/)
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter((l) => (l.match(WORD) ?? []).length >= 2);
+  const out = (lines.slice(0, 2).join(". ") || cleaned.replace(/\s+/g, " ").trim()).slice(0, 400).trim();
+  return out;
+}
+
+export interface FullPostParts {
+  post: string;
+  scene: string | null;
+  headline: string | null;
+  firstComment: string | null;
+  alt: string | null;
+}
+
+const clip = (v: unknown, n: number): string | null => {
+  if (typeof v !== "string") return null;
+  const s = v.trim().slice(0, n);
+  return s || null;
+};
+
+/**
+ * Parses the full-post AI answer. Expected JSON: {"post","scene","headline","firstComment","alt"}.
+ * Tolerates code fences and prose around the JSON. When no JSON is found the whole answer is the post.
+ */
+export function parseFullPost(raw: string, maxLen = 5000): FullPostParts | null {
+  const txt = (raw ?? "").trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  if (!txt) return null;
+  const start = txt.indexOf("{");
+  const end = txt.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      const j = JSON.parse(txt.slice(start, end + 1)) as Record<string, unknown>;
+      const post = clip(j.post ?? j.text ?? j.caption, maxLen);
+      if (post) {
+        return {
+          post: post.replace(/\\n/g, "\n"),
+          scene: clip(j.scene ?? j.image ?? j.imagePrompt, 500),
+          headline: clip(j.headline, 120),
+          firstComment: clip(j.firstComment ?? j.first_comment, 600),
+          alt: clip(j.alt ?? j.altText, 300),
+        };
+      }
+    } catch {
+      /* fall through to plain text */
+    }
+  }
+  const post = txt.replace(/^["“«]+|["”»]+$/g, "").trim().slice(0, maxLen);
+  return post ? { post, scene: null, headline: null, firstComment: null, alt: null } : null;
+}
+
+/** Writing rules per goal, used in the full-post system prompt. */
+export function goalDirection(goal: StudioGoal | null | undefined): string {
+  switch (goal) {
+    case "sell":
+      return "Goal: drive a sale or inquiry. Lead with the customer's desire or pain, show the benefit (not features), and end with a direct call to action (message us / order / book).";
+    case "inform":
+      return "Goal: teach something useful. Open with a surprising fact or question, give 2-3 crisp practical points, end by inviting saves/shares.";
+    case "brand":
+      return "Goal: build brand love. Tell a short human story or behind-the-scenes moment, warm and authentic, end with an invitation to follow.";
+    case "event":
+      return "Goal: announce something. Make it clear what, for whom and why it matters; if date/place are not given, do NOT invent them — invite people to message for details.";
+    default:
+      return "Goal: maximum engagement. Open with a scroll-stopping hook, make it relatable, and end with a question or a light call to comment.";
+  }
+}
+
+/** Rough quality checklist for a finished post (pure, shown to the user as hints). */
+export function postChecklist(text: string, platform: StudioPlatform, hasImage: boolean): { hook: boolean; cta: boolean; hashtags: boolean; length: boolean; image: boolean } {
+  const t = (text ?? "").trim();
+  const first = t.split(/\n/)[0] ?? "";
+  const tags = (t.match(/#[\p{L}\p{N}_]+/gu) ?? []).length;
+  const len = t.length;
+  return {
+    hook: first.length > 0 && first.length <= 140,
+    cta: /[?？]|הודעה|כתבו|שלחו|התקשרו|הזמינו|לחצו|הגיבו|שתפו|תגובות|קישור|message|comment|book|call|order|share|dm|link|راسلونا|اتصلوا|احجزوا|شاركوا/i.test(t),
+    hashtags: platform === "instagram" ? tags >= 3 && tags <= 30 : tags >= 1 && tags <= 5,
+    length: platform === "instagram" ? len >= 80 && len <= 2200 : len >= 60 && len <= 1500,
+    image: hasImage || platform === "facebook",
+  };
+}

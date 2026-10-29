@@ -4645,7 +4645,55 @@
       "notConfigured": "AI images are not connected (an image key is missing in the server settings)",
       "imageFailed": "The image could not be created — try again in a moment. No credit was charged.",
       "maxVariations": "You already have the maximum number of options",
-      "quota": "The image provider's quota is used up and the backup generator is also unavailable. Check billing in Google AI Studio, then try again. No credit was charged."
+      "quota": "The image provider's quota is used up and the backup generator is also unavailable. Check billing in Google AI Studio, then try again. No credit was charged.",
+      "pro": {
+        "style": "Image style",
+        "styles": {
+          "auto": "Style: automatic",
+          "photo": "Professional photo",
+          "cinematic": "Cinematic",
+          "illustration": "Modern illustration",
+          "3d": "3D",
+          "minimal": "Minimalist",
+          "flatlay": "Top-down (flat lay)"
+        },
+        "fromPost": "Create an image from the post text",
+        "fromPostHint": "The image will match exactly what the post says",
+        "fromPostEmpty": "Write the post text (or ask the AI) — then you can create a matching image",
+        "sent": "The text was moved to the image box",
+        "sentAuto": "Text moved — creating a matching image…",
+        "copied": "Copied",
+        "fullTitle": "Full post in one click — text + matching image",
+        "goal": "Post goal",
+        "goals": {
+          "engage": "Engagement",
+          "sell": "Sales",
+          "inform": "Tip / knowledge",
+          "brand": "Brand story",
+          "event": "Announcement"
+        },
+        "fullRun": "Create full post",
+        "fullNeedTopic": "Write above what the post is about, pick a goal and a style — the agent will prepare the text and the image together.",
+        "fullCost": "One text call + one image (one AI credit for the image).",
+        "fullDone": "The full post is ready — text and image were added",
+        "fullTextOnly": "The text was written, but the image was not created. Click \"Create matching image\" to try again.",
+        "writtenReady": "Text ready ✓ — now create a matching image",
+        "sendHint": "Move the text to the image box",
+        "sendAuto": "Create matching image",
+        "sendOnly": "Only move to the image box",
+        "headline": "Headline",
+        "firstComment": "Suggested first comment",
+        "alt": "Image alt text",
+        "copy": "Copy",
+        "checkTitle": "Quality check",
+        "check": {
+          "hook": "Strong hook",
+          "cta": "Call to action",
+          "hashtags": "Hashtags",
+          "length": "Good length",
+          "image": "Image"
+        }
+      }
     }
   },
   "market": {

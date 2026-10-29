@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { DEFAULT_TIME_ZONE } from "@/lib/format";
 import { Chips, CalendarPanel, ComposerExtras, ExportButton, OverviewPanel, SearchBox, downloadCsv } from "@/components/social/social-extras";
 import { StudioPanel } from "@/components/social/social-studio";
+import type { StudioSeed } from "@/components/social/social-studio";
 import { filterComments, filterPosts, filterReviews, type CommentFilter, type PostFilter, type ReviewFilter } from "@/lib/social/insights";
 import { approveAllDraftsAction, commentStatusAction, duplicatePostAction, postStatusAction, replyCommentAction, replyReviewAction, reviewSettingsAction, savePostAction, saveSocialSettingsAction } from "@/app/[locale]/(dashboard)/social/actions";
 
@@ -133,6 +134,8 @@ function PostEditor({ initial, onDone, presetAt }: { initial?: PostRow | null; o
   const router = useRouter();
   const [body, setBody] = useState(initial?.body ?? "");
   const [image, setImage] = useState(initial?.image_url ?? "");
+  // stage B — hand-off from the AI writer to the image panel
+  const [studioSeed, setStudioSeed] = useState<StudioSeed | null>(null);
   const [fb, setFb] = useState(initial ? initial.platforms.includes("facebook") : true);
   const [ig, setIg] = useState(initial ? initial.platforms.includes("instagram") : false);
   const local = (iso: string) => {
@@ -157,8 +160,8 @@ function PostEditor({ initial, onDone, presetAt }: { initial?: PostRow | null; o
     <div className="space-y-3 rounded-2xl border border-accent/30 bg-accent-soft/30 p-4" data-testid="post-editor">
       <Textarea rows={5} value={body} onChange={(e) => setBody(e.target.value)} placeholder={t("social.postPlaceholder")} dir="auto" aria-label={t("social.postText")} />
       <Input value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://…/image.jpg" dir="ltr" aria-label={t("social.imageUrl")} />
-      <ComposerExtras body={body} setBody={setBody} fb={fb} ig={ig} image={image} setAt={setAt} />
-      <StudioPanel body={body} setBody={setBody} image={image} setImage={setImage} fb={fb} ig={ig} />
+      <ComposerExtras body={body} setBody={setBody} fb={fb} ig={ig} image={image} setAt={setAt} setImage={setImage} onSendToImage={(s) => setStudioSeed({ ...s, nonce: Date.now() })} />
+      <StudioPanel body={body} setBody={setBody} image={image} setImage={setImage} fb={fb} ig={ig} seed={studioSeed} />
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <label className="inline-flex items-center gap-2">
           <input type="checkbox" checked={fb} onChange={(e) => setFb(e.target.checked)} /> Facebook

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { AlertTriangle, CalendarPlus, ChevronLeft, ChevronRight, Download, Lightbulb, MessageSquareWarning, Search, Sparkles, Star, Wand2 } from "lucide-react";
+import { ArrowDownToLine, CheckCircle2, Circle, Copy, ImagePlus, Layers, Rocket } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Badge, Button, Input } from "@/components/ui/primitives";
@@ -10,6 +11,9 @@ import { DEFAULT_TIME_ZONE } from "@/lib/format";
 import { runAgentNowAction } from "@/app/[locale]/(dashboard)/agents/actions";
 import { aiWritePostAction } from "@/app/[locale]/(dashboard)/social/actions";
 import { POST_TEMPLATES, TEMPLATE_KEYS, charInfo, computeStats, dayKey, localInput, monthGrid, postsByDay, suggestedSlots, toCsv, type CommentLite, type PostLite, type ReviewLite } from "@/lib/social/insights";
+import { aiFullPostAction, type FullPostResult } from "@/app/[locale]/(dashboard)/social/studio-actions";
+import { STUDIO_GOALS, STUDIO_STYLES, postChecklist, type StudioGoal, type StudioStyle } from "@/lib/social/studio-core";
+import type { StudioSeed } from "@/components/social/social-studio";
 
 /** Wave 36 — everything the big social tools have, added next to what already existed. */
 
@@ -283,7 +287,27 @@ export function CalendarPanel({ posts, canPost, onNew, onEdit }: { posts: (PostL
 }
 
 /* ------------------------------------------------------------------ composer helpers */
-export function ComposerExtras({ body, setBody, fb, ig, image, setAt }: { body: string; setBody: (v: string) => void; fb: boolean; ig: boolean; image: string; setAt: (v: string) => void }) {
+export function ComposerExtras({
+  body,
+  setBody,
+  fb,
+  ig,
+  image,
+  setAt,
+  setImage,
+  onSendToImage,
+}: {
+  body: string;
+  setBody: (v: string) => void;
+  fb: boolean;
+  ig: boolean;
+  image: string;
+  setAt: (v: string) => void;
+  /** stage B — lets "full post" put the generated image straight into the post */
+  setImage?: (v: string) => void;
+  /** stage B — hands the written text to the image panel (and optionally creates the image there) */
+  onSendToImage?: (seed: Omit<StudioSeed, "nonce">) => void;
+}) {
   const { t, locale } = useI18n();
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState<"friendly" | "professional" | "playful" | "premium">("friendly");
@@ -294,9 +318,50 @@ export function ComposerExtras({ body, setBody, fb, ig, image, setAt }: { body: 
   const fmt = (d: Date) => d.toLocaleString(locale === "en" ? "en-GB" : locale === "ar" ? "ar" : "he-IL", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: DEFAULT_TIME_ZONE });
   const local = (d: Date) => localInput(dayKey(d), d.getHours(), d.getMinutes());
   const put = (text: string) => {
-    if (body.trim() && !window.confirm(t("social.pro.composer.aiOverwrite"))) return;
+    if (body.trim() && !window.confirm(t("social.pro.composer.aiOverwrite"))) return false;
     setBody(text);
+    return true;
   };
+  // stage B — hand-off + full post state
+  const [written, setWritten] = useState(false);
+  const [goal, setGoal] = useState<StudioGoal>("engage");
+  const [style, setStyle] = useState<StudioStyle>("photo");
+  const [extra, setExtra] = useState<FullPostResult | null>(null);
+  const platform = ig && !fb ? "instagram" : "facebook";
+  const sendToImage = (auto: boolean) => {
+    if (!onSendToImage || !body.trim()) return;
+    onSendToImage({ topic, tone, text: body, auto });
+    if (auto) toast.success(t("social.studio.pro.sentAuto"));
+    else toast.success(t("social.studio.pro.sent"));
+    setWritten(false);
+  };
+  const copy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t("social.studio.pro.copied"));
+    } catch {
+      toast.error(t("errors.generic"));
+    }
+  };
+  const fullPost = () =>
+    start(async () => {
+      const r = await aiFullPostAction({ locale, topic, tone, platform, style, goal, withImage: true });
+      if (r.error) return void toast.error(t(r.error));
+      const d = r.data;
+      if (!d?.text) return void toast.error(t("ai.failed"));
+      if (!put(d.text)) return;
+      setExtra(d);
+      setWritten(false);
+      if (d.imageUrl && setImage) {
+        setImage(d.imageUrl);
+        toast.success(t("social.studio.pro.fullDone"));
+      } else if (d.imageError) {
+        toast.error(t(d.imageError));
+        toast.message(t("social.studio.pro.fullTextOnly"));
+        setWritten(true);
+      } else toast.success(t("social.pro.composer.aiDone"));
+    });
+  const checks = postChecklist(body, platform, image.trim().startsWith("https://"));
   return (
     <div className="space-y-3" data-testid="composer-extras">
       <div>
@@ -333,7 +398,10 @@ export function ComposerExtras({ body, setBody, fb, ig, image, setAt }: { body: 
                 const r = await aiWritePostAction({ locale, topic, tone, platform: ig && !fb ? "instagram" : "facebook" });
                 if (r.error) toast.error(t(r.error));
                 else if (r.data?.text) {
-                  put(r.data.text);
+                  if (put(r.data.text)) {
+                    setWritten(true);
+                    setExtra(null);
+                  }
                   toast.success(t("social.pro.composer.aiDone"));
                 }
               })
@@ -342,6 +410,79 @@ export function ComposerExtras({ body, setBody, fb, ig, image, setAt }: { body: 
             <Sparkles className="h-3.5 w-3.5" /> {t("social.pro.composer.aiWrite")}
           </Button>
         </div>
+        {/* stage B — full post in one click: text + matching image */}
+        <div className="mt-3 space-y-2 rounded-xl border border-accent/30 bg-accent-soft/20 p-2.5" data-testid="full-post">
+          <p className="flex items-center gap-1.5 text-[12px] font-semibold text-accent">
+            <Rocket className="h-3.5 w-3.5" /> {t("social.studio.pro.fullTitle")}
+          </p>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("social.studio.pro.goal")}>
+            {STUDIO_GOALS.map((g) => (
+              <button key={g} type="button" aria-pressed={goal === g} onClick={() => setGoal(g)} className={cn("rounded-full border px-2.5 py-0.5 text-[12px] transition", goal === g ? "border-accent bg-accent-soft text-accent" : "border-line text-muted hover:bg-surface-hover")}>
+                {t(`social.studio.pro.goals.${g}`)}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={style} onChange={(e) => setStyle(e.target.value as StudioStyle)} className="h-9 rounded-xl border border-line bg-surface px-2 text-sm" aria-label={t("social.studio.pro.style")}>
+              {STUDIO_STYLES.filter((x) => x !== "auto").map((x) => (
+                <option key={x} value={x}>
+                  {t(`social.studio.pro.styles.${x}`)}
+                </option>
+              ))}
+            </select>
+            <Button size="sm" loading={pending} disabled={topic.trim().length < 2} onClick={fullPost} data-testid="full-post-run">
+              <Layers className="h-3.5 w-3.5" /> {t("social.studio.pro.fullRun")}
+            </Button>
+          </div>
+          <p className="text-[11px] text-subtle">{topic.trim().length < 2 ? t("social.studio.pro.fullNeedTopic") : t("social.studio.pro.fullCost")}</p>
+        </div>
+        {/* stage B — after the agent wrote the text: one click moves it to the image box and creates the image */}
+        {onSendToImage && body.trim() ? (
+          <div className={cn("mt-3 flex flex-wrap items-center gap-2 rounded-xl border p-2.5", written ? "border-success/40 bg-success/10" : "border-line bg-elevated")} data-testid="send-to-image">
+            <span className="flex min-w-[10rem] flex-1 items-center gap-1.5 text-[12px]">
+              {written ? <CheckCircle2 className="h-3.5 w-3.5 text-success" /> : <ImagePlus className="h-3.5 w-3.5 text-muted" />}
+              {written ? t("social.studio.pro.writtenReady") : t("social.studio.pro.sendHint")}
+            </span>
+            <Button size="sm" onClick={() => sendToImage(true)} data-testid="send-to-image-auto">
+              <ImagePlus className="h-3.5 w-3.5" /> {t("social.studio.pro.sendAuto")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => sendToImage(false)}>
+              <ArrowDownToLine className="h-3.5 w-3.5" /> {t("social.studio.pro.sendOnly")}
+            </Button>
+          </div>
+        ) : null}
+        {extra && (extra.headline || extra.firstComment || extra.alt) ? (
+          <div className="mt-3 space-y-1.5 rounded-xl border border-line bg-surface p-2.5 text-[12px]" data-testid="full-post-extras">
+            {extra.headline ? (
+              <div className="flex items-start justify-between gap-2">
+                <span dir="auto">
+                  <span className="font-medium text-muted">{t("social.studio.pro.headline")}: </span>
+                  {extra.headline}
+                </span>
+                <button type="button" onClick={() => copy(extra.headline!)} className="shrink-0 text-muted hover:text-accent" aria-label={t("social.studio.pro.copy")}>
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : null}
+            {extra.firstComment ? (
+              <div className="flex items-start justify-between gap-2">
+                <span className="whitespace-pre-wrap" dir="auto">
+                  <span className="font-medium text-muted">{t("social.studio.pro.firstComment")}: </span>
+                  {extra.firstComment}
+                </span>
+                <button type="button" onClick={() => copy(extra.firstComment!)} className="shrink-0 text-muted hover:text-accent" aria-label={t("social.studio.pro.copy")}>
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : null}
+            {extra.alt ? (
+              <p className="text-muted" dir="auto">
+                <span className="font-medium">{t("social.studio.pro.alt")}: </span>
+                {extra.alt}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       <div>
         <p className="mb-1.5 text-[12px] font-medium text-muted">{t("social.pro.composer.slots")}</p>
@@ -370,6 +511,16 @@ export function ComposerExtras({ body, setBody, fb, ig, image, setAt }: { body: 
               </div>
             );
           })}
+        </div>
+      ) : null}
+      {body.trim() ? (
+        <div className="flex flex-wrap items-center gap-1.5" role="list" aria-label={t("social.studio.pro.checkTitle")} data-testid="post-checklist">
+          <span className="text-[12px] font-medium text-muted">{t("social.studio.pro.checkTitle")}:</span>
+          {(["hook", "cta", "hashtags", "length", "image"] as const).map((k) => (
+            <span key={k} role="listitem" className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]", checks[k] ? "border-success/40 text-success" : "border-line text-subtle")}>
+              {checks[k] ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />} {t(`social.studio.pro.check.${k}`)}
+            </span>
+          ))}
         </div>
       ) : null}
       <div>
