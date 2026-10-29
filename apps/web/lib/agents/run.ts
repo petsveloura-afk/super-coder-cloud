@@ -13,7 +13,7 @@ import { analystBriefRules, marketingCopyRules, salesManagerRules } from "@/lib/
  *    24-hour windows, caps, quiet hours) — the same single conversation state as everything else.
  */
 type Locale = "he" | "en" | "ar";
-interface Org {
+export interface Org {
   id: string;
   name: string;
   locale: Locale;
@@ -21,7 +21,7 @@ interface Org {
   agent: { id: string; instructions: string; provider: string | null; model: string | null } | null;
 }
 
-async function loadOrg(orgId: string): Promise<Org | null> {
+export async function loadOrg(orgId: string): Promise<Org | null> {
   const admin = createAdminClient();
   const [{ data: o }, { data: a }] = await Promise.all([
     admin.from("organizations").select("id, name, locale, timezone").eq("id", orgId).maybeSingle(),
@@ -37,18 +37,18 @@ async function loadOrg(orgId: string): Promise<Org | null> {
   };
 }
 
-async function logRun(orgId: string, agent: string, summary: string, details: Record<string, unknown>, actions: number) {
+export async function logRun(orgId: string, agent: string, summary: string, details: Record<string, unknown>, actions: number) {
   await createAdminClient().from("agent_runs").insert({ organization_id: orgId, agent, summary: summary.slice(0, 4000), details, actions });
 }
 
-async function notifyOwners(orgId: string, titleKey: string, params: Record<string, string>, link: string) {
+export async function notifyOwners(orgId: string, titleKey: string, params: Record<string, string>, link: string) {
   const admin = createAdminClient();
   const { data: members } = await admin.from("organization_members").select("user_id").eq("organization_id", orgId).in("role", ["agency_owner", "owner", "admin", "manager"]);
   const rows = ((members ?? []) as { user_id: string }[]).map((m) => ({ organization_id: orgId, user_id: m.user_id, kind: "agents", title_key: titleKey, params, link }));
   if (rows.length) await admin.from("notifications").insert(rows);
 }
 
-async function ai(org: Org, feature: "marketing" | "sales_manager" | "brief" | "collections", system: string, user: string, maxTokens = 700): Promise<string | null> {
+export async function ai(org: Org, feature: "marketing" | "sales_manager" | "brief" | "collections", system: string, user: string, maxTokens = 700): Promise<string | null> {
   const out = await runAISystem({
     orgId: org.id,
     feature,
@@ -219,7 +219,7 @@ export async function runSalesManager(orgId: string, config: Record<string, unkn
 }
 
 /* ------------------------------------------------------------------ collections (+ abandoned carts) */
-async function messageContact(orgId: string, contactId: string, text: string, kind: "reminder" | "automation", meta: Record<string, unknown>): Promise<boolean> {
+export async function messageContact(orgId: string, contactId: string, text: string, kind: "reminder" | "automation", meta: Record<string, unknown>): Promise<boolean> {
   const admin = createAdminClient();
   const { checkGuard, checkContact } = await import("@/lib/conversations/guard");
   const { sendToConversation, sendToContact } = await import("@/lib/channels/send-message");
@@ -396,6 +396,11 @@ export async function runAgentsCron(budgetMs = 50_000): Promise<Record<string, u
       }
     }
     out[key] = { orgs: done, actions };
+  }
+  // wave 54 — the new team members: review requests + re-engagement of quiet customers
+  if (left() > 8000) {
+    const { runPlusAgentsCron } = await import("./run-plus");
+    out.plus = await runPlusAgentsCron(Math.min(20_000, left() - 4000)).catch((e) => ({ error: (e as Error).message }));
   }
   if (left() > 6000) out.carts = await runAbandonedCarts(Math.min(15_000, left() - 3000)).catch((e) => ({ error: (e as Error).message }));
   // social posts that are due → publish

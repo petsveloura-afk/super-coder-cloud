@@ -22,6 +22,7 @@ import { NewTaskButton, TaskCheckbox } from "@/components/tasks/task-form";
 import { companyOptions, contactOptions, memberOptions, pipelinesWithStages } from "@/lib/lookups";
 import { MessageContactButton } from "@/components/inbox/inbox-client";
 import { InsightsCard, type InsightsData } from "@/components/crm/insights-card";
+import { MemoryCard, type MemoryItem } from "@/components/crm/memory-card";
 import { AgentCallButton } from "@/components/crm/agent-call-button";
 import { UnifiedTimeline, type TimelineItem } from "@/components/crm/unified-timeline";
 
@@ -131,6 +132,9 @@ export default async function ContactDetailPage({ params, searchParams }: { para
     if (fresh) insights = { ...(insights ?? {}), ...(fresh as InsightsData) };
   }
   const identities = (idRes.data ?? []) as { kind: string; value: string; source: string | null }[];
+  // wave 54 — what the AI agents remember about this customer (empty before the migration ran)
+  const memRes = await supabase.from("contact_memories").select("id, fact, kind, source, created_at").eq("organization_id", ctx.org.id).eq("contact_id", contact.id).order("created_at", { ascending: false }).limit(40);
+  const memories = (memRes.error ? [] : (memRes.data ?? [])) as MemoryItem[];
   const timeline = ((tlRes.data ?? []) as TimelineItem[]);
   const moreBefore = timeline.length >= 60 ? timeline[timeline.length - 1]!.at : null;
 
@@ -226,6 +230,10 @@ export default async function ContactDetailPage({ params, searchParams }: { para
         <Card>
           <CardHeader title={t("insights.title")} description={t("insights.subtitle")} />
           <InsightsCard contactId={contact.id} data={insights} canAnalyze={ctx.can("ai.use")} aiLocked={!aiInsights} />
+        </Card>
+        <Card>
+          <CardHeader title={t("memory.title")} description={t("memory.subtitle")} />
+          <MemoryCard contactId={contact.id} items={memories} canWrite={ctx.can("contacts.write")} />
         </Card>
         {duplicates.length > 0 ? (
           <Card className="border-gold/40">
