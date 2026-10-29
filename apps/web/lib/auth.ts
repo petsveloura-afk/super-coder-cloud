@@ -15,6 +15,8 @@ export interface Profile {
   full_name: string;
   locale: Locale;
   default_organization_id: string | null;
+  /** wave 52 — profile picture (column exists since phase 1) */
+  avatar_url?: string | null;
 }
 
 export interface OrgContext {
@@ -74,7 +76,7 @@ export const getOrgContext = cache(async (locale: Locale): Promise<OrgContext> =
   const supabase = await createClient();
   const [memberships, profileRes, adminRes] = await Promise.all([
     getMemberships(user.id),
-    supabase.from("profiles").select("id, email, full_name, locale, default_organization_id").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("id, email, full_name, locale, default_organization_id, avatar_url").eq("id", user.id).maybeSingle(),
     supabase.rpc("is_platform_admin"),
   ]);
   const profile = (profileRes.data as Profile | null) ?? null;

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Film, Globe, ImageUp, Link2, Loader2, MessageCircle, MessageSquareText, MousePointerClick, Trash2, Upload, Video } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
-import { Badge, Input, Textarea } from "@/components/ui/primitives";
+import { Badge, Input } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 import { CTA_TYPES, ctaLabel, ctaUrl, isVideoUrl, uploadCheck, type CtaType } from "@/lib/social/post-core";
 import { createMediaUploadAction, saveAssetAction } from "@/app/[locale]/(dashboard)/social/studio-actions";
@@ -194,7 +194,8 @@ export function PostExtras(props: {
         <label htmlFor="post-first-comment" className="flex items-center gap-1.5 text-[12.5px] font-medium">
           <MessageSquareText className="h-3.5 w-3.5 text-accent" aria-hidden /> {t("social.post.firstComment")}
         </label>
-        <Textarea id="post-first-comment" rows={2} value={props.firstComment} onChange={(e) => props.setFirstComment(e.target.value)} placeholder={t("social.post.firstCommentHint")} dir="auto" />
+        {/* single-line on purpose: the post editor keeps exactly one multi-line box (the post text) */}
+        <Input id="post-first-comment" value={props.firstComment} onChange={(e) => props.setFirstComment(e.target.value)} placeholder={t("social.post.firstCommentHint")} dir="auto" maxLength={2200} className="h-9" />
       </div>
 
       {/* live preview */}

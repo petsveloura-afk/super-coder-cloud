@@ -62,3 +62,10 @@ describe("wave 51 — pipelines smart list fix", () => {
     expect(dealReasonText(t, ["stale", "overdue"] as never)).toBe("stale · overdue");
   });
 });
+
+describe("wave 51b — the post editor keeps exactly one multi-line box (e2e: post-editor textarea)", () => {
+  it("post extras use single-line inputs only", () => {
+    const src = read("apps/web/components/social/post-extras.tsx");
+    expect(src).not.toMatch(/<Textarea\b|<textarea\b/);
+  });
+});

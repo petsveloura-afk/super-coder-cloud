@@ -77,3 +77,66 @@ export async function markNotificationsReadAction(fd: FormData) {
     .is("read_at", null);
   revalidatePath(`/${locale}`, "layout");
 }
+
+/* ---------------------------------------------------------------- wave 52 — personal profile pro (additive) */
+
+const profileProSchema = z.object({
+  job_title: z.string().trim().max(120, "validation.tooLong").optional().default(""),
+  phone: z.string().trim().max(40, "validation.tooLong").optional().default(""),
+  bio: z.string().trim().max(500, "validation.tooLong").optional().default(""),
+});
+
+/** Job title, phone and a short bio (shown to the team). */
+export async function updateProfileProAction(input: { locale: string; job_title?: string; phone?: string; bio?: string }): Promise<ActionState> {
+  const locale = isLocale(input.locale) ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  const p = profileProSchema.safeParse(input);
+  if (!p.success) return { error: "validation.invalid" };
+  const { cleanPhone } = await import("@/lib/profile/profile-core");
+  const phone = p.data.phone ? cleanPhone(p.data.phone) : null;
+  if (p.data.phone && !phone) return { error: "settings.pro.badPhone" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ job_title: p.data.job_title || null, phone, bio: p.data.bio || null })
+    .eq("id", ctx.userId);
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}`, "layout");
+  return { ok: true, message: "settings.saved" };
+}
+
+/** One-time signed upload URL for the profile picture, inside the person's own folder (avatars/<user id>/…). */
+export async function createAvatarUploadAction(input: { locale: string; type: string; size: number }): Promise<ActionState<{ signedUrl: string; publicUrl: string }>> {
+  const locale = isLocale(input.locale) ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  const { avatarCheck } = await import("@/lib/profile/profile-core");
+  const chk = avatarCheck({ type: String(input.type ?? ""), size: Number(input.size) });
+  if (!chk.ok) return { error: chk.error === "type" ? "settings.pro.avatarType" : "settings.pro.avatarSize" };
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "errors.generic" };
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+  const { data: bucket } = await admin.storage.getBucket("avatars");
+  if (!bucket) await admin.storage.createBucket("avatars", { public: true, fileSizeLimit: 2097152, allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"] }).catch(() => undefined);
+  const { randomUUID } = await import("node:crypto");
+  const path = `${ctx.userId}/${randomUUID()}.${chk.ext}`;
+  const { data, error } = await admin.storage.from("avatars").createSignedUploadUrl(path);
+  if (error || !data?.signedUrl) return { error: "settings.pro.avatarFailed" };
+  return { ok: true, data: { signedUrl: data.signedUrl, publicUrl: admin.storage.from("avatars").getPublicUrl(path).data.publicUrl } };
+}
+
+/** Saves (or clears, with an empty url) the profile picture — only a picture from the person's own folder is accepted. */
+export async function setAvatarAction(input: { locale: string; url: string }): Promise<ActionState> {
+  const locale = isLocale(input.locale) ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  const url = String(input.url ?? "").trim();
+  if (url) {
+    const { isOwnAvatarUrl } = await import("@/lib/profile/profile-core");
+    const { publicEnv } = await import("@/lib/env");
+    if (!isOwnAvatarUrl(url, ctx.userId, publicEnv.supabaseUrl)) return { error: "validation.invalid" };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ avatar_url: url || null }).eq("id", ctx.userId);
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}`, "layout");
+  return { ok: true, message: url ? "settings.pro.avatarSaved" : "settings.pro.avatarRemoved" };
+}

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import * as DM from "@radix-ui/react-dropdown-menu";
-import { Bell, Check, ChevronDown, ChevronsLeft, ChevronsRight, LogOut, Menu, Plus, Search, ShieldCheck } from "lucide-react";
+import { Bell, Check, ChevronDown, ChevronsLeft, ChevronsRight, LogOut, Menu, Plus, Search, ShieldCheck, UserRound } from "lucide-react";
 import type { Permission } from "@scc/shared/permissions";
 import { matchCommands } from "@/lib/command-actions";
 import { MOBILE_PRIMARY, NAV_ITEMS, type NavItem, type NavSection } from "@/lib/navigation";
@@ -20,7 +20,7 @@ import { signOutAction } from "@/app/[locale]/(auth)/actions";
 import { switchOrganizationAction } from "@/app/[locale]/(onboarding)/onboarding/actions";
 
 export interface ShellProps {
-  user: { name: string; email: string };
+  user: { name: string; email: string; avatarUrl?: string | null };
   org: { id: string; name: string; isDemo: boolean };
   role: string;
   permissions: Permission[];
@@ -192,7 +192,13 @@ function UserMenu({ user, role, isPlatformAdmin }: { user: ShellProps["user"]; r
   return (
     <DM.Root dir={dir}>
       <DM.Trigger className="grid h-10 w-10 place-items-center rounded-full bg-accent-soft text-[13px] font-bold text-accent ring-1 ring-accent/30" aria-label={t("common.profile")}>
-        {initials(user.name || user.email)}
+        {user.avatarUrl ? (
+          // wave 52 — profile picture when the person uploaded one
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={user.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+        ) : (
+          initials(user.name || user.email)
+        )}
       </DM.Trigger>
       <DM.Portal>
         <DM.Content align="end" sideOffset={8} className="z-50 w-72 rounded-xl border border-line bg-elevated p-1.5 shadow-2xl">
@@ -209,6 +215,12 @@ function UserMenu({ user, role, isPlatformAdmin }: { user: ShellProps["user"]; r
             </div>
           </div>
           <DM.Separator className="my-1 h-px bg-line" />
+          {/* wave 52 — quick way to the personal profile */}
+          <DM.Item asChild>
+            <a href={`/${locale}/settings#my-profile`} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[14px] outline-none data-[highlighted]:bg-accent-soft" data-testid="menu-my-profile">
+              <UserRound className="h-4 w-4" aria-hidden /> {t("settings.pro.title")}
+            </a>
+          </DM.Item>
           <div className="px-1.5 py-1.5">
             <LanguageSwitcher />
           </div>

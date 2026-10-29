@@ -20,7 +20,7 @@ export default async function DashboardLayout({ children, params }: { children: 
 
   return (
     <AppShell
-      user={{ name: ctx.profile?.full_name ?? "", email: ctx.email }}
+      user={{ name: ctx.profile?.full_name ?? "", email: ctx.email, avatarUrl: ctx.profile?.avatar_url ?? null }}
       org={{ id: ctx.org.id, name: ctx.org.name, isDemo: ctx.org.is_demo }}
       role={ctx.role}
       permissions={PERMISSIONS.filter((p) => ctx.can(p))}

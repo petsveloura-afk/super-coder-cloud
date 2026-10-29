@@ -10,13 +10,14 @@ import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { auditLabel } from "@/lib/i18n/translate";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime } from "@/lib/format";
+import { formatCurrency, formatDateTime } from "@/lib/format";
 import { markNotificationsReadAction } from "./actions";
 import { ConversationPolicyCard, LeadRoutingCard, MyChannelsCard, type MyChannel } from "@/components/settings/team-plus";
 import { memberOptions } from "@/lib/lookups";
 import { CalendarCard, type CalendarConn } from "@/components/settings/calendar-card";
 import { PushCard } from "@/components/settings/push-card";
 import { vapidReady } from "@/lib/push/webpush-core";
+import { ProfileProCard, type MyStats } from "@/components/settings/profile-pro";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -75,6 +76,24 @@ export default async function SettingsPage({ params, searchParams }: { params: P
   const org = orgRes.data ?? { name: ctx.org.name, timezone: "Asia/Jerusalem", currency: "ILS", locale: "he" };
   const notifications = (notifRes.data ?? []) as { id: string; title_key: string; params: Record<string, string>; created_at: string; read_at: string | null; link?: string | null }[];
   const audit = auditRes.data as Pick<AuditLogRow, "id" | "action" | "entity_type" | "created_at">[] | null;
+  // wave 52 — personal profile pro: extra fields (tolerant before the migration runs) + my week
+  const nowIso = new Date().toISOString();
+  const [proRes, myOpenTasks, myOverdue, myDeals, myConvs] = await Promise.all([
+    supabase.from("profiles").select("avatar_url, job_title, phone, bio").eq("id", ctx.userId).maybeSingle(),
+    ctx.can("tasks.read") ? supabase.from("tasks").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).eq("assignee_id", ctx.userId).in("status", ["open", "in_progress"]) : Promise.resolve({ count: null }),
+    ctx.can("tasks.read") ? supabase.from("tasks").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).eq("assignee_id", ctx.userId).in("status", ["open", "in_progress"]).lt("due_at", nowIso) : Promise.resolve({ count: null }),
+    ctx.can("deals.read") ? supabase.from("deals").select("value").eq("organization_id", ctx.org.id).eq("owner_id", ctx.userId).eq("status", "open").limit(1000) : Promise.resolve({ data: null }),
+    ctx.can("inbox.read") ? supabase.from("conversations").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).eq("assignee_id", ctx.userId).eq("status", "open") : Promise.resolve({ count: null }),
+  ]);
+  const pro = (proRes.error ? null : proRes.data) as { avatar_url: string | null; job_title: string | null; phone: string | null; bio: string | null } | null;
+  const dealRows = ((myDeals as { data: { value: number | string }[] | null }).data ?? []) as { value: number | string }[];
+  const myStats: MyStats = {
+    openTasks: (myOpenTasks as { count: number | null }).count ?? 0,
+    overdueTasks: (myOverdue as { count: number | null }).count ?? 0,
+    openDeals: dealRows.length,
+    openDealsValue: formatCurrency(locale, dealRows.reduce((sum, d) => sum + Number(d.value ?? 0), 0), (org as { currency?: string }).currency || "ILS"),
+    myConversations: (myConvs as { count: number | null }).count ?? 0,
+  };
 
   return (
     <>
@@ -91,6 +110,20 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           <div className="p-5">
             <ProfileForm fullName={ctx.profile?.full_name ?? ""} preferredLocale={ctx.profile?.locale ?? locale} />
           </div>
+        </Card>
+        {/* wave 52 — personal profile pro */}
+        <Card id="my-profile" className="scroll-mt-24 xl:col-span-2">
+          <CardHeader title={t("settings.pro.title")} description={t("settings.pro.subtitle")} />
+          <ProfileProCard
+            name={ctx.profile?.full_name ?? ""}
+            email={ctx.email}
+            role={t(`team.roles.${ctx.role}`)}
+            avatarUrl={pro?.avatar_url ?? null}
+            jobTitle={pro?.job_title ?? ""}
+            phone={pro?.phone ?? ""}
+            bio={pro?.bio ?? ""}
+            stats={myStats}
+          />
         </Card>
 
         <Card id="my-channels" className="scroll-mt-24">

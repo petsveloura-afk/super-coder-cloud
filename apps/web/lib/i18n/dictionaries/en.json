@@ -329,6 +329,38 @@
     "inviteLinkBackup": "The email was sent. You can also share the link manually — it is shown only once:"
   },
   "settings": {
+    "pro": {
+      "title": "My profile",
+      "subtitle": "Photo, role and contact details the team sees — plus a snapshot of your week",
+      "avatarChange": "Change profile photo",
+      "avatarRemove": "Remove photo",
+      "avatarSaved": "Profile photo updated",
+      "avatarRemoved": "Profile photo removed",
+      "avatarType": "Upload a JPG, PNG or WEBP",
+      "avatarSize": "The picture is too large — up to 2MB",
+      "avatarFailed": "Photo upload failed — try again",
+      "completeness": "Profile completeness",
+      "item": {
+        "name": "Name",
+        "avatar": "Photo",
+        "jobTitle": "Role",
+        "phone": "Phone",
+        "bio": "About me"
+      },
+      "jobTitle": "Role",
+      "jobTitlePh": "e.g. Sales manager",
+      "phone": "Phone",
+      "bio": "About me",
+      "bioPh": "A sentence or two so the team and customers get to know you",
+      "badPhone": "The phone number is not valid",
+      "myWeek": "My week",
+      "stat": {
+        "tasks": "My open tasks",
+        "overdue": "Overdue",
+        "deals": "{n} open deals of mine",
+        "inbox": "Open conversations assigned to me"
+      }
+    },
     "title": "Settings",
     "organization": "Organization",
     "profile": "My profile",
