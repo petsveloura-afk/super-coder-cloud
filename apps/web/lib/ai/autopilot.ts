@@ -40,6 +40,7 @@ import {
 } from "./intelligence";
 import { normalizeSchedule, nextOpenText, scheduleStatus } from "./schedule";
 import { proBrief } from "./brain-pro";
+import { agentActionsInstructions, memoryBlock, parseActionMarkers } from "./agent-actions-core";
 
 /**
  * AI autopilot — the business's AI agent answers customers automatically on
@@ -432,6 +433,10 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
       website: site?.slug ? `${base}/${locale}/s/${site.slug}` : null,
     },
   });
+  // wave 54 — long-term memory about this customer + the action tools (task, tag, follow-up, booking)
+  const { loadMemories, canBook } = await import("./agent-actions");
+  const [memories, bookable] = await Promise.all([loadMemories(orgId, (conv.contact_id as string | null) ?? null).catch(() => []), canBook(orgId).catch(() => false)]);
+  const actionsSection = [memoryBlock(memories), agentActionsInstructions({ canBook: bookable, hasContact: Boolean(conv.contact_id) })].filter(Boolean).join("\n\n");
   // wave 7 — business profile, goal, sales method and tools (lead capture, buttons, share-phone)
   const system = `${baseInstructions}\n\n${salesAgentInstructions({
     profile: (agent.profile as AgentProfile | null) ?? null,
@@ -439,7 +444,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     channel: ch,
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
     locale,
-  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}`;
+  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}\n\n${actionsSection}`;
   void typingIndicator(orgId, ch, conv.external_id as string); // speed upgrade: never waited for (the typing loop already runs)
   // wave 16: help-center answers (knowledge base) for this question
   let kb = "";
@@ -512,7 +517,9 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   timing.mark("ai");
   // wave 15 — the agent checks its own answer (invented prices, repetition, leaks, empty text)
   // and gets exactly one chance to fix it; whatever is still wrong is removed or handed to a person
-  let answer = out.text;
+  // wave 54: the action markers are taken out first (the customer never sees them)
+  let actionMarkers = parseActionMarkers(out.text);
+  let answer = actionMarkers.text;
   let unsupportedLeft: string[] = [];
   {
     const facts = factsText({ instructions: agent.instructions as string, profile: profile as Record<string, unknown> });
@@ -540,8 +547,12 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
       );
       timing.mark("self_check");
       if (fixed.ok) {
-        const again = checkReply({ reply: parseAgentTools(fixed.text).text, facts, previousAssistant: previous, allowEmpty: parseAgentTools(fixed.text).handoff, customerText: lastIn });
-        if (again.ok || again.issues.length < check.issues.length) answer = fixed.text;
+        const fixedMarkers = parseActionMarkers(fixed.text);
+        const again = checkReply({ reply: parseAgentTools(fixedMarkers.text).text, facts, previousAssistant: previous, allowEmpty: parseAgentTools(fixedMarkers.text).handoff, customerText: lastIn });
+        if (again.ok || again.issues.length < check.issues.length) {
+          answer = fixedMarkers.text;
+          if (fixedMarkers.actions.length) actionMarkers = fixedMarkers;
+        }
       }
     }
     const last = parseAgentTools(answer);
@@ -609,6 +620,21 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   }
   let lead: LeadCaptureResult | null = null;
   if (tools.lead) lead = await captureLead({ orgId, conversationId: conv.id as string, lead: tools.lead, channel: ch, title: (conv.title as string | null) ?? null });
+  // wave 54: memory + actions (task, tag, follow-up, booking) — never blocks or breaks the reply
+  if (actionMarkers.actions.length || tools.lead) {
+    const { executeAgentActions } = await import("./agent-actions");
+    await executeAgentActions({
+      orgId,
+      conversationId: conv.id as string,
+      contactId: lead?.contact_id ?? ((conv.contact_id as string | null) ?? null),
+      channel: ch,
+      agentId: agent.id as string,
+      locale: replyLocale,
+      actions: actionMarkers.actions,
+      lead: tools.lead,
+      customer,
+    }).catch((e) => console.error("agent actions failed", (e as Error).message));
+  }
   if (tools.handoff) await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: tools.reason ?? "agent" });
   return { replied: true, handoff: tools.handoff, reason: tools.handoff ? (tools.reason ?? "agent") : undefined, text, lead, leadData: tools.lead ?? null };
 }

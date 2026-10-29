@@ -23,6 +23,7 @@ import {
   Sparkles,
   Share2,
   BookOpen,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,4 +54,6 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   // wave 19
   agents: Sparkles,
   social: Share2,
+  // wave 54
+  operator: Zap,
 };

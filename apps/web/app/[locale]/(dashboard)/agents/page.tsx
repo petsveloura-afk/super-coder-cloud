@@ -8,6 +8,8 @@ import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { AGENTS, AGENT_DEFAULTS } from "@/lib/agents/core";
+import { PlusAgents, type PlusAgentView } from "@/components/agents/plus-agents";
+import { AGENTS_PLUS, PLUS_DEFAULTS } from "@/lib/agents/plus-core";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -42,6 +44,17 @@ export default async function AgentsPage({ params }: { params: Promise<{ locale:
       runs: ((runs ?? []) as { id: number; agent: string; summary: string; actions: number; created_at: string }[]).filter((r) => r.agent === key).slice(0, 8),
     };
   });
+  // wave 54 — the new team members (same settings / runs tables)
+  const plusViews: PlusAgentView[] = AGENTS_PLUS.map((key) => {
+    const s = ((settings ?? []) as { agent: string; enabled: boolean; config: Record<string, unknown>; last_run_at: string | null }[]).find((x) => x.agent === key);
+    return {
+      key,
+      enabled: Boolean(s?.enabled),
+      config: { ...PLUS_DEFAULTS[key].config, ...(s?.config ?? {}) } as Record<string, number | boolean | string>,
+      lastRunAt: s?.last_run_at ?? null,
+      runs: ((runs ?? []) as { id: number; agent: string; summary: string; actions: number; created_at: string }[]).filter((r) => r.agent === key).slice(0, 6),
+    };
+  });
   return (
     <>
       <PageHeader title={t("agents.title")} description={t("agents.subtitle")} />
@@ -59,6 +72,7 @@ export default async function AgentsPage({ params }: { params: Promise<{ locale:
       </Card>
       <AgentsBrain agents={views} canManage={ctx.can("ai.manage")} />
       <AgentsHub agents={views} canManage={ctx.can("ai.manage")} />
+      <PlusAgents agents={plusViews} canManage={ctx.can("ai.manage")} />
     </>
   );
 }

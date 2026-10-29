@@ -25,6 +25,8 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "ai-agents", label: "nav.aiAgents", section: "growth", phase: null, permission: "ai.use" },
   // wave 19: the AI team (marketing, sales manager, daily brief, collections) + social (comments, posts, reviews)
   { key: "agents", label: "nav.agents", section: "growth", phase: null, permission: "ai.use" },
+  // wave 54: the AI Operator — say what should happen, approve, done
+  { key: "operator", label: "nav.operator", section: "growth", phase: null, permission: "ai.use" },
   { key: "social", label: "nav.social", section: "growth", phase: null, permission: "inbox.read" },
   { key: "campaigns", label: "nav.campaigns", section: "growth", phase: null, permission: "campaigns.manage" },
   { key: "websites", label: "nav.websites", section: "growth", phase: null, permission: "websites.manage" },
