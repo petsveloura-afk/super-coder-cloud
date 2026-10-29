@@ -110,3 +110,42 @@ export function cleanTranslation(raw: string | null | undefined, fallback: strin
   const t = (raw ?? "").replace(/\s+/g, " ").replace(/^["'“”«»\s]+|["'“”«»\s]+$/g, "").trim().slice(0, 300);
   return t.length >= 2 ? t : fallback;
 }
+
+/* ---------------------------------------------------------------- text options (post copy) */
+
+const WORD = /[\p{L}\p{N}]+/gu;
+const words = (s: string) => (s.match(WORD) ?? []).length;
+const norm = (s: string) => (s.match(WORD) ?? []).join(" ").toLowerCase();
+
+/** The brief sent as the user message: the topic is a subject to write ABOUT, never text to repeat. */
+export function buildTextBrief(input: { topic: string; tone: StudioTone; platform: StudioPlatform; langName: string }): string {
+  const topic = input.topic.replace(/\s+/g, " ").trim().slice(0, 400);
+  return [
+    `Subject of the post: ${topic}`,
+    `Platform: ${input.platform === "instagram" ? "Instagram" : "Facebook"}`,
+    `Tone: ${input.tone}`,
+    `Language: ${input.langName}`,
+    "Write complete, ready-to-publish posts about this subject. Do not just repeat the subject.",
+  ].join("\n");
+}
+
+/**
+ * Keeps only real posts: long enough (min 6 words), not an echo of the topic or of the text already on screen,
+ * no duplicates. An empty result means the model failed, so the caller reports an error instead of showing junk.
+ */
+export function validateVariants(variants: string[], topic: string, current?: string | null): string[] {
+  const t = norm(topic);
+  const c = norm(current ?? "");
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const v of variants) {
+    const n = norm(v);
+    if (words(v) < 6) continue;
+    if (n === t || n === c) continue;
+    if (t && n.startsWith(t) && words(v) - words(topic) < 5) continue;
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(v);
+  }
+  return out;
+}
