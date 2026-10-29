@@ -266,7 +266,7 @@ export function InstallAppBanner({ className }: { className?: string }) {
         <X className="h-4 w-4" />
       </button>
       <div className="flex flex-wrap items-center gap-4 pe-6">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-accent text-white shadow-md">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-accent-solid text-accent-fg shadow-md">
           <Smartphone className="h-6 w-6" aria-hidden />
         </span>
         <div className="min-w-[12rem] flex-1">
@@ -278,7 +278,7 @@ export function InstallAppBanner({ className }: { className?: string }) {
           </ul>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={primary} className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-[14px] font-semibold text-white shadow-sm transition hover:opacity-90" data-testid="install-app-banner-cta">
+          <button type="button" onClick={primary} className="inline-flex items-center gap-2 rounded-xl bg-accent-solid px-4 py-2.5 text-[14px] font-semibold text-accent-fg shadow-sm transition hover:bg-accent-solid-hover" data-testid="install-app-banner-cta">
             {hint === "inapp" ? <ExternalLink className="h-4 w-4" aria-hidden /> : <Download className="h-4 w-4" aria-hidden />}
             {hint === "inapp" ? t("pwaPro.openInBrowser") : t("pwa.install")}
           </button>

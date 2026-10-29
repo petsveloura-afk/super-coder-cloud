@@ -4,6 +4,7 @@ import { limitErrorKey } from "@scc/shared/billing";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateAndStoreImage, imagesConfigured } from "@/lib/ai/images";
 import { generateRouted } from "@/lib/ai/router";
+import { chainFor } from "./image-providers-core";
 import { PRIMARY_COOLDOWN_MS, buildFallbackUrl, cleanTranslation, isQuotaError, needsEnglishTopic, postToSceneSeed, primaryAvailable, type StudioPlatform } from "./studio-core";
 
 /**
@@ -51,12 +52,31 @@ async function produce(orgId: string, prompt: string, platform: StudioPlatform):
       if (isQuotaError(primaryError)) primaryCoolUntil = Date.now() + PRIMARY_COOLDOWN_MS;
     }
   }
+  // wave 49 — free AI generators (Cloudflare / Hugging Face / Together) before the keyless fallback
+  const chain = chainFor(process.env);
+  if (chain.before.length) {
+    try {
+      const { runFreeChain } = await import("./image-providers");
+      return await runFreeChain(orgId, prompt, platform, chain.before, 45_000);
+    } catch (e) {
+      console.error("studio free chain (before) failed", (e as Error).message);
+    }
+  }
   try {
     const r = await fallbackAndStore(orgId, prompt, platform);
     return { ...r, provider: "fallback" };
   } catch (e) {
     const fb = (e as Error).message;
     console.error("studio fallback failed", fb);
+    // wave 49 — real photos (Pexels / Pixabay / Openverse) and, last, the branded design that always works
+    if (chain.after.length) {
+      try {
+        const { runFreeChain } = await import("./image-providers");
+        return await runFreeChain(orgId, prompt, platform, chain.after, 30_000);
+      } catch (e2) {
+        console.error("studio free chain (after) failed", (e2 as Error).message);
+      }
+    }
     // while the primary provider is cooling down after a quota error, report it as a quota problem
     throw new Error(primaryError || (primaryAvailable(primaryCoolUntil, Date.now()) ? fb : "image_429:cooldown"));
   }
