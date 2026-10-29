@@ -203,3 +203,20 @@ Migrations: `20261015000032_crm_intelligence.sql`, `20261015000033_conversation_
 Public API: new scope `webhooks.manage` — REST hooks for Zapier / Make / n8n (`POST/GET /api/public/v1/hooks`, `DELETE /api/public/v1/hooks/{id}`, samples `GET /api/public/v1/samples?event=`).
 
 Migrations: `20261015000038_platform_social.sql`, `20261015000039_stores_reviews.sql`, `20261015000040_agents_events.sql`.
+
+
+## נספח: משתנים אופציונליים נוספים (הושלם בסריקת התאמות)
+כל המשתנים שהקוד קורא ושלא הופיעו קודם. הרשימה המלאה בקובץ הדוגמה בשורות המוערות בסוף `.env.example`.
+
+| משתנה | שימוש |
+|---|---|
+| `APP_URL` | כתובת האפליקציה עבור גשר WhatsApp/Worker |
+| `NEXT_PUBLIC_APP_TIMEZONE` | אזור הזמן להצגת תאריכים (ברירת מחדל Asia/Jerusalem) |
+| `SITES_ROOT_DOMAIN`, `SITES_DEFAULT_LANG` | דומיין הבסיס ושפת ברירת המחדל של אתרי הלקוחות |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | התראות Push |
+| `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`, `SHOPIFY_API_VERSION` | אינטגרציית Shopify |
+| `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID`, `DOMAIN_AUTO_RENEW` | ניהול דומיינים מותאמים |
+| `META_PAGES_APP_SECRET`, `META_IG_APP_SECRET`, `META_PAGES_CONFIG_ID`, `META_WEBHOOK_AUTOFIX` | Messenger / Instagram |
+| `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `DATA_DIR`, `LOG_LEVEL` | שירות wa-bridge (חשבון טלגרם אישי, תיקיית סשנים קבועה, רמת לוג) |
+| `BACKUP_PASSPHRASE` | סוד GitHub Actions להצפנת גיבויי מסד הנתונים |
+| `*_API_BASE`, `*_URL` של ספקים | דריסת כתובות ספקים לבדיקות/פרוקסי בלבד. לא להגדיר בפרודקשן |

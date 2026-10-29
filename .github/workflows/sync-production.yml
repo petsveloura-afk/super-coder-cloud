@@ -24,10 +24,14 @@ concurrency:
   group: sync-production
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: production
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

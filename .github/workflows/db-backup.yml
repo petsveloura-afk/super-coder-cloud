@@ -17,9 +17,13 @@ on:
     - cron: "41 2 * * 0"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   backup:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}

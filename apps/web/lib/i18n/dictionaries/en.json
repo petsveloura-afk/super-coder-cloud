@@ -636,7 +636,8 @@
         "sms": "SMS",
         "telegram_user": "Telegram (personal account)",
         "messenger": "Facebook Messenger",
-        "instagram": "Instagram"
+        "instagram": "Instagram",
+        "voice": "Phone call"
       }
     },
     "templates": {
@@ -2022,7 +2023,8 @@
       "whatsapp_qr": "WhatsApp (QR)",
       "telegram_user": "Telegram (personal account)",
       "messenger": "Facebook Messenger",
-      "instagram": "Instagram Direct"
+      "instagram": "Instagram Direct",
+      "voice": "Phone call"
     },
     "notConnected": "Not connected",
     "message": "Message",
@@ -2330,6 +2332,7 @@
     },
     "empty": "No conversations here",
     "openContact": "Open contact",
+    "voiceReplyNote": "Phone call: a written reply is sent to the caller as an SMS (requires a connected SMS channel).",
     "pick": "Pick a conversation",
     "reply": "Reply",
     "replyPlaceholder": "Write a reply… (Ctrl+Enter to send)",
@@ -3619,7 +3622,8 @@
       "email": "E-mail",
       "web": "Website chat",
       "messenger": "Messenger",
-      "instagram": "Instagram"
+      "instagram": "Instagram",
+      "voice": "Phone call"
     },
     "fromCustomer": "from the customer",
     "fromAI": "AI reply",

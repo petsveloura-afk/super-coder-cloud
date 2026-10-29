@@ -636,7 +636,8 @@
         "sms": "SMS",
         "telegram_user": "Telegram (חשבון אישי)",
         "messenger": "Facebook Messenger",
-        "instagram": "Instagram (הודעות)"
+        "instagram": "Instagram (הודעות)",
+        "voice": "שיחת טלפון"
       }
     },
     "templates": {
@@ -2022,7 +2023,8 @@
       "whatsapp_qr": "WhatsApp (QR)",
       "telegram_user": "Telegram (חשבון אישי)",
       "messenger": "Facebook Messenger",
-      "instagram": "Instagram"
+      "instagram": "Instagram",
+      "voice": "שיחת טלפון"
     },
     "notConnected": "לא מחובר",
     "message": "תוכן ההודעה",
@@ -2330,6 +2332,7 @@
     },
     "empty": "אין שיחות כאן",
     "openContact": "לכרטיס איש הקשר",
+    "voiceReplyNote": "שיחת טלפון: תשובה כתובה נשלחת למתקשר כהודעת SMS (דורש ערוץ SMS מחובר).",
     "pick": "בחרו שיחה מהרשימה",
     "reply": "תשובה",
     "replyPlaceholder": "כתבו תשובה… (Ctrl+Enter לשליחה)",
@@ -3619,7 +3622,8 @@
       "email": "מייל",
       "web": "צ׳אט באתר",
       "messenger": "מסנג'ר",
-      "instagram": "אינסטגרם"
+      "instagram": "אינסטגרם",
+      "voice": "שיחת טלפון"
     },
     "fromCustomer": "מהלקוח",
     "fromAI": "תשובת AI",

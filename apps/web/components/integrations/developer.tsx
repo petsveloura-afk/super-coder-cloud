@@ -19,7 +19,7 @@ import {
 } from "@/app/[locale]/(dashboard)/integrations/actions";
 import { formatDateTime } from "@/lib/format";
 
-const SCOPES = ["contacts.read", "contacts.write", "deals.read", "deals.write", "tasks.write", "events.read"] as const;
+const SCOPES = ["contacts.read", "contacts.write", "deals.read", "deals.write", "tasks.write", "events.read", "webhooks.manage"] as const;
 const EVENTS = ["*", ...AUTOMATION_TRIGGERS.filter((x) => x !== "webhook.inbound")];
 
 function CopyButton({ value }: { value: string }) {

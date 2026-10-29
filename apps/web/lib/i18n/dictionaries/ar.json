@@ -636,7 +636,8 @@
         "sms": "SMS",
         "telegram_user": "Telegram (حساب شخصي)",
         "messenger": "فيسبوك ماسنجر",
-        "instagram": "رسائل إنستغرام"
+        "instagram": "رسائل إنستغرام",
+        "voice": "مكالمة هاتفية"
       }
     },
     "templates": {
@@ -2022,7 +2023,8 @@
       "whatsapp_qr": "WhatsApp (QR)",
       "telegram_user": "Telegram (حساب شخصي)",
       "messenger": "Facebook Messenger",
-      "instagram": "إنستغرام"
+      "instagram": "إنستغرام",
+      "voice": "مكالمة هاتفية"
     },
     "notConnected": "غير متصل",
     "message": "نص الرسالة",
@@ -2330,6 +2332,7 @@
     },
     "empty": "لا توجد محادثات هنا",
     "openContact": "فتح جهة الاتصال",
+    "voiceReplyNote": "مكالمة هاتفية: يُرسل الرد المكتوب إلى المتصل كرسالة SMS (يتطلب قناة SMS متصلة).",
     "pick": "اختر محادثة",
     "reply": "الرد",
     "replyPlaceholder": "اكتب ردًا… (Ctrl+Enter للإرسال)",
@@ -3619,7 +3622,8 @@
       "email": "البريد",
       "web": "دردشة الموقع",
       "messenger": "ماسنجر",
-      "instagram": "إنستغرام"
+      "instagram": "إنستغرام",
+      "voice": "مكالمة هاتفية"
     },
     "fromCustomer": "من العميل",
     "fromAI": "رد الذكاء الاصطناعي",

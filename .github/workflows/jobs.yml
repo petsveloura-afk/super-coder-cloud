@@ -16,6 +16,9 @@ concurrency:
   group: automation-jobs
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   dispatch:
     runs-on: ubuntu-latest

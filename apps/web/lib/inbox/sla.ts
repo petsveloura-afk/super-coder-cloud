@@ -40,7 +40,7 @@ export function waitLabel(minutes: number, locale: string): string {
   return he ? `${d} ימים` : ar ? `${d} أيام` : `${d}d`;
 }
 
-export const INBOX_CHANNELS = ["whatsapp", "whatsapp_qr", "telegram", "telegram_user", "instagram", "messenger", "web", "email", "sms"] as const;
+export const INBOX_CHANNELS = ["whatsapp", "whatsapp_qr", "telegram", "telegram_user", "instagram", "messenger", "web", "email", "sms", "voice"] as const;
 export type InboxChannel = (typeof INBOX_CHANNELS)[number];
 export const INBOX_FLAGS = ["waiting", "hot", "human"] as const;
 export type InboxFlag = (typeof INBOX_FLAGS)[number];
