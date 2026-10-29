@@ -4644,7 +4644,8 @@
       "badUrl": "The link must start with https://",
       "notConfigured": "AI images are not connected (an image key is missing in the server settings)",
       "imageFailed": "The image could not be created — try again in a moment. No credit was charged.",
-      "maxVariations": "You already have the maximum number of options"
+      "maxVariations": "You already have the maximum number of options",
+      "quota": "The image provider's quota is used up and the backup generator is also unavailable. Check billing in Google AI Studio, then try again. No credit was charged."
     }
   },
   "market": {

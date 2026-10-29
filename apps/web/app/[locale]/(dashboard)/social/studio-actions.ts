@@ -53,7 +53,7 @@ export async function aiImageAction(input: { locale: string; topic: string; plat
   const images: { url: string }[] = [];
   let partialError: string | undefined;
   for (let i = 0; i < count; i++) {
-    const r = await generateMeteredImage(ctx.org.id, prompt);
+    const r = await generateMeteredImage(ctx.org.id, prompt, p.data.platform);
     if (!r.ok) {
       partialError = r.error;
       break; // stop at the first failure — nothing more is reserved

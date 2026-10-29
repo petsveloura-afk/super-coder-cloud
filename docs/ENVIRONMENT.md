@@ -220,3 +220,12 @@ Migrations: `20261015000038_platform_social.sql`, `20261015000039_stores_reviews
 | `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `DATA_DIR`, `LOG_LEVEL` | שירות wa-bridge (חשבון טלגרם אישי, תיקיית סשנים קבועה, רמת לוג) |
 | `BACKUP_PASSPHRASE` | סוד GitHub Actions להצפנת גיבויי מסד הנתונים |
 | `*_API_BASE`, `*_URL` של ספקים | דריסת כתובות ספקים לבדיקות/פרוקסי בלבד. לא להגדיר בפרודקשן |
+
+### Post studio images — fallback provider (wave 45)
+When the Gemini image quota is exhausted (HTTP 429) the post studio falls back to a keyless generator so the picture is still created. After a 429 the Gemini image models are skipped for 10 minutes.
+
+| Variable | Required | Scope | Purpose |
+|---|---|---|---|
+| `STUDIO_IMAGE_FALLBACK` | no | server | `pollinations` (default) or `off` to disable the fallback |
+| `STUDIO_IMAGE_FALLBACK_URL` | no | server | alternative compatible prompt endpoint (default `https://image.pollinations.ai/prompt`) |
+| `POLLINATIONS_API_KEY` | no | server | sent as a bearer token when the provider asks for one |

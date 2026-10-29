@@ -70,3 +70,30 @@ export function normalizeAsset(input: AssetInput): { url: string; title: string 
   const tags = [...new Set((input.tags ?? []).map((t) => t.trim().toLowerCase().slice(0, 40)).filter(Boolean))].slice(0, 10);
   return { url, title: clean(input.title, 200), prompt: clean(input.prompt, 1800), tags };
 }
+
+/* ---------------------------------------------------------------- fallback image provider (stage A fix) */
+
+/** True when an image error means the provider quota / billing is exhausted (HTTP 429). */
+export function isQuotaError(message: string | null | undefined): boolean {
+  return /image_429|RESOURCE_EXHAUSTED|quota/i.test(message ?? "");
+}
+
+export function imageSize(platform: StudioPlatform): { width: number; height: number } {
+  return platform === "instagram" ? { width: 1024, height: 1024 } : { width: 1200, height: 630 };
+}
+
+/**
+ * URL of the keyless fallback generator (Pollinations "prompt" endpoint). `base` is overridable
+ * with STUDIO_IMAGE_FALLBACK_URL so the business can point at another compatible service.
+ */
+export function buildFallbackUrl(prompt: string, platform: StudioPlatform, seed: number, base = "https://image.pollinations.ai/prompt"): string {
+  const { width, height } = imageSize(platform);
+  const q = new URLSearchParams({ width: String(width), height: String(height), nologo: "true", model: "flux", seed: String(Math.abs(Math.floor(seed)) % 1_000_000) });
+  return `${base.replace(/\/$/, "")}/${encodeURIComponent(prompt.slice(0, 900))}?${q.toString()}`;
+}
+
+/** After a quota error, skip the primary provider for this long (ms) instead of burning ~6 calls per click. */
+export const PRIMARY_COOLDOWN_MS = 10 * 60_000;
+export function primaryAvailable(coolUntil: number, now: number): boolean {
+  return now >= coolUntil;
+}

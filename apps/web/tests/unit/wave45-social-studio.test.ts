@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { STUDIO_MAX_VARIATIONS, buildImagePrompt, extraVariations, normalizeAsset, splitVariants, variationCount } from "@/lib/social/studio-core";
+import { PRIMARY_COOLDOWN_MS, STUDIO_MAX_VARIATIONS, buildFallbackUrl, buildImagePrompt, extraVariations, imageSize, isQuotaError, normalizeAsset, primaryAvailable, splitVariants, variationCount } from "@/lib/social/studio-core";
 
 const root = path.resolve(__dirname, "../../../..");
 const read = (p: string) => fs.readFileSync(path.join(root, p), "utf8");
@@ -37,6 +37,27 @@ describe("wave 45 / stage A — post studio core", () => {
     expect(normalizeAsset({ url: "https://x.test/" + "a".repeat(1000) })).toBeNull();
     const a = normalizeAsset({ url: " https://x.test/a.png ", title: " hi   there ", tags: ["A", "a", " b ", ""] });
     expect(a).toEqual({ url: "https://x.test/a.png", title: "hi there", prompt: null, tags: ["a", "b"] });
+  });
+});
+
+describe("wave 45 / stage A — fallback image provider", () => {
+  it("recognises quota errors", () => {
+    expect(isQuotaError("image_429:RESOURCE_EXHAUSTED:You exceeded your current quota")).toBe(true);
+    expect(isQuotaError("image_503")).toBe(false);
+    expect(isQuotaError(null)).toBe(false);
+  });
+  it("builds a bounded, encoded fallback url sized for the network", () => {
+    const u = buildFallbackUrl("fresh bread & butter", "instagram", 12345);
+    expect(u.startsWith("https://image.pollinations.ai/prompt/fresh%20bread%20%26%20butter?")).toBe(true);
+    expect(u).toContain("width=1024");
+    expect(u).toContain("height=1024");
+    expect(imageSize("facebook")).toEqual({ width: 1200, height: 630 });
+    expect(buildFallbackUrl("x".repeat(5000), "facebook", 1, "https://img.test/p/").length).toBeLessThan(1400);
+  });
+  it("skips the primary provider only during the cool-down", () => {
+    expect(primaryAvailable(0, 1000)).toBe(true);
+    expect(primaryAvailable(1000 + PRIMARY_COOLDOWN_MS, 1000)).toBe(false);
+    expect(primaryAvailable(1000, 1000 + 1)).toBe(true);
   });
 });
 
