@@ -15,7 +15,10 @@ export async function publishDuePosts(budgetMs = 20_000): Promise<{ claimed: num
   const recovered = stuck?.length ?? 0;
   const { data, error } = await admin.rpc("claim_due_social_posts", { p_limit: 10 });
   if (error) return { claimed: 0, published: 0, failed: 0, retried: 0, recovered };
-  const rows = (data ?? []) as { id: string; organization_id: string; platforms: string[]; body: string; image_url: string | null; results?: Record<string, unknown> | null }[];
+  const rows = (data ?? []) as { id: string; organization_id: string; platforms: string[]; body: string; image_url: string | null; results?: Record<string, unknown> | null; link_url?: string | null; video_url?: string | null; cta_type?: string | null; cta_value?: string | null; first_comment?: string | null }[];
+  // wave 51 — posts with a link / button / video / first comment take the rich path (old posts: unchanged path)
+  const { isRichPost } = await import("./post-core");
+  const orgLang = new Map<string, string>();
   const { publishPost } = await import("@/lib/channels/meta-pages");
   let published = 0;
   let failed = 0;
@@ -36,7 +39,30 @@ export async function publishDuePosts(budgetMs = 20_000): Promise<{ claimed: num
         results[platform] = { ok: false, error: "not_connected" };
         continue;
       }
-      const r = await publishPost({ platform, pageId: acc.config.page_id ?? "", igId: acc.config.ig_id ?? null, pageToken: acc.secrets.page_token, text: p.body, imageUrl: p.image_url });
+      let r: { ok: boolean; id?: string; error?: string };
+      if (isRichPost(p)) {
+        if (!orgLang.has(p.organization_id)) {
+          const { data: org } = await admin.from("organizations").select("locale").eq("id", p.organization_id).maybeSingle();
+          orgLang.set(p.organization_id, String((org as { locale?: string } | null)?.locale ?? "he"));
+        }
+        const { publishRichPost } = await import("@/lib/channels/meta-pages");
+        r = await publishRichPost({
+          platform,
+          pageId: acc.config.page_id ?? "",
+          igId: acc.config.ig_id ?? null,
+          igUsername: acc.config.username || null,
+          pageToken: acc.secrets.page_token,
+          text: p.body,
+          imageUrl: p.image_url,
+          videoUrl: p.video_url ?? null,
+          linkUrl: p.link_url ?? null,
+          cta: p.cta_type ? { type: p.cta_type, value: p.cta_value ?? null } : null,
+          firstComment: p.first_comment ?? null,
+          lang: orgLang.get(p.organization_id) ?? "he",
+        });
+      } else {
+        r = await publishPost({ platform, pageId: acc.config.page_id ?? "", igId: acc.config.ig_id ?? null, pageToken: acc.secrets.page_token, text: p.body, imageUrl: p.image_url });
+      }
       results[platform] = r.ok ? r : { ...r, kind: classifyPublishError(r.error) };
       if (r.ok) ok++;
     }

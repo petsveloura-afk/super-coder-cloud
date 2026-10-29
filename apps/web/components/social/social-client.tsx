@@ -12,6 +12,7 @@ import { DEFAULT_TIME_ZONE } from "@/lib/format";
 import { Chips, CalendarPanel, ComposerExtras, ExportButton, OverviewPanel, SearchBox, downloadCsv } from "@/components/social/social-extras";
 import { StudioPanel } from "@/components/social/social-studio";
 import type { StudioSeed } from "@/components/social/social-studio";
+import { PostExtras, PostMediaBadges } from "@/components/social/post-extras";
 import { filterComments, filterPosts, filterReviews, type CommentFilter, type PostFilter, type ReviewFilter } from "@/lib/social/insights";
 import { approveAllDraftsAction, commentStatusAction, duplicatePostAction, postStatusAction, replyCommentAction, replyReviewAction, reviewSettingsAction, savePostAction, saveSocialSettingsAction } from "@/app/[locale]/(dashboard)/social/actions";
 
@@ -36,6 +37,12 @@ export interface PostRow {
   status: string;
   source: string;
   results: Record<string, { ok?: boolean; error?: string }>;
+  // wave 51
+  link_url?: string | null;
+  video_url?: string | null;
+  cta_type?: string | null;
+  cta_value?: string | null;
+  first_comment?: string | null;
 }
 export interface ReviewRow {
   id: string;
@@ -136,6 +143,12 @@ function PostEditor({ initial, onDone, presetAt }: { initial?: PostRow | null; o
   const [image, setImage] = useState(initial?.image_url ?? "");
   // stage B — hand-off from the AI writer to the image panel
   const [studioSeed, setStudioSeed] = useState<StudioSeed | null>(null);
+  // wave 51 — link, button, video, first comment
+  const [linkUrl, setLinkUrl] = useState(initial?.link_url ?? "");
+  const [videoUrl, setVideoUrl] = useState(initial?.video_url ?? "");
+  const [ctaType, setCtaType] = useState(initial?.cta_type ?? "");
+  const [ctaValue, setCtaValue] = useState(initial?.cta_value ?? "");
+  const [firstComment, setFirstComment] = useState(initial?.first_comment ?? "");
   const [fb, setFb] = useState(initial ? initial.platforms.includes("facebook") : true);
   const [ig, setIg] = useState(initial ? initial.platforms.includes("instagram") : false);
   const local = (iso: string) => {
@@ -148,7 +161,7 @@ function PostEditor({ initial, onDone, presetAt }: { initial?: PostRow | null; o
   const save = (draft: boolean) =>
     start(async () => {
       const platforms = [...(fb ? ["facebook"] : []), ...(ig ? ["instagram"] : [])];
-      const r = await savePostAction({ locale, id: initial?.id ?? null, body, platforms, scheduled_at: new Date(at).toISOString(), image_url: image, draft });
+      const r = await savePostAction({ locale, id: initial?.id ?? null, body, platforms, scheduled_at: new Date(at).toISOString(), image_url: image, draft, link_url: linkUrl, video_url: videoUrl, cta_type: ctaType, cta_value: ctaValue, first_comment: firstComment });
       if (r.error) toast.error(t(r.error));
       else {
         toast.success(t(r.message ?? "common.saved"));
@@ -160,8 +173,30 @@ function PostEditor({ initial, onDone, presetAt }: { initial?: PostRow | null; o
     <div className="space-y-3 rounded-2xl border border-accent/30 bg-accent-soft/30 p-4" data-testid="post-editor">
       <Textarea rows={5} value={body} onChange={(e) => setBody(e.target.value)} placeholder={t("social.postPlaceholder")} dir="auto" aria-label={t("social.postText")} />
       <Input value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://…/image.jpg" dir="ltr" aria-label={t("social.imageUrl")} />
-      <ComposerExtras body={body} setBody={setBody} fb={fb} ig={ig} image={image} setAt={setAt} setImage={setImage} onSendToImage={(s) => setStudioSeed({ ...s, nonce: Date.now() })} />
+      <ComposerExtras body={body} setBody={setBody} fb={fb} ig={ig} image={image} setAt={setAt} setImage={setImage} onSendToImage={(s) => setStudioSeed({ ...s, nonce: Date.now() })}
+        onFullPost={(d) => {
+          if (d.firstComment && !firstComment.trim()) setFirstComment(d.firstComment);
+          if (!ctaType && (d.goal === "sell" || d.goal === "event")) setCtaType("message");
+        }}
+      />
       <StudioPanel body={body} setBody={setBody} image={image} setImage={setImage} fb={fb} ig={ig} seed={studioSeed} />
+      <PostExtras
+        body={body}
+        image={image}
+        setImage={setImage}
+        videoUrl={videoUrl}
+        setVideoUrl={setVideoUrl}
+        linkUrl={linkUrl}
+        setLinkUrl={setLinkUrl}
+        ctaType={ctaType}
+        setCtaType={setCtaType}
+        ctaValue={ctaValue}
+        setCtaValue={setCtaValue}
+        firstComment={firstComment}
+        setFirstComment={setFirstComment}
+        fb={fb}
+        ig={ig}
+      />
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <label className="inline-flex items-center gap-2">
           <input type="checkbox" checked={fb} onChange={(e) => setFb(e.target.checked)} /> Facebook
@@ -227,6 +262,7 @@ function PostCard({ p, onEdit }: { p: PostRow; onEdit: () => void }) {
       <p className="mt-2 line-clamp-6 whitespace-pre-wrap text-sm" dir="auto">
         {p.body}
       </p>
+      <PostMediaBadges p={p} />
       {Object.values(p.results ?? {}).some((r) => r && r.ok === false) ? (
         <div className="mt-2 space-y-1 text-[12px]">
           <p className="text-danger">{Object.entries(p.results).filter(([, r]) => r && r.ok === false).map(([k, r]) => `${k}: ${r.error ?? ""}`).join(" · ")}</p>

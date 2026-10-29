@@ -73,18 +73,44 @@ const postSchema = z.object({
   platforms: z.array(z.enum(["facebook", "instagram"])).min(1).max(2),
   scheduled_at: z.string().trim().min(10).max(40),
   image_url: z.string().trim().max(1000).regex(/^https:\/\//).optional().or(z.literal("")),
+  // wave 51 — link, button, video, first comment (all optional)
+  link_url: z.string().trim().max(1000).regex(/^https?:\/\/\S+$/).optional().or(z.literal("")),
+  video_url: z.string().trim().max(1000).regex(/^https:\/\//).optional().or(z.literal("")),
+  cta_type: z.enum(["message", "whatsapp", "call", "book", "learn_more", "shop", "sign_up", "order"]).optional().or(z.literal("")),
+  cta_value: z.string().trim().max(500).optional(),
+  first_comment: z.string().trim().max(2200).optional(),
 });
 
-export async function savePostAction(input: { locale: string; id?: string | null; body: string; platforms: string[]; scheduled_at: string; image_url?: string; draft?: boolean }): Promise<ActionState> {
+export async function savePostAction(input: { locale: string; id?: string | null; body: string; platforms: string[]; scheduled_at: string; image_url?: string; draft?: boolean; link_url?: string; video_url?: string; cta_type?: string; cta_value?: string; first_comment?: string }): Promise<ActionState> {
   const locale = loc(input.locale);
   const ctx = await getOrgContext(locale);
   if (!ctx.can("campaigns.manage")) return { error: "errors.forbidden" };
   const p = postSchema.safeParse(input);
   if (!p.success) return { error: "social.invalidPost" };
-  if (p.data.platforms.includes("instagram") && !p.data.image_url) return { error: "social.instagramNeedsImage" };
+  // Instagram needs a picture — or (wave 51) a video, published as a Reel
+  if (p.data.platforms.includes("instagram") && !p.data.image_url && !p.data.video_url) return { error: "social.instagramNeedsImage" };
+  // a button that needs a phone / link must have one
+  if (p.data.cta_type && p.data.cta_type !== "message") {
+    const { ctaUrl } = await import("@/lib/social/post-core");
+    const ok = ctaUrl({ type: p.data.cta_type, value: p.data.cta_value || p.data.link_url || "" }, { platform: "facebook" });
+    if (!ok) return { error: "social.post.ctaNeedsValue" };
+  }
   const when = new Date(p.data.scheduled_at);
   if (Number.isNaN(when.getTime())) return { error: "social.invalidPost" };
-  const row = { body: p.data.body, platforms: p.data.platforms, scheduled_at: when.toISOString(), image_url: p.data.image_url || null, status: input.draft ? "draft" : "scheduled", updated_at: new Date().toISOString() };
+  const row = {
+    body: p.data.body,
+    platforms: p.data.platforms,
+    scheduled_at: when.toISOString(),
+    image_url: p.data.image_url || null,
+    status: input.draft ? "draft" : "scheduled",
+    updated_at: new Date().toISOString(),
+    // wave 51
+    link_url: p.data.link_url || null,
+    video_url: p.data.video_url || null,
+    cta_type: p.data.cta_type || null,
+    cta_value: p.data.cta_type && p.data.cta_type !== "message" ? (p.data.cta_value || p.data.link_url || null) : null,
+    first_comment: p.data.first_comment || null,
+  };
   const supabase = await createClient();
   const { error } = input.id && uuidSchema.safeParse(input.id).success
     ? await supabase.from("social_posts").update(row).eq("id", input.id).eq("organization_id", ctx.org.id).in("status", ["draft", "scheduled", "failed"])
@@ -189,7 +215,7 @@ export async function duplicatePostAction(input: { locale: string; id: string })
   if (!ctx.can("campaigns.manage")) return { error: "errors.forbidden" };
   if (!uuidSchema.safeParse(input.id).success) return { error: "validation.invalidId" };
   const supabase = await createClient();
-  const { data: src } = await supabase.from("social_posts").select("body, platforms, image_url, scheduled_at").eq("id", input.id).eq("organization_id", ctx.org.id).maybeSingle();
+  const { data: src } = await supabase.from("social_posts").select("body, platforms, image_url, scheduled_at, link_url, video_url, cta_type, cta_value, first_comment").eq("id", input.id).eq("organization_id", ctx.org.id).maybeSingle();
   if (!src) return { error: "validation.invalidId" };
   const base = Math.max(new Date(src.scheduled_at as string).getTime(), Date.now());
   const { error } = await supabase.from("social_posts").insert({
@@ -201,6 +227,12 @@ export async function duplicatePostAction(input: { locale: string; id: string })
     platforms: src.platforms,
     image_url: src.image_url,
     scheduled_at: new Date(base + 86_400_000).toISOString(),
+    // wave 51 — keep the link, button, video and first comment on the copy
+    link_url: (src as { link_url?: string | null }).link_url ?? null,
+    video_url: (src as { video_url?: string | null }).video_url ?? null,
+    cta_type: (src as { cta_type?: string | null }).cta_type ?? null,
+    cta_value: (src as { cta_value?: string | null }).cta_value ?? null,
+    first_comment: (src as { first_comment?: string | null }).first_comment ?? null,
   });
   if (error) return { error: dbErrorKey(error) };
   revalidatePath(`/${locale}/social`);

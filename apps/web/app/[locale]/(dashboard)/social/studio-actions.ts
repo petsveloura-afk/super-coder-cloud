@@ -311,3 +311,38 @@ export async function aiFullPostAction(input: { locale: string; topic: string; t
   }
   return { ok: true, data: { ...result, scene, imageUrl: img.url } };
 }
+
+/* ---------------------------------------------------------------- wave 51 — upload images / videos from the device (additive) */
+
+const MEDIA_BUCKET = "social-media";
+
+/**
+ * Issues a one-time signed upload URL in the business's own folder (<org>/…), after checking type and size.
+ * The browser uploads the file straight to storage (no size limit of the server in between), then uses `publicUrl`.
+ * The bucket is created on first use when the migration did not create it.
+ */
+export async function createMediaUploadAction(input: { locale: string; type: string; size: number }): Promise<ActionState<{ signedUrl: string; publicUrl: string; kind: "image" | "video" }>> {
+  const locale = loc(input.locale);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("campaigns.manage")) return { error: "errors.forbidden" };
+  const { uploadCheck } = await import("@/lib/social/post-core");
+  const chk = uploadCheck({ type: String(input.type ?? ""), size: Number(input.size) });
+  if (!chk.ok) return { error: chk.error === "type" ? "social.post.uploadType" : "social.post.uploadSize" };
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "errors.generic" };
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+  const { data: allowed } = await admin.rpc("public_rate_limit", { p_bucket: `socialupload:${ctx.org.id}`, p_limit: 30, p_window_seconds: 300 });
+  if (allowed === false) return { error: "ai.busy" };
+  const { data: bucket } = await admin.storage.getBucket(MEDIA_BUCKET);
+  if (!bucket) {
+    await admin.storage
+      .createBucket(MEDIA_BUCKET, { public: true, fileSizeLimit: 52428800, allowedMimeTypes: ["image/png", "image/jpeg", "image/webp", "image/gif", "video/mp4", "video/quicktime", "video/webm"] })
+      .catch(() => undefined);
+  }
+  const { randomUUID } = await import("node:crypto");
+  const path = `${ctx.org.id}/${randomUUID()}.${chk.ext}`;
+  const { data, error } = await admin.storage.from(MEDIA_BUCKET).createSignedUploadUrl(path);
+  if (error || !data?.signedUrl) return { error: "social.post.uploadFailed" };
+  const publicUrl = admin.storage.from(MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
+  return { ok: true, data: { signedUrl: data.signedUrl, publicUrl, kind: chk.kind } };
+}

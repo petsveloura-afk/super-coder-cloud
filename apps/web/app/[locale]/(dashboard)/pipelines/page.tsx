@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Brain, KanbanSquare, List, ThumbsDown, Trophy, Zap } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { KanbanBoard, type BoardDeal, type StageMeta } from "@/components/pipelines/board";
-import { FocusPanel, ForecastPanel, FunnelPanel, HealthRing, LevelBadge, OwnerPanel, VelocityStrip, reasonText, type BrainInfo, type FocusRow, type FunnelRow, type OwnerView } from "@/components/pipelines/pipeline-brain";
+import { FocusPanel, ForecastPanel, FunnelPanel, HealthRing, LevelBadge, OwnerPanel, VelocityStrip, type BrainInfo, type FocusRow, type FunnelRow, type OwnerView } from "@/components/pipelines/pipeline-brain";
 import { EditDealDialog, NewDealButton, type DealPickers } from "@/components/pipelines/deal-form";
 import { NewPipelineButton, PipelineManager } from "@/components/pipelines/pipeline-manager";
 import { getOrgContext } from "@/lib/auth";
@@ -15,6 +15,7 @@ import { pipelineLabel, stageLabel } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { DEAL_FLAGS, dealAgeDays, isOverdue, isStale, pipelineInsights, type DealFlag } from "@/lib/deals/insights";
 import { searchTerm } from "@/lib/inbox/sla";
+import { dealReasonText } from "@/lib/deals/brain-text";
 import {
   BRAIN_FLAGS, DEAL_SORTS, adaptiveWinChance, bottleneck, compareDeals, dealHealth, daysUntil, focusList, forecast, matchesBrainFlag, nextBestAction,
   ownerBoard, salesVelocity, stageFlow, stageProgressMap, type BrainFlag, type DealSort, type HealthLevel, type StageHistoryRow,
@@ -394,7 +395,7 @@ export default async function PipelinesPage({ params, searchParams }: { params: 
                         canDelete={ctx.can("deals.delete")}
                         trigger={
                           <button type="button" className="flex w-full flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3 text-start hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            {d.brain ? <HealthRing score={d.brain.score} level={d.brain.level} size={38} label={`${t("deals.brain.healthLabel", { score: d.brain.score })} — ${reasonText(t, d.brain.reasons)}`} /> : null}
+                            {d.brain ? <HealthRing score={d.brain.score} level={d.brain.level} size={38} label={`${t("deals.brain.healthLabel", { score: d.brain.score })} — ${dealReasonText(t, d.brain.reasons)}`} /> : null}
                             <span className="min-w-0 flex-1 basis-48">
                               <span className="block truncate text-[14px] font-semibold">{d.title}</span>
                               <span className="block truncate text-[12px] text-muted">{[d.contact_name, d.company_name].filter(Boolean).join(" · ") || "—"}</span>
