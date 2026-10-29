@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { Button, Select, Textarea } from "@/components/ui/primitives";
 import { Dialog } from "@/components/ui/dialog";
 import { markReadAction, replyAction, setAiModeAction, startConversationAction, updateConversationAction } from "@/app/[locale]/(dashboard)/inbox/actions";
+import { ComposeAi } from "@/components/inbox/compose-ai";
 
 export const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone } as const;
 
@@ -99,6 +100,8 @@ export function ReplyBox({ conversationId, disabled }: { conversationId: string;
         }}
         className="min-h-[52px] flex-1 resize-none"
       />
+      {/* wave 50 — AI writing tools for the draft */}
+      <ComposeAi conversationId={conversationId} text={text} setText={setText} disabled={disabled} />
       <Button onClick={send} loading={pending} disabled={disabled || !text.trim()} aria-label={t("inbox.send")}>
         <Send className="h-4 w-4 rtl:-scale-x-100" /> <span className="hidden sm:inline">{t("inbox.send")}</span>
       </Button>

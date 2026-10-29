@@ -9,6 +9,9 @@ import { createClient } from "@/lib/supabase/server";
 import { contactOptions, memberOptions } from "@/lib/lookups";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { TaskFocus } from "@/components/tasks/task-focus";
+import { focusCounts, weeklyProgress } from "@/lib/tasks/focus-core";
+import { DEFAULT_TIME_ZONE } from "@/lib/format";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -49,10 +52,25 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
   const memberName = new Map(members.map((m) => [m.id, m.label]));
   const contactName = new Map(contacts.map((c) => [c.id, c.label]));
   const canWrite = ctx.can("tasks.write");
+  // wave 50 — focus band: open tasks by due bucket (mine on "mine", otherwise the whole team) + weekly progress
+  const weekAgo = new Date(new Date(nowIso).getTime() - 7 * 86_400_000).toISOString();
+  const mineScope = filter === "mine";
+  let openQ = supabase.from("tasks").select("status, due_at").eq("organization_id", ctx.org.id).in("status", ["open", "in_progress"]).limit(1000);
+  let doneQ = supabase.from("tasks").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).eq("status", "done").gte("updated_at", weekAgo);
+  let lateQ = supabase.from("tasks").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).in("status", ["open", "in_progress"]).gte("due_at", weekAgo).lt("due_at", nowIso);
+  if (mineScope) {
+    openQ = openQ.eq("assignee_id", ctx.userId);
+    doneQ = doneQ.eq("assignee_id", ctx.userId);
+    lateQ = lateQ.eq("assignee_id", ctx.userId);
+  }
+  const [{ data: openRows }, { count: doneWeek }, { count: lateWeek }] = await Promise.all([openQ, doneQ, lateQ]);
+  const focus = focusCounts((openRows ?? []) as { status: string; due_at: string | null }[], new Date(), DEFAULT_TIME_ZONE);
+  const progress = weeklyProgress(doneWeek ?? 0, lateWeek ?? 0);
 
   return (
     <>
       <PageHeader title={t("tasks.title")} description={t("tasks.subtitle")} actions={canWrite ? <NewTaskButton members={members} contacts={contacts} /> : null} />
+      <TaskFocus counts={focus} progress={progress} locale={locale} t={t} mine={mineScope} />
       <Card className="mb-4 p-3">
         <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label={t("tasks.filter")}>
           {FILTERS.map((f) => (

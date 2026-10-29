@@ -194,4 +194,69 @@ export const AUTOMATION_RECIPES: { key: string; trigger_type: AutomationTrigger;
       { type: "notify", config: { to: "admins", text: "🔔 {{contact.first_name}} {{contact.email}}" } },
     ],
   },
+  // wave 50 — more one-click templates (only existing triggers and actions)
+  {
+    key: "formLead",
+    trigger_type: "form.submitted",
+    actions: [
+      { type: "add_tag", config: { tag: "form-lead" } },
+      { type: "create_task", config: { title: "📝 {{contact.first_name}} {{contact.last_name}} {{contact.phone}}", due_in_days: 0, assignee: "owner" } },
+      { type: "notify", config: { to: "admins", text: "📝 {{contact.first_name}} {{contact.last_name}}" } },
+    ],
+  },
+  {
+    key: "appointmentPrep",
+    trigger_type: "appointment.booked",
+    actions: [
+      { type: "add_tag", config: { tag: "booked" } },
+      { type: "create_task", config: { title: "📅 {{contact.first_name}} {{contact.last_name}}", due_in_days: 0, assignee: "owner" } },
+    ],
+  },
+  {
+    key: "invoicePaid",
+    trigger_type: "invoice.paid",
+    actions: [
+      { type: "set_contact_status", config: { status: "customer" } },
+      { type: "add_tag", config: { tag: "paid" } },
+      { type: "notify", config: { to: "admins", text: "💰 {{contact.first_name}} {{contact.last_name}}" } },
+    ],
+  },
+  {
+    key: "invoiceOverdue",
+    trigger_type: "invoice.overdue",
+    actions: [
+      { type: "create_task", config: { title: "💳 {{contact.first_name}} {{contact.last_name}} {{contact.phone}}", due_in_days: 0, assignee: "owner" } },
+      { type: "add_tag", config: { tag: "payment-due" } },
+    ],
+  },
+  {
+    key: "cartRecovery",
+    trigger_type: "cart.abandoned",
+    actions: [
+      { type: "add_tag", config: { tag: "abandoned-cart" } },
+      { type: "create_task", config: { title: "🛒 {{contact.first_name}} {{contact.last_name}} {{contact.phone}}", due_in_days: 0, assignee: "owner", delay_minutes: 60 } },
+    ],
+  },
+  {
+    key: "ticketUrgent",
+    trigger_type: "ticket.created",
+    actions: [
+      { type: "notify", config: { to: "admins", text: "🎫 {{contact.first_name}} {{contact.last_name}}" } },
+      { type: "create_task", config: { title: "🎫 {{contact.first_name}} {{contact.last_name}}", due_in_days: 0, assignee: "owner" } },
+    ],
+  },
+  {
+    key: "contractSigned",
+    trigger_type: "contract.signed",
+    actions: [
+      { type: "set_contact_status", config: { status: "customer" } },
+      { type: "notify", config: { to: "all", text: "✍️ {{contact.first_name}} {{contact.last_name}}" } },
+      { type: "create_task", config: { title: "🚀 {{contact.first_name}} {{contact.last_name}}", due_in_days: 1, assignee: "owner" } },
+    ],
+  },
+  {
+    key: "newDealQuote",
+    trigger_type: "deal.created",
+    actions: [{ type: "create_task", config: { title: "📄 {{deal.title}}", due_in_days: 1, assignee: "owner" } }],
+  },
 ];

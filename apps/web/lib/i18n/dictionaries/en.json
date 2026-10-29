@@ -1141,6 +1141,25 @@
     "noPeople": "No linked contacts"
   },
   "tasks": {
+    "focus": {
+      "title": "Team focus",
+      "titleMine": "My focus",
+      "progress": "Done in the last 7 days",
+      "head": {
+        "overdue": "{n} overdue tasks — start with them",
+        "today": "{n} tasks for today",
+        "upcoming": "{n} tasks in the coming week",
+        "clear": "All clear — no urgent open tasks 🎉"
+      },
+      "bucket": {
+        "overdue": "Overdue",
+        "today": "Today",
+        "tomorrow": "Tomorrow",
+        "week": "This week",
+        "later": "Later",
+        "nodate": "No date"
+      }
+    },
     "title": "Tasks",
     "subtitle": "Follow-ups, calls and meetings — for the whole team",
     "taskTitle": "Task",
@@ -1308,6 +1327,38 @@
     "templates": "Ready-made templates",
     "templatesHint": "Start from a template and adjust",
     "recipes": {
+      "formLead": {
+        "name": "Form submitted → hot lead with a task",
+        "body": "Everyone who fills a form gets a form-lead tag, a call task for today and a team alert"
+      },
+      "appointmentPrep": {
+        "name": "Meeting booked → prepare",
+        "body": "A new booking tags the contact booked and creates a prep task"
+      },
+      "invoicePaid": {
+        "name": "Invoice paid → paying customer",
+        "body": "A received payment makes the contact a customer, tags paid and notifies the team"
+      },
+      "invoiceOverdue": {
+        "name": "Invoice overdue → collection task",
+        "body": "An overdue invoice creates a collection task for today and a payment-due tag"
+      },
+      "cartRecovery": {
+        "name": "Abandoned cart → recovery call",
+        "body": "A customer who left a cart gets a tag and a call task after one hour"
+      },
+      "ticketUrgent": {
+        "name": "Support ticket → act now",
+        "body": "Every new ticket alerts the team and creates a task for today"
+      },
+      "contractSigned": {
+        "name": "Contract signed → onboarding",
+        "body": "A signed contract makes the contact a customer, tells everyone and opens an onboarding task"
+      },
+      "newDealQuote": {
+        "name": "New deal → send a quote",
+        "body": "Every new deal creates a task to send a quote by tomorrow"
+      },
       "welcomeLead": {
         "name": "New lead → call task",
         "body": "Every new lead gets a call task for tomorrow and the new-lead tag"
@@ -2392,6 +2443,30 @@
     "metaHint": "Facebook Messenger and Instagram Direct only reach people who already messaged your page or account. Outside Meta's 24-hour window some messages may be rejected, and those show as failed in the report."
   },
   "inbox": {
+    "ai": {
+      "menu": "Improve the draft with AI",
+      "empty": "Write a draft in the box and AI will improve it in one click",
+      "done": "Draft updated — review and send",
+      "undo": "Restore the previous text",
+      "group": {
+        "quality": "Quality",
+        "tone": "Tone",
+        "translate": "Translate"
+      },
+      "mode": {
+        "improve": "Improve wording",
+        "fix": "Fix mistakes",
+        "shorter": "Make shorter",
+        "longer": "Expand",
+        "friendlier": "Friendlier",
+        "formal": "Formal & professional",
+        "persuasive": "More persuasive",
+        "empathetic": "Empathetic",
+        "translate_he": "Translate to Hebrew",
+        "translate_en": "Translate to English",
+        "translate_ar": "Translate to Arabic"
+      }
+    },
     "title": "Inbox",
     "subtitle": "WhatsApp, Telegram and SMS in one place — assigned to your team, linked to contacts",
     "noChannels": "No messaging channel connected yet. Connect WhatsApp, Telegram or SMS to send and receive messages.",
