@@ -4,6 +4,7 @@
     "tagline": "The operating system for your business"
   },
   "nav": {
+    "operator": "AI Operator",
     "overview": "Overview",
     "crm": "Contacts",
     "leads": "Leads",
@@ -4491,6 +4492,40 @@
     "farDb": "The database is far from the server, so every step of an agent reply is delayed. Set Vercel's function region to your Supabase region (Settings → Functions → Region)."
   },
   "agents": {
+    "plus": {
+      "title": "New team members",
+      "subtitle": "Two more agents that work for you automatically — every message follows the system's consent and limit rules",
+      "new": "New",
+      "on": "On",
+      "enable": "Enable",
+      "runNow": "Run now",
+      "lastRun": "Last run: {when}",
+      "neverRan": "Hasn't run yet",
+      "reviews_requester": {
+        "name": "Review requester",
+        "body": "After a completed meeting or a won deal — sends the customer a warm review request with your link (once per customer every six months)."
+      },
+      "reengage": {
+        "name": "Customer re-engager",
+        "body": "Finds leads and customers who went quiet and sends each one a personal check-in that the AI writes from their history and memory."
+      },
+      "field": {
+        "review_url": "Review link (Google / Facebook)",
+        "days_after": "Days after",
+        "max_per_run": "Max messages per run",
+        "meetings": "After completed meetings",
+        "deals": "After won deals",
+        "inactive_days": "Days without contact",
+        "target": "Who to reach"
+      },
+      "opt": {
+        "leads": "Leads",
+        "customers": "Customers",
+        "both": "Leads and customers"
+      },
+      "reviewsNotification": "The review requester sent {count} requests",
+      "reengageNotification": "The re-engager sent {count} personal check-ins"
+    },
     "title": "Your AI team",
     "subtitle": "Agents that work for you every day: marketing, sales, a morning brief and collections. Each one switches on with a click, and everything they do is logged here.",
     "on": "On",
@@ -5314,6 +5349,142 @@
         "collectionsAgent": "Turn on the collections agent — it sends reminders automatically",
         "first": "Create a first quote or invoice"
       }
+    }
+  },
+  "operator": {
+    "title": "AI Operator",
+    "subtitle": "Write or say what should happen — the agent plans it, you approve, and it is done in the system",
+    "composeTitle": "What should be done?",
+    "composeHint": "Tasks, deals, meetings, contacts, messages, campaigns and posts — in plain language, several at once",
+    "placeholder": "e.g. Create a task for Dana tomorrow at 10 to call Moshe Cohen, move the Cohen deal to won, and book a meeting with Yossi on Tuesday at 11",
+    "plan": "Plan actions",
+    "voice": "Voice input",
+    "stopVoice": "Stop recording",
+    "reset": "Start over",
+    "shortcut": "Ctrl+Enter to plan",
+    "examplesTitle": "Examples",
+    "planTitle": "The plan",
+    "nothing": "No actions found — try phrasing it differently",
+    "examples": {
+      "task": "Create a task for tomorrow at 9am to call the new customer and send them a quote",
+      "deal": "Open a new 12,000 deal for Alpha Ltd in the proposal stage",
+      "meeting": "Book an intro meeting this Sunday at 10:00 for half an hour",
+      "contact": "Add a contact: Ronit Levi, +972 50-123-4567, interested in the premium package, and tag her vip",
+      "campaign": "Prepare a WhatsApp campaign for existing customers with a perk for next month",
+      "followup": "Schedule a follow-up to the customer tomorrow morning asking if they had a chance to review the proposal"
+    },
+    "exampleChip": {
+      "task": "Task",
+      "deal": "Deal",
+      "meeting": "Meeting",
+      "contact": "Contact + tag",
+      "campaign": "Campaign",
+      "followup": "Follow-up"
+    },
+    "tool": {
+      "create_contact": "Create contact",
+      "update_contact": "Update contact",
+      "add_note": "Add note",
+      "add_tag": "Tag contact",
+      "remember": "Save to the agents' memory",
+      "create_task": "Create task",
+      "complete_task": "Complete task",
+      "create_deal": "Open deal",
+      "move_deal": "Update deal",
+      "book_meeting": "Book meeting",
+      "schedule_message": "Schedule a message",
+      "draft_campaign": "Campaign draft",
+      "draft_post": "Social post draft"
+    },
+    "arg": {
+      "first_name": "First name",
+      "last_name": "Last name",
+      "phone": "Phone",
+      "email": "Email",
+      "company": "Company",
+      "status": "Status",
+      "title": "Title",
+      "value": "Amount",
+      "tag": "Tag",
+      "fact": "Fact",
+      "body": "Content",
+      "text": "Message",
+      "name": "Name",
+      "channel": "Channel",
+      "subject": "Subject",
+      "duration_min": "Duration (min)",
+      "location": "Location",
+      "lost_reason": "Lost reason",
+      "description": "Description",
+      "note": "Note",
+      "job_title": "Job title",
+      "tags": "Tags",
+      "platforms": "Platforms"
+    },
+    "chip": {
+      "newContact": "The contact from action {n}",
+      "contactMissing": "Not found: {name}"
+    },
+    "chooseContact": "Choose a contact",
+    "chooseDeal": "Choose a deal",
+    "chooseTask": "Choose a task",
+    "warn": {
+      "forbidden": "You don't have permission for this action",
+      "chooseContact": "Several contacts match — choose the right one",
+      "contactNotFound": "Contact not found — create it first or give a phone / email",
+      "chooseDeal": "Several deals match — choose the right one",
+      "dealNotFound": "Deal not found",
+      "chooseTask": "Several tasks match — choose the right one",
+      "taskNotFound": "Task not found",
+      "memberNotFound": "Team member not found — it will be assigned to you",
+      "stageNotFound": "Stage not found — the first stage will be used",
+      "badTime": "Couldn't understand the date / time",
+      "pastTime": "That time has already passed",
+      "needPhoneOrEmail": "A phone or email is needed to create a contact"
+    },
+    "resultOk": "Done ✓",
+    "open": "Open",
+    "dropped": "{n} actions were not understood and were left out",
+    "selected": "{n} of {total} actions selected",
+    "execute": "Run {n} actions",
+    "doneAll": "{n} actions completed",
+    "donePartial": "{ok} of {n} actions completed — see details",
+    "historyTitle": "My recent actions",
+    "historyEmpty": "You haven't run anything with the operator yet — try an example above",
+    "status": {
+      "planned": "Planned",
+      "executed": "Done",
+      "partial": "Partly done",
+      "failed": "Failed"
+    },
+    "actionsCount": "{n} actions",
+    "reuse": "Reuse",
+    "err": {
+      "tooShort": "Write what should be done (a few words at least)",
+      "noContact": "A contact is missing for this action",
+      "nothingToChange": "Nothing to change was given",
+      "noTask": "No task selected",
+      "noPipeline": "No pipeline is set up",
+      "noDeal": "No deal selected",
+      "noTime": "The time is missing",
+      "noConversation": "There is no conversation with this contact yet — a message can't be scheduled"
+    }
+  },
+  "memory": {
+    "title": "Agents' memory",
+    "subtitle": "What the AI agents remember about this customer from every conversation and channel — used in the next chat",
+    "empty": "No memories yet. The agent learns from conversations, and you can add a fact yourself.",
+    "placeholder": "e.g. prefers calls in the evening, has a dog named Lucky",
+    "add": "Add",
+    "remove": "Remove",
+    "saved": "Saved to the agents' memory",
+    "removed": "Removed from memory",
+    "exists": "This fact is already saved",
+    "source": {
+      "agent": "Learned by the agent",
+      "lead": "From the lead details",
+      "team": "Added by the team",
+      "operator": "Added by the operator"
     }
   }
 }
