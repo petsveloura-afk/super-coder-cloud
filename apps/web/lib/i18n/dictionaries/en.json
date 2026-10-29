@@ -3847,6 +3847,7 @@
       "other": "Other"
     },
     "activity": {
+      "voice_call": "📞 Phone call with the AI agent — {summary}",
       "sales_state": "Sales stage moved forward (AI agent)",
       "review_request": "Review request sent",
       "reengage": "Personal check-in sent (re-engagement)",
@@ -5533,6 +5534,7 @@
     }
   },
   "voicePersona": {
+    "phoneNote": "The same voice also speaks on the agent's phone calls (Business plan), including live calls the caller can interrupt.",
     "title": "The agent's voice",
     "subtitle": "Choose how the agent sounds when it answers with a voice note, and teach it the business' words so it understands voice messages",
     "persona": "Voice persona",

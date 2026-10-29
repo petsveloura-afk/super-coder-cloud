@@ -55,3 +55,23 @@ export function escalationText(locale: string, input: { org: string; customer: s
   if (locale === "ar") return `عاجل من ${input.org}: ${input.customer} يحتاج موظفاً الآن. ${input.reason}. يرجى فتح صندوق الرسائل.`;
   return `הודעה דחופה מ${input.org}: ${input.customer} מבקש נציג עכשיו. ${input.reason}. כנסו לתיבת ההודעות.`;
 }
+
+/**
+ * Wave 56 — the agent's own voice on turn-by-turn calls: play the clip (ElevenLabs / OpenAI) inside the
+ * <Gather>, so the caller can still interrupt it by speaking (barge-in), then listen again.
+ */
+export function gatherPlayTwiml(audioUrl: string, action: string, locale: string, opts: { timeout?: number; hangupText?: string; hangupUrl?: string | null } = {}): string {
+  const { language, voice } = voiceLang(locale);
+  const bye = opts.hangupUrl
+    ? `<Play>${xmlEscape(opts.hangupUrl)}</Play><Hangup/>`
+    : opts.hangupText
+      ? `<Say language="${language}" voice="${voice}">${xmlEscape(speakable(opts.hangupText))}</Say><Hangup/>`
+      : "<Hangup/>";
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Gather input="speech" language="${language}" speechTimeout="auto" timeout="${opts.timeout ?? 6}" action="${xmlEscape(action)}" method="POST"><Play>${xmlEscape(audioUrl)}</Play></Gather>${bye}</Response>`;
+}
+
+/** Plays the agent's last words (own voice), then transfers to the team member or hangs up. */
+export function playTwiml(audioUrl: string, opts: { dialTo?: string | null } = {}): string {
+  const dial = opts.dialTo && /^\+\d{8,15}$/.test(opts.dialTo) ? `<Dial timeout="25">${xmlEscape(opts.dialTo)}</Dial>` : "<Hangup/>";
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Play>${xmlEscape(audioUrl)}</Play>${dial}</Response>`;
+}

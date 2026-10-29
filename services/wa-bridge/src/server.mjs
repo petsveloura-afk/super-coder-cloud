@@ -12,6 +12,30 @@
 import http from "node:http";
 import { SessionManager } from "./sessions.mjs";
 import { authorized, sign, validCallback, validSessionId } from "./util.mjs";
+import { upgradeToWebSocket } from "./ws.mjs";
+import { VoiceSession } from "./voice-realtime.mjs";
+
+/**
+ * Wave 56 — live phone calls: Twilio Media Streams connect to wss://<bridge>/voice/stream.
+ * The stream is authenticated by the HMAC parameters the web app puts in the TwiML.
+ */
+export function attachVoiceStream(server, { secret, appUrl, log = console.log }) {
+  const sessions = new Set();
+  server.on("upgrade", (req, socket) => {
+    const path = new URL(req.url ?? "/", "http://bridge").pathname;
+    if (path !== "/voice/stream" || !appUrl) {
+      socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    const ws = upgradeToWebSocket(req, socket, { maxPayload: 512 * 1024 });
+    if (!ws) return;
+    const s = new VoiceSession(ws, { secret, appUrl, log });
+    sessions.add(s);
+    ws.on("close", () => sessions.delete(s));
+  });
+  return sessions;
+}
 
 export function createServer({ manager, secret, appUrl, telegram = null }) {
   return http.createServer(async (req, res) => {
@@ -21,7 +45,7 @@ export function createServer({ manager, secret, appUrl, telegram = null }) {
     };
     try {
       const url = new URL(req.url ?? "/", "http://bridge");
-      if (req.method === "GET" && url.pathname === "/health") return send(200, { ok: true, sessions: manager.sessions.size, telegram: Boolean(telegram?.configured()) });
+      if (req.method === "GET" && url.pathname === "/health") return send(200, { ok: true, sessions: manager.sessions.size, telegram: Boolean(telegram?.configured()), voice_realtime: Boolean(appUrl) }); // wave 56: + live calls
       if (!authorized(req.headers.authorization, secret)) return send(401, { error: "unauthorized" });
       // personal Telegram accounts: /tg/sessions/{id}[/start|send|logout|password]
       const tg = url.pathname.match(/^\/tg\/sessions\/([^/]+)(?:\/(start|send|logout|password|voice))?$/); // wave 22: + voice
@@ -151,7 +175,9 @@ async function main() {
   }
 
   const port = Number(process.env.PORT ?? 8080);
-  createServer({ manager, secret, appUrl, telegram }).listen(port, () => console.log(`wa-bridge listening on :${port} (restored ${restored} sessions)`));
+  const server = createServer({ manager, secret, appUrl, telegram });
+  attachVoiceStream(server, { secret, appUrl, log: (...a) => console.log(...a) }); // wave 56: live phone calls
+  server.listen(port, () => console.log(`wa-bridge listening on :${port} (restored ${restored} sessions)`));
 
   // wave 21: a reliable heartbeat to the web app every 30s, signed with WA_BRIDGE_SECRET (no extra setup):
   // customers who got "on it…" while the AI was busy get their real answer within ~30 seconds,

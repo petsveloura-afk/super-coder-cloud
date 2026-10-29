@@ -96,6 +96,20 @@ export async function voiceTurn(input: { orgId: string; callId: string; conversa
     if (input.conversationId) await admin.rpc("ai_handoff", { p_conv: input.conversationId, p_reason: "phone_human" });
     return { say, end: true, transfer: true };
   }
+  // wave 56: the full sales brain on the phone (objections, funnel state, memory, hours, real booking,
+  // lead capture, anti-repetition, self-correction). The original simple turn below stays as the fallback.
+  if (process.env.VOICE_BRAIN !== "basic") {
+    const { phoneTurn } = await import("./phone-brain");
+    const smart = await phoneTurn(input).catch((e) => {
+      console.error("phone brain failed", (e as Error).message);
+      return null;
+    });
+    if (smart) {
+      await addTurn(input.callId, input.conversationId, input.orgId, { role: "agent", text: smart.say, at: new Date().toISOString() });
+      if (smart.transfer && input.conversationId) await admin.rpc("ai_handoff", { p_conv: input.conversationId, p_reason: "phone_agent" });
+      return { say: smart.say, end: smart.end || smart.transfer, transfer: smart.transfer };
+    }
+  }
   const [{ data: call }, { data: agent }, { data: org }] = await Promise.all([
     admin.from("voice_calls").select("turns").eq("id", input.callId).maybeSingle(),
     admin.from("ai_agents").select("id, name, instructions, provider, model, profile").eq("organization_id", input.orgId).eq("enabled", true).order("created_at").limit(1).maybeSingle(),
@@ -132,7 +146,7 @@ export async function startAgentCall(orgId: string, contactId: string): Promise<
   const { checkContact } = await import("@/lib/conversations/guard");
   if (!(await checkContact(contactId, "automation")).allowed) return { ok: false, error: "guard.reasons.opted_out" };
   const call = await openVoiceCall({ orgId, direction: "out", from: acc.config.from_number, to, callSid: null, contactId });
-  const r = await twilioCall(acc.config.account_sid, acc.secrets.auth_token, { To: to, From: acc.config.from_number, Url: voiceWebhookUrl(acc.webhook_token, `/turn?call=${call.id}`), Method: "POST" });
+  const r = await twilioCall(acc.config.account_sid, acc.secrets.auth_token, { To: to, From: acc.config.from_number, Url: voiceWebhookUrl(acc.webhook_token, `/turn?call=${call.id}`), Method: "POST", StatusCallback: voiceWebhookUrl(acc.webhook_token, "/status"), StatusCallbackMethod: "POST" });
   if (!r.ok) {
     await admin.from("voice_calls").update({ status: "failed" }).eq("id", call.id);
     return { ok: false, error: "voice.callFailed" };

@@ -65,6 +65,8 @@ export function VoicePersonaCard({ agentId, value, ttsReady }: { agentId: string
   return (
     <div className="space-y-4 p-5" data-testid="voice-persona">
       {!ttsReady ? <p className="rounded-xl border border-warning/30 bg-warning-soft px-3 py-2 text-[12.5px] text-warning">{t("voicePersona.noKey")}</p> : null}
+      {/* wave 56: the same voice speaks on phone calls */}
+      <p className="text-[12.5px] text-muted" data-testid="voice-phone-note">📞 {t("voicePersona.phoneNote")}</p>
       <div role="radiogroup" aria-label={t("voicePersona.persona")} className="grid gap-2 sm:grid-cols-2">
         {PRESETS.map(({ key, icon: Icon }) => {
           const on = v.preset === key;

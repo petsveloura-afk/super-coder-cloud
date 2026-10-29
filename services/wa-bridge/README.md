@@ -30,3 +30,16 @@ Every request needs `Authorization: Bearer WA_BRIDGE_SECRET`.
 Callbacks to the web app are signed: `X-SCC-Timestamp` + `X-SCC-Signature = HMAC-SHA256(secret, ts + "." + body)`.
 
 Tests: `npm test`
+
+## Live phone calls (wave 56)
+The same service also runs **live AI phone calls** (like Vapi / Retell): Twilio streams the call audio to
+`wss://<this service>/voice/stream`, the bridge detects when the caller speaks, stops talking when the
+caller interrupts (short "uh-huh"s do not stop it), and plays the agent's own voice back in real time.
+The web app does the thinking (speech-to-text + the full sales brain) and the voice (ElevenLabs / OpenAI),
+so **no new variables are needed here** — only `WA_BRIDGE_SECRET` and `APP_URL`, which are already set.
+
+- The web app switches calls to live mode automatically once this version is deployed (`GET /health` →
+  `"voice_realtime": true`). Set `VOICE_REALTIME=off` on Vercel to keep turn-by-turn calls.
+- Stream authentication: the TwiML carries `call`, `ts` and `sig = HMAC-SHA256(WA_BRIDGE_SECRET, call + "." + ts)`
+  (valid for 15 minutes). Callbacks to the web app are signed like every other bridge callback.
+- Endpoints called on the web app: `POST /api/voice/realtime/turn`, `/tts` (µ-law 8 kHz stream), `/end`.

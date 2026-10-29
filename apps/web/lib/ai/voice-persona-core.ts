@@ -153,7 +153,7 @@ export function elevenBody(text: string, v: VoiceSettings, model: string, lang: 
 }
 
 /** The OpenAI fallback: same character (voice + speaking instructions), Opus for a real voice bubble. */
-export function openaiBody(text: string, v: VoiceSettings, model: string, format: "opus" | "mp3", lang: "he" | "en" | "ar"): Record<string, unknown> {
+export function openaiBody(text: string, v: VoiceSettings, model: string, format: "opus" | "mp3" | "pcm", lang: "he" | "en" | "ar"): Record<string, unknown> {
   const tone = v.preset === "default" || v.preset === "custom" ? "Speak naturally, warmly and clearly, like a friendly professional." : PRESET_DEFS[v.preset].tone;
   const langName = lang === "en" ? "English" : lang === "ar" ? "Arabic" : "Hebrew";
   return {
