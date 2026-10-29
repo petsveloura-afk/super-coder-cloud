@@ -5,6 +5,9 @@ import { ArrowLeft, ArrowRight, MessagesSquare } from "lucide-react";
 import { uuidSchema } from "@scc/shared/validators";
 import { AgentSetup, type SetupAgent } from "@/components/ai/agent-setup";
 import { FlowsEditor, GuardrailsCard, type FlowView, type RailsValue } from "@/components/ai/agent-plus";
+import { VoicePersonaCard } from "@/components/ai/voice-persona-card";
+import { FeatureLock, TrialNote } from "@/components/billing/feature-gate";
+import { featureAccess } from "@/lib/billing/features";
 import { Card, CardHeader, PageHeader } from "@/components/ui/primitives";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
@@ -40,6 +43,12 @@ export default async function AgentSetupPage({ params }: { params: Params }) {
   const flows = ((flowRows ?? []) as (Omit<FlowView, "nodes"> & { nodes: unknown })[]).map((f) => ({ ...f, nodes: validFlowNodes(f.nodes) }));
   const { ttsConfigured } = await import("@/lib/ai/tts");
   const ttsReady = ttsConfigured();
+  // wave 55: the agent's voice persona (null before the migration ran → the card is hidden)
+  const { data: voiceRow, error: voiceErr } = await supabase.from("ai_agents").select("voice").eq("id", id).maybeSingle();
+  const { normalizeVoice } = await import("@/lib/ai/voice-persona-core");
+  const voice = voiceErr || !voiceRow ? null : normalizeVoice((voiceRow as { voice?: unknown }).voice);
+  // wave 55: voice answers + voice persona are a paid feature (Pro) with a 7-day free trial
+  const voiceAccess = await featureAccess(ctx.org.id, "voice_notes");
   return (
     <>
       <Link href={`/${locale}/ai-agents`} className="mb-2 inline-flex items-center gap-1 text-[13px] text-muted hover:text-fg">
@@ -66,6 +75,22 @@ export default async function AgentSetupPage({ params }: { params: Params }) {
           <FlowsEditor agentId={agent.id as string} flows={flows} locked={!flowsOn} />
         </Card>
       </div>
+      {/* wave 55: voice persona (ElevenLabs / OpenAI) + speech-to-text glossary */}
+      {voice ? (
+        <Card id="voice" className="mt-4">
+          <CardHeader title={t("voicePersona.title")} description={t("voicePersona.subtitle")} />
+          {voiceAccess.allowed ? (
+            <div className="px-5 pt-4">
+              <TrialNote locale={locale} access={voiceAccess} />
+            </div>
+          ) : (
+            <div className="px-5 pt-4">
+              <FeatureLock locale={locale} feature="voice_notes" plan="pro" access={voiceAccess} canTrial={ctx.can("billing.manage") || ctx.can("ai.manage")} />
+            </div>
+          )}
+          {voiceAccess.allowed ? <VoicePersonaCard agentId={agent.id as string} value={voice} ttsReady={ttsReady} /> : null}
+        </Card>
+      ) : null}
     </>
   );
 }

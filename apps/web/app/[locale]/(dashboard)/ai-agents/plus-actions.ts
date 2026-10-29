@@ -27,6 +27,11 @@ export async function saveGuardrailsAction(input: { locale: string; agentId: str
   if (!id.success) return { error: "validation.invalidId" };
   const p = railsSchema.safeParse(input.rails);
   if (!p.success) return { error: "rails.invalid" };
+  // wave 55: voice answers are a paid feature (plan or free trial)
+  if (p.data.voice_replies) {
+    const { orgHasFeature } = await import("@/lib/billing/features");
+    if (!(await orgHasFeature(ctx.org.id, "voice_notes"))) return { error: "plans.locked.voice_notes.title" };
+  }
   const supabase = await createClient();
   const { error } = await supabase.from("ai_agents").update({ guardrails: p.data }).eq("id", id.data).eq("organization_id", ctx.org.id);
   if (error) return { error: dbErrorKey(error) };

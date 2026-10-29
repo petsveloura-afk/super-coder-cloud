@@ -27,6 +27,8 @@ async function voiceRepliesOn(request: APIRequestContext, slug: string) {
   const org = ((await (await request.get(`${SUPA}/rest/v1/organizations?select=id&slug=eq.${slug}`, { headers: H })).json()) as { id: string }[])[0]!;
   const agents = (await (await request.get(`${SUPA}/rest/v1/ai_agents?select=id,guardrails&organization_id=eq.${org.id}`, { headers: H })).json()) as { id: string; guardrails: Record<string, unknown> | null }[];
   for (const a of agents) await request.patch(`${SUPA}/rest/v1/ai_agents?id=eq.${a.id}`, { headers: H, data: { guardrails: { ...(a.guardrails ?? {}), voice_replies: true } } });
+  // wave 55: voice answers are a paid feature — this business uses its 7-day free trial
+  await request.post(`${SUPA}/rest/v1/feature_trials`, { headers: H, data: { organization_id: org.id, feature: "voice_notes", ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString() } });
   return org.id;
 }
 async function lastInbound(request: APIRequestContext, orgId: string, channel: string, externalId: string) {

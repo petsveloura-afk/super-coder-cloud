@@ -43,6 +43,8 @@ export async function runAI(input: {
   maxTokens?: number;
   /** ask for a single JSON object (site builder) */
   json?: boolean;
+  /** wave 55: time budget override (ms) for heavier interactive calls (e.g. the AI Operator's plan) */
+  budgetMs?: number;
 }): Promise<AIOutcome> {
   const provider = pickProvider(input.provider) ?? (routerExtrasConfigured() ? input.provider ?? "gemini" : null);
   if (!provider) return { ok: false, error: "ai.notConfigured" };
@@ -69,7 +71,9 @@ export async function runAI(input: {
       temperature: input.temperature ?? 0.3,
       maxTokens: input.maxTokens ?? 700,
       json: input.json,
-      budgetMs: input.feature === "site_builder" ? 55_000 : 30_000,
+      budgetMs: input.budgetMs ?? (input.feature === "site_builder" ? 55_000 : 30_000),
+      // wave 55: more engines in the chain → more of them may be tried within the same time budget
+      maxCalls: 12,
     });
     await supabase.rpc("finalize_ai_usage", {
       p_usage_id: usageId,

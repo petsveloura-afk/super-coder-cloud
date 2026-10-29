@@ -6,6 +6,7 @@ import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/primit
 import { AgentDialog, AgentStatus, DeleteAgentButton, QuickAgentButton, type AgentRow } from "@/components/ai/agents-client";
 import { AutopilotExplainer } from "@/components/ai/autopilot-explainer";
 import { AgentStats } from "@/components/ai/agent-stats";
+import { SalesFunnel } from "@/components/ai/sales-funnel";
 import { StudioChat } from "@/components/ai/studio-chat";
 import { aiSiteCaps } from "@/lib/ai/site-builder";
 import { UsageMeter } from "@/components/billing/usage-meter";
@@ -64,6 +65,8 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
       />
 
       {ctx.can("inbox.read") ? <AgentStats orgId={ctx.org.id} locale={locale} /> : null}
+      {/* wave 55: the live sales funnel (new lead → booked meeting) */}
+      {ctx.can("inbox.read") ? <SalesFunnel orgId={ctx.org.id} locale={locale} canTrial={ctx.can("billing.manage") || ctx.can("ai.manage")} /> : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.8fr)_1.6fr]">
         <div className="space-y-4">

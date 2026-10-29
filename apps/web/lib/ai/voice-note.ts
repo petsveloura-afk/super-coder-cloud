@@ -14,9 +14,16 @@ export interface VoiceAudio {
   mime: string;
 }
 
-export async function synthesizeVoiceNote(text: string, locale: string): Promise<VoiceAudio | null> {
+export async function synthesizeVoiceNote(text: string, locale: string, persona?: import("./voice-persona-core").VoiceSettings | null): Promise<VoiceAudio | null> {
   const clean = spokenText(text);
   if (!clean) return null;
+  // wave 55: the agent's own voice persona first (ElevenLabs voice settings → OpenAI voice + tone),
+  // then the default voice below exactly as before
+  if (persona) {
+    const { synthesizePersonaVoice } = await import("./voice-persona");
+    const own = await synthesizePersonaVoice(text, locale, persona).catch(() => null);
+    if (own) return { buf: own.buf, mime: own.mime };
+  }
   const env = process.env;
   if (env.ELEVENLABS_API_KEY) {
     // Hebrew needs Eleven v3 (Multilingual v2 has no Hebrew). OGG/Opus first (a real voice message),

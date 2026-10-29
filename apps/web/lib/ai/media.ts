@@ -39,12 +39,14 @@ function extFor(mime: string): string {
   return "ogg";
 }
 
-async function whisper(base: string, key: string, model: string, buf: Buffer, mime: string, lang?: string): Promise<string> {
+async function whisper(base: string, key: string, model: string, buf: Buffer, mime: string, lang?: string, hint?: string): Promise<string> {
   const form = new FormData();
   form.append("file", new Blob([new Uint8Array(buf)], { type: mime.split(";")[0] || "audio/ogg" }), `voice.${extFor(mime)}`);
   form.append("model", model);
   form.append("response_format", "json");
   if (lang && /^(he|ar|en)$/.test(lang)) form.append("language", lang);
+  // wave 55: business glossary (names, products, slang, abbreviations) as the Whisper prompt
+  if (hint && hint.trim()) form.append("prompt", hint.trim().slice(0, 600));
   const res = await fetch(`${base}/audio/transcriptions`, { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form, signal: AbortSignal.timeout(45_000), cache: "no-store" });
   const j = (await res.json().catch(() => ({}))) as { text?: string; error?: { message?: string } };
   if (!res.ok) throw new Error(`whisper_${res.status}:${j.error?.message?.slice(0, 200) ?? ""}`);
@@ -64,13 +66,13 @@ async function geminiParts(key: string, model: string, parts: unknown[], maxToke
   return (j.candidates?.[0]?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("").trim();
 }
 
-export async function transcribeAudio(buf: Buffer, mime: string, lang?: string): Promise<MediaResult | null> {
+export async function transcribeAudio(buf: Buffer, mime: string, lang?: string, hint?: string): Promise<MediaResult | null> {
   if (!buf.length || buf.length > MAX) return null;
   const env = process.env;
   for (const key of providerKeys("groq", env).slice(0, 2)) {
     try {
       const model = env.AI_GROQ_WHISPER_MODEL || "whisper-large-v3-turbo";
-      const text = await whisper(groqBase(), key, model, buf, mime, lang);
+      const text = await whisper(groqBase(), key, model, buf, mime, lang, hint);
       if (text) return { text, provider: "groq", model };
     } catch (e) {
       console.error("groq whisper failed", (e as Error).message);
@@ -79,7 +81,7 @@ export async function transcribeAudio(buf: Buffer, mime: string, lang?: string):
   if (env.OPENAI_API_KEY) {
     try {
       const model = env.AI_OPENAI_TRANSCRIBE_MODEL || "whisper-1";
-      const text = await whisper(openaiBase(), env.OPENAI_API_KEY, model, buf, mime, lang);
+      const text = await whisper(openaiBase(), env.OPENAI_API_KEY, model, buf, mime, lang, hint);
       if (text) return { text, provider: "openai", model };
     } catch (e) {
       console.error("openai whisper failed", (e as Error).message);
@@ -89,7 +91,7 @@ export async function transcribeAudio(buf: Buffer, mime: string, lang?: string):
     try {
       const model = env.AI_GEMINI_MEDIA_MODEL || "gemini-2.5-flash";
       const text = await geminiParts(key, model, [
-        { text: "Transcribe this voice message word for word in its original language. Output only the transcript, nothing else." },
+        { text: `Transcribe this voice message word for word in its original language. Output only the transcript, nothing else.${hint ? ` Words that may appear (spell them exactly like this): ${hint.slice(0, 600)}` : ""}` },
         { inline_data: { mime_type: mime.split(";")[0] || "audio/ogg", data: buf.toString("base64") } },
       ]);
       if (text) return { text, provider: "gemini", model };

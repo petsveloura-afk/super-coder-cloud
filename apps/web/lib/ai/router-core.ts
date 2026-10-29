@@ -8,8 +8,12 @@
  * (remembered across requests), and moves on immediately to the next provider.
  */
 
-export type RouteProvider = "gemini" | "groq" | "cerebras" | "openrouter" | "mistral" | "anthropic" | "openai";
-export const ROUTE_PROVIDERS: RouteProvider[] = ["groq", "cerebras", "gemini", "openrouter", "mistral", "anthropic", "openai"];
+export type RouteProvider = "gemini" | "groq" | "cerebras" | "openrouter" | "mistral" | "anthropic" | "openai" | "cloudflare" | "github" | "sambanova" | "nvidia" | "huggingface";
+// wave 55: five more free engines (Cloudflare Workers AI, GitHub Models, SambaNova, NVIDIA NIM, Hugging Face)
+// join the failover chain — each is used only when its key is set
+export const ROUTE_PROVIDERS: RouteProvider[] = ["groq", "cerebras", "gemini", "cloudflare", "github", "sambanova", "nvidia", "huggingface", "openrouter", "mistral", "anthropic", "openai"];
+/** Paid engines: always last in the background lane (free capacity first). */
+export const PAID_PROVIDERS: RouteProvider[] = ["anthropic", "openai"];
 
 export interface RouteCandidate {
   provider: RouteProvider;
@@ -54,6 +58,16 @@ export function modelsFor(provider: RouteProvider, env: Env): string[] {
       return list(env.AI_ANTHROPIC_MODELS, [env.AI_ANTHROPIC_MODEL || "claude-haiku-5-5"]);
     case "openai":
       return list(env.AI_OPENAI_MODELS, [env.AI_OPENAI_MODEL || "gpt-4o-mini"]);
+    case "cloudflare":
+      return list(env.AI_CLOUDFLARE_MODELS, ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/openai/gpt-oss-120b", "@cf/mistralai/mistral-small-3.1-24b-instruct"]);
+    case "github":
+      return list(env.AI_GITHUB_MODELS, ["openai/gpt-4.1-mini", "openai/gpt-4o-mini", "meta/Llama-3.3-70B-Instruct"]);
+    case "sambanova":
+      return list(env.AI_SAMBANOVA_MODELS, ["Meta-Llama-3.3-70B-Instruct", "gpt-oss-120b"]);
+    case "nvidia":
+      return list(env.AI_NVIDIA_MODELS, ["meta/llama-3.3-70b-instruct", "openai/gpt-oss-120b"]);
+    case "huggingface":
+      return list(env.AI_HUGGINGFACE_MODELS, ["openai/gpt-oss-120b", "meta-llama/Llama-3.3-70B-Instruct"]);
   }
 }
 
@@ -62,7 +76,47 @@ const BASES: Record<string, [string, string]> = {
   cerebras: ["AI_CEREBRAS_BASE_URL", "https://api.cerebras.ai/v1"],
   openrouter: ["AI_OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"],
   mistral: ["AI_MISTRAL_BASE_URL", "https://api.mistral.ai/v1"],
+  github: ["AI_GITHUB_BASE_URL", "https://models.github.ai/inference"],
+  sambanova: ["AI_SAMBANOVA_BASE_URL", "https://api.sambanova.ai/v1"],
+  nvidia: ["AI_NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1"],
+  huggingface: ["AI_HUGGINGFACE_BASE_URL", "https://router.huggingface.co/v1"],
 };
+
+/** Engines whose OpenAI-compatible API may reject response_format=json_object (the prompt asks for JSON anyway). */
+export const NO_JSON_MODE: RouteProvider[] = ["cloudflare", "huggingface", "sambanova"];
+
+/**
+ * Cloudflare Workers AI accounts as "accountId:token" keys: CLOUDFLARE_AI_ACCOUNTS="id:token,…" plus the
+ * single pair CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_AI_TOKEN (the same keys the image engine already uses).
+ */
+export function cloudflareKeys(env: Env): string[] {
+  const out: string[] = [];
+  for (const pair of (env.CLOUDFLARE_AI_ACCOUNTS ?? "").split(",").map((x) => x.trim()).filter(Boolean)) {
+    const i = pair.indexOf(":");
+    if (i > 0 && pair.slice(i + 1).trim().length >= 20) out.push(`${pair.slice(0, i).trim()}:${pair.slice(i + 1).trim()}`);
+  }
+  const id = clean(env.CLOUDFLARE_ACCOUNT_ID);
+  const token = clean(env.CLOUDFLARE_AI_TOKEN || env.CLOUDFLARE_API_TOKEN);
+  if (id && token.length >= 20) out.push(`${id}:${token}`);
+  return [...new Set(out)];
+}
+
+/**
+ * wave 55 — lanes: background work (team agents, insights, summaries) walks the engines in the
+ * opposite order of live conversations, so the fast free engines stay available for customers and
+ * for the people using the app; paid engines stay last in both lanes.
+ */
+export function laneOrder(cands: RouteCandidate[], lane: "interactive" | "background" = "interactive"): RouteCandidate[] {
+  if (lane === "interactive") return cands;
+  const providers = [...new Set(cands.map((c) => c.provider))];
+  const free = providers.filter((p) => !PAID_PROVIDERS.includes(p)).reverse();
+  const paid = providers.filter((p) => PAID_PROVIDERS.includes(p));
+  const rank = new Map([...free, ...paid].map((p, i) => [p, i]));
+  return cands
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => (rank.get(a.c.provider)! - rank.get(b.c.provider)!) || a.i - b.i)
+    .map((x) => x.c);
+}
 
 export function providerKeys(provider: RouteProvider, env: Env): string[] {
   switch (provider) {
@@ -80,6 +134,16 @@ export function providerKeys(provider: RouteProvider, env: Env): string[] {
       return keysFor(env, "ANTHROPIC_API_KEY", 1);
     case "openai":
       return keysFor(env, "OPENAI_API_KEY", 1);
+    case "cloudflare":
+      return cloudflareKeys(env);
+    case "github":
+      return keysFor(env, "GITHUB_MODELS_TOKEN");
+    case "sambanova":
+      return keysFor(env, "SAMBANOVA_API_KEY", 16);
+    case "nvidia":
+      return keysFor(env, "NVIDIA_API_KEY");
+    case "huggingface":
+      return keysFor(env, "HF_TOKEN");
   }
 }
 
@@ -95,7 +159,9 @@ const RETIRED = /^(gemini-1\.|gemini-2\.0|gemini-pro$)/;
 export function buildCandidates(input: { preferred?: string | null; model?: string | null; env: Env; random?: () => number }): RouteCandidate[] {
   const env = input.env;
   const rnd = input.random ?? Math.random;
-  const order = list(env.AI_PROVIDER_ORDER, ROUTE_PROVIDERS).filter((p): p is RouteProvider => (ROUTE_PROVIDERS as string[]).includes(p));
+  const listed = list(env.AI_PROVIDER_ORDER, ROUTE_PROVIDERS).filter((p): p is RouteProvider => (ROUTE_PROVIDERS as string[]).includes(p));
+  // wave 55: engines missing from a custom AI_PROVIDER_ORDER still join at the end (paid last), so adding a key always adds capacity
+  const order = [...listed, ...ROUTE_PROVIDERS.filter((p) => !listed.includes(p) && !PAID_PROVIDERS.includes(p)), ...PAID_PROVIDERS.filter((p) => !listed.includes(p))];
   const pref = input.preferred && (ROUTE_PROVIDERS as string[]).includes(input.preferred) ? (input.preferred as RouteProvider) : null;
   const providers = pref ? [pref, ...order.filter((p) => p !== pref)] : order;
   const out: RouteCandidate[] = [];
@@ -109,6 +175,15 @@ export function buildCandidates(input: { preferred?: string | null; model?: stri
     for (const model of models) {
       for (let i = 0; i < keys.length; i++) {
         const key = keys[(start + i) % keys.length]!;
+        if (provider === "cloudflare") {
+          // "accountId:token" → the account's OpenAI-compatible endpoint + the token as the key
+          const at = key.indexOf(":");
+          const account = key.slice(0, at);
+          const token = key.slice(at + 1);
+          const cfBase = clean(env.AI_CLOUDFLARE_BASE_URL) || `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(account)}/ai/v1`;
+          out.push({ provider, model, key: token, keyId: keyId(provider, token), baseUrl: cfBase });
+          continue;
+        }
         out.push({ provider, model, key, keyId: keyId(provider, key), ...(base ? { baseUrl: base } : {}) });
       }
     }

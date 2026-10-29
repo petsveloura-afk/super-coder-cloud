@@ -387,6 +387,9 @@ export async function runAgentsCron(budgetMs = 50_000): Promise<Record<string, u
     let actions = 0;
     for (const row of (data ?? []) as { organization_id: string; config: Record<string, unknown> }[]) {
       if (left() < 6000) break;
+      // wave 55: only businesses whose plan (or free trial) includes the AI team
+      const { orgHasFeatureAdmin } = await import("@/lib/billing/features");
+      if (!(await orgHasFeatureAdmin(row.organization_id, "ai_team").catch(() => false))) continue;
       try {
         const r = await runners[key](row.organization_id, row.config ?? {});
         actions += r.actions;

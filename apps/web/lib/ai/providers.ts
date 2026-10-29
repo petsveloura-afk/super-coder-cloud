@@ -58,7 +58,11 @@ export function providerConfigured(p: AIProviderName): boolean {
 /** First configured provider, preferring the requested one. */
 /** Any key of the extra free providers the AI router can use (Groq, Cerebras, OpenRouter, Mistral). */
 export function routerExtrasConfigured(env: Record<string, string | undefined> = process.env): boolean {
-  return ["GROQ_API_KEY", "CEREBRAS_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY"].some((b) => Boolean(env[b] || env[`${b}S`] || env[`${b}_2`]));
+  return (
+    ["GROQ_API_KEY", "CEREBRAS_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY", "GITHUB_MODELS_TOKEN", "SAMBANOVA_API_KEY", "NVIDIA_API_KEY", "HF_TOKEN"].some((b) => Boolean(env[b] || env[`${b}S`] || env[`${b}_2`])) ||
+    // wave 55: Cloudflare Workers AI (text) with the same account keys as the image engine
+    Boolean(env.CLOUDFLARE_AI_ACCOUNTS || (env.CLOUDFLARE_ACCOUNT_ID && (env.CLOUDFLARE_AI_TOKEN || env.CLOUDFLARE_API_TOKEN)))
+  );
 }
 
 export function pickProvider(preferred?: AIProviderName): AIProviderName | null {
@@ -280,7 +284,7 @@ export async function geminiCall(req: AIRequest, key: string): Promise<AIResult>
  */
 export async function openaiCompatibleCall(
   req: AIRequest,
-  opts: { name: string; baseUrl: string; key: string; timeoutMs?: number; headers?: Record<string, string> },
+  opts: { name: string; baseUrl: string; key: string; timeoutMs?: number; headers?: Record<string, string>; noJsonMode?: boolean },
 ): Promise<{ text: string; inputTokens: number; outputTokens: number; model: string }> {
   const reasoning = /gpt-oss/i.test(req.model);
   const res = await fetch(`${opts.baseUrl.replace(/\/$/, "")}/chat/completions`, {
@@ -293,7 +297,7 @@ export async function openaiCompatibleCall(
       max_tokens: reasoning || opts.name === "openrouter" ? req.maxTokens + 1024 : req.maxTokens,
       messages: [{ role: "system", content: req.system }, ...req.messages],
       ...(reasoning ? { reasoning_effort: "low" } : {}),
-      ...(req.json ? { response_format: { type: "json_object" } } : {}),
+      ...(req.json && !opts.noJsonMode ? { response_format: { type: "json_object" } } : {}),
     }),
     signal: AbortSignal.timeout(opts.timeoutMs ?? 25_000),
     cache: "no-store",

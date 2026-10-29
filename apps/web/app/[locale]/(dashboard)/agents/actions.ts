@@ -16,6 +16,8 @@ export async function saveAgentAction(input: { locale: string; agent: string; en
   const ctx = await getOrgContext(locale);
   if (!ctx.can("ai.manage")) return { error: "errors.forbidden" };
   if (!(AGENTS as readonly string[]).includes(input.agent)) return { error: "validation.invalidId" };
+  // wave 55: the AI team is a paid feature (plan or free trial) — switching off is always allowed
+  if (input.enabled && !(await import("@/lib/billing/features").then((m) => m.orgHasFeature(ctx.org.id, "ai_team")))) return { error: "plans.locked.ai_team.title" };
   const cfg = configSchema.safeParse({ ...AGENT_DEFAULTS[input.agent as AgentKey].config, ...(input.config ?? {}) });
   if (!cfg.success) return { error: "validation.invalid" };
   const supabase = await createClient();
@@ -32,6 +34,7 @@ export async function runAgentNowAction(input: { locale: string; agent: string }
   if (!ctx.can("ai.manage")) return { error: "errors.forbidden" };
   if (!(AGENTS as readonly string[]).includes(input.agent)) return { error: "validation.invalidId" };
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "errors.generic" };
+  if (!(await import("@/lib/billing/features").then((m) => m.orgHasFeature(ctx.org.id, "ai_team")))) return { error: "plans.locked.ai_team.title" };
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const admin = createAdminClient();
   // at most one manual run per agent every 2 minutes

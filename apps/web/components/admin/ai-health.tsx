@@ -15,6 +15,12 @@ const NAMES: Record<string, string> = {
   mistral: "Mistral",
   anthropic: "Anthropic Claude",
   openai: "OpenAI",
+  // wave 55: more free engines in the failover chain
+  cloudflare: "Cloudflare Workers AI",
+  github: "GitHub Models",
+  sambanova: "SambaNova",
+  nvidia: "NVIDIA NIM",
+  huggingface: "Hugging Face",
 };
 
 /**

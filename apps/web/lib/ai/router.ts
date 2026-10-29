@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { anthropicCall, geminiCall, openaiCall, openaiCompatibleCall, type AIMessage } from "./providers";
-import { buildCandidates, classifyError, isResting, restKey, soonestReady, type RouteCandidate, type RouteProvider } from "./router-core";
+import { buildCandidates, classifyError, isResting, laneOrder, NO_JSON_MODE, restKey, soonestReady, type RouteCandidate, type RouteProvider } from "./router-core";
 import { capRest, probeOrder, restKeysOf, withDeadline } from "./resilience-core";
 
 /**
@@ -115,7 +115,7 @@ async function callOneRaw(c: RouteCandidate, req: { system: string; messages: AI
   }
   const headers: Record<string, string> =
     c.provider === "openrouter" ? { "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://super-coder-cloud.vercel.app", "X-Title": "Super Coder Cloud" } : {};
-  return openaiCompatibleCall(base, { name: c.provider, baseUrl: c.baseUrl!, key: c.key, timeoutMs, headers });
+  return openaiCompatibleCall(base, { name: c.provider, baseUrl: c.baseUrl!, key: c.key, timeoutMs, headers, noJsonMode: NO_JSON_MODE.includes(c.provider) });
 }
 
 export class RouterError extends Error {
@@ -148,8 +148,13 @@ export async function generateRouted(input: {
   maxCalls?: number;
   /** speed upgrade (hedged request): providers this run must not use (the parallel run uses them) */
   skipProviders?: string[];
+  /** wave 55: background work walks the engines in the other direction (live chats keep the fast ones) */
+  lane?: "interactive" | "background";
 }): Promise<RoutedResult & { attempts: RouteAttempt[] }> {
-  const cands = buildCandidates({ preferred: input.preferred, model: input.model, env: process.env }).filter((c) => !(input.skipProviders ?? []).includes(c.provider));
+  const cands = laneOrder(
+    buildCandidates({ preferred: input.preferred, model: input.model, env: process.env }).filter((c) => !(input.skipProviders ?? []).includes(c.provider)),
+    input.lane ?? "interactive",
+  );
   if (!cands.length) throw new RouterError("ai_not_configured", [], null, false);
   const rests = await loadRests();
   const started = Date.now();

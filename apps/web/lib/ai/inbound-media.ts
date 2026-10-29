@@ -70,7 +70,13 @@ export async function understandInboundMedia(input: { kind: Kind; token: string;
     if (reserveError || usageId == null) return null;
     const { data: agent } = await admin.from("ai_agents").select("language").eq("organization_id", orgId).eq("enabled", true).order("created_at").limit(1).maybeSingle();
     const locale = (agent?.language as string | undefined) ?? "he";
-    const r = feature === "transcribe" ? await transcribeAudio(file.buf, file.mime, locale) : isDoc ? await readDocument(file.buf, file.mime, locale, input.media.name) : await describeImage(file.buf, file.mime, locale);
+    // wave 55: the business name + the agents' glossary help speech-to-text with names, products and slang
+    let sttHint: string | undefined;
+    if (feature === "transcribe") {
+      const [{ loadSttContext }, { sttPrompt }] = await Promise.all([import("./voice-persona"), import("./voice-persona-core")]);
+      sttHint = sttPrompt({ ...(await loadSttContext(orgId)), locale });
+    }
+    const r = feature === "transcribe" ? await transcribeAudio(file.buf, file.mime, locale, sttHint) : isDoc ? await readDocument(file.buf, file.mime, locale, input.media.name) : await describeImage(file.buf, file.mime, locale);
     await admin.rpc("finalize_ai_usage_system", { p_usage_id: usageId, p_provider: r?.provider ?? "none", p_model: r?.model ?? "none", p_input: Math.ceil(file.buf.length / 4000), p_output: Math.ceil((r?.text.length ?? 0) / 4), p_ok: Boolean(r) });
     if (!r?.text) return null;
     const text = r.text.slice(0, 3000);

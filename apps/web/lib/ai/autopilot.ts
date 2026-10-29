@@ -437,6 +437,11 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   const { loadMemories, canBook } = await import("./agent-actions");
   const [memories, bookable] = await Promise.all([loadMemories(orgId, (conv.contact_id as string | null) ?? null).catch(() => []), canBook(orgId).catch(() => false)]);
   const actionsSection = [memoryBlock(memories), agentActionsInstructions({ canBook: bookable, hasContact: Boolean(conv.contact_id) })].filter(Boolean).join("\n\n");
+  // wave 55 — the conversation's sales funnel state and the precise goal of this reply
+  const { loadSalesState } = await import("./sales-state");
+  const { salesStateBrief } = await import("./sales-state-core");
+  const salesStateBefore = await loadSalesState(conv.id as string).catch(() => null);
+  const salesSection = salesStateBrief(salesStateBefore);
   // wave 7 — business profile, goal, sales method and tools (lead capture, buttons, share-phone)
   const system = `${baseInstructions}\n\n${salesAgentInstructions({
     profile: (agent.profile as AgentProfile | null) ?? null,
@@ -444,7 +449,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     channel: ch,
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
     locale,
-  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}\n\n${actionsSection}`;
+  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}\n\n${actionsSection}\n\n${salesSection}`;
   void typingIndicator(orgId, ch, conv.external_id as string); // speed upgrade: never waited for (the typing loop already runs)
   // wave 16: help-center answers (knowledge base) for this question
   let kb = "";
@@ -605,11 +610,17 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   const { voiceChannel } = await import("./voice-note-core");
   if (rails.voice_replies && voiceChannel(ch)) {
     const { data: lastMsg } = await admin.from("messages").select("meta").eq("conversation_id", conv.id).eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (typeof (lastMsg?.meta as { transcript?: string } | null)?.transcript === "string") {
+    // wave 55: voice answers are a paid feature (plan "voice_notes" or its free trial)
+    const { orgHasFeatureAdmin } = await import("@/lib/billing/features");
+    const voicePaid = await orgHasFeatureAdmin(orgId, "voice_notes").catch(() => false);
+    if (voicePaid && typeof (lastMsg?.meta as { transcript?: string } | null)?.transcript === "string") {
       const { ttsConfigured } = await import("./tts");
       if (ttsConfigured()) {
         const { synthesizeVoiceNote, deliverVoiceNote } = await import("./voice-note");
-        const audio = await synthesizeVoiceNote(tools.text, locale);
+        // wave 55: speak with this agent's voice persona (falls back to the default voice)
+        const { loadVoicePersona } = await import("./voice-persona");
+        const persona = await loadVoicePersona(agent.id as string);
+        const audio = await synthesizeVoiceNote(tools.text, locale, persona);
         if (audio) await deliverVoiceNote({ orgId, channel: ch, externalId: conv.external_id as string, conversationId: conv.id as string, audio });
       }
     }
@@ -621,9 +632,10 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   let lead: LeadCaptureResult | null = null;
   if (tools.lead) lead = await captureLead({ orgId, conversationId: conv.id as string, lead: tools.lead, channel: ch, title: (conv.title as string | null) ?? null });
   // wave 54: memory + actions (task, tag, follow-up, booking) — never blocks or breaks the reply
+  let actionsDone: string[] = [];
   if (actionMarkers.actions.length || tools.lead) {
     const { executeAgentActions } = await import("./agent-actions");
-    await executeAgentActions({
+    actionsDone = await executeAgentActions({
       orgId,
       conversationId: conv.id as string,
       contactId: lead?.contact_id ?? ((conv.contact_id as string | null) ?? null),
@@ -633,7 +645,29 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
       actions: actionMarkers.actions,
       lead: tools.lead,
       customer,
-    }).catch((e) => console.error("agent actions failed", (e as Error).message));
+    })
+      .then((r) => r.done)
+      .catch((e) => {
+        console.error("agent actions failed", (e as Error).message);
+        return [] as string[];
+      });
+  }
+  // wave 55 — move the funnel state forward from what really happened in this turn (CRM synced)
+  try {
+    const { nextSalesState } = await import("./sales-state-core");
+    const { applySalesTransition } = await import("./sales-state");
+    const transition = nextSalesState({
+      current: salesStateBefore,
+      text: lastIn,
+      history,
+      leadCaptured: Boolean(lead?.contact_id),
+      bookingRequested: actionMarkers.actions.some((a) => a.kind === "book"),
+      booked: actionsDone.includes("book:ok"),
+      handoff: Boolean(tools.handoff),
+    });
+    await applySalesTransition({ orgId, conversationId: conv.id as string, contactId: lead?.contact_id ?? ((conv.contact_id as string | null) ?? null), from: salesStateBefore, transition });
+  } catch (e) {
+    console.error("sales state failed", (e as Error).message);
   }
   if (tools.handoff) await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: tools.reason ?? "agent" });
   return { replied: true, handoff: tools.handoff, reason: tools.handoff ? (tools.reason ?? "agent") : undefined, text, lead, leadData: tools.lead ?? null };

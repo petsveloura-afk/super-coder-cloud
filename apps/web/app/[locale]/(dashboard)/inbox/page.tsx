@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { SalesStateBar } from "@/components/inbox/sales-state-bar";
+import { isSalesState, type SalesState } from "@/lib/ai/sales-state-core";
 import { latencyLabel } from "@/lib/ai/speed-core";
 import { aiNoteKey, resumeInMinutes, type AiNoteKey } from "@/lib/inbox/ai-note";
 import { DEFAULT_RESUME_MINUTES } from "@/lib/ai/resume";
@@ -119,6 +121,15 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
   }
   // conversation guard: one state for all channels (ownership, consent, planned items, blocked reasons)
   const guardState = selected ? ((await supabase.rpc("conversation_state", { p_conversation: selected.id })).data as ConversationStateView | null) : null;
+  // wave 55: sales funnel state (null before the migration ran → the bar is hidden)
+  let salesInfo: { state: SalesState | null } | null = null;
+  if (selected) {
+    const { data: ss, error: ssErr } = await supabase.from("conversations").select("sales_state").eq("id", selected.id).maybeSingle();
+    if (!ssErr && ss) {
+      const v = (ss as { sales_state?: unknown }).sales_state;
+      salesInfo = { state: isSalesState(v) ? v : null };
+    }
+  }
   const { data: msgs } = selected
     ? await supabase.from("messages").select("id, direction, body, status, error, created_at, sent_by, media, ai_agent_id, meta").eq("organization_id", ctx.org.id).eq("conversation_id", selected.id).order("created_at").limit(300)
     : { data: [] };
@@ -266,6 +277,8 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
               {ctx.can("inbox.reply") ? <AiModeToggle conversationId={selected.id} mode={selected.ai_mode ?? "auto"} /> : null}
               {ctx.can("inbox.reply") ? <ConversationControls conversationId={selected.id} status={selected.status} assigneeId={selected.assignee_id} members={members} /> : null}
             </header>
+            {/* wave 55: the conversation's sales funnel state (tracked by the agent, editable by the team) */}
+            {salesInfo ? <SalesStateBar conversationId={selected.id} state={salesInfo.state} canEdit={ctx.can("inbox.reply")} /> : null}
             {guardState ? <ConversationStatePanel conversationId={selected.id} state={guardState} canReply={ctx.can("inbox.reply")} /> : null}
             {aiNote ? (
               <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-2.5 text-[13px]", aiNote.key === "busy" ? "bg-accent-soft/40" : "bg-warning-soft/60")} data-testid="ai-note" data-note={aiNote.key}>

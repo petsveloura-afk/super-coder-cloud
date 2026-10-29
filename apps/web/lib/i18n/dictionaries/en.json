@@ -526,6 +526,10 @@
       "ai_agents": "AI agents"
     },
     "features": {
+      "voice_notes": "Voice agent — voice-note answers in a voice you choose",
+      "ai_operator": "AI Operator — plain instructions into actions",
+      "ai_team": "AI team — marketing, sales, analyst and collections",
+      "ai_team_plus": "Review requester and customer re-engager",
       "crm": "Full CRM",
       "team": "Team & permissions",
       "demo": "Demo data",
@@ -893,6 +897,7 @@
       "uploadFailed": "Upload failed, try again"
     },
     "hours": {
+      "addIsraeliHolidays": "Add all Israeli holidays for the coming year",
       "title": "Opening hours",
       "hint": "The agent knows when you are open, books appointments and deliveries only within opening hours, and after hours tries to close for the next opening or says you are closed.",
       "enable": "Enable opening hours",
@@ -3660,6 +3665,22 @@
   },
   "plans": {
     "locked": {
+      "voice_notes": {
+        "title": "The voice agent is part of Pro",
+        "body": "The agent answers voice notes with a voice note, in the voice you choose (ElevenLabs / OpenAI), with a transcription glossary. Available on {plan} and up — or a 7-day free trial."
+      },
+      "ai_operator": {
+        "title": "The AI Operator is part of Pro",
+        "body": "Write or say what should happen and the agent does it: tasks, deals, meetings, contacts, messages and campaigns. Available on {plan} and up — or a 7-day free trial."
+      },
+      "ai_team": {
+        "title": "The AI team is part of Pro",
+        "body": "A marketing agent, sales manager, analyst and collections agent working for you automatically. Available on {plan} and up — or a 7-day free trial."
+      },
+      "ai_team_plus": {
+        "title": "The new team members are part of Business",
+        "body": "Review requester and customer re-engager — automatic personal messages that bring reviews and returning customers. Available on {plan} and up — or a 7-day free trial."
+      },
       "cta": "Upgrade to {plan}",
       "api_access": {
         "title": "API access is part of the Business plan",
@@ -3826,6 +3847,9 @@
       "other": "Other"
     },
     "activity": {
+      "sales_state": "Sales stage moved forward (AI agent)",
+      "review_request": "Review request sent",
+      "reengage": "Personal check-in sent (re-engagement)",
       "deal_auto_stage": "Deal moved automatically to {stage}",
       "contact_merged": "Merged with a duplicate ({name})",
       "contact_analyzed": "AI analysis: score {score}",
@@ -5486,5 +5510,95 @@
       "team": "Added by the team",
       "operator": "Added by the operator"
     }
+  },
+  "sales": {
+    "title": "Sales stage",
+    "change": "Change the sales stage",
+    "saved": "Sales stage updated",
+    "invalidState": "Invalid stage",
+    "state": {
+      "NEW_LEAD": "New lead",
+      "QUALIFYING_NEEDS": "Qualifying needs",
+      "VALUE_PROP": "Value proposition",
+      "OBJECTION_HANDLING": "Handling objection",
+      "DEMO_OR_OFFER": "Offer / demo",
+      "CLOSING": "Closing",
+      "BOOKED_MEETING": "Meeting booked",
+      "HUMAN_HANDOFF": "Handed to a person"
+    },
+    "funnel": {
+      "title": "The agents' sales funnel",
+      "period": "Last 60 days",
+      "now": "{n} are here now"
+    }
+  },
+  "voicePersona": {
+    "title": "The agent's voice",
+    "subtitle": "Choose how the agent sounds when it answers with a voice note, and teach it the business' words so it understands voice messages",
+    "persona": "Voice persona",
+    "selected": "Selected",
+    "noKey": "For the agent to speak, an ElevenLabs or OpenAI key is needed (platform settings).",
+    "needVoiceId": "A custom voice needs an ElevenLabs Voice ID",
+    "saved": "Voice saved",
+    "previewEmpty": "Write a sample sentence",
+    "previewFailed": "Couldn't create a sample — check the voice ID or the key",
+    "sample": "Voice sample",
+    "sampleText": "Hi, it's our team here. Great to hear from you! Tell me briefly what you need and I'll sort it out for you.",
+    "play": "Play sample",
+    "glossaryPlaceholder": "e.g. business name, product and service names, team members, abbreviations",
+    "preset": {
+      "soft_female": {
+        "name": "Soft & warm female",
+        "body": "Pleasant, inviting and calming — great for service, beauty and health"
+      },
+      "authoritative_male": {
+        "name": "Authoritative male",
+        "body": "Deep, confident and professional — great for advice, legal, finance and real estate"
+      },
+      "energetic_sales": {
+        "name": "High-energy sales",
+        "body": "Young, enthusiastic and engaging — great for offers, events and sales"
+      },
+      "custom": {
+        "name": "Custom voice",
+        "body": "Any ElevenLabs voice, including your own cloned voice, with every setting"
+      },
+      "default": {
+        "name": "Platform default",
+        "body": "The general voice set on the platform"
+      }
+    },
+    "field": {
+      "voice_id": "ElevenLabs Voice ID",
+      "stability": "Stability",
+      "similarity_boost": "Similarity",
+      "style": "Style exaggeration",
+      "speed": "Speaking speed",
+      "speaker_boost": "Speaker boost",
+      "openai_voice": "OpenAI fallback voice",
+      "glossary": "Glossary for understanding voice messages"
+    },
+    "hint": {
+      "voice_id": "Empty = the selected persona's voice. Paste another ID to replace it.",
+      "voice_id_custom": "Copy it from ElevenLabs → Voices → the voice → ID.",
+      "stability": "Low = more emotion and variety, high = even and stable",
+      "similarity_boost": "How close to the original voice",
+      "style": "How much to exaggerate style and expression (high = more dramatic)",
+      "speed": "1.00 = normal",
+      "speaker_boost": "Higher clarity and similarity to the original voice",
+      "openai_voice": "If ElevenLabs is unavailable, the agent keeps speaking with this voice and the same tone",
+      "glossary": "Comma-separated. Helps transcription understand the business' names, products, slang and abbreviations."
+    }
+  },
+  "trial": {
+    "start": "Try free for 7 days",
+    "started": "Trial started — 7 full days, no credit card",
+    "active": "Free trial active · {n} days left",
+    "keep": "Keep it after the trial",
+    "ended": "The free trial has ended — upgrade to keep using it",
+    "used": "The trial of this feature was already used",
+    "inPlan": "This feature is already in your plan",
+    "demo": "Trials can't be started in a demo workspace",
+    "notAvailable": "This feature has no free trial"
   }
 }

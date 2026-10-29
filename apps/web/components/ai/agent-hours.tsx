@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Copy, Plus, Store, Trash2, UserRound } from "lucide-react";
+import { CalendarHeart, Clock, Copy, Plus, Store, Trash2, UserRound } from "lucide-react";
+import { israeliHolidays, mergeClosedDates } from "@/lib/ai/holidays-core";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Input, Textarea } from "@/components/ui/primitives";
 import { DAYS, type BusinessSchedule, type Day, type TimeRange } from "@/lib/ai/schedule";
@@ -160,6 +161,20 @@ export function HoursEditor({ value, onChange }: { value: BusinessSchedule; onCh
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
+            {/* wave 55: every Israeli holiday of the coming year in one click (computed from the Hebrew calendar) */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              data-testid="hours-holidays-il"
+              onClick={() => {
+                const today = new Date().toISOString().slice(0, 10);
+                const add = israeliHolidays(today, 380).map((h) => h.date);
+                onChange({ ...value, closed_dates: mergeClosedDates(value.closed_dates ?? [], add) });
+              }}
+            >
+              <CalendarHeart className="h-4 w-4" aria-hidden /> {t("ai.hours.addIsraeliHolidays")}
+            </Button>
           </div>
 
           {value.after_hours === "closed_message" ? (

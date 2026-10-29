@@ -175,6 +175,8 @@ export async function operatorPlanAction(input: { locale: string; text: string }
   const locale = loc(input.locale);
   const ctx = await getOrgContext(locale);
   if (!ctx.can("ai.use")) return { error: "errors.forbidden" };
+  // wave 55: the AI Operator is a paid feature (plan or free trial)
+  if (!(await import("@/lib/billing/features").then((m) => m.orgHasFeature(ctx.org.id, "ai_operator")))) return { error: "plans.locked.ai_operator.title" };
   const p = planSchema.safeParse(input);
   if (!p.success) return { error: "operator.err.tooShort" };
   const { t } = await getT(locale);
@@ -199,6 +201,8 @@ export async function operatorPlanAction(input: { locale: string; text: string }
     temperature: 0.1,
     maxTokens: 1600,
     json: true,
+    // wave 55: a plan may take longer than a chat reply — give the failover chain room to find a free engine
+    budgetMs: 45_000,
   });
   if (!out.ok) return { error: out.error };
   const plan = parsePlan(out.text);
@@ -274,6 +278,7 @@ export async function operatorExecuteAction(input: { locale: string; runId?: str
   const locale = loc(input.locale);
   const ctx = await getOrgContext(locale);
   if (!ctx.can("ai.use")) return { error: "errors.forbidden" };
+  if (!(await import("@/lib/billing/features").then((m) => m.orgHasFeature(ctx.org.id, "ai_operator")))) return { error: "plans.locked.ai_operator.title" };
   const p = execSchema.safeParse(input);
   if (!p.success) return { error: "validation.invalid" };
   const sb = await createClient();

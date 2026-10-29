@@ -14,6 +14,8 @@ export async function savePlusAgentAction(input: { locale: string; agent: string
   const ctx = await getOrgContext(locale);
   if (!ctx.can("ai.manage")) return { error: "errors.forbidden" };
   if (!isPlusAgent(input.agent)) return { error: "validation.invalidId" };
+  // wave 55: the new team members are a paid feature (Business plan or free trial) — switching off is always allowed
+  if (input.enabled && !(await import("@/lib/billing/features").then((m) => m.orgHasFeature(ctx.org.id, "ai_team_plus")))) return { error: "plans.locked.ai_team_plus.title" };
   const config = cleanPlusConfig(input.agent, input.config ?? {});
   const supabase = await createClient();
   const { error } = await supabase.from("agent_settings").upsert({ organization_id: ctx.org.id, agent: input.agent, enabled: Boolean(input.enabled), config, updated_at: new Date().toISOString() }, { onConflict: "organization_id,agent" });
@@ -28,6 +30,7 @@ export async function runPlusAgentNowAction(input: { locale: string; agent: stri
   if (!ctx.can("ai.manage")) return { error: "errors.forbidden" };
   if (!isPlusAgent(input.agent)) return { error: "validation.invalidId" };
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "errors.generic" };
+  if (!(await import("@/lib/billing/features").then((m) => m.orgHasFeature(ctx.org.id, "ai_team_plus")))) return { error: "plans.locked.ai_team_plus.title" };
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const admin = createAdminClient();
   const { data: allowed } = await admin.rpc("public_rate_limit", { p_bucket: `agent:${ctx.org.id}:${input.agent}`, p_limit: 1, p_window_seconds: 120 });

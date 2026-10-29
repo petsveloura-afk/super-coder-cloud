@@ -31,7 +31,12 @@ export type PlanFeature =
   | "conversion_api"
   | "ai_copilot"
   | "flow_builder"
-  | "advanced_analytics";
+  | "advanced_analytics"
+  // wave 55 (paid, with a 7-day free trial)
+  | "voice_notes"
+  | "ai_operator"
+  | "ai_team"
+  | "ai_team_plus";
 
 /** For the signed-in member (RLS session). */
 export async function orgHasFeature(orgId: string, feature: PlanFeature): Promise<boolean> {
@@ -53,4 +58,27 @@ export async function orgFeatures(orgId: string, features: PlanFeature[]): Promi
   const out = {} as Record<PlanFeature, boolean>;
   await Promise.all(features.map(async (f) => (out[f] = await orgHasFeature(orgId, f))));
   return out;
+}
+
+/** Wave 55 — features a business can try free for 7 days (once per feature). */
+export const TRIAL_FEATURES: PlanFeature[] = ["voice_notes", "ai_operator", "ai_team", "ai_team_plus", "advanced_analytics", "flow_builder", "ai_insights"];
+
+export interface FeatureAccess {
+  allowed: boolean;
+  /** "plan" (included), "trial" (active free trial) or null (locked) */
+  via: "plan" | "trial" | null;
+  trialAvailable: boolean;
+  trialEndsAt: string | null;
+}
+
+/** Wave 55 — is the feature available, how (plan / trial), and can a trial still be started? */
+export async function featureAccess(orgId: string, feature: PlanFeature): Promise<FeatureAccess> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("feature_access", { p_org: orgId, p_feature: feature });
+  if (error || !data) {
+    const allowed = await orgHasFeature(orgId, feature);
+    return { allowed, via: allowed ? "plan" : null, trialAvailable: false, trialEndsAt: null };
+  }
+  const d = data as { allowed?: boolean; via?: string | null; trial_available?: boolean; trial_ends_at?: string | null };
+  return { allowed: d.allowed === true, via: d.via === "plan" || d.via === "trial" ? d.via : null, trialAvailable: d.trial_available === true, trialEndsAt: d.trial_ends_at ?? null };
 }

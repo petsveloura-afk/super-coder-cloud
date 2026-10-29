@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase/server";
 import { AGENTS, AGENT_DEFAULTS } from "@/lib/agents/core";
 import { PlusAgents, type PlusAgentView } from "@/components/agents/plus-agents";
 import { AGENTS_PLUS, PLUS_DEFAULTS } from "@/lib/agents/plus-core";
+import { FeatureLock, TrialNote } from "@/components/billing/feature-gate";
+import { featureAccess } from "@/lib/billing/features";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -55,6 +57,9 @@ export default async function AgentsPage({ params }: { params: Promise<{ locale:
       runs: ((runs ?? []) as { id: number; agent: string; summary: string; actions: number; created_at: string }[]).filter((r) => r.agent === key).slice(0, 6),
     };
   });
+  // wave 55: the AI team (Pro) and the new members (Business) are paid features with a 7-day free trial
+  const [teamAccess, plusAccess] = await Promise.all([featureAccess(ctx.org.id, "ai_team"), featureAccess(ctx.org.id, "ai_team_plus")]);
+  const canTrial = ctx.can("billing.manage") || ctx.can("ai.manage");
   return (
     <>
       <PageHeader title={t("agents.title")} description={t("agents.subtitle")} />
@@ -70,8 +75,10 @@ export default async function AgentsPage({ params }: { params: Promise<{ locale:
           {t("agents.conversation.open")}
         </Link>
       </Card>
+      {teamAccess.allowed ? <TrialNote locale={locale} access={teamAccess} /> : <div className="mb-4"><FeatureLock locale={locale} feature="ai_team" plan="pro" access={teamAccess} canTrial={canTrial} /></div>}
       <AgentsBrain agents={views} canManage={ctx.can("ai.manage")} />
       <AgentsHub agents={views} canManage={ctx.can("ai.manage")} />
+      {plusAccess.allowed ? <div className="mt-4"><TrialNote locale={locale} access={plusAccess} /></div> : <div className="mt-4"><FeatureLock locale={locale} feature="ai_team_plus" plan="business" access={plusAccess} canTrial={canTrial} /></div>}
       <PlusAgents agents={plusViews} canManage={ctx.can("ai.manage")} />
     </>
   );

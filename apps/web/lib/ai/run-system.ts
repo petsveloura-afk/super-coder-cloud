@@ -49,6 +49,10 @@ export async function runAISystem(input: {
       temperature: input.temperature ?? 0.4,
       maxTokens: input.maxTokens ?? 600,
       budgetMs: input.patienceMs ?? (Number(process.env.AI_AUTOPILOT_PATIENCE_MS) > 0 ? Number(process.env.AI_AUTOPILOT_PATIENCE_MS) : 30_000),
+      // wave 55: more engines in the chain → more of them may be tried within the same time budget
+      maxCalls: 12,
+      // wave 55: team agents / insights / summaries use the background lane (live chats keep the fast engines)
+      lane: (["autopilot", "voice", "kb", "vision", "transcribe"].includes(input.feature) ? "interactive" : "background") as "interactive" | "background",
     };
     // speed upgrade — live conversations (chat, phone, help-center answers): when the main engine is
     // slow, a second configured engine starts in parallel after AI_HEDGE_MS (default 6s); first answer wins
