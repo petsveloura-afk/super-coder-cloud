@@ -15,6 +15,8 @@ import { publicEnv } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import { LOCALE_META } from "@/lib/i18n/config";
 import { formatNumber, formatPercent } from "@/lib/format";
+import { ScreenPulse } from "@/components/ui/screen-pulse";
+import { appointmentsPulse } from "@/lib/insights/screens-core";
 import {
   addDays,
   addMonths,
@@ -90,6 +92,11 @@ export default async function AppointmentsPage({ params, searchParams }: { param
   const todayCount = statRows.filter((r) => r.status !== "canceled" && dayKeyOf(r.starts_at, timeZone) === todayKey).length;
   const weekCount = statRows.filter((r) => r.status !== "canceled" && (() => { const k = dayKeyOf(r.starts_at, timeZone); return k >= weekStart && k <= weekEnd; })()).length;
   const past90 = computeApptStats(statRows.filter((r) => new Date(r.starts_at) <= now), timeZone, now);
+  // wave 53 — smart tips: no-shows in the last 30 days and whether a booking page exists
+  const since30 = now.getTime() - 30 * 86_400_000;
+  const last30 = statRows.filter((r) => new Date(r.starts_at).getTime() >= since30 && new Date(r.starts_at) <= now);
+  const { count: typesCount } = await supabase.from("appointment_types").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id);
+  const apptPulse = appointmentsPulse({ today: todayCount, week: weekCount, upcoming: upcomingCount.count ?? 0, noShows30: last30.filter((r) => r.status === "no_show").length, held30: last30.filter((r) => r.status === "completed").length, types: typesCount ?? 0 });
 
   const timeFmt = new Intl.DateTimeFormat(intl, { hour: "2-digit", minute: "2-digit", timeZone });
   const range = (a: { starts_at: string; ends_at: string }) => `${timeFmt.format(new Date(a.starts_at))}–${timeFmt.format(new Date(a.ends_at))}`;
@@ -545,6 +552,8 @@ export default async function AppointmentsPage({ params, searchParams }: { param
   return (
     <>
       <PageHeader title={t("appointments.title")} description={t("appointments.subtitle")} actions={canManage ? <NewAppointmentButton contacts={contacts} members={members} /> : null} />
+      {/* wave 53 — smart tips (the KPI cards below already show the numbers) */}
+      <ScreenPulse screen="appointments" pulse={{ ...apptPulse, stats: [] }} locale={locale} t={t} />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" data-testid="appointment-kpis">
         {kpis.map((k) => (
           <Card key={k.label} className="kpi-card group relative overflow-hidden p-4">

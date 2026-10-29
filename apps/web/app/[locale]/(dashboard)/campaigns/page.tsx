@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { CAMPAIGN_CHANNELS } from "@scc/shared/engagement";
 import { CampaignOverview } from "@/components/campaigns/campaign-overview";
 import { CampaignAgent } from "@/components/campaigns/campaign-agent";
+import { ScreenPulse } from "@/components/ui/screen-pulse";
+import { campaignsPulse } from "@/lib/insights/screens-core";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -59,6 +61,8 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
     <>
       <PageHeader title={t("campaigns.title")} description={t("campaigns.subtitle")} actions={newLink} />
       {ctx.can("ai.use") ? <CampaignAgent compact /> : null}
+      {/* wave 53 — smart tips (the KPI cards below already show the numbers) */}
+      <ScreenPulse screen="campaigns" pulse={campaignsPulse(sum)} locale={locale} t={t} />
       {all.length > 0 ? (
         <>
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="campaign-kpis">

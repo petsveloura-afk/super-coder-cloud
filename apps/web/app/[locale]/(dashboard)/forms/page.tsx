@@ -5,6 +5,8 @@ import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives"
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
+import { ScreenPulse } from "@/components/ui/screen-pulse";
+import { formsPulse } from "@/lib/insights/screens-core";
 import { formatDate, formatNumber } from "@/lib/format";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -26,6 +28,8 @@ export default async function FormsPage({ params }: { params: Promise<{ locale: 
   const supabase = await createClient();
   const { data } = await supabase.from("forms").select("id, name, slug, status, submission_count, created_at").eq("organization_id", ctx.org.id).order("created_at", { ascending: false });
   const forms = data ?? [];
+  // wave 53 — submissions in the last 7 days for the smart pulse
+  const { count: weekSubs } = await supabase.from("form_submissions").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).gte("created_at", new Date(new Date().getTime() - 7 * 86_400_000).toISOString());
   const newLink = (
     <Link href={`/${locale}/forms/new`} className="inline-flex h-10 items-center gap-2 rounded-xl bg-accent-solid px-4 text-sm font-medium text-accent-fg hover:bg-accent-solid-hover">
       <Plus className="h-4 w-4" /> {t("forms.new")}
@@ -34,6 +38,7 @@ export default async function FormsPage({ params }: { params: Promise<{ locale: 
   return (
     <>
       <PageHeader title={t("forms.pageTitle")} description={t("forms.subtitle")} actions={newLink} />
+      <ScreenPulse screen="forms" pulse={formsPulse(forms.map((f) => ({ status: String(f.status), submission_count: Number(f.submission_count ?? 0), name: String(f.name) })), weekSubs ?? 0)} locale={locale} t={t} />
       {forms.length === 0 ? (
         <Card>
           <EmptyState icon={<FileInput className="h-6 w-6" />} title={t("forms.empty")} body={t("forms.emptyBody")} action={newLink} />

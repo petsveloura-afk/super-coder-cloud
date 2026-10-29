@@ -11,6 +11,8 @@ import { contactOptions } from "@/lib/lookups";
 import { publicEnv } from "@/lib/env";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ScreenPulse } from "@/components/ui/screen-pulse";
+import { financePulse } from "@/lib/insights/screens-core";
 import { DOC_STATUS_TONE } from "@/lib/finance/labels";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -188,10 +190,21 @@ export default async function FinancePage({ params, searchParams }: { params: Pr
   const outstanding = (openInv ?? []).reduce((s, d) => s + Number(d.total) - Number(d.amount_paid), 0);
   const overdue = (openInv ?? []).filter((d) => d.due_date && (d.due_date as string) < today).reduce((s, d) => s + Number(d.total) - Number(d.amount_paid), 0);
   const collected = (paidMonth ?? []).reduce((s, p) => s + Number(p.amount), 0);
+  // wave 53 — smart pulse: due this week + quotes waiting for an answer (the cards below show the rest)
+  const { data: sentQuotes } = await supabase.from("documents").select("total, amount_paid, due_date").eq("organization_id", ctx.org.id).eq("kind", "quote").eq("status", "sent").limit(2000);
+  const finPulseAll = financePulse(
+    [
+      ...((openInv ?? []) as { total: number; amount_paid: number; due_date: string | null }[]).map((d) => ({ kind: "invoice", status: "sent", due_date: d.due_date, total: Number(d.total), amount_paid: Number(d.amount_paid) })),
+      ...((sentQuotes ?? []) as { total: number; amount_paid: number; due_date: string | null }[]).map((d) => ({ kind: "quote", status: "sent", due_date: d.due_date, total: Number(d.total), amount_paid: Number(d.amount_paid) })),
+    ],
+    today,
+  );
+  const finPulse = { ...finPulseAll, stats: finPulseAll.stats.filter((x) => x.key === "dueSoon" || x.key === "quotes") };
 
   return (
     <>
       {header}
+      <ScreenPulse screen="finance" pulse={finPulse} locale={locale} t={t} currency={ctx.org.currency || "ILS"} />
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         {[
           ["finance.kpiOutstanding", outstanding, "text-fg"],

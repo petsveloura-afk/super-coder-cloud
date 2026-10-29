@@ -13,6 +13,8 @@ import { createClient } from "@/lib/supabase/server";
 import { contactSearchFilter, sanitizeSearch } from "@/lib/search";
 import { formatDate, formatNumber, formatPhone } from "@/lib/format";
 import { cn, initials } from "@/lib/utils";
+import { ScreenPulse } from "@/components/ui/screen-pulse";
+import { contactsPulse } from "@/lib/insights/screens-core";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -68,6 +70,17 @@ export default async function ContactsPage({ params, searchParams }: { params: P
     );
   };
   const pages = Math.max(1, Math.ceil(total / query.pageSize));
+  // wave 53 — smart pulse: whole-base numbers (independent of the current search / filter)
+  const weekAgoIso = new Date(new Date().getTime() - 7 * 86_400_000).toISOString();
+  const head = { count: "exact" as const, head: true };
+  const [allC, newC, custC, noChanC, hotC] = await Promise.all([
+    supabase.from("contacts").select("id", head).eq("organization_id", ctx.org.id),
+    supabase.from("contacts").select("id", head).eq("organization_id", ctx.org.id).gte("created_at", weekAgoIso),
+    supabase.from("contacts").select("id", head).eq("organization_id", ctx.org.id).eq("status", "customer"),
+    supabase.from("contacts").select("id", head).eq("organization_id", ctx.org.id).is("email", null).is("phone", null),
+    supabase.from("contact_insights").select("contact_id", head).eq("organization_id", ctx.org.id).gte("lead_score", 70),
+  ]);
+  const pulse = contactsPulse({ total: allC.count ?? 0, newWeek: newC.count ?? 0, customers: custC.count ?? 0, noChannel: noChanC.count ?? 0, hot: hotC.error ? 0 : (hotC.count ?? 0) });
   const q = sanitizeSearch(query.q);
 
   const href = (over: Record<string, string | number | undefined>) => {
@@ -102,6 +115,7 @@ export default async function ContactsPage({ params, searchParams }: { params: P
           </>
         }
       />
+      <ScreenPulse screen="contacts" pulse={pulse} locale={locale} t={t} />
 
       {/* Filters */}
       <Card className="mb-4 p-3">

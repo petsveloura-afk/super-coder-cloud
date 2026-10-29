@@ -5207,5 +5207,113 @@
       "change": "Change",
       "netGain": "Net gain / month"
     }
+  },
+  "pulse": {
+    "title": "Smart snapshot",
+    "tipsTitle": "Smart tips",
+    "contacts": {
+      "stat": {
+        "total": "Contacts",
+        "newWeek": "New this week",
+        "hot": "Hot leads",
+        "customers": "Customers"
+      },
+      "tip": {
+        "callHot": "{n} hot leads are waiting — call them today",
+        "enrich": "{n} contacts have no phone and no email — complete them so you can follow up",
+        "noNew": "No new leads this week — share a form or a landing page",
+        "winBack": "You have {n} customers — a repeat-customer campaign can bring sales",
+        "first": "Add your first contact or import a list"
+      }
+    },
+    "campaigns": {
+      "tip": {
+        "first": "Create your first campaign — the agent can write it for you",
+        "drafts": "{n} campaigns are drafts — finish and schedule them",
+        "delivery": "Delivery rate is {pct}% — check the failed recipients",
+        "keepRhythm": "No active campaign — a regular one keeps customers close"
+      }
+    },
+    "sites": {
+      "stat": {
+        "published": "Live sites",
+        "drafts": "Drafts",
+        "visits": "Visits"
+      },
+      "tip": {
+        "first": "Build a site or landing page with AI in a minute",
+        "publish": "{n} sites are still drafts — publish them",
+        "share": "{n} live sites have no visits — share the link on social and in a campaign",
+        "convert": "Add a form to the site to turn visitors into leads"
+      }
+    },
+    "forms": {
+      "stat": {
+        "active": "Active forms",
+        "total": "Total submissions",
+        "week": "Submissions this week"
+      },
+      "tip": {
+        "first": "Create a first form and share it",
+        "idle": "{n} active forms have no submissions — share them or embed them on the site",
+        "best": "Top form: \"{name}\" with {n} submissions",
+        "automate": "Turn on an automation: every form → a hot lead with a task"
+      }
+    },
+    "appointments": {
+      "stat": {
+        "today": "Today",
+        "week": "This week",
+        "upcoming": "Upcoming",
+        "noShow": "No-shows (30 days)"
+      },
+      "tip": {
+        "bookingPage": "Create a booking page — customers book by themselves",
+        "noShow": "{pct}% did not show up last month — send a reminder the day before",
+        "today": "{n} meetings today — good luck!",
+        "promote": "No upcoming meetings — share the booking page in a campaign"
+      }
+    },
+    "analytics": {
+      "stat": {
+        "runRate": "30-day revenue pace",
+        "weighted": "Weighted pipeline"
+      },
+      "tip": {
+        "up": "Revenue is up {pct}% vs the previous period",
+        "down": "Revenue is down {pct}% vs the previous period — check the stuck deals",
+        "coverageOk": "The weighted pipeline covers {x}× the revenue pace — healthy",
+        "coverageLow": "The weighted pipeline covers only {x}× the revenue pace — add deals",
+        "closeFirst": "There are open deals but no wins in this period yet — focus on closing"
+      }
+    },
+    "support": {
+      "stat": {
+        "open": "Open tickets",
+        "breached": "Past the target time",
+        "urgent": "Urgent",
+        "unanswered": "No first reply"
+      },
+      "tip": {
+        "breached": "{n} tickets are past their target time — handle them first",
+        "unanswered": "{n} tickets have not received a first reply yet",
+        "clear": "No open tickets — great job!",
+        "kb": "Help articles in the knowledge base reduce tickets — and the agent answers from them"
+      }
+    },
+    "finance": {
+      "stat": {
+        "outstanding": "Outstanding",
+        "overdue": "Overdue",
+        "dueSoon": "Due this week",
+        "quotes": "Quotes waiting"
+      },
+      "tip": {
+        "collect": "{n} invoices are overdue — send a payment reminder",
+        "followQuotes": "{n} quotes are waiting for an answer — follow up with the customers",
+        "collectionsAgent": "Turn on the collections agent — it sends reminders automatically",
+        "first": "Create a first quote or invoice"
+      }
+    }
   }
 }

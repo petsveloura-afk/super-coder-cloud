@@ -9,6 +9,8 @@ import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { sitePublicBase } from "@/lib/websites";
+import { ScreenPulse } from "@/components/ui/screen-pulse";
+import { sitesPulse } from "@/lib/insights/screens-core";
 import { formatDateTime, formatNumber } from "@/lib/format";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -49,6 +51,8 @@ export default async function WebsitesPage({ params, searchParams }: { params: P
           </Link>
         }
       />
+      {/* wave 53 — smart tips (the summary bar already shows the numbers) */}
+      <ScreenPulse screen="sites" pulse={{ ...sitesPulse(all.map((x) => ({ status: String(x.status), visits: Number(x.visits ?? 0) }))), stats: [] }} locale={locale} t={t} />
       <div className="mb-3 grid gap-2 sm:grid-cols-3" data-testid="sites-quick-create">
         {[
           { href: `/${locale}/websites/new`, icon: <Sparkles className="h-4 w-4" />, title: t("websites.quick.ai"), body: t("websites.quick.aiBody") },

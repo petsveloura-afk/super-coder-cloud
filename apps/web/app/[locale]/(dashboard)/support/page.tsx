@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase/server";
 import { contactOptions, memberOptions } from "@/lib/lookups";
 import { publicEnv } from "@/lib/env";
 import { formatDateTime } from "@/lib/format";
+import { ScreenPulse } from "@/components/ui/screen-pulse";
+import { supportPulse } from "@/lib/insights/screens-core";
 import { cn } from "@/lib/utils";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -53,6 +55,9 @@ export default async function SupportPage({ params, searchParams }: { params: Pr
   const memberName = new Map(members.map((m) => [m.id, m.label]));
   const now = new Date().getTime();
   const portalUrl = `${publicEnv.appUrl.replace(/\/$/, "")}/${locale}/help/${ctx.org.slug}`;
+  // wave 53 — smart pulse over all active tickets (independent of the current filter)
+  const { data: activeAll } = await supabase.from("tickets").select("status, priority, sla_due_at, first_response_at").eq("organization_id", ctx.org.id).in("status", ["open", "pending"]).limit(2000);
+  const supPulse = supportPulse((activeAll ?? []) as { status: string; priority: string; sla_due_at: string | null; first_response_at: string | null }[], new Date(now));
 
   return (
     <>
@@ -69,6 +74,7 @@ export default async function SupportPage({ params, searchParams }: { params: Pr
           </>
         }
       />
+      <ScreenPulse screen="support" pulse={supPulse} locale={locale} t={t} />
       <Card className="mb-4 p-4">
         <p className="mb-2 text-[13px] text-muted">{t("support.portalHint")}</p>
         <ShareBox url={portalUrl} height={760} />

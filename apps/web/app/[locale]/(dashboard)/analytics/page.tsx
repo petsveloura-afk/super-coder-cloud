@@ -14,6 +14,8 @@ import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 import { stageLabel } from "@/lib/labels";
+import { ScreenPulse } from "@/components/ui/screen-pulse";
+import { analyticsPulse } from "@/lib/insights/screens-core";
 import { cn } from "@/lib/utils";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -240,6 +242,10 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
         ))}
       </div>
 
+      {/* wave 53 — revenue pace: 30-day run-rate, change vs the previous period, pipeline coverage */}
+      <div className="mt-4">
+        <ScreenPulse screen="analytics" pulse={analyticsPulse({ wonValue: Number(a.won_value), prevWonValue: prev?.wonValue ?? 0, days, openValue: Number(a.open_value), weightedValue: Number(a.weighted_value) })} locale={locale} t={t} currency={currency} />
+      </div>
       <div className="mt-4">
         <HighlightsStrip items={highlights} title={t("analytics.pro.highlightsTitle")} text={(h) => t(`analytics.pro.hl.${h.key}`, h.params)} />
       </div>
