@@ -39,6 +39,7 @@ import {
   stopMessage,
 } from "./intelligence";
 import { normalizeSchedule, nextOpenText, scheduleStatus } from "./schedule";
+import { proBrief } from "./brain-pro";
 
 /**
  * AI autopilot — the business's AI agent answers customers automatically on
@@ -438,7 +439,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     channel: ch,
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
     locale,
-  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}`;
+  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}`;
   void typingIndicator(orgId, ch, conv.external_id as string); // speed upgrade: never waited for (the typing loop already runs)
   // wave 16: help-center answers (knowledge base) for this question
   let kb = "";

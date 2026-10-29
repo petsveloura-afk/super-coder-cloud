@@ -14,6 +14,9 @@ import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 import { CONTACT_STATUSES } from "@scc/shared/validators";
+import { CommandCenter } from "@/components/dashboard/command-center";
+import { InstallAppBanner } from "@/components/layout/install-app";
+import { DEFAULT_TIME_ZONE } from "@/lib/format";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -94,6 +97,27 @@ export default async function OverviewPage({ params }: { params: Promise<{ local
             <ShieldCheck className="h-3.5 w-3.5" /> {t("dashboard.verified")}
           </Badge>
         }
+      />
+
+      {/* wave 48 — install-to-home-screen banner + command center (health, trend, quick actions, insights) */}
+      <InstallAppBanner className="mb-4" />
+      <CommandCenter
+        kpis={k}
+        daily={daily}
+        locale={locale}
+        t={t}
+        firstName={firstName}
+        timeZone={DEFAULT_TIME_ZONE}
+        perms={{
+          contacts: ctx.can("contacts.write"),
+          deals: ctx.can("deals.read"),
+          inbox: ctx.can("inbox.read"),
+          tasks: ctx.can("tasks.read"),
+          social: ctx.can("inbox.read"),
+          campaigns: ctx.can("campaigns.manage"),
+          ai: ctx.can("ai.use"),
+          websites: ctx.can("websites.manage"),
+        }}
       />
 
       {pulse ? <AiPulseBand pulse={pulse} locale={locale} t={t} /> : null}

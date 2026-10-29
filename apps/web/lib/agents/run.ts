@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { publicEnv } from "@/lib/env";
 import { runAISystem } from "@/lib/ai/run-system";
 import { AGENT_DEFAULTS, attentionItems, cartText, isMorning, overdueText, parsePostPlan, reminderTone, scheduleSlots, trend, type AgentKey, type DayMetrics } from "./core";
+import { analystBriefRules, marketingCopyRules, salesManagerRules } from "@/lib/ai/brain-pro";
 
 /**
  * Wave 19 — the AI team, run by /api/cron/agents. Every agent:
@@ -136,7 +137,7 @@ export async function runAnalyst(orgId: string): Promise<{ actions: number }> {
   const text = await ai(
     org,
     "brief",
-    `You are the business analyst of "${org.name}". Write the owner's morning brief in ${langName(org.locale)}: 3-5 short bullet lines with yesterday's key numbers and what changed (use the trends), then "Today:" with 2-3 concrete actions in order of money impact. Plain text, no markdown headers, no invented numbers.`,
+    `You are the business analyst of "${org.name}". Write the owner's morning brief in ${langName(org.locale)}: 3-5 short bullet lines with yesterday's key numbers and what changed (use the trends), then "Today:" with 2-3 concrete actions in order of money impact. Plain text, no markdown headers, no invented numbers.\n\n${analystBriefRules()}`,
     JSON.stringify({ yesterday: facts, needs_attention: attention }),
     500,
   );
@@ -178,7 +179,7 @@ export async function runSalesManager(orgId: string, config: Record<string, unkn
   const plan = await ai(
     org,
     "sales_manager",
-    `You are the sales manager of "${org.name}". For each quiet deal give ONE concrete next step (max 14 words) in ${langName(org.locale)}. Answer as JSON: [{"id": "...", "step": "..."}]. No invented facts.`,
+    `You are the sales manager of "${org.name}". For each quiet deal give ONE concrete next step (max 14 words) in ${langName(org.locale)}. Answer as JSON: [{"id": "...", "step": "..."}]. No invented facts.\n\n${salesManagerRules()}`,
     JSON.stringify(deals.slice(0, maxTasks).map((d) => ({ id: d.id, title: d.title, value: d.value, stage: d.stage_name, quiet_days: d.days_quiet }))),
     600,
   );
@@ -324,6 +325,7 @@ export async function runMarketing(orgId: string, config: Record<string, unknown
     [
       `You are the social media manager of "${org.name}". Business information:\n${(org.agent?.instructions ?? "").slice(0, 5000)}`,
       social?.brand_voice ? `Brand voice: ${String(social.brand_voice).slice(0, 800)}` : "",
+      marketingCopyRules(),
       `Write ${posts} different posts for next week in ${langName(org.locale)}: a mix of value tips, a customer story/benefit, and one clear offer with a call to action (send a message / book). 2-5 short lines each, 1-3 relevant hashtags at the end, emojis sparingly. Never invent prices or facts. Answer ONLY as JSON: [{"text": "...", "platforms": ["facebook"${ig ? ', "instagram"' : ""}]}]`,
     ].filter(Boolean).join("\n\n"),
     "Plan next week's posts.",

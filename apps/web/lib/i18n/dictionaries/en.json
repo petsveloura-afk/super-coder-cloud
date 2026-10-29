@@ -146,6 +146,53 @@
     "inviteInvalid": "This invitation is invalid, expired, or was sent to another email"
   },
   "dashboard": {
+    "pro": {
+      "title": "Command center",
+      "health": "Business health",
+      "greet": {
+        "morning": "Good morning, {name} ☀️",
+        "noon": "Good afternoon, {name}",
+        "evening": "Good evening, {name}",
+        "night": "Good night, {name} 🌙"
+      },
+      "level": {
+        "excellent": "The business is in excellent shape — keep going!",
+        "good": "The business is in good shape, with room to grow",
+        "fair": "A few things are worth improving",
+        "attention": "A few topics need attention today",
+        "start": "Let's get started — add contacts and deals and we'll measure the health"
+      },
+      "part": {
+        "growth": "Growth",
+        "conversion": "Conversion",
+        "pipeline": "Pipeline",
+        "execution": "Execution"
+      },
+      "weekTitle": "New contacts in the last 7 days",
+      "weekUnit": "contacts",
+      "weekNew": "A fresh start this week",
+      "weekChange": "{pct}% vs the previous week ({prev})",
+      "qaTitle": "Quick actions",
+      "qa": {
+        "contact": "New contact",
+        "deal": "Deal",
+        "inbox": "Inbox",
+        "task": "Task",
+        "post": "Social post",
+        "campaign": "Campaign",
+        "agent": "AI agent",
+        "site": "Website / landing page"
+      },
+      "insightsTitle": "Smart insights",
+      "insight": {
+        "overdue": "{n} overdue tasks — worth closing them today",
+        "conversion": "Your close rate is {rate}% of decided deals",
+        "pipeline": "{n} open deals in the pipeline — a next step for each",
+        "growth": "{n} new contacts this week ({pct}% change)",
+        "qualified": "{n} qualified leads without a deal — turn them into deals",
+        "customers": "{n} existing customers — a repeat campaign can bring sales"
+      }
+    },
     "welcome": "Hello, {name}",
     "subtitle": "Snapshot of {org} — last 30 days",
     "totalContacts": "Total contacts",
@@ -330,6 +377,24 @@
     "offlineBody": "Content will come back as soon as you reconnect.",
     "goHome": "Back to home",
     "rateLimited": "Too many requests. Try again in a few minutes."
+  },
+  "pwaPro": {
+    "title": "Install the app on your home screen",
+    "benefitFast": "Opens with one tap",
+    "benefitPush": "Alerts for messages and leads",
+    "benefitFull": "Full screen, no browser bar",
+    "notNow": "Not now",
+    "openInBrowser": "Open in browser",
+    "copyLink": "Copy link",
+    "linkCopied": "Link copied — paste it in Chrome or Safari",
+    "inappStep1": "You are inside the Facebook / Instagram browser, which cannot install apps",
+    "inappStep2": "Tap ⋯ at the top and choose \"Open in browser\" (or copy the link and paste it in Chrome / Safari)",
+    "inappStep3": "In the browser, tap \"Install app\" again",
+    "androidStep1": "Tap the ⋮ menu at the top corner of Chrome",
+    "androidStep2": "Choose \"Install app\" or \"Add to Home screen\"",
+    "androidStep3": "Confirm — the icon appears on your home screen",
+    "desktopStep1": "Click the install icon at the side of the address bar (a screen with an arrow)",
+    "desktopStep2": "Choose \"Install\" — the app opens in its own window"
   },
   "pwa": {
     "install": "Install app",

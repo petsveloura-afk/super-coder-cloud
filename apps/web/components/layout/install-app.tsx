@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import * as DM from "@radix-ui/react-dropdown-menu";
 import { Download, PlusSquare, Share } from "lucide-react";
+import { BellRing, Copy, ExternalLink, Maximize2, MoreVertical, Smartphone, X, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog } from "@/components/ui/dialog";
 import { useI18n } from "@/lib/i18n/client";
 import { resolveInstallMode, type InstallEnv, type InstallMode } from "@/lib/pwa/install-core";
+import { resolveInstallHint, shouldShowInstallBanner, type InstallHint } from "@/lib/pwa/install-core";
 import { cn } from "@/lib/utils";
 
 /**
@@ -186,5 +188,124 @@ export function InstallAppMenuItem() {
         <Download className="h-4 w-4" aria-hidden /> {t("pwa.install")}
       </DM.Item>
     </>
+  );
+}
+
+/* ---------------------------------------------------------------- wave 48 — smart install banner (additive) */
+
+const SNOOZE_KEY = "scc.install.snoozedAt";
+
+function readSnooze(): number | null {
+  try {
+    const v = Number(window.localStorage.getItem(SNOOZE_KEY));
+    return Number.isFinite(v) && v > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSnooze(ts: number) {
+  try {
+    window.localStorage.setItem(SNOOZE_KEY, String(ts));
+  } catch {
+    /* private mode — the banner simply shows again next time */
+  }
+}
+
+function useInstallHint(): InstallHint {
+  const s = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  return resolveInstallHint({ env: s.env, hasPrompt: Boolean(s.deferred), installed: s.installed });
+}
+
+/**
+ * A friendly card that explains the benefits and gives the right one-tap action for this exact device:
+ * native prompt, iPhone steps, "open in your browser" for Facebook/Instagram in-app browsers,
+ * Android ⋮ menu steps, or the desktop address-bar icon. "Not now" hides it for 7 days.
+ */
+export function InstallAppBanner({ className }: { className?: string }) {
+  const { t } = useI18n();
+  const hint = useInstallHint();
+  const [snoozed, setSnoozed] = useState<boolean | undefined>(undefined);
+  const [open, setOpen] = useState(false);
+  // read the snooze once after hydration (time and storage are only read in effects / handlers)
+  useEffect(() => {
+    const at = readSnooze();
+    const timer = window.setTimeout(() => setSnoozed(!shouldShowInstallBanner({ hint: "native", dismissedAt: at, now: Date.now() })), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  if (snoozed === undefined || snoozed || hint === "none") return null;
+
+  const snooze = () => {
+    writeSnooze(Date.now());
+    setSnoozed(true);
+  };
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success(t("pwaPro.linkCopied"));
+    } catch {
+      toast.error(t("errors.generic"));
+    }
+  };
+  const primary = () => {
+    if (hint === "native" || hint === "ios") return void requestInstall();
+    setOpen((v) => !v);
+  };
+  const steps: string[] =
+    hint === "inapp"
+      ? [t("pwaPro.inappStep1"), t("pwaPro.inappStep2"), t("pwaPro.inappStep3")]
+      : hint === "android_manual"
+        ? [t("pwaPro.androidStep1"), t("pwaPro.androidStep2"), t("pwaPro.androidStep3")]
+        : hint === "desktop_manual"
+          ? [t("pwaPro.desktopStep1"), t("pwaPro.desktopStep2")]
+          : [];
+
+  return (
+    <div className={cn("relative overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-l from-accent-soft/60 via-surface to-surface p-4 shadow-sm", className)} data-testid="install-app-banner">
+      <button type="button" onClick={snooze} className="absolute end-2 top-2 rounded-full p-1.5 text-muted hover:bg-surface-hover hover:text-fg" aria-label={t("pwaPro.notNow")}>
+        <X className="h-4 w-4" />
+      </button>
+      <div className="flex flex-wrap items-center gap-4 pe-6">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-accent text-white shadow-md">
+          <Smartphone className="h-6 w-6" aria-hidden />
+        </span>
+        <div className="min-w-[12rem] flex-1">
+          <p className="text-[15px] font-semibold">{t("pwaPro.title")}</p>
+          <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-muted">
+            <li className="inline-flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-accent" aria-hidden /> {t("pwaPro.benefitFast")}</li>
+            <li className="inline-flex items-center gap-1.5"><BellRing className="h-3.5 w-3.5 text-accent" aria-hidden /> {t("pwaPro.benefitPush")}</li>
+            <li className="inline-flex items-center gap-1.5"><Maximize2 className="h-3.5 w-3.5 text-accent" aria-hidden /> {t("pwaPro.benefitFull")}</li>
+          </ul>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={primary} className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-[14px] font-semibold text-white shadow-sm transition hover:opacity-90" data-testid="install-app-banner-cta">
+            {hint === "inapp" ? <ExternalLink className="h-4 w-4" aria-hidden /> : <Download className="h-4 w-4" aria-hidden />}
+            {hint === "inapp" ? t("pwaPro.openInBrowser") : t("pwa.install")}
+          </button>
+          <button type="button" onClick={snooze} className="rounded-xl px-3 py-2.5 text-[13px] text-muted hover:bg-surface-hover">
+            {t("pwaPro.notNow")}
+          </button>
+        </div>
+      </div>
+      {open && steps.length ? (
+        <div className="mt-4 rounded-xl border border-line bg-surface p-3">
+          <ol className="space-y-2.5 text-[13.5px]">
+            {steps.map((st, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-[12px] font-semibold text-accent">
+                  {hint === "android_manual" && i === 0 ? <MoreVertical className="h-4 w-4" aria-hidden /> : i + 1}
+                </span>
+                <span className="pt-0.5">{st}</span>
+              </li>
+            ))}
+          </ol>
+          {hint === "inapp" ? (
+            <button type="button" onClick={() => void copyLink()} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-[13px] hover:bg-surface-hover">
+              <Copy className="h-4 w-4" aria-hidden /> {t("pwaPro.copyLink")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
