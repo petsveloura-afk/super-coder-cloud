@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { Badge, Button, Input, Textarea } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 import { Chips, CalendarPanel, ComposerExtras, ExportButton, OverviewPanel, SearchBox, downloadCsv } from "@/components/social/social-extras";
+import { StudioPanel } from "@/components/social/social-studio";
 import { filterComments, filterPosts, filterReviews, type CommentFilter, type PostFilter, type ReviewFilter } from "@/lib/social/insights";
 import { approveAllDraftsAction, commentStatusAction, duplicatePostAction, postStatusAction, replyCommentAction, replyReviewAction, reviewSettingsAction, savePostAction, saveSocialSettingsAction } from "@/app/[locale]/(dashboard)/social/actions";
 
@@ -156,6 +157,7 @@ function PostEditor({ initial, onDone, presetAt }: { initial?: PostRow | null; o
       <Textarea rows={5} value={body} onChange={(e) => setBody(e.target.value)} placeholder={t("social.postPlaceholder")} dir="auto" aria-label={t("social.postText")} />
       <Input value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://…/image.jpg" dir="ltr" aria-label={t("social.imageUrl")} />
       <ComposerExtras body={body} setBody={setBody} fb={fb} ig={ig} image={image} setAt={setAt} />
+      <StudioPanel body={body} setBody={setBody} image={image} setImage={setImage} fb={fb} ig={ig} />
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <label className="inline-flex items-center gap-2">
           <input type="checkbox" checked={fb} onChange={(e) => setFb(e.target.checked)} /> Facebook

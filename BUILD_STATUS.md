@@ -767,3 +767,12 @@
 
 **נבדק:** `tsc --noEmit` נקי, ESLint נקי על הקבצים שנגעו, בדיקות יחידה חדשות + i18n עוברות.
 **לא נבדק:** התקנה בפועל על מכשיר אמיתי (אנדרואיד / אייפון). הכפתור פועל רק ב-production (ה-service worker נרשם רק שם) ורק ב-HTTPS.
+
+## עדכון גל 45 — שלב א': סטודיו פוסטים (תמונת AI ממוטרת + ספריית נכסים) — שדרוג תוספתי
+- **עיקרון:** הוספה בלבד. `images.ts`, `runAISystem`, טבלת `social_posts` (כולל מגבלת `platforms`) והעורך הקיים לא שונו. בעורך נוספו רק שורת import ורכיב אחד.
+- **תמונות AI עם מדידת קרדיטים:** `lib/social/studio-image.ts` עוטף את `generateAndStoreImage` ב-`reserve_ai_credits_system` / `finalize_ai_usage_system` (feature קיים `image_gen`). תמונה אחת = קרדיט אחד; יצירה שנכשלה מסומנת כשגיאה ולא מחויבת. מצב דמו, הגבלת קצב ותקרת תוכנית נאכפים על ידי אותה פונקציית SQL.
+- **ברירת מחדל חסכנית:** יצירה אחת לכל לחיצה. "עוד אפשרויות" (עד 3 בסך הכול) נוצרות רק בלחיצה מפורשת, וכל תמונה נוספת מחויבת בנפרד. אפשרויות נוספות לטקסט: קריאת AI אחת (קרדיט אחד) שמחזירה שתי חלופות.
+- **ספריית נכסים:** טבלה חדשה `social_assets` (מיגרציה `20261029000003_social_assets.sql`): `organization_id`, RLS דרך `has_permission` (קריאה: `campaigns.manage` או `analytics.read`; כתיבה: `campaigns.manage`), כתובת https בלבד, ייחודיות לפי עסק+כתובת, טריגר יומן ביקורת. תמונות שנוצרו נשמרות אוטומטית; אפשר גם לשמור קישור ולמחוק.
+- **הרשאות:** ללא הרשאה חדשה (משתמשים ב-`campaigns.manage` וב-`ai.use` הקיימות), ולכן אין צורך ב-`pnpm gen:permissions`.
+- **קבצים חדשים:** `lib/social/studio-core.ts`, `lib/social/studio-image.ts`, `app/[locale]/(dashboard)/social/studio-actions.ts`, `components/social/social-studio.tsx`, מיגרציה, ושתי בדיקות (`tests/unit/wave45-social-studio.test.ts`, `packages/database/tests/wave45-social-assets.test.ts`). **קבצים שהורחבו:** `components/social/social-client.tsx` (שתי שורות), שלושת מילוני התרגום (`social.studio`, 22 מפתחות זהים).
+- **מצב אימות (יושר מלא):** נבדק בסביבה ללא רשת, ללא `pnpm` וללא Postgres. **לא הורצו:** typecheck, lint, vitest, build ובדיקות ה-RLS. כן הורצו: בדיקת שפיות ב-Node על לוגיקת הליבה (וריאציות, פרומפט, פיצול טקסט, נרמול נכסים), זהות מפתחות התרגום בשלוש השפות ושכל מפתח שנמצא בשימוש קיים, ו-diff מול הארכיון המקורי (כל השינויים הם הוספות). **לא נבדק מול שירות אמיתי:** יצירת תמונה ב-Gemini, אחסון ב-Supabase.
