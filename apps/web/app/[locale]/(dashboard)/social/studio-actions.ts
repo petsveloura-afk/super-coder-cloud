@@ -5,7 +5,7 @@ import { uuidSchema } from "@scc/shared/validators";
 import { getOrgContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { dbErrorKey, type ActionState } from "@/lib/action-state";
-import { buildImagePrompt, extraVariations, normalizeAsset, splitVariants, variationCount, STUDIO_MORE_EXTRA } from "@/lib/social/studio-core";
+import { buildImagePrompt, buildTextBrief, extraVariations, normalizeAsset, splitVariants, validateVariants, variationCount, STUDIO_MORE_EXTRA } from "@/lib/social/studio-core";
 
 /** Wave 45 / stage A — post studio: metered AI images, "more options", asset library. */
 const loc = (l: string) => (l === "ar" || l === "en" ? l : "he");
@@ -104,16 +104,16 @@ export async function aiMoreTextAction(input: { locale: string; topic: string; t
     system: [
       `You are the social media manager of "${String(org?.name ?? "").slice(0, 120)}". Business information:\n${String(agent?.instructions ?? "").slice(0, 4000)}`,
       social?.brand_voice ? `Brand voice: ${String(social.brand_voice).slice(0, 800)}` : "",
-      `Write ${STUDIO_MORE_EXTRA} DIFFERENT alternative ${isIg ? "Instagram" : "Facebook"} posts in ${lang}, tone: ${p.data.tone}, each with a different angle. ${isIg ? "Up to 6 short lines, 4-8 relevant hashtags at the end." : "2-5 short lines, 1-3 relevant hashtags at the end."} Emojis sparingly. End each with one clear call to action. NEVER invent prices, discounts, dates or facts that are not in the business information. Separate the posts with a line containing only === . Answer with the posts only — no numbering, no explanations.`,
+      `Write ${STUDIO_MORE_EXTRA} DIFFERENT alternative ${isIg ? "Instagram" : "Facebook"} posts in ${lang}, tone: ${p.data.tone}, each with a different angle (for example: benefit, story, question). Each post must be a complete, ready-to-publish post of at least 2 full sentences, written about the subject the user gives. NEVER answer with just the subject or a single word. ${isIg ? "Up to 6 short lines, 4-8 relevant hashtags at the end." : "2-5 short lines, 1-3 relevant hashtags at the end."} Emojis sparingly. End each with one clear call to action. If the business information does not cover something, stay general: NEVER invent prices, discounts, dates, names or facts. Separate the posts with a line containing only === . Answer with the posts only: no numbering, no titles, no explanations.`,
       p.data.current ? `Already written (do not repeat it):\n${p.data.current.slice(0, 1500)}` : "",
     ].filter(Boolean).join("\n\n"),
-    messages: [{ role: "user", content: p.data.topic }],
-    temperature: 0.85,
+    messages: [{ role: "user", content: buildTextBrief({ topic: p.data.topic, tone: p.data.tone, platform: p.data.platform, langName: lang }) }],
+    temperature: 0.8,
     maxTokens: 1000,
     patienceMs: 20_000,
   });
   if (!out.ok) return { error: out.error };
-  const variants = splitVariants(out.text, STUDIO_MORE_EXTRA, isIg ? 2200 : 5000);
+  const variants = validateVariants(splitVariants(out.text, STUDIO_MORE_EXTRA, isIg ? 2200 : 5000), p.data.topic, p.data.current);
   if (!variants.length) return { error: "ai.failed" };
   return { ok: true, data: { variants } };
 }
