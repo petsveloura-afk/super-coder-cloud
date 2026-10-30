@@ -14,7 +14,8 @@ import { AdminDomains } from "@/components/admin/admin-domains";
 import { AdminOverrides } from "@/components/admin/admin-growth";
 import { SpeedCard } from "@/components/admin/speed-card";
 import { PlatformSetup } from "@/components/admin/platform-setup";
-import { setupSteps } from "@/lib/admin/setup-core";
+import { setupSteps, voiceSetupSteps } from "@/lib/admin/setup-core";
+import { AdminPhones } from "@/components/admin/admin-phones";
 import { publicEnv } from "@/lib/env";
 import { providerKeys, ROUTE_PROVIDERS } from "@/lib/ai/router-core";
 
@@ -71,7 +72,9 @@ export default async function AdminPage({ params, searchParams }: { params: Prom
     <>
       <PageHeader title={t("admin.title")} description={t("admin.subtitle")} />
       {/* wave 20: the platform's one-time setup — after it, every business connects in one click */}
-      <PlatformSetup steps={setupSteps(process.env, publicEnv.appUrl)} />
+      {/* wave 57: + the agents' voice and phone numbers for every business (set once by the platform owner) */}
+      <PlatformSetup steps={[...setupSteps(process.env, publicEnv.appUrl), ...voiceSetupSteps(process.env, publicEnv.appUrl)]} />
+      <AdminPhones orgs={orgRows.map((o) => ({ id: o.id, name: o.name, plan: o.plan }))} />
       <AiHealth configured={Object.fromEntries(ROUTE_PROVIDERS.map((p) => [p, providerKeys(p, process.env).length]))} />
       <SpeedCard locale={locale} />
       <AdminPayments locale={locale} />

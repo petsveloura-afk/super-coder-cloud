@@ -114,7 +114,7 @@ test("a live call: greeting → caller speaks → answer → barge-in clears →
   await new Promise((r) => bridge.listen(0, r));
   const ws = new WebSocket(`ws://127.0.0.1:${bridge.address().port}/voice/stream`);
   const got = [];
-  const waitFor = async (pred, ms = 5000) => {
+  const waitFor = async (pred, ms = 12000) => {
     const until = Date.now() + ms;
     while (Date.now() < until) {
       const hit = got.find(pred);

@@ -222,6 +222,15 @@ export async function connectChannelAction(_prev: ActionState, fd: FormData): Pr
       // cosmetic — the bot works without it
     }
   }
+  // wave 57: Twilio — the number's calls / status / SMS are wired automatically (nothing to paste in the Twilio console)
+  if (kind === "sms" && token && v.account_sid && v.auth_token && v.from_number) {
+    try {
+      const { autoWireOwnNumber } = await import("@/lib/voice/platform-phone");
+      await autoWireOwnNumber({ sid: v.account_sid, token: v.auth_token, phone: v.from_number, webhookToken: token });
+    } catch {
+      // best effort — the manual address is still shown on the page
+    }
+  }
   revalidatePath(`/${locale}/integrations`);
   revalidatePath(`/${locale}/inbox`);
   return { ok: true, message: "integrations.channels.connected" };

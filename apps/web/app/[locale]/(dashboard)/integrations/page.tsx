@@ -199,6 +199,11 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
               {voiceUrl}
             </bdi>
             <p className="text-subtle">{t(voiceOn ? "voice.ready" : "plans.locked.voice_ai.title")}</p>
+            {/* wave 57: the number is wired automatically; everything about the phone agent in one screen */}
+            <p className="text-success">{t("phone.autoWiredNote")}</p>
+            <a href={`/${locale}/phone`} className="inline-block font-semibold text-accent hover:underline">
+              {t("phone.openHub")}
+            </a>
           </div>
         </Card>
       ) : null}

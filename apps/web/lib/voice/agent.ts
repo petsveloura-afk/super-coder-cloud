@@ -138,7 +138,10 @@ export async function startAgentCall(orgId: string, contactId: string): Promise<
   const { data: has } = await admin.rpc("has_feature", { p_org: orgId, p_feature: "voice_ai" });
   if (has !== true) return { ok: false, error: "plans.locked.voice_ai.title" };
   const acc = await loadAccount(orgId, "sms");
-  if (!acc?.config.account_sid || !acc.secrets.auth_token || !acc.config.from_number) return { ok: false, error: "voice.notConnected" };
+  if (!acc?.config.account_sid || !acc.secrets.auth_token || !acc.config.from_number) {
+    // wave 57: no own Twilio account → the business's platform number (zero setup)
+    return startPlatformAgentCall(orgId, contactId);
+  }
   const { data: c } = await admin.from("contacts").select("phone").eq("id", contactId).eq("organization_id", orgId).maybeSingle();
   const { toE164 } = await import("@/lib/channels/secrets");
   const to = toE164((c?.phone as string | null) ?? null);
@@ -158,7 +161,10 @@ export async function startAgentCall(orgId: string, contactId: string): Promise<
 /** Urgent call to the team members who chose "urgent calls" (job "call"). */
 export async function escalationCalls(orgId: string, payload: { customer?: string; reason?: string; conversation_id?: string }): Promise<{ ok: boolean; error?: string; permanent?: boolean }> {
   const admin = createAdminClient();
-  const acc = await loadAccount(orgId, "sms");
+  const acc0 = await loadAccount(orgId, "sms");
+  // wave 57: no own Twilio account → urgent calls go out from the business's platform number
+  const platform = !acc0?.config.account_sid || !acc0.secrets.auth_token || !acc0.config.from_number ? await import("./platform-phone").then((m) => m.twilioCredsForOrg(orgId)) : null;
+  const acc = platform ? { config: { account_sid: platform.sid, from_number: platform.from }, secrets: { auth_token: platform.token } } : acc0;
   if (!acc?.config.account_sid || !acc.secrets.auth_token || !acc.config.from_number) return { ok: false, error: "twilio_not_connected", permanent: true };
   const { data: recs } = await admin.from("notify_recipients").select("id, target").eq("organization_id", orgId).eq("kind", "call").eq("enabled", true).contains("events", ["escalation"]).not("target", "is", null).limit(3);
   if (!recs?.length) return { ok: true };
@@ -173,4 +179,29 @@ export async function escalationCalls(orgId: string, payload: { customer?: strin
     any = any || res.ok;
   }
   return any ? { ok: true } : { ok: false, error: "call_failed" };
+}
+
+/** Wave 57 — "call with the agent" from a business that uses a platform number (no Twilio of its own). */
+async function startPlatformAgentCall(orgId: string, contactId: string): Promise<{ ok: boolean; error?: string }> {
+  const admin = createAdminClient();
+  const { twilioCredsForOrg, platformMinutes, platformUrls } = await import("./platform-phone");
+  const cr = await twilioCredsForOrg(orgId);
+  if (!cr || cr.via !== "platform") return { ok: false, error: "voice.notConnected" };
+  if ((await platformMinutes(orgId)).left === 0) return { ok: false, error: "phone.minutesUsed" };
+  const { data: c } = await admin.from("contacts").select("phone").eq("id", contactId).eq("organization_id", orgId).maybeSingle();
+  const { toE164 } = await import("@/lib/channels/secrets");
+  const to = toE164((c?.phone as string | null) ?? null);
+  if (!to) return { ok: false, error: "voice.noPhone" };
+  const { checkContact } = await import("@/lib/conversations/guard");
+  if (!(await checkContact(contactId, "automation")).allowed) return { ok: false, error: "guard.reasons.opted_out" };
+  const call = await openVoiceCall({ orgId, direction: "out", from: cr.from, to, callSid: null, contactId });
+  await admin.from("voice_calls").update({ via: "platform" }).eq("id", call.id);
+  const urls = platformUrls();
+  const r = await twilioCall(cr.sid, cr.token, { To: to, From: cr.from, Url: urls.turn(call.id), Method: "POST", StatusCallback: urls.status, StatusCallbackMethod: "POST" });
+  if (!r.ok) {
+    await admin.from("voice_calls").update({ status: "failed" }).eq("id", call.id);
+    return { ok: false, error: "voice.callFailed" };
+  }
+  await admin.from("voice_calls").update({ call_sid: r.sid ?? null, status: "ringing" }).eq("id", call.id);
+  return { ok: true };
 }

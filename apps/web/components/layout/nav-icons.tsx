@@ -24,6 +24,7 @@ import {
   Share2,
   BookOpen,
   Zap,
+  PhoneCall,
   type LucideIcon,
 } from "lucide-react";
 
@@ -56,4 +57,6 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   social: Share2,
   // wave 54
   operator: Zap,
+  // wave 57
+  phone: PhoneCall,
 };

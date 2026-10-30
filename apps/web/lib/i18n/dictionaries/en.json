@@ -4,6 +4,7 @@
     "tagline": "The operating system for your business"
   },
   "nav": {
+    "phone": "Phone agent",
     "operator": "AI Operator",
     "overview": "Overview",
     "crm": "Contacts",
@@ -3554,6 +3555,16 @@
       "liveFail": "Check failed: {error}",
       "footer": "Keys live only in Vercel — not in the database or the code. No customer sees this screen.",
       "steps": {
+        "voice": {
+          "title": "The agents' voice (once for the whole platform)",
+          "unlocks": "Every agent speaks in a natural voice — in voice notes and on the phone — without businesses dealing with it",
+          "how": "1. ElevenLabs → Settings → API Keys → Create (recommended: the most natural Hebrew). An OpenAI key works too.\n2. Vercel → Settings → Environment Variables: add ELEVENLABS_API_KEY (or OPENAI_API_KEY).\n3. Optional: ELEVENLABS_VOICE_ID — the default voice for businesses that didn't choose one.\n4. Redeploy. From now on every business chooses its agent's voice in \"Conversation setup\" — no keys."
+        },
+        "phone_platform": {
+          "title": "Phone numbers for businesses (once for the whole platform)",
+          "unlocks": "Every Business-plan business gets a phone number for its agent in one click — no Twilio account of its own",
+          "how": "1. Open a Twilio account and add credit (each number costs a few dollars a month + call minutes).\n2. Copy the Account SID and Auth Token from the Console.\n3. In Vercel: TWILIO_PLATFORM_ACCOUNT_SID, TWILIO_PLATFORM_AUTH_TOKEN, TWILIO_PLATFORM_COUNTRY (e.g. US or IL), optional VOICE_PLATFORM_MINUTES (minutes per business per month, default 300). Redeploy.\n4. Israeli numbers need regulatory approval in Twilio: buy the number in Twilio, then assign it to the business below in \"Phone numbers for businesses\" — wiring is automatic.\n5. Live calls (optional): the Railway service (WA bridge) on the latest version — no extra variables."
+        },
         "bridge": {
           "title": "WhatsApp from the phone (QR and code)",
           "unlocks": "Every business links WhatsApp in a minute, no Meta needed",
@@ -5071,6 +5082,8 @@
     "adminOnly": "Only you see this"
   },
   "guide": {
+    "newTitle": "What's new on the platform",
+    "newSubtitle": "Every new capability in order — a short explanation, steps and a direct link to the screen",
     "title": "User guide",
     "subtitle": "29 short steps, one per page. The numbers on each picture match the list beside it. Move with the arrows, a swipe or the keyboard, and search any topic.",
     "onlyHebrew": "The guide is in Hebrew for now.",
@@ -5602,5 +5615,85 @@
     "inPlan": "This feature is already in your plan",
     "demo": "Trials can't be started in a demo workspace",
     "notAvailable": "This feature has no free trial"
+  },
+  "phone": {
+    "title": "Phone agent",
+    "subtitle": "The agent answers calls to the business number, runs a sales conversation, books meetings and hands over to a person when needed — all here",
+    "readyTitle": "The phone agent is live ✓",
+    "notReadyTitle": "One small step and the agent answers the phone",
+    "readyBody": "Customers who call {number} get an instant answer from the agent, 24/7.",
+    "notReadyBody": "Finish the highlighted step below — everything else is set up automatically.",
+    "modeLive": "Live call",
+    "modeTurn": "Turn-by-turn call",
+    "minutes": "Call minutes this month",
+    "minutesOf": "{used} of {limit} minutes",
+    "stepsTitle": "Go live in 3 steps",
+    "stepsSubtitle": "No Twilio console, no addresses to copy — the system connects everything",
+    "s1": {
+      "title": "An active AI agent",
+      "done": "\"{name}\" will answer calls with the same information, prices and script as in chat.",
+      "body": "The phone uses the same agent as chat. Create one in a click.",
+      "edit": "Edit the agent",
+      "cta": "Create an agent"
+    },
+    "s2": {
+      "title": "A phone number for the agent",
+      "own": "Your Twilio number is connected — the agent answers its calls. It was wired automatically.",
+      "platform": "You have a platform number — give it to customers or forward your existing number to it.",
+      "body": "One click and you get a phone number connected to the agent — no Twilio account, no settings.",
+      "bodyOwn": "Connect the business's Twilio account on the Integrations page — the number is wired automatically.",
+      "wire": "Re-wire automatically",
+      "get": "Get a number for the agent",
+      "connectOwn": "Connect Twilio on the Integrations page"
+    },
+    "s3": {
+      "title": "The agent's voice",
+      "persona": "The agent speaks in the voice you chose.",
+      "default": "The agent speaks in the platform's default voice. You can choose a personal voice.",
+      "missing": "The platform voice engine isn't set yet — the agent uses the basic phone voice.",
+      "cta": "Choose a voice"
+    },
+    "s4": {
+      "title": "Transfer to a person (optional)",
+      "body": "When a customer asks for a person, or in an urgent case, the call goes to this number."
+    },
+    "testTitle": "Test call",
+    "testBody": "Type your number — the agent calls you now so you hear exactly what customers hear.",
+    "testCta": "Call me",
+    "try": {
+      "t1": "Ask \"how much is it?\" — prices only from the business information",
+      "t2": "Say \"too expensive\" — calm objection handling",
+      "t3": "Ask for \"tomorrow at 10\" — it books and reads it back",
+      "t4": "Interrupt mid-sentence — it stops and listens",
+      "t5": "Ask for a person — the call goes to the transfer number"
+    },
+    "callsTitle": "Recent calls",
+    "noCalls": "No calls yet. Try the test call above.",
+    "autoWiredNote": "New: the number is wired automatically when you connect — no need to paste the address in Twilio.",
+    "openHub": "All phone agent settings →",
+    "gotNumber": "The number is ready and connected to the agent ✓",
+    "released": "The number was released",
+    "wired": "The number was wired to the agent ✓",
+    "wireFailed": "Couldn't wire the number — check that it belongs to the connected Twilio account",
+    "transferSaved": "Transfer number saved",
+    "calling": "The agent is calling you now…",
+    "tooMany": "Up to 3 test calls every 10 minutes",
+    "platformOff": "Platform numbers aren't enabled yet — you can connect your own Twilio number",
+    "manualAssign": "Numbers in this country need approval — the platform team will assign you one shortly",
+    "buyFailed": "Couldn't get a number right now. Please try again later",
+    "notInAccount": "The number isn't in the platform's Twilio account",
+    "configFailed": "Couldn't configure the number in Twilio",
+    "minutesUsed": "This month's call minutes are used up",
+    "noNumber": "A phone number for the agent is needed first",
+    "assigned": "The number was assigned to the business ✓",
+    "admin": {
+      "title": "Phone numbers for businesses",
+      "subtitle": "From the platform's Twilio account: buy automatically, assign an existing number (e.g. Israeli), or release",
+      "org": "Business",
+      "number": "Existing number in the account (E.164)",
+      "assign": "Assign",
+      "buy": "Buy automatically",
+      "release": "Release"
+    }
   }
 }

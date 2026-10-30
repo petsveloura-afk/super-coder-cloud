@@ -77,6 +77,25 @@ export function toTelegramOwnerEvent(event, sentIds = new Set(), meId = null) {
   return { type: "owner_message", id, to: uid, text, media };
 }
 
+/**
+ * Wave 57 — texts the bridge is sending right now (before Telegram returns the message id). A slow send
+ * must never look like the owner typing: the echo is matched by chat + text for two minutes.
+ */
+export function rememberOutgoing(list, uid, text, now = Date.now()) {
+  const t = String(text ?? "").replace(/\s+/g, " ").trim();
+  const keep = list.filter((p) => now - p.at < 120_000);
+  if (t) keep.push({ uid: String(uid), text: t, at: now });
+  return keep.slice(-200);
+}
+
+export function isOwnOutgoing(list, ev, now = Date.now()) {
+  if (!ev || !Array.isArray(list)) return false;
+  const t = String(ev.text ?? "").replace(/\s+/g, " ").trim();
+  // the agent's voice note (no text): matched by chat while a voice send is in flight
+  if (!t) return Boolean(ev.media) && list.some((p) => p.uid === String(ev.to) && p.text === "\u0000voice" && now - p.at < 120_000);
+  return list.some((p) => p.uid === String(ev.to) && now - p.at < 120_000 && (p.text === t || (t.length >= 8 && p.text.includes(t))));
+}
+
 export class TelegramUserManager {
   /**
    * @param {object} o
@@ -219,6 +238,8 @@ export class TelegramUserManager {
     s.client.addEventHandler((event) => {
       setTimeout(() => {
         const ev = toTelegramOwnerEvent(event, s.sentIds, s.meId);
+        // wave 57: the agent's own reply whose send was still in flight is not "the owner typing"
+        if (ev && isOwnOutgoing(s.pendingOut, ev)) return;
         if (ev) this.post(id, ev).catch(() => {});
       }, this.ownerDelayMs ?? 1500).unref?.();
     }, new NewMessage({ outgoing: true }));
@@ -246,6 +267,7 @@ export class TelegramUserManager {
     const { Api, bigInt } = this.lib;
     const hash = s.peers[uid];
     const peer = hash && Api && bigInt ? new Api.InputPeerUser({ userId: bigInt(uid), accessHash: bigInt(hash) }) : uid;
+    s.pendingOut = rememberOutgoing(s.pendingOut ?? [], uid, body); // wave 57: known before Telegram answers
     const r = await s.client.sendMessage(peer, { message: body });
     if (r?.id != null) {
       s.sentIds = s.sentIds ?? new Set();
@@ -269,6 +291,7 @@ export class TelegramUserManager {
     const hash = s.peers[uid];
     const peer = hash && Api && bigInt ? new Api.InputPeerUser({ userId: bigInt(uid), accessHash: bigInt(hash) }) : uid;
     const file = new CustomFile(v.ogg ? "voice.ogg" : "voice.mp3", v.buf.length, "", v.buf);
+    s.pendingOut = rememberOutgoing(s.pendingOut ?? [], uid, "\u0000voice"); // wave 57
     const r = await s.client.sendFile(peer, { file, voiceNote: v.ogg, forceDocument: false });
     if (r?.id != null) {
       s.sentIds = s.sentIds ?? new Set();

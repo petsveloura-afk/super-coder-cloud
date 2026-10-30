@@ -38,14 +38,15 @@ export function liveCallTwiml(callId: string, locale: string): string | null {
 
 /** Changes a live call on Twilio (e.g. transfer to a person) — the stream ends and the new TwiML runs. */
 export async function twilioUpdateCall(orgId: string, callSid: string, twiml: string): Promise<boolean> {
-  const { loadAccount } = await import("@/lib/channels/accounts");
-  const acc = await loadAccount(orgId, "sms");
-  if (!acc?.config.account_sid || !acc.secrets.auth_token || !/^CA[0-9a-f]{32}$/i.test(callSid)) return false;
+  // wave 57: the business's own Twilio account, or the platform's (platform numbers)
+  const { twilioCredsForOrg } = await import("./platform-phone");
+  const cr = await twilioCredsForOrg(orgId);
+  if (!cr || !/^CA[0-9a-f]{32}$/i.test(callSid)) return false;
   const base = (process.env.TWILIO_API_BASE || "https://api.twilio.com").replace(/\/$/, "");
   try {
-    const res = await fetch(`${base}/2010-04-01/Accounts/${encodeURIComponent(acc.config.account_sid)}/Calls/${encodeURIComponent(callSid)}.json`, {
+    const res = await fetch(`${base}/2010-04-01/Accounts/${encodeURIComponent(cr.sid)}/Calls/${encodeURIComponent(callSid)}.json`, {
       method: "POST",
-      headers: { Authorization: `Basic ${Buffer.from(`${acc.config.account_sid}:${acc.secrets.auth_token}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" },
+      headers: { Authorization: `Basic ${Buffer.from(`${cr.sid}:${cr.token}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ Twiml: twiml }).toString(),
       signal: AbortSignal.timeout(10_000),
       cache: "no-store",
@@ -58,13 +59,13 @@ export async function twilioUpdateCall(orgId: string, callSid: string, twiml: st
 
 /** Asks Twilio to report when the call ends (for the CRM summary) — no setup needed by the business. */
 export async function watchCallStatus(orgId: string, callSid: string, statusUrl: string): Promise<void> {
-  const { loadAccount } = await import("@/lib/channels/accounts");
-  const acc = await loadAccount(orgId, "sms");
-  if (!acc?.config.account_sid || !acc.secrets.auth_token || !/^CA[0-9a-f]{32}$/i.test(callSid)) return;
+  const { twilioCredsForOrg } = await import("./platform-phone");
+  const cr = await twilioCredsForOrg(orgId);
+  if (!cr || !/^CA[0-9a-f]{32}$/i.test(callSid)) return;
   const base = (process.env.TWILIO_API_BASE || "https://api.twilio.com").replace(/\/$/, "");
-  await fetch(`${base}/2010-04-01/Accounts/${encodeURIComponent(acc.config.account_sid)}/Calls/${encodeURIComponent(callSid)}.json`, {
+  await fetch(`${base}/2010-04-01/Accounts/${encodeURIComponent(cr.sid)}/Calls/${encodeURIComponent(callSid)}.json`, {
     method: "POST",
-    headers: { Authorization: `Basic ${Buffer.from(`${acc.config.account_sid}:${acc.secrets.auth_token}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" },
+    headers: { Authorization: `Basic ${Buffer.from(`${cr.sid}:${cr.token}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ StatusCallback: statusUrl, StatusCallbackMethod: "POST" }).toString(),
     signal: AbortSignal.timeout(8000),
     cache: "no-store",

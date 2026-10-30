@@ -37,6 +37,10 @@ export interface TgBusinessMessage {
   chat: { id: number; type: string; first_name?: string; last_name?: string; username?: string };
   from?: TgUser;
   sender_business_bot?: TgUser;
+  /** wave 57: sent by an implicit action (Telegram Business greeting / away message, scheduled message) */
+  is_from_offline?: boolean;
+  /** unix seconds */
+  date?: number;
   text?: string;
   caption?: string;
   photo?: { file_id?: string; file_size?: number }[];
@@ -91,6 +95,14 @@ export async function handleTelegramBusiness(
 
   const { data: conn } = await admin.from("telegram_business_connections").select("owner_user_id, is_enabled, can_reply").eq("id", m.business_connection_id).maybeSingle();
   const fromOwner = Boolean(conn && m.from && Number(conn.owner_user_id) === m.from.id);
+  // wave 57: from the owner's own account, only a message the owner really TYPED takes the chat from the agent.
+  // Telegram's own greeting / away / scheduled messages, an instant automatic reply, or an echo of the agent's
+  // answer leave the conversation with the agent (same rules as WhatsApp / personal Telegram).
+  if (fromOwner && m.chat.type === "private") {
+    if (m.is_from_offline) return;
+    const { ownerMessageIsAutomatic } = await import("./owner-telegram-business");
+    if (await ownerMessageIsAutomatic({ token, chatId: m.chat.id, text: m.text ?? m.caption ?? "", sentAtSec: m.date ?? null })) return;
+  }
 
   let text = m.text ?? m.caption ?? "";
   let media: Record<string, unknown> | null = null;

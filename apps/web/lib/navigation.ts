@@ -27,6 +27,8 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "agents", label: "nav.agents", section: "growth", phase: null, permission: "ai.use" },
   // wave 54: the AI Operator — say what should happen, approve, done
   { key: "operator", label: "nav.operator", section: "growth", phase: null, permission: "ai.use" },
+  // wave 57: the phone agent in one place (number, voice, transfer, test call, calls)
+  { key: "phone", label: "nav.phone", section: "growth", phase: null, permission: "ai.use" },
   { key: "social", label: "nav.social", section: "growth", phase: null, permission: "inbox.read" },
   { key: "campaigns", label: "nav.campaigns", section: "growth", phase: null, permission: "campaigns.manage" },
   { key: "websites", label: "nav.websites", section: "growth", phase: null, permission: "websites.manage" },

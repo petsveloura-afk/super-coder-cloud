@@ -113,3 +113,21 @@ test("not configured without API credentials", async () => {
   assert.equal(mgr.configured(), false);
   await assert.rejects(mgr.start(ID, CB), /tg_not_configured/);
 });
+
+// wave 57 — a slow send is still recognised as the agent's own message (never "the owner typing")
+import { isOwnOutgoing, rememberOutgoing } from "../src/telegram-user.mjs";
+test("wave 57: own outgoing texts are recognised before Telegram returns the id", () => {
+  const now = 1_000_000;
+  let list = rememberOutgoing([], "123456", "שלום! מה שלומך?", now);
+  assert.equal(isOwnOutgoing(list, { to: "123456", text: "שלום!  מה שלומך?" }, now + 2000), true);
+  assert.equal(isOwnOutgoing(list, { to: "999999", text: "שלום! מה שלומך?" }, now + 2000), false);
+  assert.equal(isOwnOutgoing(list, { to: "123456", text: "משהו אחר לגמרי" }, now + 2000), false);
+  assert.equal(isOwnOutgoing(list, { to: "123456", text: "שלום! מה שלומך?" }, now + 200_000), false);
+  list = rememberOutgoing(list, "123456", "", now + 1);
+  assert.equal(list.length, 1);
+});
+test("wave 57: the agent's voice note in flight is not the owner", () => {
+  const list = rememberOutgoing([], "123456", "\u0000voice", 5);
+  assert.equal(isOwnOutgoing(list, { to: "123456", text: "", media: { type: "media" } }, 10), true);
+  assert.equal(isOwnOutgoing(list, { to: "123456", text: "", media: null }, 10), false);
+});

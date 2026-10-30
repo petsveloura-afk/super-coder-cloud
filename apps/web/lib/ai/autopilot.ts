@@ -195,8 +195,16 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
       .maybeSingle();
     // wave 21: an agent that never set this comes back after 30 minutes of owner silence (0 = never)
     const minutes = Number((ra?.profile as { resume_after_minutes?: number } | null)?.resume_after_minutes ?? DEFAULT_RESUME_MINUTES);
+    // wave 57: a conversation that was paused only because of a TECHNICAL hiccup (an empty / broken AI
+    // answer, a busy engine) — not by a person and not by a real handoff — comes straight back to the agent
+    const { data: noteRow } = await admin.from("conversations").select("ai_note").eq("id", conv.id).maybeSingle();
+    const { technicalPause } = await import("./autopilot-heal");
+    if (technicalPause((noteRow as { ai_note?: string | null } | null)?.ai_note ?? null)) {
+      await admin.from("conversations").update({ ai_mode: "auto", handoff_at: null, ai_note: null, ai_note_at: null }).eq("id", conv.id).eq("ai_mode", "human");
+      conv.ai_mode = "auto";
+    }
     const { maybeResumeAgent } = await import("@/lib/channels/owner");
-    if (!(minutes > 0 && (await maybeResumeAgent(conv.id as string, minutes)))) return { replied: false, handoff: false, reason: "human_mode" };
+    if (conv.ai_mode !== "auto" && !(minutes > 0 && (await maybeResumeAgent(conv.id as string, minutes)))) return { replied: false, handoff: false, reason: "human_mode" };
     conv.ai_mode = "auto";
   }
   const channel = conv.channel as string;
@@ -435,12 +443,15 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   });
   // wave 54 — long-term memory about this customer + the action tools (task, tag, follow-up, booking)
   const { loadMemories, canBook } = await import("./agent-actions");
+  // wave 57: the funnel state loads in the same round trip (no extra wait before the answer)
+  const salesStateP = import("./sales-state").then((m) => m.loadSalesState(conv.id as string)).catch(() => null);
   const [memories, bookable] = await Promise.all([loadMemories(orgId, (conv.contact_id as string | null) ?? null).catch(() => []), canBook(orgId).catch(() => false)]);
   const actionsSection = [memoryBlock(memories), agentActionsInstructions({ canBook: bookable, hasContact: Boolean(conv.contact_id) })].filter(Boolean).join("\n\n");
   // wave 55 — the conversation's sales funnel state and the precise goal of this reply
   const { loadSalesState } = await import("./sales-state");
   const { salesStateBrief } = await import("./sales-state-core");
-  const salesStateBefore = await loadSalesState(conv.id as string).catch(() => null);
+  void loadSalesState; // (kept: the same loader, started above in parallel)
+  const salesStateBefore = await salesStateP;
   const salesSection = salesStateBrief(salesStateBefore);
   // wave 7 — business profile, goal, sales method and tools (lead capture, buttons, share-phone)
   const system = `${baseInstructions}\n\n${salesAgentInstructions({
@@ -566,6 +577,49 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   }
   const tools = parseAgentTools(answer);
   if (unsupportedLeft.length) tools.text = dropUnsupportedSentences(tools.text, unsupportedLeft);
+  // wave 57: a control line the parsers did not recognise ("[[FOLLOW-UP …]]", "[[TASK - …]]") is never shown to the customer
+  {
+    const { stripStrayMarkers } = await import("./autopilot-heal");
+    tools.text = stripStrayMarkers(tools.text);
+  }
+  // wave 57: an empty answer gets one more quick try with the compact prompt (no extra sections) —
+  // a technical hiccup must never pause the conversation and wait for "return to agent"
+  if (!tools.text && !tools.handoff) {
+    const retry = await withSoftDeadline(
+      runAISystem({
+        orgId,
+        feature: "autopilot",
+        agentId: agent.id as string,
+        provider: agent.provider as "openai" | "anthropic" | "gemini",
+        model: agent.model as string,
+        system: `${baseInstructions}\n\n${salesAgentInstructions({ profile: (agent.profile as AgentProfile | null) ?? null, goal: (agent.lead_goal as string | null) ?? "lead", channel: ch, leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null, locale })}`,
+        messages: history,
+        temperature: Number(agent.temperature ?? 0.4),
+        maxTokens: ch === "email" ? 1200 : 600,
+      }),
+      ch === "messenger" || ch === "instagram" ? 6000 : 9000,
+      { ok: false, error: "ai.empty_retry_timeout" } as Awaited<ReturnType<typeof runAISystem>>,
+    );
+    if (retry.ok) {
+      const { stripStrayMarkers } = await import("./autopilot-heal");
+      const retryMarkers = parseActionMarkers(retry.text);
+      const retryTools = parseAgentTools(retryMarkers.text);
+      retryTools.text = stripStrayMarkers(retryTools.text);
+      if (retryTools.text || retryTools.handoff) {
+        Object.assign(tools, retryTools);
+        if (retryMarkers.actions.length) actionMarkers = retryMarkers;
+      }
+    }
+    if (!tools.text && !tools.handoff) {
+      // still nothing: a short "on it" and the safety net answers properly — the agent keeps the conversation
+      const { data: recentHold } = await admin.from("messages").select("id").eq("conversation_id", conv.id).eq("direction", "out").eq("meta->>fallback", "true").gt("created_at", new Date(Date.now() - 15 * 60_000).toISOString()).limit(1).maybeSingle();
+      await admin.from("conversations").update({ ai_note: "ai_busy", ai_note_at: new Date().toISOString() }).eq("id", conv.id).then(() => undefined, () => undefined);
+      if (input.retry) return { replied: false, handoff: false, reason: "empty_answer" };
+      const hold = formatForChannel(busyMessage(locale), ch);
+      if (!recentHold) await sendToConversation(orgId, conv.id as string, hold, undefined, { aiAgentId: agent.id as string, meta: { fallback: true } });
+      return { replied: !recentHold, handoff: false, reason: "empty_answer", text: recentHold ? undefined : hold };
+    }
+  }
   void parseAutopilotReply; // (wave 6 parser kept for compatibility; the tools parser is a superset)
   // an empty answer must never be sent as "I passed you to the team" without really doing it
   if (!tools.text && !tools.handoff) {
@@ -576,7 +630,8 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   // wave 16: never send a forbidden phrase or a price that is not in the business data
   {
     const { bannedHit, unknownPrices } = await import("./guardrails");
-    const known = [JSON.stringify(agent.profile ?? {}), String(agent.instructions ?? ""), kb].join("\n");
+    // wave 57: what the customer said and what we remember about them (their budget, a price they saw) is known too
+    const known = [JSON.stringify(agent.profile ?? {}), String(agent.instructions ?? ""), kb, lastIn, memories.map((m) => m.fact).join("\n")].join("\n");
     const hit = bannedHit(tools.text, rails.banned);
     const badPrices = rails.price_guard ? unknownPrices(tools.text, known) : [];
     if (hit || badPrices.length) {

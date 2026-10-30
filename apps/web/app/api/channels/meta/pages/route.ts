@@ -86,19 +86,30 @@ export async function POST(request: NextRequest) {
       {
         const { data: c } = await admin.from("conversations").select("id").eq("organization_id", acc.organization_id).eq("channel", m.platform).eq("external_id", m.senderId).maybeSingle();
         if (c?.id) {
-          const { data: recent } = await admin
-            .from("messages")
-            .select("body, external_id, meta")
-            .eq("conversation_id", c.id as string)
-            .eq("direction", "out")
-            .gte("created_at", new Date(Date.now() - 3 * 60_000).toISOString())
-            .order("created_at", { ascending: false })
-            .limit(15);
           const probe = m.text.trim().slice(0, 80);
-          const ours = ((recent ?? []) as { body: string | null; external_id: string | null; meta: { owner?: boolean } | null }[]).some(
-            (r) => r.meta?.owner !== true && ((r.external_id && r.external_id === m.mid) || (probe.length > 0 && (r.body ?? "").includes(probe))),
-          );
-          if (ours) continue;
+          const isOurs = async () => {
+            const { data: recent } = await admin
+              .from("messages")
+              .select("body, external_id, meta, ai_agent_id")
+              .eq("conversation_id", c.id as string)
+              .eq("direction", "out")
+              .gte("created_at", new Date(Date.now() - 3 * 60_000).toISOString())
+              .order("created_at", { ascending: false })
+              .limit(15);
+            const rows = (recent ?? []) as { body: string | null; external_id: string | null; meta: { owner?: boolean; media?: unknown } | null; ai_agent_id: string | null }[];
+            return rows.some(
+              (r) =>
+                r.meta?.owner !== true &&
+                ((r.external_id && r.external_id === m.mid) ||
+                  (probe.length > 0 && (r.body ?? "").includes(probe)) ||
+                  // wave 57: a picture / file the agent just sent comes back without text
+                  (!probe && Boolean(m.media) && (Boolean(r.ai_agent_id) || Boolean(r.meta?.media)))),
+            );
+          };
+          if (await isOurs()) continue;
+          // wave 57: the echo can overtake the storing of our own reply — look once more before deciding a person wrote
+          await new Promise((r) => setTimeout(r, 2500));
+          if (await isOurs()) continue;
         }
       }
       await admin.rpc("ingest_owner_message_meta", { p_token: acc.webhook_token, p_kind: m.platform, p_chat: m.senderId, p_text: m.text, p_message: m.mid, p_media: m.media ?? null }).then(

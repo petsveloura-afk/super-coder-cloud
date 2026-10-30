@@ -11,7 +11,9 @@
 export type RouteProvider = "gemini" | "groq" | "cerebras" | "openrouter" | "mistral" | "anthropic" | "openai" | "cloudflare" | "github" | "sambanova" | "nvidia" | "huggingface";
 // wave 55: five more free engines (Cloudflare Workers AI, GitHub Models, SambaNova, NVIDIA NIM, Hugging Face)
 // join the failover chain — each is used only when its key is set
-export const ROUTE_PROVIDERS: RouteProvider[] = ["groq", "cerebras", "gemini", "cloudflare", "github", "sambanova", "nvidia", "huggingface", "openrouter", "mistral", "anthropic", "openai"];
+// wave 57: the original engines keep their places at the front (exactly as before wave 55) — the new free
+// engines are extra capacity right after them, before the paid ones
+export const ROUTE_PROVIDERS: RouteProvider[] = ["groq", "cerebras", "gemini", "openrouter", "mistral", "cloudflare", "github", "sambanova", "nvidia", "huggingface", "anthropic", "openai"];
 /** Paid engines: always last in the background lane (free capacity first). */
 export const PAID_PROVIDERS: RouteProvider[] = ["anthropic", "openai"];
 
