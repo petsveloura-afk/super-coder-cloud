@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AudioLines, Crown, Flame, Heart, Play, Save, SlidersHorizontal } from "lucide-react";
+import { AudioLines, Crown, Flame, Heart, Mic, Play, Save, SlidersHorizontal, Smile } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Badge, Button, Field, Input, Select, Textarea } from "@/components/ui/primitives";
@@ -11,6 +11,9 @@ import { OPENAI_VOICES, presetSettings, type VoicePreset, type VoiceSettings } f
 import { previewVoiceAction, saveVoiceAction } from "@/app/[locale]/(dashboard)/ai-agents/voice-actions";
 
 const PRESETS: { key: VoicePreset; icon: typeof Heart }[] = [
+  // wave 58: native Israeli voices first (Danit / Dorian)
+  { key: "hebrew_female", icon: Smile },
+  { key: "hebrew_male", icon: Mic },
   { key: "soft_female", icon: Heart },
   { key: "authoritative_male", icon: Crown },
   { key: "energetic_sales", icon: Flame },

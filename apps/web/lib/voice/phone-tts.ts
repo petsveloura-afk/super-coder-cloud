@@ -2,7 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { publicEnv } from "@/lib/env";
 import { spokenText } from "@/lib/ai/voice-note-core";
-import { elevenBody, hasPersona, normalizeVoice, openaiBody, type VoiceSettings } from "@/lib/ai/voice-persona-core";
+import { defaultVoiceId, elevenBody, hasPersona, normalizeVoice, openaiBody, type VoiceSettings } from "@/lib/ai/voice-persona-core";
 import { Pcm24kToUlaw8k } from "./realtime-core";
 
 /**
@@ -42,7 +42,7 @@ export async function phoneSpeechMp3(orgId: string, text: string, locale: string
   const env = process.env;
   const lang = langOf(locale);
   const v = await phoneVoice(orgId);
-  const voiceId = (hasPersona(v) ? v.voice_id : "") || env.ELEVENLABS_VOICE_ID || "";
+  const voiceId = (hasPersona(v) ? v.voice_id : "") || defaultVoiceId(lang, env); // wave 58: never robotic for lack of a voice id
   if (env.ELEVENLABS_API_KEY && voiceId) {
     try {
       const base = (env.ELEVENLABS_API_BASE || "https://api.elevenlabs.io").replace(/\/$/, "");
@@ -109,7 +109,7 @@ export async function phoneSpeechStream(orgId: string, text: string, locale: str
   const env = process.env;
   const lang = langOf(locale);
   const v = await phoneVoice(orgId);
-  const voiceId = (hasPersona(v) ? v.voice_id : "") || env.ELEVENLABS_VOICE_ID || "";
+  const voiceId = (hasPersona(v) ? v.voice_id : "") || defaultVoiceId(lang, env); // wave 58: never robotic for lack of a voice id
   if (env.ELEVENLABS_API_KEY && voiceId) {
     try {
       const base = (env.ELEVENLABS_API_BASE || "https://api.elevenlabs.io").replace(/\/$/, "");

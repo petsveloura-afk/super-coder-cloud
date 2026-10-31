@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isOggOpus, spokenText } from "./voice-note-core";
-import { elevenBody, hasPersona, normalizeVoice, openaiBody, type VoiceSettings } from "./voice-persona-core";
+import { defaultVoiceId, elevenBody, hasPersona, normalizeVoice, openaiBody, type VoiceSettings } from "./voice-persona-core";
 
 /**
  * Wave 55 — speaks with the agent's own voice persona:
@@ -36,7 +36,7 @@ export async function synthesizePersonaVoice(text: string, locale: string, v: Vo
   if (!clean) return null;
   const env = process.env;
   const lang = langOf(locale);
-  const voiceId = v.voice_id || env.ELEVENLABS_VOICE_ID || "";
+  const voiceId = v.voice_id || defaultVoiceId(lang, env); // wave 58
   if (env.ELEVENLABS_API_KEY && voiceId) {
     const base = (env.ELEVENLABS_API_BASE || "https://api.elevenlabs.io").replace(/\/$/, "");
     const model = env.ELEVENLABS_MODEL || "eleven_v3";

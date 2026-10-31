@@ -8,7 +8,7 @@
  * makes speech-to-text understand the business' names, products, slang and abbreviations.
  */
 
-export const VOICE_PRESETS = ["default", "soft_female", "authoritative_male", "energetic_sales", "custom"] as const;
+export const VOICE_PRESETS = ["default", "soft_female", "authoritative_male", "energetic_sales", "custom", "hebrew_female", "hebrew_male"] as const; // wave 58: + native Israeli voices
 export type VoicePreset = (typeof VOICE_PRESETS)[number];
 
 export const OPENAI_VOICES = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"] as const;
@@ -72,7 +72,39 @@ export const PRESET_DEFS: Record<Exclude<VoicePreset, "default" | "custom">, Pre
     openai_voice: "ash",
     tone: "Speak in an upbeat, enthusiastic, young and energetic sales voice. Lively pace, positive and persuasive but natural and never pushy.",
   },
+  // wave 58 — native Israeli Hebrew voices from the ElevenLabs voice library
+  hebrew_female: {
+    voice_id: "s0T0DT6EAPeX57MQpn3I", // Danit — natural Israeli Hebrew, conversational
+    stability: 0.5,
+    similarity_boost: 0.8,
+    style: 0.2,
+    speaker_boost: true,
+    speed: 1,
+    openai_voice: "coral",
+    tone: "Speak in a natural, warm, friendly young Israeli female voice. Conversational everyday Hebrew, relaxed and personal, like talking to a friend.",
+  },
+  hebrew_male: {
+    voice_id: "PBHwEnXdzx0yfhIO2UCH", // Dorian — expressive young Israeli man, warm and charismatic
+    stability: 0.45,
+    similarity_boost: 0.8,
+    style: 0.3,
+    speaker_boost: true,
+    speed: 1,
+    openai_voice: "ash",
+    tone: "Speak in a warm, expressive, charismatic young Israeli male voice. Natural conversational Hebrew, engaging and sincere, never robotic.",
+  },
 };
+
+/**
+ * Wave 58 — the voice used when neither the agent nor the platform chose one: a native Israeli voice in
+ * Hebrew, a premade multilingual voice otherwise, so the agent never falls back to a robotic voice just
+ * because ELEVENLABS_VOICE_ID was left empty. ELEVENLABS_VOICE_PRESET=hebrew_male picks the male voice.
+ */
+export function defaultVoiceId(lang: "he" | "en" | "ar", env: Record<string, string | undefined> = process.env): string {
+  if (env.ELEVENLABS_VOICE_ID && validVoiceId(env.ELEVENLABS_VOICE_ID)) return env.ELEVENLABS_VOICE_ID.trim();
+  if (lang !== "he") return PRESET_DEFS.soft_female.voice_id;
+  return env.ELEVENLABS_VOICE_PRESET === "hebrew_male" ? PRESET_DEFS.hebrew_male.voice_id : PRESET_DEFS.hebrew_female.voice_id;
+}
 
 export const DEFAULT_VOICE: VoiceSettings = {
   preset: "default",

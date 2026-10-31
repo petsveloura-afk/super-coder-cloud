@@ -5581,6 +5581,14 @@
       "default": {
         "name": "Platform default",
         "body": "The general voice set on the platform"
+      },
+      "hebrew_female": {
+        "name": "Danit — natural Israeli Hebrew",
+        "body": "A native Israeli female voice, natural and conversational — sounds like a real rep. Recommended for service and sales"
+      },
+      "hebrew_male": {
+        "name": "Dorian — warm Israeli male",
+        "body": "A young, warm, charismatic and expressive male voice — great for sales and personal calls"
       }
     },
     "field": {
