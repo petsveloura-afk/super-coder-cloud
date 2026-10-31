@@ -3595,7 +3595,8 @@
           "unlocks": "طلبات Shopify والسلال المتروكة بنقرة واحدة",
           "how": "1. partners.shopify.com ← Apps ← Create app.\n2. App URL و Allowed redirection URL: العناوين أدناه.\n3. انسخ Client ID و Client secret إلى Vercel ‏(SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET)."
         }
-      }
+      },
+      "voiceSection": "الصوت والهاتف — الوكيل يتحدث ويرد على المكالمات"
     }
   },
   "chat": {

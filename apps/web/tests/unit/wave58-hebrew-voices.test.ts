@@ -33,3 +33,15 @@ describe("wave 58 — Danit and Dorian, by choice", () => {
     }
   });
 });
+
+describe("wave 58 — the platform setup wizard keeps its six steps", () => {
+  it("voice + phone steps render in their own list (data-voice-step), never as extra data-step rows", () => {
+    const page = readFileSync(join(__dirname, "../../app/[locale]/(dashboard)/admin/page.tsx"), "utf8");
+    expect(page).toContain("extra={voiceSetupSteps(");
+    expect(page).not.toMatch(/\.\.\.voiceSetupSteps\(/);
+    const ui = readFileSync(join(__dirname, "../../components/admin/platform-setup.tsx"), "utf8");
+    expect(ui).toContain('row(s, i, "data-step", 0)');
+    expect(ui).toContain('"data-voice-step"');
+    expect(ui).toContain('data-testid="platform-setup-voice"');
+  });
+});

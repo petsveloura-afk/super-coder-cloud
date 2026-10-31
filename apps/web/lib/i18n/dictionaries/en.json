@@ -3595,7 +3595,8 @@
           "unlocks": "Shopify orders and abandoned carts in one click",
           "how": "1. partners.shopify.com → Apps → Create app.\n2. App URL and Allowed redirection URL: the addresses below.\n3. Copy Client ID and Client secret to Vercel (SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET)."
         }
-      }
+      },
+      "voiceSection": "Voice & phone — the agent speaks and answers calls"
     }
   },
   "chat": {

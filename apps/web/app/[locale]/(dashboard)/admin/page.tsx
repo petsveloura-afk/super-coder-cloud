@@ -73,7 +73,7 @@ export default async function AdminPage({ params, searchParams }: { params: Prom
       <PageHeader title={t("admin.title")} description={t("admin.subtitle")} />
       {/* wave 20: the platform's one-time setup — after it, every business connects in one click */}
       {/* wave 57: + the agents' voice and phone numbers for every business (set once by the platform owner) */}
-      <PlatformSetup steps={[...setupSteps(process.env, publicEnv.appUrl), ...voiceSetupSteps(process.env, publicEnv.appUrl)]} />
+      <PlatformSetup steps={setupSteps(process.env, publicEnv.appUrl)} extra={voiceSetupSteps(process.env, publicEnv.appUrl)} />
       <AdminPhones orgs={orgRows.map((o) => ({ id: o.id, name: o.name, plan: o.plan }))} />
       <AiHealth configured={Object.fromEntries(ROUTE_PROVIDERS.map((p) => [p, providerKeys(p, process.env).length]))} />
       <SpeedCard locale={locale} />

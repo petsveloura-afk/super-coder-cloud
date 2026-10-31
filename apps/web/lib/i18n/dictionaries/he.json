@@ -3595,7 +3595,8 @@
           "unlocks": "הזמנות ועגלות נטושות מ-Shopify בלחיצה",
           "how": "1. partners.shopify.com ← Apps ← Create app.\n2. App URL ו-Allowed redirection URL: הכתובות שלמטה.\n3. מעתיקים את Client ID ואת Client secret ל-Vercel ‏(SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET)."
         }
-      }
+      },
+      "voiceSection": "קול וטלפון — הסוכן מדבר ועונה לשיחות"
     }
   },
   "chat": {
