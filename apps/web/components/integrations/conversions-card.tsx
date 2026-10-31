@@ -58,7 +58,7 @@ export function ConversionsCard({ conns, locked }: { conns: Partial<Record<P, Co
         <div className="grid gap-3 sm:grid-cols-2">
           {p === "meta_capi" ? (
             <Field label={t("conversions.pixelId")} htmlFor="cv-id">
-              <Input id="cv-id" name="pixel_id" dir="ltr" inputMode="numeric" defaultValue={String(cfg.pixel_id ?? "")} placeholder="123456789012345" />
+              <Input id="cv-id" name="pixel_id" dir="ltr" inputMode="numeric" autoComplete="off" data-1p-ignore data-lpignore="true" pattern="\d{6,20}" title="123456789012345" defaultValue={/^\d+$/.test(String(cfg.pixel_id ?? "")) ? String(cfg.pixel_id) : ""} placeholder="123456789012345" />
             </Field>
           ) : p === "ga4" ? (
             <Field label={t("conversions.measurementId")} htmlFor="cv-id">
@@ -70,7 +70,7 @@ export function ConversionsCard({ conns, locked }: { conns: Partial<Record<P, Co
             </Field>
           )}
           <Field label={t(p === "ga4" ? "conversions.apiSecret" : "conversions.accessToken")} htmlFor="cv-secret" hint={c ? t("finance.keepSecretHint") : undefined}>
-            <Input id="cv-secret" name="secret" type="password" dir="ltr" autoComplete="off" />
+            <Input id="cv-secret" name="secret" type="password" dir="ltr" autoComplete="new-password" data-1p-ignore data-lpignore="true" />
           </Field>
           {p !== "ga4" ? (
             <Field label={t("conversions.testCode")} htmlFor="cv-test" hint={t("conversions.testCodeHint")}>

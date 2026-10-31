@@ -11,6 +11,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { ConfirmActionButton } from "@/components/ui/form-dialog";
 import { connectWhatsAppEmbeddedAction, disconnectChannelAction, disconnectChannelV2Action, startWhatsAppQrAction, whatsAppQrStatusAction, type QrState } from "@/app/[locale]/(dashboard)/integrations/actions";
 import { pairWhatsAppAction } from "@/app/[locale]/(dashboard)/integrations/whatsapp-actions";
+import { WhatsAppFix } from "@/components/integrations/wa-fix";
 import { cn } from "@/lib/utils";
 import { waitForSignup } from "@/lib/channels/wa-signup-wait";
 
@@ -194,6 +195,8 @@ export function WhatsAppConnect(p: WaConnectProps) {
               </span>
             </p>
           ) : null}
+          {/* wave 60: check & fix the official number with Meta (registration / two-step PIN) */}
+          {p.official.connected && p.canManage ? <WhatsAppFix problem={/133010|not registered|wa_not_registered/i.test(p.official.error ?? "")} /> : null}
         </div>
         {p.canManage ? (
           <div className="flex flex-col gap-2 sm:items-end">

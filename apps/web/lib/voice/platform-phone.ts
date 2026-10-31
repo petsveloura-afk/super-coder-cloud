@@ -2,7 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { publicEnv } from "@/lib/env";
 import { monthStart, minutesLeft, minutesLeftWithPacks, minutesUsed, monthlyMinutes, needsManualAssign, overflowMinutes, platformTwilio, validE164 } from "./platform-phone-core";
-import { buyNumber, configureNumber, findIncomingNumber, releaseNumber } from "./twilio-api";
+import { buyNumber, configureNumber, findIncomingNumber, releaseNumber, twilioRequest } from "./twilio-api";
 
 /**
  * Wave 57 — zero-setup phone for businesses.
@@ -68,7 +68,14 @@ export async function assignToOrg(orgId: string, phone: string): Promise<{ ok: b
   if (!tw) return { ok: false, error: "phone.platformOff" };
   if (!validE164(phone)) return { ok: false, error: "validation.phone" };
   const num = await findIncomingNumber(tw.sid, tw.token, phone.trim());
-  if (!num) return { ok: false, error: "phone.notInAccount" };
+  if (!num) {
+    // wave 60: say WHY — wrong keys, a trial account (its demo number is shared and cannot be assigned), or simply not bought yet
+    const acct = await twilioRequest<{ type?: string; status?: string }>(tw.sid, tw.token, "GET", ".json");
+    if (!acct.ok && (acct.status === 401 || acct.status === 403)) return { ok: false, error: "phone.authFailed" };
+    if (acct.ok && /trial/i.test(acct.data?.type ?? "")) return { ok: false, error: "phone.trialAccount" };
+    if (acct.ok && acct.data?.status && acct.data.status !== "active") return { ok: false, error: "phone.accountSuspended" };
+    return { ok: false, error: "phone.notInAccount" };
+  }
   const urls = platformUrls();
   const c = await configureNumber(tw.sid, tw.token, num.sid, { voice: urls.voice, status: urls.status });
   if (!c.ok) return { ok: false, error: "phone.configFailed" };

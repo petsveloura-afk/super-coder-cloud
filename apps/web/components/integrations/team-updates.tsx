@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 export interface RecipientView {
   id: string;
-  kind: "email" | "telegram" | "whatsapp" | "sms";
+  kind: "email" | "telegram" | "whatsapp" | "sms" | "call";
   target: string | null;
   label: string | null;
   events: string[];
@@ -161,14 +161,18 @@ export function TeamUpdates({ recipients, botUsername, business }: { recipients:
             {recipients.map((r) => {
               const Icon = KINDS.find((x) => x.k === r.kind)?.icon ?? Mail;
               const waiting = r.kind === "telegram" && !r.target;
+              // wave 60: the phone agent's transfer number is a call target, not a text update — no stale errors, no "test"
+              const isCall = r.kind === "call";
+              const err = isCall ? null : r.last_error;
+              const friendlyErr = !err ? null : /133010|not registered/i.test(err) ? t("integrations.wa.notRegistered") : /sms_not_connected/i.test(err) ? t("notify.smsFallback") : err;
               return (
                 <li key={r.id} className="space-y-2 px-4 py-3" data-recipient={r.kind} data-linked={waiting ? "0" : "1"}>
                   <div className="flex flex-wrap items-center gap-2">
                     <Icon className="h-4 w-4 shrink-0 text-muted" />
-                    <span className="min-w-0 truncate font-medium">{r.label || (r.kind === "telegram" ? t("notify.kinds.telegram") : r.target)}</span>
+                    <span className="min-w-0 truncate font-medium">{isCall ? t("notify.transferLabel") : r.label || (r.kind === "telegram" ? t("notify.kinds.telegram") : r.target)}</span>
                     {r.target && r.kind !== "telegram" ? <span dir="ltr" className="truncate text-[12px] text-subtle">{r.target}</span> : null}
-                    <Badge tone={!r.enabled ? "neutral" : waiting ? "warning" : r.last_error ? "danger" : "success"}>
-                      {!r.enabled ? t("notify.paused") : waiting ? t("notify.waiting") : r.last_error ? t("notify.error") : t("notify.active")}
+                    <Badge tone={!r.enabled ? "neutral" : waiting ? "warning" : err ? "danger" : "success"}>
+                      {!r.enabled ? t("notify.paused") : waiting ? t("notify.waiting") : err ? t("notify.error") : t("notify.active")}
                     </Badge>
                     <span className="text-[11.5px] text-subtle">{r.events.map((e) => t(`notify.events.${e}`)).join(" · ")}</span>
                   </div>
@@ -182,9 +186,19 @@ export function TeamUpdates({ recipients, botUsername, business }: { recipients:
                       </Button>
                     </div>
                   ) : null}
-                  {r.last_error ? <p className="text-[11.5px] text-danger" dir="ltr">{r.last_error}</p> : null}
+                  {friendlyErr ? (
+                    <p className="text-[11.5px] text-danger" dir={friendlyErr === err ? "ltr" : undefined}>
+                      {friendlyErr}
+                      {/133010|not registered/i.test(err ?? "") ? (
+                        <a href="#wa-fix" className="ms-1.5 font-semibold text-accent hover:underline">
+                          {t("integrations.wa.fixNow")}
+                        </a>
+                      ) : null}
+                    </p>
+                  ) : null}
+                  {isCall ? <p className="text-[11.5px] text-muted">{t("notify.transferHint")}</p> : null}
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="secondary" disabled={pending || waiting} onClick={() => start(async () => { const x = await testRecipientAction({ locale, id: r.id }); if (x.error) toast.error(t(x.error, x.messageParams)); else toast.success(t("notify.testSent")); })}>
+                    <Button size="sm" variant="secondary" className={isCall ? "hidden" : undefined} disabled={pending || waiting || isCall} onClick={() => start(async () => { const x = await testRecipientAction({ locale, id: r.id }); if (x.error) toast.error(t(x.error, x.messageParams)); else toast.success(t("notify.testSent")); })}>
                       <Send className="h-3.5 w-3.5" /> {t("notify.test")}
                     </Button>
                     <Button size="sm" variant="secondary" disabled={pending} onClick={() => start(async () => { const x = await updateRecipientAction({ locale, id: r.id, enabled: !r.enabled }); if (x.error) toast.error(t(x.error)); })}>

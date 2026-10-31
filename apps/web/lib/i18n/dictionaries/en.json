@@ -1897,7 +1897,18 @@
       "codeFailed": "We couldn't get a code from WhatsApp. Try again in a moment, or scan a QR.",
       "unofficial": "Linking from the phone is unofficial: WhatsApp may block a number that sends many messages at once. For a main business number, prefer the official connection.",
       "adminSetup": "Set up the connection",
-      "soon": "Coming soon"
+      "soon": "Coming soon",
+      "notRegistered": "The number is connected but not yet activated at Meta, so messages are not sent. One click and we will activate it.",
+      "pinLabel": "Two-step verification PIN (6 digits)",
+      "fixNow": "Activate and fix",
+      "checkNow": "Check connection",
+      "pinHint": "This number already has a WhatsApp two-step PIN. Enter it once (you can reset it in WhatsApp Manager → Phone numbers → Two-step verification).",
+      "pinInvalid": "The PIN must be 6 digits",
+      "notOfficial": "There is no official WhatsApp connection to check",
+      "tokenExpired": "The Facebook permission expired — click \"Reconnect\" and approve again",
+      "registeredOk": "WhatsApp is active — messages flow in and out normally",
+      "needPin": "The number's two-step PIN (6 digits) is required",
+      "registerFailed": "Meta did not approve the activation. Try again in a few minutes or reconnect"
     },
     "shopifyInstall": {
       "title": "Connecting your Shopify store",
@@ -3690,7 +3701,10 @@
       "step2NoBot": "Connect a Telegram bot above first, then type its username.",
       "step3": "Allow it to manage / reply to messages and choose which chats.",
       "step4": "Done — messages appear in the inbox and the agent answers within Telegram's 24-hour window."
-    }
+    },
+    "smsFallback": "SMS was not sent because no number was connected — it now goes out from the platform number automatically",
+    "transferLabel": "Call transfer (phone agent)",
+    "transferHint": "The phone agent transfers urgent calls to this number. Edit it in the \"Phone agent\" screen."
   },
   "plans": {
     "locked": {
@@ -5769,7 +5783,10 @@
       "reminder": "Appointment reminder",
       "callback": "Follow-up call"
     },
-    "minutesAddedNotification": "⏱️ {minutes} phone minutes were added"
+    "minutesAddedNotification": "⏱️ {minutes} phone minutes were added",
+    "authFailed": "Twilio rejected the credentials — check TWILIO_PLATFORM_ACCOUNT_SID and TWILIO_PLATFORM_AUTH_TOKEN in Vercel",
+    "trialAccount": "The Twilio account is still a Trial: the shared demo number does not belong to the account, so it cannot be assigned. Upgrade in Twilio, buy a number, then assign it here",
+    "accountSuspended": "The Twilio account is suspended or closed — sign in to Twilio and check the account status"
   },
   "siteImport": {
     "title": "Set up the agent from your website — in a minute",
@@ -5859,7 +5876,8 @@
       "disabled": "The connection is disabled",
       "send_failures": "{n} messages failed in the last 24 hours",
       "no_messages": "No messages for two weeks",
-      "never": "No message on this channel yet"
+      "never": "No message on this channel yet",
+      "wa_not_registered": "The number is not activated at Meta — click \"Activate and fix\" on the WhatsApp card"
     },
     "lastIn": "Last customer message: {when}",
     "never": "Not yet",

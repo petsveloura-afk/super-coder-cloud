@@ -83,6 +83,13 @@ async function providerSend(channel: Kind | "web" | "voice", orgId: string, exte
     r = rich?.buttons?.length
       ? await whatsappSendButtons(acc.secrets.access_token ?? "", acc.config.phone_number_id ?? "", `+${externalId.replace(/^\+/, "")}`, text, rich.buttons)
       : await whatsappSendText(acc.secrets.access_token ?? "", acc.config.phone_number_id ?? "", `+${externalId.replace(/^\+/, "")}`, text);
+    // wave 60: "(#133010) Account not registered" → register the number once and send again
+    const { isNotRegistered, ensureRegistered } = await import("./wa-register");
+    if (!r.ok && isNotRegistered(r.error) && (await ensureRegistered(acc)).ok) {
+      r = rich?.buttons?.length
+        ? await whatsappSendButtons(acc.secrets.access_token ?? "", acc.config.phone_number_id ?? "", `+${externalId.replace(/^\+/, "")}`, text, rich.buttons)
+        : await whatsappSendText(acc.secrets.access_token ?? "", acc.config.phone_number_id ?? "", `+${externalId.replace(/^\+/, "")}`, text);
+    }
   } else {
     const { buttonsAsText } = await import("@/lib/ai/autopilot-core");
     r = await twilioSendSms(acc.config.account_sid ?? "", acc.secrets.auth_token ?? "", acc.config.from_number ?? "", externalId, rich?.buttons?.length ? buttonsAsText(text, rich.buttons) : text);

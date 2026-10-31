@@ -10,7 +10,8 @@ import { notifyEmailHtml, notifySubject, notifyTelegramHtml, notifyText, type No
  */
 export interface RecipientRow {
   id: string;
-  kind: "email" | "telegram" | "whatsapp" | "sms";
+  /** wave 60: "call" = the phone agent's transfer number (urgent calls job) — never a text update */
+  kind: "email" | "telegram" | "whatsapp" | "sms" | "call";
   target: string | null;
   label: string | null;
   events: string[];
@@ -23,6 +24,7 @@ export function inboxLink(conversationId?: string | null) {
 
 export async function sendToRecipient(orgId: string, r: RecipientRow, event: NotifyEvent, payload: NotifyPayload): Promise<{ ok: boolean; error?: string }> {
   if (!r.target) return { ok: false, error: "not_linked" };
+  if (r.kind === "call") return { ok: true }; // wave 60: handled by the urgent-calls job, not a text message
   try {
     if (r.kind === "email") {
       const { sendEmail } = await import("@/lib/email/send");
@@ -47,11 +49,22 @@ export async function sendToRecipient(orgId: string, r: RecipientRow, event: Not
       const wa = await loadAccount(orgId, "whatsapp");
       if (!wa) return { ok: false, error: "whatsapp_not_connected" };
       const { whatsappSendText } = await import("@/lib/channels/providers");
-      const res = await whatsappSendText(wa.secrets.access_token ?? "", wa.config.phone_number_id ?? "", r.target, notifyText(event, payload));
+      let res = await whatsappSendText(wa.secrets.access_token ?? "", wa.config.phone_number_id ?? "", r.target, notifyText(event, payload));
+      // wave 60: the number was never registered on WhatsApp Cloud API → register once and retry
+      const { isNotRegistered, ensureRegistered } = await import("@/lib/channels/wa-register");
+      if (!res.ok && isNotRegistered(res.error) && (await ensureRegistered(wa)).ok) res = await whatsappSendText(wa.secrets.access_token ?? "", wa.config.phone_number_id ?? "", r.target, notifyText(event, payload));
       return res.ok ? { ok: true } : { ok: false, error: res.error ?? "whatsapp_failed" };
     }
     const sms = await loadAccount(orgId, "sms");
-    if (!sms) return { ok: false, error: "sms_not_connected" };
+    if (!sms) {
+      // wave 60: no own SMS account → the platform phone number sends the SMS (zero setup)
+      const { twilioCredsForOrg } = await import("@/lib/voice/platform-phone");
+      const cr = await twilioCredsForOrg(orgId).catch(() => null);
+      if (!cr) return { ok: false, error: "sms_not_connected" };
+      const { twilioSendSms } = await import("@/lib/channels/providers");
+      const res = await twilioSendSms(cr.sid, cr.token, cr.from, r.target, notifyText(event, payload, { short: true }));
+      return res.ok ? { ok: true } : { ok: false, error: res.error ?? "sms_failed" };
+    }
     const { twilioSendSms } = await import("@/lib/channels/providers");
     const res = await twilioSendSms(sms.config.account_sid ?? "", sms.secrets.auth_token ?? "", sms.config.from_number ?? "", r.target, notifyText(event, payload, { short: true }));
     return res.ok ? { ok: true } : { ok: false, error: res.error ?? "sms_failed" };
@@ -70,6 +83,7 @@ export async function forwardToTeam(orgId: string, event: NotifyEvent, payload: 
       .eq("organization_id", orgId)
       .eq("enabled", true)
       .not("target", "is", null)
+      .neq("kind", "call") // wave 60: transfer numbers get urgent calls, not text updates
       .contains("events", [event])
       .limit(20);
     const rows = (data ?? []) as RecipientRow[];

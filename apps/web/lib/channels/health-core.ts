@@ -19,11 +19,13 @@ export interface AccountHealthInput {
 
 export interface AccountHealth {
   level: HealthLevel;
-  reason: "ok" | "status_error" | "disabled" | "send_failures" | "no_messages" | "never";
+  reason: "ok" | "status_error" | "disabled" | "send_failures" | "no_messages" | "never" | "wa_not_registered";
 }
 
 export function accountHealth(a: AccountHealthInput, now = new Date()): AccountHealth {
   if (a.status === "disabled") return { level: "warning", reason: "disabled" };
+  // wave 60: the official WhatsApp number was never registered on Meta's Cloud API (fix in one click)
+  if (/133010|not registered|wa_not_registered/i.test(a.lastError ?? "")) return { level: "error", reason: "wa_not_registered" };
   if (a.status === "error") return { level: "error", reason: "status_error" };
   if (a.failed24h >= 3 && a.failed24h >= a.sent24h * 0.5) return { level: "error", reason: "send_failures" };
   if (a.failed24h >= 2) return { level: "warning", reason: "send_failures" };
