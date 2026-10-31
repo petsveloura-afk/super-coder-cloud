@@ -33,7 +33,38 @@ export function creditPacks(env: Record<string, string | undefined> = process.en
 }
 
 export function packByKey(key: string, env?: Record<string, string | undefined>): CreditPack | null {
-  return creditPacks(env).find((p) => p.key === key) ?? null;
+  return creditPacks(env).find((p) => p.key === key) ?? minutePacks(env).find((p) => p.key === key) ?? null; // wave 59: + phone minute packs
+}
+
+/**
+ * Wave 59 — phone minute packs for the platform phone number (used after the monthly minutes, never
+ * expire). Same purchase flow as AI credit packs; keys start with "min_" so the payment adds minutes.
+ * `credits` = minutes. Prices per deployment with MINUTE_PACKS_JSON.
+ */
+export const DEFAULT_MINUTE_PACKS: CreditPack[] = [
+  { key: "min_100", credits: 100, usd: 12 },
+  { key: "min_500", credits: 500, usd: 49 },
+  { key: "min_2000", credits: 2000, usd: 169 },
+];
+
+export function minutePacks(env: Record<string, string | undefined> = process.env): CreditPack[] {
+  const raw = env.MINUTE_PACKS_JSON;
+  if (!raw) return DEFAULT_MINUTE_PACKS;
+  try {
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr)) return DEFAULT_MINUTE_PACKS;
+    const packs = arr
+      .filter((p): p is CreditPack => !!p && typeof p === "object" && /^min_[a-z0-9_]{1,36}$/.test(String((p as CreditPack).key)) && Number((p as CreditPack).credits) > 0 && Number((p as CreditPack).usd) > 0)
+      .map((p) => ({ key: p.key, credits: Math.min(1_000_000, Math.round(Number(p.credits))), usd: Math.round(Number(p.usd) * 100) / 100 }))
+      .slice(0, 6);
+    return packs.length ? packs : DEFAULT_MINUTE_PACKS;
+  } catch {
+    return DEFAULT_MINUTE_PACKS;
+  }
+}
+
+export function isMinutePack(key: string): boolean {
+  return key.startsWith("min_");
 }
 
 /** Crypto order reference for a pack purchase: "pack:<purchase id>:<nonce>". */

@@ -59,3 +59,18 @@ export function displayPhone(e164: string): string {
 export function needsManualAssign(errorText: string): boolean {
   return /address|bundle|regulat|identity|end.?user|not available|no numbers|21631|21649|21650|21615/i.test(errorText ?? "");
 }
+
+/**
+ * Wave 59 — minutes of a finished call that go beyond the monthly allowance (taken from purchased
+ * minute packs). Counts only the part of THIS call above the limit.
+ */
+export function overflowMinutes(usedBefore: number, usedAfter: number, limit: number): number {
+  if (limit <= 0) return 0; // unlimited plan
+  return Math.max(0, Math.max(0, usedAfter - limit) - Math.max(0, usedBefore - limit));
+}
+
+/** Minutes left = what is left of the month + purchased minutes (null = unlimited). */
+export function minutesLeftWithPacks(left: number | null, packBalance: number): number | null {
+  if (left === null) return null;
+  return left + Math.max(0, Math.round(packBalance));
+}

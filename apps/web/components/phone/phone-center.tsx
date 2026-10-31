@@ -23,7 +23,7 @@ export interface PhoneCenterView {
   transfer: string | null;
   canManage: boolean;
   canIntegrations: boolean;
-  calls: { id: string; direction: "in" | "out"; other: string; status: string; duration: number | null; summary: string | null; live: boolean; at: string }[];
+  calls: { id: string; direction: "in" | "out"; other: string; status: string; duration: number | null; summary: string | null; live: boolean; at: string; recording?: boolean; purpose?: string | null }[];
 }
 
 function Step({ done, n, title, body, children, current }: { done: boolean; n: number; title: string; body: string; children?: React.ReactNode; current: boolean }) {
@@ -195,6 +195,7 @@ export function PhoneCenter({ view }: { view: PhoneCenterView }) {
                         {c.other}
                       </bdi>
                       {c.live ? <Badge tone="gold">{t("phone.modeLive")}</Badge> : null}
+                      {c.purpose === "reminder" || c.purpose === "callback" ? <Badge tone="accent">{t(`phone.purpose.${c.purpose}`)}</Badge> : null}
                       <span className="ms-auto inline-flex items-center gap-1 text-[12px] text-subtle">
                         <Clock className="h-3.5 w-3.5" aria-hidden /> {mins(c.duration)} · {when(c.at)}
                       </span>
@@ -204,6 +205,8 @@ export function PhoneCenter({ view }: { view: PhoneCenterView }) {
                         {c.summary}
                       </p>
                     ) : null}
+                    {/* wave 59: the call recording (when the business turned recording on) */}
+                    {c.recording ? <audio controls preload="none" src={`/api/voice/recording/${c.id}`} className="mt-2 h-9 w-full" aria-label={t("phone.recording")} data-testid="call-recording" /> : null}
                   </li>
                 ))}
               </ul>

@@ -77,6 +77,14 @@ export async function saveAgentAction(_prev: ActionState, fd: FormData): Promise
   };
   const supabase = await createClient();
   const id = uuidSchema.safeParse(fd.get("id"));
+  // wave 59 fix: the agent form edits only the basic profile fields — everything set on the conversation
+  // setup screen (script, details, pricing, links, menu, gallery, hours, openers …) is kept, not erased
+  if (id.success && "profile" in row && row.profile) {
+    const { data: cur } = await supabase.from("ai_agents").select("profile").eq("id", id.data).eq("organization_id", ctx.org.id).maybeSingle();
+    const keep = { ...((cur?.profile as Record<string, unknown> | null) ?? {}) };
+    for (const k of [...PROFILE_KEYS, "tone"]) delete keep[k];
+    (row as { profile: Record<string, unknown> }).profile = { ...keep, ...(row.profile as Record<string, unknown>) };
+  }
   const { error } = id.success
     ? await supabase.from("ai_agents").update(row).eq("id", id.data).eq("organization_id", ctx.org.id)
     : await supabase.from("ai_agents").insert({ ...row, organization_id: ctx.org.id, created_by: ctx.userId });

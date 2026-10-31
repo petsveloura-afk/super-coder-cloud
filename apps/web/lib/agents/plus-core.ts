@@ -13,7 +13,7 @@ export interface PlusDefaults {
 }
 
 export const PLUS_DEFAULTS: Record<PlusAgentKey, PlusDefaults> = {
-  reviews_requester: { minutes: 6 * 60, config: { review_url: "", days_after: 1, max_per_run: 10, meetings: true, deals: true } },
+  reviews_requester: { minutes: 6 * 60, config: { review_url: "", days_after: 1, max_per_run: 10, meetings: true, deals: true, smart_gate: true } },
   reengage: { minutes: 24 * 60, config: { inactive_days: 30, target: "both", max_per_run: 5 } },
 };
 
@@ -29,6 +29,8 @@ export const PLUS_FIELDS: Record<PlusAgentKey, { key: string; type: "number" | "
     { key: "max_per_run", type: "number", min: 1, max: 50 },
     { key: "meetings", type: "boolean" },
     { key: "deals", type: "boolean" },
+    // wave 59: ask "how was it?" first — happy → the review link, unhappy → the owner (privately)
+    { key: "smart_gate", type: "boolean" },
   ],
   reengage: [
     { key: "inactive_days", type: "number", min: 7, max: 365 },

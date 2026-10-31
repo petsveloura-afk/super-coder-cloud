@@ -15,10 +15,12 @@ export type AgentAction =
   | { kind: "task"; title: string; dueDays: number }
   | { kind: "tag"; tag: string }
   | { kind: "followup"; delayMinutes: number; text: string }
-  | { kind: "book"; local: string; service: string | null };
+  | { kind: "book"; local: string; service: string | null }
+  // wave 59: a payment link inside the chat (deposit / order) — the system creates it in the business's own payment account
+  | { kind: "pay"; amount: number; description: string };
 
-const MARKER_RE = /\[\[\s*(remember|task|tag|followup|follow_up|book)\s*:([^\]]{0,900})\]\]/gi;
-const LIMITS = { remember: 3, task: 2, tag: 3, followup: 1, book: 1 } as const;
+const MARKER_RE = /\[\[\s*(remember|task|tag|followup|follow_up|book|pay)\s*:([^\]]{0,900})\]\]/gi;
+const LIMITS = { remember: 3, task: 2, tag: 3, followup: 1, book: 1, pay: 1 } as const;
 
 const clean = (s: string, max: number) =>
   (s ?? "")
@@ -77,6 +79,10 @@ export function parseActionMarkers(raw: string): { text: string; actions: AgentA
     } else if (kind === "book") {
       const d = /(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})/.exec(first ?? "");
       if (d) a = { kind, local: `${d[1]}T${d[2]!.padStart(2, "0")}:${d[3]}`, service: clean(second, 120) || null };
+    } else if (kind === "pay") {
+      const amount = parseAmount(first ?? "");
+      const description = clean(second, 120);
+      if (amount !== null && description.length >= 2) a = { kind, amount, description };
     }
     if (a) {
       actions.push(a);
@@ -91,8 +97,16 @@ export function parseActionMarkers(raw: string): { text: string; actions: AgentA
   return { text, actions };
 }
 
+/** Wave 59 — "250", "₪250", "250 ש״ח", "1,200.50" → a positive amount (max 100,000), or null. */
+export function parseAmount(raw: string): number | null {
+  const m = /(\d{1,3}(?:[,\s]\d{3})+|\d+)(?:\.(\d{1,2}))?/.exec((raw ?? "").replace(/[₪$€]/g, " "));
+  if (!m) return null;
+  const n = Number(`${m[1]!.replace(/[,\s]/g, "")}${m[2] ? `.${m[2]}` : ""}`);
+  return Number.isFinite(n) && n > 0 && n <= 100_000 ? Math.round(n * 100) / 100 : null;
+}
+
 /** System-prompt section that teaches the model the action tools (appended after the existing sections). */
-export function agentActionsInstructions(opts: { canBook: boolean; hasContact: boolean }): string {
+export function agentActionsInstructions(opts: { canBook: boolean; hasContact: boolean; canPay?: boolean }): string {
   return [
     "ACTION TOOLS (you can really act for the business — add these control lines at the very END of your reply; the customer never sees them):",
     "- [[REMEMBER: fact]] — a lasting fact the customer told you that will matter next time (preferences, sizes, names of family/pets, budget, constraints, what they bought). Only real facts from the customer, max 2 per reply, never sensitive health/financial details.",
@@ -101,6 +115,9 @@ export function agentActionsInstructions(opts: { canBook: boolean; hasContact: b
     "- [[FOLLOWUP: 2d | the exact friendly message to send then]] — when the customer asked you to get back to them later, or needs time to decide. At most one. It is canceled automatically if they answer first.",
     opts.canBook
       ? "- [[BOOK: YYYY-MM-DD HH:MM | service]] — ONLY after the customer clearly confirmed a specific date and time AND you know their name and phone or e-mail. The system books it in the real calendar (checking availability) and sends the confirmation itself — so in your text say you are locking the time now; never claim it is confirmed yourself. If the time may not suit the opening hours, offer options first."
+      : "",
+    opts.canPay
+      ? "- [[PAY: amount | what it is for]] — ONLY after the customer clearly agreed to pay now (an order, a deposit for a booking) and the amount comes from the business's prices / pricing policy. The system creates a secure payment link in the business's own payment account and adds it to your message — so say a payment link is on its way; never write a link or card details yourself."
       : "",
     opts.hasContact ? "" : "(The customer is not saved yet — REMEMBER and TAG start working once a name and phone or e-mail are known; still use TASK when the team must act.)",
   ]

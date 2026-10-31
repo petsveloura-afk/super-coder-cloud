@@ -309,6 +309,16 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   const ch = channel as AutopilotChannel;
   const profile = (agent.profile as AgentProfile | null) ?? {};
   const menu = (profile.menu ?? []).map((b) => b.trim()).filter(Boolean).slice(0, 8);
+  // wave 59: the customer answered a review question ("how was it? 1–5") → the right reply, no AI call.
+  // Checked only when the message looks like a rating (no extra wait for ordinary messages).
+  if (conv.contact_id) {
+    const { parseRating } = await import("@/lib/agents/review-gate-core");
+    if (parseRating(lastIn) !== null) {
+      const { handleReviewReply } = await import("@/lib/agents/review-gate");
+      const gateText = await handleReviewReply({ orgId, contactId: conv.contact_id as string, conversationId: conv.id as string, text: lastIn, locale, agentId: agent.id as string, channel: ch });
+      if (gateText) return { replied: true, handoff: false, text: gateText };
+    }
+  }
   // Telegram / chat commands (/start, /menu, /human, /prices …)
   const lastLine = lastIn.split("\n").pop() ?? lastIn;
   const intent = commandIntent(lastLine, locale);
@@ -445,14 +455,28 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   const { loadMemories, canBook } = await import("./agent-actions");
   // wave 57: the funnel state loads in the same round trip (no extra wait before the answer)
   const salesStateP = import("./sales-state").then((m) => m.loadSalesState(conv.id as string)).catch(() => null);
-  const [memories, bookable] = await Promise.all([loadMemories(orgId, (conv.contact_id as string | null) ?? null).catch(() => []), canBook(orgId).catch(() => false)]);
-  const actionsSection = [memoryBlock(memories), agentActionsInstructions({ canBook: bookable, hasContact: Boolean(conv.contact_id) })].filter(Boolean).join("\n\n");
+  // wave 59: + can the agent send a payment link (the business's own Stripe / PayPal is connected)
+  const { canPayOnline } = await import("@/lib/finance/pay-chat");
+  const [memories, bookable, payable] = await Promise.all([loadMemories(orgId, (conv.contact_id as string | null) ?? null).catch(() => []), canBook(orgId).catch(() => false), canPayOnline(orgId).catch(() => false)]);
+  const actionsSection = [memoryBlock(memories), agentActionsInstructions({ canBook: bookable, hasContact: Boolean(conv.contact_id), canPay: payable })].filter(Boolean).join("\n\n");
   // wave 55 — the conversation's sales funnel state and the precise goal of this reply
   const { loadSalesState } = await import("./sales-state");
   const { salesStateBrief } = await import("./sales-state-core");
   void loadSalesState; // (kept: the same loader, started above in parallel)
   const salesStateBefore = await salesStateP;
   const salesSection = salesStateBrief(salesStateBefore);
+  // wave 59: A/B test of the opening line — only on the first reply of a conversation
+  let openerPick: { variant: 0 | 1; text: string } | null = null;
+  let openerLine = "";
+  if (!history.some((m) => m.role === "assistant")) {
+    const { openersOf, chooseOpener, openerInstruction } = await import("./opener-ab-core");
+    const openers = openersOf(profile as { openers?: unknown });
+    if (openers.length) {
+      const { loadOpenerStats } = await import("./opener-ab");
+      openerPick = chooseOpener(conv.id as string, openers, openers.length > 1 ? await loadOpenerStats(orgId).catch(() => null) : null);
+      if (openerPick) openerLine = `\n\n${openerInstruction(openerPick.text)}`;
+    }
+  }
   // wave 7 — business profile, goal, sales method and tools (lead capture, buttons, share-phone)
   const system = `${baseInstructions}\n\n${salesAgentInstructions({
     profile: (agent.profile as AgentProfile | null) ?? null,
@@ -460,7 +484,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     channel: ch,
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
     locale,
-  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}\n\n${actionsSection}\n\n${salesSection}`;
+  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}\n\n${actionsSection}\n\n${salesSection}${openerLine}`;
   void typingIndicator(orgId, ch, conv.external_id as string); // speed upgrade: never waited for (the typing loop already runs)
   // wave 16: help-center answers (knowledge base) for this question
   let kb = "";
@@ -723,6 +747,10 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     await applySalesTransition({ orgId, conversationId: conv.id as string, contactId: lead?.contact_id ?? ((conv.contact_id as string | null) ?? null), from: salesStateBefore, transition });
   } catch (e) {
     console.error("sales state failed", (e as Error).message);
+  }
+  if (openerPick) {
+    const { markOpener } = await import("./opener-ab");
+    await markOpener(conv.id as string, openerPick.variant);
   }
   if (tools.handoff) await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: tools.reason ?? "agent" });
   return { replied: true, handoff: tools.handoff, reason: tools.handoff ? (tools.reason ?? "agent") : undefined, text, lead, leadData: tools.lead ?? null };

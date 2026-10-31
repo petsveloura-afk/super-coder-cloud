@@ -83,3 +83,30 @@ export async function testCallAction(input: { locale: string; phone: string }): 
   revalidatePath(`/${locale}/phone`);
   return r.ok ? { ok: true, message: "phone.calling" } : { error: r.error ?? "voice.callFailed" };
 }
+
+/**
+ * Wave 59 — phone automations: text back after a missed call (on by default, own text optional), call
+ * recording, reminder calls before appointments, follow-up calls to quiet leads (consent only).
+ */
+export async function savePhoneSettingsAction(input: { locale: string; missedText: boolean; missedMessage: string; recordCalls: boolean; reminderCalls: boolean; callbackCalls: boolean }): Promise<ActionState> {
+  const locale = loc(input.locale);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("ai.manage")) return { error: "errors.forbidden" };
+  const msg = String(input.missedMessage ?? "").replace(/\s+\n/g, "\n").trim().slice(0, 500);
+  const supabase = await createClient();
+  const { error } = await supabase.from("phone_settings").upsert(
+    {
+      organization_id: ctx.org.id,
+      missed_text: input.missedText !== false,
+      missed_message: msg.length >= 4 ? msg : null,
+      record_calls: input.recordCalls === true,
+      reminder_calls: input.reminderCalls === true,
+      callback_calls: input.callbackCalls === true,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "organization_id" },
+  );
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}/phone`);
+  return { ok: true, message: "phone.auto.saved" };
+}

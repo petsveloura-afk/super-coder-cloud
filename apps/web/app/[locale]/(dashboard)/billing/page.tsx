@@ -1,6 +1,7 @@
+import { MinutePacks } from "@/components/phone/minute-packs";
 import Link from "next/link";
 import { CreditPacksCard } from "@/components/billing/credit-packs";
-import { creditPacks } from "@/lib/billing/packs-core";
+import { creditPacks, minutePacks } from "@/lib/billing/packs-core";
 import type { Metadata } from "next";
 import { Check, Clock, CreditCard, Crown, ShieldCheck, Sparkles } from "lucide-react";
 import { LIVE_FEATURES, type PlanLimits } from "@scc/shared/billing";
@@ -136,6 +137,12 @@ export default async function BillingPage({
   );
   const renewIn = daysLeft(ent?.current_period_end);
   const allFeatures = [...new Set(plans.flatMap((p) => p.features))];
+  // wave 59: minute packs are offered to businesses that have a platform phone number
+  const minutePackView = await (async () => {
+    const { orgPhoneNumber, minutePackBalance } = await import("@/lib/voice/platform-phone");
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !(await orgPhoneNumber(ctx.org.id).catch(() => null))) return null;
+    return { balance: await minutePackBalance(ctx.org.id) };
+  })();
   return (
     <>
       <PageHeader title={t("billing.title")} description={t("billing.subtitle")} />
@@ -258,6 +265,14 @@ export default async function BillingPage({
             status={typeof sp.pack === "string" ? sp.pack : null}
           />
         </div>
+      ) : null}
+
+      {/* wave 59: phone minute packs (businesses with a platform phone number) */}
+      {minutePackView ? (
+        <Card className="mt-4" id="minutes">
+          <CardHeader title={t("phone.packs.title")} description={t("phone.packs.subtitle")} />
+          <MinutePacks packs={minutePacks()} balance={minutePackView.balance} canBuy={canManage && !ctx.org.is_demo} methods={{ paypal: paypalConfigured(), crypto: cryptoConfigured() }} />
+        </Card>
       ) : null}
 
       {!payments && !anyExtra ? (

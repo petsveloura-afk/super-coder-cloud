@@ -45,8 +45,15 @@ export async function runReviewsRequester(orgId: string, config: Record<string, 
   const { data: people } = todo.length ? await admin.from("contacts").select("id, first_name").eq("organization_id", orgId).in("id", todo) : { data: [] };
   const names = new Map(((people ?? []) as { id: string; first_name: string | null }[]).map((p) => [p.id, p.first_name]));
   let sent = 0;
+  // wave 59: smart gate — first "how was it? 1–5", the link only for happy customers (see review-gate.ts)
+  const smart = cfg.smart_gate !== false;
   for (const id of todo) {
-    const text = reviewRequestText(org.locale, { name: names.get(id) ?? null, org: org.name, url: String(cfg.review_url || "") || null, reason: candidates.get(id)! });
+    let text = reviewRequestText(org.locale, { name: names.get(id) ?? null, org: org.name, url: String(cfg.review_url || "") || null, reason: candidates.get(id)! });
+    if (smart) {
+      const { openReviewGate } = await import("./review-gate");
+      const gated = await openReviewGate({ orgId, contactId: id, reviewUrl: String(cfg.review_url || "") || null, locale: org.locale, name: names.get(id) ?? null, org: org.name });
+      if (gated) text = gated;
+    }
     const ok = await messageContact(orgId, id, text, "automation", { review_request: true }).catch(() => false);
     if (ok) {
       sent++;

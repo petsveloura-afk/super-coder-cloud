@@ -19,6 +19,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!call) return new NextResponse(null, { status: 204 });
   const duration = Number(v.form.CallDuration ?? 0);
   await admin.from("voice_calls").update({ status: call.status === "transferred" ? "transferred" : st === "completed" ? "completed" : st, ...(Number.isFinite(duration) && duration > 0 ? { duration_sec: duration } : {}) }).eq("id", call.id);
+  // wave 59: a missed call → the caller gets a WhatsApp / SMS right away
+  after(async () => (await import("@/lib/voice/missed-call")).afterCallEnded({ orgId: v.acc.organization_id, callId: call.id as string, status: st, duration: Number.isFinite(duration) ? duration : null }));
   if (st === "completed") {
     after(async () => {
       const { summarizeCall } = await import("@/lib/voice/phone-brain");

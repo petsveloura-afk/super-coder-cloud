@@ -110,7 +110,10 @@ export async function phoneTurn(input: { orgId: string; callId: string; conversa
     .filter(Boolean)
     .join("\n");
   const knownName = [contact?.first_name, contact?.last_name].filter(Boolean).join(" ").trim();
+  // wave 59: why the agent is calling (appointment reminder / follow-up) — read separately, never blocks the call
+  const purposeLine = call.direction === "out" ? await callPurposeLine(input.callId) : "";
   const sections = [
+    purposeLine,
     knownName ? `The caller's name (from the CRM): ${knownName}. Caller phone: ${callerPhone}.` : `Caller phone (already known — do not ask for it unless they want another number): ${callerPhone}.`,
     scheduleInstructions((p.schedule as never) ?? null, new Date(), lang),
     memoryBlock(memories),
@@ -224,4 +227,25 @@ export async function summarizeCall(callId: string): Promise<string | null> {
   if (call.conversation_id) await admin.from("conversations").update({ summary: summary.slice(0, 1000) }).eq("id", call.conversation_id).then(() => undefined, () => undefined);
   if (call.contact_id) await admin.from("activities").insert({ organization_id: call.organization_id, contact_id: call.contact_id, type: "voice_call", payload: { summary: summary.slice(0, 600), call_id: call.id, duration_sec: duration } }).then(() => undefined, () => undefined);
   return summary;
+}
+
+/** Wave 59 — the purpose of an outbound call (reminder / callback) for the system prompt; "" when none. */
+async function callPurposeLine(callId: string): Promise<string> {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.from("voice_calls").select("purpose, purpose_ref, organization_id").eq("id", callId).maybeSingle();
+    if (error || !data?.purpose) return "";
+    let note: string | null = null;
+    if (data.purpose === "reminder" && data.purpose_ref) {
+      const { data: appt } = await admin.from("appointments").select("title, starts_at, location").eq("id", data.purpose_ref as string).eq("organization_id", data.organization_id as string).maybeSingle();
+      if (appt) {
+        const when = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(new Date(appt.starts_at as string));
+        note = `${String(appt.title ?? "")} — ${when}${appt.location ? `, ${String(appt.location)}` : ""}`;
+      }
+    }
+    const { purposeBrief } = await import("./outbound-core");
+    return purposeBrief(data.purpose as "reminder" | "callback", note);
+  } catch {
+    return "";
+  }
 }

@@ -164,6 +164,16 @@ export async function executeAgentActions(input: AgentActionInput): Promise<{ do
           await say(bookingText(locale, code === "booking.detailsRequired" ? "details" : code === "booking.outOfRange" || code === "booking.notAvailable" ? "range" : "taken", { when: whenText }));
           done.push(`book:${code || "error"}`);
         }
+      } else if (a.kind === "pay") {
+        // wave 59: a secure payment link in the business's own payment account (deposit / order)
+        const { canPayOnline, createChatPaymentLink } = await import("@/lib/finance/pay-chat");
+        if (await canPayOnline(input.orgId)) {
+          const link = await createChatPaymentLink({ orgId: input.orgId, conversationId: input.conversationId, contactId: input.contactId, amount: a.amount, description: a.description, locale });
+          if (link) {
+            await say(link.text);
+            done.push("pay:ok");
+          } else done.push("pay:error");
+        } else done.push("pay:offline");
       }
     } catch (e) {
       console.error("agent action failed", a.kind, (e as Error).message);

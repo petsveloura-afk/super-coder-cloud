@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { PhoneCenter, type PhoneCenterView } from "@/components/phone/phone-center";
+import { PhoneAutomations } from "@/components/phone/phone-automations";
+import { MinutePacks } from "@/components/phone/minute-packs";
 import { FeatureLock } from "@/components/billing/feature-gate";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
@@ -59,6 +61,15 @@ export default async function PhonePage({ params }: { params: Promise<{ locale: 
   const platformNumber = own ? null : await orgPhoneNumber(ctx.org.id);
   const minutes = platformNumber ? await platformMinutes(ctx.org.id) : null;
   const persona = agent ? hasPersona(await phoneVoice(ctx.org.id)) : false;
+  // wave 59: recordings + call purpose (separate query: never breaks the page before the migration ran)
+  const callIds = ((callsRes.error ? [] : callsRes.data) ?? []).map((c) => c.id as string);
+  const { data: extraRows } = callIds.length ? await supabase.from("voice_calls").select("id, recording_url, purpose").in("id", callIds) : { data: null };
+  const extra = new Map(((extraRows ?? []) as { id: string; recording_url: string | null; purpose: string | null }[]).map((r) => [r.id, r]));
+  const { data: settingsRow, error: settingsErr } = await supabase.from("phone_settings").select("missed_text, missed_message, record_calls, reminder_calls, callback_calls").eq("organization_id", ctx.org.id).maybeSingle();
+  const { PHONE_DEFAULTS } = await import("@/lib/voice/phone-settings");
+  const { minutePacks } = await import("@/lib/billing/packs-core");
+  const { paypalConfigured } = await import("@/lib/billing/paypal");
+  const { cryptoConfigured } = await import("@/lib/billing/nowpayments");
   const view: PhoneCenterView = {
     agent: agent ? { id: agent.id as string, name: (agent.name as string) ?? "" } : null,
     voiceReady: phoneTtsReady(),
@@ -81,12 +92,27 @@ export default async function PhonePage({ params }: { params: Promise<{ locale: 
       summary: (c.summary as string | null) ?? null,
       live: c.mode === "realtime",
       at: c.created_at as string,
+      recording: Boolean(extra.get(c.id as string)?.recording_url),
+      purpose: extra.get(c.id as string)?.purpose ?? null,
     })),
   };
   return (
     <>
       <PageHeader title={t("phone.title")} description={t("phone.subtitle")} />
       <PhoneCenter view={view} />
+      {/* wave 59: missed-call text-back, reminder / follow-up calls, recordings + minute packs */}
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.25fr_1fr]">
+        <Card id="automations">
+          <CardHeader title={t("phone.auto.title")} description={t("phone.auto.subtitle")} />
+          <PhoneAutomations value={{ ...PHONE_DEFAULTS, ...((settingsRow ?? {}) as object) }} canManage={ctx.can("ai.manage")} ready={!settingsErr} />
+        </Card>
+        {platformNumber ? (
+          <Card id="minutes">
+            <CardHeader title={t("phone.packs.title")} description={t("phone.packs.subtitle")} />
+            <MinutePacks packs={minutePacks()} balance={minutes?.packs ?? 0} canBuy={ctx.can("billing.manage") && !ctx.org.is_demo} methods={{ paypal: paypalConfigured(), crypto: cryptoConfigured() }} />
+          </Card>
+        ) : null}
+      </div>
     </>
   );
 }

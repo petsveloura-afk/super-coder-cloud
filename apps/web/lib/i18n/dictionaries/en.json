@@ -283,7 +283,8 @@
       "other": "Other",
       "webhook": "Webhook",
       "api": "API",
-      "sms": "SMS"
+      "sms": "SMS",
+      "phone": "Phone"
     },
     "empty": "No contacts yet",
     "emptyBody": "Create your first contact to start managing leads",
@@ -2609,7 +2610,11 @@
       "added": "Reply saved",
       "badShortcut": "Shortcut may contain only letters, numbers and dashes",
       "shortcutTaken": "This shortcut is already used"
-    }
+    },
+    "chips": {
+      "suggest": "✨ Suggested replies"
+    },
+    "voiceMessage": "Voice message"
   },
   "support": {
     "title": "Customer support",
@@ -3594,9 +3599,21 @@
           "title": "Shopify",
           "unlocks": "Shopify orders and abandoned carts in one click",
           "how": "1. partners.shopify.com → Apps → Create app.\n2. App URL and Allowed redirection URL: the addresses below.\n3. Copy Client ID and Client secret to Vercel (SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET)."
+        },
+        "push": {
+          "title": "Phone notifications (one time)",
+          "unlocks": "Hot leads, waiting customers and broken connections — straight to business owners' phones",
+          "how": "1. Press \"Create notification keys\" below.\n2. Copy both values to Vercel → Settings → Environment Variables.\n3. Optional: VAPID_SUBJECT = mailto:your address.\n4. Redeploy — every user turns notifications on in Settings with one click."
+        },
+        "voice_default": {
+          "title": "Default voice for agents (optional)",
+          "unlocks": "Without it agents speak Hebrew with Danit's voice; every business can pick its own",
+          "how": "Optional. To choose another voice for the whole platform, copy a Voice ID from ElevenLabs and add ELEVENLABS_VOICE_ID in Vercel. Library voices (Danit, Dorian) need a paid ElevenLabs plan — without it the agent switches to a natural fallback voice."
         }
       },
-      "voiceSection": "Voice & phone — the agent speaks and answers calls"
+      "voiceSection": "Voice & phone — the agent speaks and answers calls",
+      "moreSection": "Phone notifications and default voice",
+      "makeVapid": "Create notification keys"
     }
   },
   "chat": {
@@ -4553,7 +4570,8 @@
         "meetings": "After completed meetings",
         "deals": "After won deals",
         "inactive_days": "Days without contact",
-        "target": "Who to reach"
+        "target": "Who to reach",
+        "smart_gate": "Ask for a rating before the link (happy → review, unhappy → you)"
       },
       "opt": {
         "leads": "Leads",
@@ -5710,6 +5728,192 @@
       "assign": "Assign",
       "buy": "Buy automatically",
       "release": "Release"
+    },
+    "auto": {
+      "title": "Phone automations",
+      "subtitle": "Text after a missed call, reminder and follow-up calls, recordings",
+      "notReady": "Automations turn on after the database update (happens with the next deploy).",
+      "saved": "Phone settings saved",
+      "save": "Save",
+      "legal": "Follow-up calls go only to contacts who gave marketing consent, at polite hours, with a daily cap. Tell customers when calls are recorded.",
+      "missedMessage": "Message text (optional)",
+      "missedPlaceholder": "Empty = a short, warm default text",
+      "missed_text": {
+        "title": "Text after a missed call",
+        "body": "A customer called and wasn't answered? They get a WhatsApp (or SMS) right away and the agent continues in writing."
+      },
+      "reminder_calls": {
+        "title": "Reminder call before appointments",
+        "body": "The day before, the agent calls, reminds and asks to confirm — or reschedules."
+      },
+      "callback_calls": {
+        "title": "Follow-up calls to leads",
+        "body": "A lead that went quiet for 2–7 days gets a follow-up call (marketing consent only)."
+      },
+      "record_calls": {
+        "title": "Call recording",
+        "body": "Every incoming call is saved with a player next to the transcript and summary, here and on the contact card."
+      }
+    },
+    "packs": {
+      "title": "Phone minute packs",
+      "subtitle": "Extra minutes after the monthly allowance — never expire",
+      "balance": "Purchased minutes left: {n}",
+      "minutes": "{n} minutes"
+    },
+    "recording": "Call recording",
+    "transcript": "Call transcript",
+    "caller": "Customer",
+    "agent": "Agent",
+    "purpose": {
+      "reminder": "Appointment reminder",
+      "callback": "Follow-up call"
+    },
+    "minutesAddedNotification": "⏱️ {minutes} phone minutes were added"
+  },
+  "siteImport": {
+    "title": "Set up the agent from your website — in a minute",
+    "subtitle": "Paste your website address; the agent reads it and prepares services, prices, hours, FAQ and a conversation script",
+    "urlLabel": "Business website address",
+    "read": "Read the website",
+    "hint": "Only empty fields are filled — nothing you wrote is overwritten. Save open changes before adding.",
+    "found": "Found {n} topics on {pages} pages",
+    "apply": "Add to the agent",
+    "applyHint": "The page reloads with the new details",
+    "applied": "{n} fields added to the agent",
+    "nothingNew": "Everything was already filled — nothing added",
+    "fields": {
+      "business": "About",
+      "services": "Services & prices",
+      "hours": "Hours",
+      "location": "Address",
+      "phone": "Phone",
+      "faq": "FAQ",
+      "pricing": "Pricing policy",
+      "flow": "Conversation script",
+      "fields": "Details to ask",
+      "menu": "Menu buttons"
+    },
+    "badUrl": "That address isn't valid — e.g. www.my-business.com",
+    "unreachable": "We couldn't open the website (a public https site is needed)",
+    "empty": "The website has almost no readable text",
+    "aiFailed": "Reading the website failed, try again in a moment",
+    "nothing": "No useful information for the agent was found"
+  },
+  "abOpener": {
+    "title": "A/B test of the opening line",
+    "subtitle": "Two opening lines — the system measures which brings more leads and picks the winner automatically",
+    "a": "Opener A",
+    "b": "Opener B",
+    "stat": "{n} conversations · {rate} became leads",
+    "winner": "Winner",
+    "placeholderA": "e.g. Hi! 😊 Great to hear from you — how can we help today?",
+    "placeholderB": "e.g. Hello! We have a special offer this week — what are you interested in?",
+    "save": "Save",
+    "saved": "Opening lines saved — the test is running",
+    "testing": "Testing — about {n} more conversations per opener before a decision",
+    "hint": "One opener = always that one. Two openers = an automatic test."
+  },
+  "learn": {
+    "title": "The agent learned from you",
+    "subtitle": "Questions customers asked that you answered yourself — approve, and the agent answers them alone next time",
+    "empty": "No new answers to learn right now. When you answer a customer yourself, they appear here.",
+    "question": "The customer asked",
+    "answer": "Your answer (editable)",
+    "approve": "Approve — the agent learns",
+    "dismiss": "Skip",
+    "approved": "Learned! The agent answers this from now on",
+    "dismissed": "Skipped",
+    "invalid": "The question or answer is too short",
+    "noAgent": "No active agent to learn the answer"
+  },
+  "coach": {
+    "title": "Weekly AI coach",
+    "subtitle": "This week's conversations and leads, why conversations didn't close — and how to fix it",
+    "stats": {
+      "conversations": "Conversations",
+      "leads": "Leads",
+      "conversion": "Conversion",
+      "lost": "Didn't close"
+    },
+    "fix": "Fix",
+    "week": "Report for the week starting {date}",
+    "empty": "The first report arrives at the end of the week (or press \"Report now\").",
+    "fixScript": "Fix the script",
+    "runNow": "Report now",
+    "ready": "The report is ready",
+    "notReady": "The report isn't available yet — try again later",
+    "notification": "📊 Your weekly coach report is ready: {conversations} conversations, {leads} leads"
+  },
+  "health": {
+    "title": "Connection health",
+    "overall": {
+      "ok": "All connections are working",
+      "quiet": "Everything is connected — some channels have been quiet",
+      "warning": "A connection should be checked",
+      "error": "A connection isn't working — fix it now"
+    },
+    "reason": {
+      "ok": "Active and healthy",
+      "status_error": "The connection failed — reconnect it",
+      "disabled": "The connection is disabled",
+      "send_failures": "{n} messages failed in the last 24 hours",
+      "no_messages": "No messages for two weeks",
+      "never": "No message on this channel yet"
+    },
+    "lastIn": "Last customer message: {when}",
+    "never": "Not yet",
+    "fix": "Fix now",
+    "alertNotification": "⚠️ The {name} connection ({channel}) isn't working — tap to fix"
+  },
+  "quickStart": {
+    "title": "Ready in 3 minutes",
+    "subtitle": "Five short steps — and the agent answers your customers",
+    "progress": "{done} of {total} steps done",
+    "steps": {
+      "agent": {
+        "title": "AI agent",
+        "body": "Create an agent in one click"
+      },
+      "site": {
+        "title": "Set up from website",
+        "body": "The agent learns your business"
+      },
+      "channel": {
+        "title": "Connect a channel",
+        "body": "WhatsApp, Telegram or Facebook"
+      },
+      "test": {
+        "title": "Test chat",
+        "body": "Write to the agent and check"
+      },
+      "app": {
+        "title": "Phone notifications",
+        "body": "Know about hot leads at once"
+      }
     }
+  },
+  "liveFeed": {
+    "title": "What the agent is doing now",
+    "subtitle": "Replies, leads, calls and payments — updates by itself",
+    "empty": "No activity yet. As soon as a customer writes, you'll see everything here live.",
+    "now": "now",
+    "minutes": "{n} min ago",
+    "hours": "{n} h ago",
+    "days": "{n} days ago",
+    "kind": {
+      "reply": "Agent replied",
+      "lead": "New lead",
+      "call": "Phone call",
+      "paid": "Payment received"
+    }
+  },
+  "payChat": {
+    "paid": "Paid",
+    "pending": "Awaiting payment",
+    "paidNotification": "💳 Payment received in the chat: {amount} {currency} — {description}"
+  },
+  "reviewGate": {
+    "negativeNotification": "😞 A customer rated {rating}/5 — get back to them personally now"
   }
 }

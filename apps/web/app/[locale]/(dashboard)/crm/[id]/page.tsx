@@ -1,3 +1,4 @@
+import { ContactCalls } from "@/components/crm/contact-calls";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -235,6 +236,8 @@ export default async function ContactDetailPage({ params, searchParams }: { para
           <CardHeader title={t("memory.title")} description={t("memory.subtitle")} />
           <MemoryCard contactId={contact.id} items={memories} canWrite={ctx.can("contacts.write")} />
         </Card>
+        {/* wave 59: the contact's phone calls — summary, transcript, recording */}
+        {ctx.can("inbox.read") ? <ContactCalls orgId={ctx.org.id} contactId={contact.id} locale={locale} /> : null}
         {duplicates.length > 0 ? (
           <Card className="border-gold/40">
             <CardHeader title={t("merge.title", { count: duplicates.length })} description={t("merge.hint")} />

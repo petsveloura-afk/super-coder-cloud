@@ -18,3 +18,14 @@ export async function loadDemoDataAction(_prev: ActionState, fd: FormData): Prom
   revalidatePath(`/${locale}`, "layout");
   return { ok: true, message: "dashboard.demoLoaded", messageParams: { count: Number(data ?? 0) } };
 }
+
+/** Wave 59 — the overview's live feed refreshes itself (what the agent did in the last minutes). */
+export async function liveFeedAction(input: { locale: string }): Promise<ActionState<{ items: import("@/lib/dashboard/live-feed").FeedItem[] }>> {
+  const locale = isLocale(input.locale) ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("inbox.read")) return { ok: true, data: { items: [] } };
+  const supabase = await createClient();
+  const { loadLiveFeed } = await import("@/lib/dashboard/live-feed");
+  const items = await loadLiveFeed(supabase, ctx.org.id).catch(() => []);
+  return { ok: true, data: { items } };
+}

@@ -17,6 +17,9 @@ import { CONTACT_STATUSES } from "@scc/shared/validators";
 import { CommandCenter } from "@/components/dashboard/command-center";
 import { InstallAppBanner } from "@/components/layout/install-app";
 import { DEFAULT_TIME_ZONE } from "@/lib/format";
+import { QuickStart } from "@/components/dashboard/quick-start";
+import { LiveFeed } from "@/components/dashboard/live-feed";
+import { loadLiveFeed } from "@/lib/dashboard/live-feed";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -48,6 +51,8 @@ export default async function OverviewPage({ params }: { params: Promise<{ local
   ]);
 
   const pulse = await pulseP;
+  // wave 59: what the agent is doing right now (refreshes itself on the page)
+  const feed = ctx.can("inbox.read") ? await loadLiveFeed(supabase, orgId).catch(() => []) : null;
   const raw = (kpiRes.data ?? EMPTY_KPIS) as DashboardKpis;
   const k = Object.fromEntries(Object.entries(raw).map(([key, v]) => [key, Number(v)])) as unknown as DashboardKpis;
   const daily = ((dailyRes.data ?? []) as DailyPoint[]).map((d) => ({ day: d.day, count: Number(d.count) }));
@@ -99,6 +104,8 @@ export default async function OverviewPage({ params }: { params: Promise<{ local
         }
       />
 
+      {/* wave 59 — ready in 3 minutes (disappears when every step is done) */}
+      {ctx.can("ai.use") ? <QuickStart orgId={orgId} userId={ctx.userId} locale={locale} /> : null}
       {/* wave 48 — install-to-home-screen banner + command center (health, trend, quick actions, insights) */}
       <InstallAppBanner className="mb-4" />
       <CommandCenter
@@ -121,12 +128,13 @@ export default async function OverviewPage({ params }: { params: Promise<{ local
       />
 
       {pulse ? <AiPulseBand pulse={pulse} locale={locale} t={t} /> : null}
+      {feed ? <LiveFeed initial={feed} /> : null}
 
       {next ? <NextActionsCard items={next} locale={locale} t={t} /> : null}
 
       <section aria-label={t("nav.overview")} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {kpis.map((kpi) => (
-          <Card key={kpi.label} className="p-4 sm:p-5">
+        {kpis.map((kpi, i) => (
+          <Card key={kpi.label} className="lift num-pop p-4 sm:p-5" style={{ animationDelay: `${i * 45}ms` }}>
             <div className="flex items-start justify-between gap-2">
               <span className="text-[12.5px] font-medium leading-tight text-muted">{kpi.label}</span>
               <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${kpi.tone}`}>

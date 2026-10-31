@@ -1,3 +1,4 @@
+import { VoiceBubble } from "@/components/inbox/voice-bubble";
 import Link from "next/link";
 import { SalesStateBar } from "@/components/inbox/sales-state-bar";
 import { isSalesState, type SalesState } from "@/lib/ai/sales-state-core";
@@ -133,6 +134,9 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
   const { data: msgs } = selected
     ? await supabase.from("messages").select("id, direction, body, status, error, created_at, sent_by, media, ai_agent_id, meta").eq("organization_id", ctx.org.id).eq("conversation_id", selected.id).order("created_at").limit(300)
     : { data: [] };
+  // wave 59: payment links in this chat (none before the migration ran)
+  const { data: payRows, error: payErr } = selected ? await supabase.from("chat_payments").select("id, amount, currency, description, status").eq("organization_id", ctx.org.id).eq("conversation_id", selected.id).order("created_at", { ascending: false }).limit(5) : { data: null, error: null };
+  const payments = (payErr ? [] : ((payRows ?? []) as { id: string; amount: number; currency: string; description: string; status: string }[]));
   // wave 21: why the agent is not answering this conversation (plain words + back to the agent)
   let aiNote: { key: AiNoteKey; resumeIn: number | null } | null = null;
   if (selected) {
@@ -290,6 +294,16 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                 {aiNote.key !== "busy" && ctx.can("inbox.reply") ? <AiModeToggle conversationId={selected.id} mode="human" testId="ai-note-resume" /> : null}
               </div>
             ) : null}
+            {/* wave 59: payment links sent in this chat and whether they were paid */}
+            {payments.length ? (
+              <div className="flex flex-wrap gap-2 border-b border-line px-4 py-2" data-testid="chat-payments">
+                {payments.map((p) => (
+                  <span key={p.id} className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium", p.status === "paid" ? "bg-success-soft text-success" : "bg-warning-soft text-warning")}>
+                    💳 {p.description} · {Number(p.amount).toLocaleString(locale === "en" ? "en-US" : "he-IL")} {p.currency} · {t(p.status === "paid" ? "payChat.paid" : "payChat.pending")}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <ol className="flex-1 space-y-2 overflow-y-auto p-4" aria-live="polite">
               {(msgs ?? []).map((m) => {
                 const out = m.direction === "out";
@@ -305,6 +319,10 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                         <p className="mb-1 inline-flex items-center gap-1 text-[11px] font-semibold opacity-80" data-testid="owner-badge">
                           <Smartphone className="h-3.5 w-3.5" /> {t("inbox.ownerPhone")}
                         </p>
+                      ) : null}
+                      {/* wave 59: WhatsApp-style voice bubble for voice messages and phone turns */}
+                      {(m.media as { type?: string } | null)?.type === "voice" || (m.media as { type?: string } | null)?.type === "audio" || (m.meta as { voice?: boolean } | null)?.voice === true ? (
+                        <VoiceBubble url={(m.media as { url?: string } | null)?.url ?? null} phone={(m.meta as { voice?: boolean } | null)?.voice === true} label={t("inbox.voiceMessage")} />
                       ) : null}
                       {(m.meta as { media?: { url?: string; title?: string } } | null)?.media?.url ? (
                         <a href={(m.meta as { media: { url: string } }).media.url} target="_blank" rel="noopener noreferrer" className="mb-1.5 block overflow-hidden rounded-xl" data-testid="inbox-image">

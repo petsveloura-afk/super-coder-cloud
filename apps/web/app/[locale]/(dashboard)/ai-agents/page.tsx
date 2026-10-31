@@ -1,3 +1,4 @@
+import { AgentGrowthPanel } from "@/components/ai/agent-growth-panel";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -141,6 +142,8 @@ export default async function AIAgentsPage({ params }: { params: Promise<{ local
           </div>
         </Card>
       </div>
+      {/* wave 59: the weekly AI coach + answers the agent learned from the team */}
+      {ctx.can("ai.use") ? <AgentGrowthPanel orgId={ctx.org.id} locale={locale} canManage={canManage} firstAgentId={agents[0]?.id ?? null} /> : null}
     </>
   );
 }

@@ -63,11 +63,42 @@ function TokenMaker() {
  * Wave 58 — the voice + phone steps (wave 57) get their own list under the original wizard, so the
  * wizard keeps its six steps exactly as before; the overall progress counts both.
  */
-export function PlatformSetup({ steps, extra = [] }: { steps: SetupStep[]; extra?: SetupStep[] }) {
+/** Wave 59 — phone-notification keys (VAPID, P-256) made right in the browser: copy both into Vercel. */
+function VapidMaker() {
+  const { t } = useI18n();
+  const [keys, setKeys] = useState<{ pub: string; priv: string } | null>(null);
+  const b64u = (buf: ArrayBuffer | Uint8Array) =>
+    btoa(String.fromCharCode(...new Uint8Array(buf instanceof Uint8Array ? buf : new Uint8Array(buf))))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+  const make = async () => {
+    try {
+      const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+      const pub = await crypto.subtle.exportKey("raw", pair.publicKey);
+      const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
+      setKeys({ pub: b64u(pub), priv: String(jwk.d ?? "") });
+    } catch {
+      toast.error(t("errors.generic"));
+    }
+  };
+  return keys ? (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Copyable label="VAPID_PUBLIC_KEY" value={keys.pub} />
+      <Copyable label="VAPID_PRIVATE_KEY" value={keys.priv} />
+    </div>
+  ) : (
+    <Button variant="secondary" size="sm" onClick={() => void make()} data-testid="vapid-make">
+      <KeyRound className="h-3.5 w-3.5" /> {t("admin.setup.makeVapid")}
+    </Button>
+  );
+}
+
+export function PlatformSetup({ steps, extra = [], more = [] }: { steps: SetupStep[]; extra?: SetupStep[]; more?: SetupStep[] }) {
   const { t, locale } = useI18n();
   const [live, setLive] = useState<LiveChecks | null>(null);
   const [checking, setChecking] = useState(false);
-  const all = [...steps, ...extra];
+  const all = [...steps, ...extra, ...more];
   const done = all.filter((s) => s.done).length;
   const firstOpen = all.find((s) => !s.done)?.key;
 
@@ -113,6 +144,7 @@ export function PlatformSetup({ steps, extra = [] }: { steps: SetupStep[]; extra
           <p className="whitespace-pre-line text-[13.5px] leading-relaxed">{t(`admin.setup.steps.${s.key}.how`)}</p>
           {s.copies.length ? <div className="grid gap-3 sm:grid-cols-2">{s.copies.map((c) => <Copyable key={c.label} label={c.label} value={c.value} />)}</div> : null}
           {s.vars.some((x) => x.name === "META_WEBHOOK_VERIFY_TOKEN" && !x.set) ? <TokenMaker /> : null}
+          {s.vars.some((x) => x.name === "VAPID_PUBLIC_KEY" && !x.set) ? <VapidMaker /> : null}
           <div>
             <p className="mb-1.5 text-[12.5px] font-medium text-muted">{t("admin.setup.vercelVars")}</p>
             <ul className="flex flex-wrap gap-1.5">
@@ -166,6 +198,13 @@ export function PlatformSetup({ steps, extra = [] }: { steps: SetupStep[]; extra
         <div className="border-t border-line" data-testid="platform-setup-voice">
           <p className="bg-elevated px-4 py-2.5 text-[12.5px] font-semibold text-muted sm:px-5">{t("admin.setup.voiceSection")}</p>
           <ol className="divide-y divide-line">{extra.map((s, i) => row(s, i, "data-voice-step", steps.length))}</ol>
+        </div>
+      ) : null}
+      {/* wave 59: phone notifications (VAPID, made in one click) + the agent's default voice */}
+      {more.length ? (
+        <div className="border-t border-line" data-testid="platform-setup-more">
+          <p className="bg-elevated px-4 py-2.5 text-[12.5px] font-semibold text-muted sm:px-5">{t("admin.setup.moreSection")}</p>
+          <ol className="divide-y divide-line">{more.map((s, i) => row(s, i, "data-voice-step", steps.length + extra.length))}</ol>
         </div>
       ) : null}
       <p className="border-t border-line p-4 text-[12.5px] text-subtle sm:px-5">{t("admin.setup.footer")}</p>

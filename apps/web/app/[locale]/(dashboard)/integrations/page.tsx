@@ -1,3 +1,4 @@
+import { HealthCenter } from "@/components/integrations/health-center";
 import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -164,9 +165,13 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
     };
   }
 
+  // wave 59: connection health center (every connected channel, its real state, one-click fix)
+  const health = canChannels && process.env.SUPABASE_SERVICE_ROLE_KEY ? await (await import("@/lib/channels/health")).loadChannelHealth(ctx.org.id) : null;
   return (
     <>
       <PageHeader title={t("integrations.title")} description={t("integrations.hubSubtitle")} />
+      {health ? <HealthCenter rows={health.rows} overall={health.overall} locale={locale} /> : null}
+      {canChannels ? <div id="whatsapp" /> : null}
       {/* wave 20: WhatsApp in one button — official (Meta) or straight from the phone (QR / code) */}
       {canChannels ? (
         <WhatsAppConnect
@@ -187,6 +192,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
       <Suspense fallback={null}>
         <IntegrationsNotice />
       </Suspense>
+      {canChannels ? <div id="connect" /> : null}
       {canChannels ? <ConnectHub {...hub} /> : null}
       {canChannels ? <div id="team-updates" /> : null}
       {canChannels ? <TeamUpdates recipients={(recRows ?? []) as RecipientView[]} business={(bizRows ?? []) as BusinessView[]} botUsername={tg?.config.username || null} /> : null}

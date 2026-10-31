@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { publicEnv } from "@/lib/env";
-import { monthStart, minutesLeft, minutesUsed, monthlyMinutes, needsManualAssign, platformTwilio, validE164 } from "./platform-phone-core";
+import { monthStart, minutesLeft, minutesLeftWithPacks, minutesUsed, monthlyMinutes, needsManualAssign, overflowMinutes, platformTwilio, validE164 } from "./platform-phone-core";
 import { buyNumber, configureNumber, findIncomingNumber, releaseNumber } from "./twilio-api";
 
 /**
@@ -89,11 +89,45 @@ export async function releaseForOrg(orgId: string): Promise<boolean> {
 }
 
 /** Minutes used this month on platform numbers vs the allowance. */
-export async function platformMinutes(orgId: string): Promise<{ used: number; limit: number; left: number | null }> {
+export async function platformMinutes(orgId: string): Promise<{ used: number; limit: number; left: number | null; packs?: number }> {
   const limit = monthlyMinutes(process.env);
   const { data } = await createAdminClient().from("voice_calls").select("duration_sec").eq("organization_id", orgId).eq("via", "platform").gte("created_at", monthStart()).limit(5000);
   const used = minutesUsed(((data ?? []) as { duration_sec: number | null }[]).map((r) => r.duration_sec));
-  return { used, limit, left: minutesLeft(used, limit) };
+  // wave 59: purchased minute packs extend the month (used after the monthly minutes)
+  const packs = await minutePackBalance(orgId);
+  return { used, limit, left: minutesLeftWithPacks(minutesLeft(used, limit), packs), packs };
+}
+
+/** Wave 59 — purchased phone minutes left (0 before the migration ran). */
+export async function minutePackBalance(orgId: string): Promise<number> {
+  try {
+    const { data, error } = await createAdminClient().rpc("voice_minutes_balance", { org: orgId });
+    return error ? 0 : Math.max(0, Number(data ?? 0));
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Wave 59 — a platform call ended: the part of it above the monthly minutes is taken from the purchased
+ * minute packs (one ledger row per call, never below zero). Best-effort.
+ */
+export async function chargeOverflowMinutes(orgId: string, callId: string, durationSec: number): Promise<number> {
+  try {
+    const limit = monthlyMinutes(process.env);
+    if (limit <= 0 || !(durationSec > 0)) return 0;
+    const admin = createAdminClient();
+    const { data } = await admin.from("voice_calls").select("id, duration_sec").eq("organization_id", orgId).eq("via", "platform").gte("created_at", monthStart()).limit(5000);
+    const rows = (data ?? []) as { id: string; duration_sec: number | null }[];
+    const usedAfter = minutesUsed(rows.map((r) => r.duration_sec));
+    const usedBefore = minutesUsed(rows.filter((r) => r.id !== callId).map((r) => r.duration_sec));
+    const over = Math.min(overflowMinutes(usedBefore, usedAfter, limit), await minutePackBalance(orgId));
+    if (over <= 0) return 0;
+    await admin.from("credit_ledger").insert({ organization_id: orgId, kind: "voice", delta: -over, reason: "usage", note: `call ${callId}`.slice(0, 300) });
+    return over;
+  } catch {
+    return 0;
+  }
 }
 
 export interface TwilioCreds {

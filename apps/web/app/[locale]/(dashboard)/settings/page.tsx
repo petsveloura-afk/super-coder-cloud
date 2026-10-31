@@ -131,7 +131,10 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           <MyChannelsCard channels={myChannels} botUsername={botUsername} available={iAmAvailable} />
         </Card>
         {/* wave 17: notifications on this phone / computer */}
-        <PushCard vapidKey={vapidReady() ? (process.env.VAPID_PUBLIC_KEY ?? null) : null} />
+        {/* wave 59: anchor for "phone notifications" links (quick start, guide) */}
+        <div id="push" className="scroll-mt-20">
+          <PushCard vapidKey={vapidReady() ? (process.env.VAPID_PUBLIC_KEY ?? null) : null} />
+        </div>
         <Card id="calendar" className="scroll-mt-24">
           <CardHeader title={t("calendar.title")} description={t("calendar.subtitle")} />
           <CalendarCard

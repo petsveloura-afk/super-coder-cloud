@@ -18,6 +18,7 @@ async function step(name: string, out: Record<string, StepResult>, fn: () => Pro
 
 export async function runGrowthCron(): Promise<Record<string, StepResult>> {
   const out: Record<string, StepResult> = {};
+  const cronStart = Date.now(); // wave 59: later steps only start while there is time left
   const admin = createAdminClient();
   // conversation guard: planned follow-ups and scheduled messages
   await step("schedules", out, async () => {
@@ -40,5 +41,14 @@ export async function runGrowthCron(): Promise<Record<string, StepResult>> {
   // waves 16-18 register more steps here
   const { moreGrowthSteps } = await import("./growth-more");
   for (const [name, fn] of moreGrowthSteps()) await step(name, out, fn);
+  // wave 59: weekly coach, connection health, outbound calls, review questions
+  const { wave59Steps } = await import("./wave59");
+  for (const [name, fn] of wave59Steps()) {
+    if (Date.now() - cronStart > 40_000) {
+      out[name] = { skipped: "time" };
+      continue;
+    }
+    await step(name, out, fn);
+  }
   return out;
 }

@@ -5,7 +5,7 @@
  * every business on the platform connects that service in one click.
  * Pure (no I/O) — unit-tested; the live checks live in lib/admin/setup.ts.
  */
-export type SetupKey = "bridge" | "meta_app" | "wa_official" | "meta_pages" | "google" | "shopify" | "voice" | "phone_platform";
+export type SetupKey = "bridge" | "meta_app" | "wa_official" | "meta_pages" | "google" | "shopify" | "voice" | "phone_platform" | "push" | "voice_default";
 
 export interface SetupStep {
   key: SetupKey;
@@ -124,5 +124,32 @@ export function voiceSetupSteps(env: Env, appUrl: string): SetupStep[] {
   // one voice engine is enough (ElevenLabs for the most natural voice, or OpenAI)
   steps[0]!.done = voiceKeys.some((x) => x.set);
   steps[1]!.done = steps[1]!.vars.slice(0, 2).every((x) => x.set);
+  return steps;
+}
+
+/**
+ * Wave 59 — two more one-time platform steps: phone notifications (VAPID keys — the admin console makes
+ * them in one click) and the agent's default natural voice (optional: Danit is used when empty).
+ */
+export function moreSetupSteps(env: Env): SetupStep[] {
+  const v = (name: string, secret = false, min = 1) => ({ name, set: has(env, name, min), secret });
+  const steps: SetupStep[] = [
+    {
+      key: "push",
+      vars: [v("VAPID_PUBLIC_KEY", false, 40), v("VAPID_PRIVATE_KEY", true, 20), v("VAPID_SUBJECT")],
+      copies: [],
+      links: [],
+      done: false,
+    },
+    {
+      key: "voice_default",
+      vars: [v("ELEVENLABS_VOICE_ID", false, 16)],
+      copies: [],
+      links: [{ label: "ElevenLabs voice library", href: "https://elevenlabs.io/app/voice-library" }],
+      done: false,
+    },
+  ];
+  // VAPID_SUBJECT is optional (a default contact is used); the default voice is optional (Danit)
+  for (const s of steps) s.done = s.key === "voice_default" ? true : s.vars.slice(0, 2).every((x) => x.set);
   return steps;
 }

@@ -6,6 +6,8 @@ import { uuidSchema } from "@scc/shared/validators";
 import { AgentSetup, type SetupAgent } from "@/components/ai/agent-setup";
 import { FlowsEditor, GuardrailsCard, type FlowView, type RailsValue } from "@/components/ai/agent-plus";
 import { VoicePersonaCard } from "@/components/ai/voice-persona-card";
+import { SiteImportCard } from "@/components/ai/site-import-card";
+import { OpenerAbCard } from "@/components/ai/opener-ab-card";
 import { FeatureLock, TrialNote } from "@/components/billing/feature-gate";
 import { featureAccess } from "@/lib/billing/features";
 import { Card, CardHeader, PageHeader } from "@/components/ui/primitives";
@@ -49,6 +51,12 @@ export default async function AgentSetupPage({ params }: { params: Params }) {
   const voice = voiceErr || !voiceRow ? null : normalizeVoice((voiceRow as { voice?: unknown }).voice);
   // wave 55: voice answers + voice persona are a paid feature (Pro) with a 7-day free trial
   const voiceAccess = await featureAccess(ctx.org.id, "voice_notes");
+  // wave 59: A/B opening line — current openers + results (null before the migration ran)
+  const { openersOf, abSummary } = await import("@/lib/ai/opener-ab-core");
+  const openers = openersOf(agent.profile as { openers?: unknown } | null);
+  const { loadOpenerStats } = await import("@/lib/ai/opener-ab");
+  const abStats = openers.length > 1 ? await loadOpenerStats(ctx.org.id, supabase as never).catch(() => null) : null;
+  const ab = abStats ? { n: abStats.n, ...abSummary(abStats) } : null;
   return (
     <>
       <Link href={`/${locale}/ai-agents`} className="mb-2 inline-flex items-center gap-1 text-[13px] text-muted hover:text-fg">
@@ -63,7 +71,17 @@ export default async function AgentSetupPage({ params }: { params: Params }) {
           </Link>
         }
       />
+      {/* wave 59: set the agent up from the business's website in a minute (fills only what is empty) */}
+      <Card id="site-import" className="mb-4 overflow-hidden bento-glow">
+        <CardHeader title={t("siteImport.title")} description={t("siteImport.subtitle")} />
+        <SiteImportCard agentId={agent.id as string} website={String((agent.profile as { website?: string } | null)?.website ?? "")} />
+      </Card>
       <AgentSetup agent={agent as SetupAgent} />
+      {/* wave 59: which opening line closes more leads (automatic A/B test) */}
+      <Card id="opener-ab" className="mt-4">
+        <CardHeader title={t("abOpener.title")} description={t("abOpener.subtitle")} />
+        <OpenerAbCard agentId={agent.id as string} openers={openers} stats={ab} />
+      </Card>
       {/* wave 16: guardrails + conversation flows */}
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <Card id="guardrails">

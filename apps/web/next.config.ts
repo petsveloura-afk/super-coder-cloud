@@ -34,6 +34,9 @@ const csp = [
   // https images, Google Fonts and YouTube / Vimeo videos
   `img-src 'self' data: blob: https: ${supabaseOrigin}`.trim(),
   "font-src 'self' data: https://fonts.gstatic.com",
+  // wave 59: voice samples / voice messages / call recordings play in the page (data: & blob: audio, own
+  // recording proxy, https media). Without it the browser silently blocked every <audio> (default-src 'self').
+  `media-src 'self' data: blob: https: ${supabaseOrigin}`.trim(),
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   `frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com ${paypalGlobal}`,
   `script-src 'self' 'unsafe-inline' ${paypalGlobal}${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,

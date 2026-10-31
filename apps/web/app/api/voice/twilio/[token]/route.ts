@@ -20,6 +20,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const locale = (org?.locale as string | undefined) ?? "he";
   const { gatherTwiml, sayTwiml } = await import("@/lib/voice/twiml");
   if (has !== true) {
+    // wave 59: the agent cannot take the call → the caller gets a WhatsApp / SMS right away
+    after(async () => void (await (await import("@/lib/voice/missed-call")).missedCallTextBack({ orgId: v.acc.organization_id, callerPhone: v.form.From ?? "", reason: "unavailable" })));
     return xml(sayTwiml(locale === "en" ? "Thank you for calling. Please send us a message and we will get back to you." : "תודה שהתקשרת. אפשר לשלוח לנו הודעה ונחזור אליך בהקדם.", locale));
   }
   const { openVoiceCall, voiceTurn, voiceWebhookUrl } = await import("@/lib/voice/agent");
@@ -27,6 +29,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // wave 56: Twilio tells us when the call ends (status, duration, CRM summary) — no setup needed
   const callSid = v.form.CallSid ?? "";
   if (callSid) after(async () => (await import("@/lib/voice/realtime")).watchCallStatus(v.acc.organization_id, callSid, voiceWebhookUrl(token, "/status")));
+  // wave 59: recording (when the business turned it on)
+  if (callSid) after(async () => void (await (await import("@/lib/voice/recording")).maybeRecordCall(v.acc.organization_id, call.id, callSid)));
   // wave 56: a LIVE call (continuous audio, interruptions, the agent's own voice) when the bridge supports it
   const { realtimeVoiceReady, liveCallTwiml } = await import("@/lib/voice/realtime");
   if (await realtimeVoiceReady()) {

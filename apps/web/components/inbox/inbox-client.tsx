@@ -9,6 +9,7 @@ import { Button, Select, Textarea } from "@/components/ui/primitives";
 import { Dialog } from "@/components/ui/dialog";
 import { markReadAction, replyAction, setAiModeAction, startConversationAction, updateConversationAction } from "@/app/[locale]/(dashboard)/inbox/actions";
 import { ComposeAi } from "@/components/inbox/compose-ai";
+import { ReplySuggestions } from "@/components/inbox/reply-suggestions";
 
 export const CHANNEL_ICON = { whatsapp: MessageCircle, telegram: Send, sms: Smartphone } as const;
 
@@ -84,27 +85,31 @@ export function ReplyBox({ conversationId, disabled }: { conversationId: string;
     });
   }
   return (
-    <div className="flex items-end gap-2 border-t border-line p-3">
-      <Textarea
-        aria-label={t("inbox.reply")}
-        placeholder={t("inbox.replyPlaceholder")}
-        value={text}
-        rows={2}
-        disabled={disabled}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            send();
-          }
-        }}
-        className="min-h-[52px] flex-1 resize-none"
-      />
-      {/* wave 50 — AI writing tools for the draft */}
-      <ComposeAi conversationId={conversationId} text={text} setText={setText} disabled={disabled} />
-      <Button onClick={send} loading={pending} disabled={disabled || !text.trim()} aria-label={t("inbox.send")}>
-        <Send className="h-4 w-4 rtl:-scale-x-100" /> <span className="hidden sm:inline">{t("inbox.send")}</span>
-      </Button>
+    <div className="border-t border-line">
+      {/* wave 59 — AI suggestion chips (tap → into the box) */}
+      <ReplySuggestions conversationId={conversationId} disabled={disabled} />
+      <div className="flex items-end gap-2 p-3">
+        <Textarea
+          aria-label={t("inbox.reply")}
+          placeholder={t("inbox.replyPlaceholder")}
+          value={text}
+          rows={2}
+          disabled={disabled}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault();
+              send();
+            }
+          }}
+          className="min-h-[52px] flex-1 resize-none"
+        />
+        {/* wave 50 — AI writing tools for the draft */}
+        <ComposeAi conversationId={conversationId} text={text} setText={setText} disabled={disabled} />
+        <Button onClick={send} loading={pending} disabled={disabled || !text.trim()} aria-label={t("inbox.send")}>
+          <Send className="h-4 w-4 rtl:-scale-x-100" /> <span className="hidden sm:inline">{t("inbox.send")}</span>
+        </Button>
+      </div>
     </div>
   );
 }
