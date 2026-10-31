@@ -240,3 +240,27 @@ describe("wave 61 — wiring and translations", () => {
     }
   });
 });
+
+describe("wave 61 — account emails always arrive", () => {
+  it("signup / reset / invitations go through the platform sender with the mailbox fallback", () => {
+    const auth = read("app/[locale]/(auth)/actions.ts");
+    expect(auth).toContain("platformSignUp");
+    expect(auth).toContain("platformRecovery");
+    expect(auth).toContain("supabase.auth.signUp"); // the original flow stays as the fallback
+    expect(read("app/[locale]/(dashboard)/team/actions.ts")).toContain("sendPlatformEmail");
+    const p = read("lib/email/platform.ts");
+    expect(p).toContain("sendViaPlatformMailbox");
+    expect(p).toContain("type=signup".slice(0, 0) + "accountEmail");
+  });
+});
+
+describe("wave 61 — every platform email has a fallback", () => {
+  it("sendEmail falls back to the business mailbox (orgId) or the platform owner's; campaigns stay on Resend", () => {
+    const s = read("lib/email/send.ts");
+    expect(s).toContain("sendViaMailboxFallback");
+    expect(s).toContain("noFallback");
+    expect(read("lib/jobs/dispatch.ts")).toContain("noFallback: true");
+    expect(read("lib/jobs/dispatch.ts")).toContain("orgId: job.organization_id");
+    for (const f of ["lib/ai/autopilot.ts", "lib/tasks/reminders.ts", "lib/appointments/reminders.ts", "lib/notify/forward.ts"]) expect(read(f), f).toMatch(/orgId/);
+  });
+});

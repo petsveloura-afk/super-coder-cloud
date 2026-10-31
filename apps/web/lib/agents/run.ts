@@ -155,7 +155,7 @@ export async function runAnalyst(orgId: string): Promise<{ actions: number }> {
       const link = `${publicEnv.appUrl.replace(/\/$/, "")}/${org.locale}/agents`;
       const html = `<div dir="${org.locale === "en" ? "ltr" : "rtl"}" style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.7">${escapeHtml(summary).replace(/\n/g, "<br>")}<p><a href="${link}">${link}</a></p></div>`;
       for (const p of ((profiles ?? []) as { email: string | null }[]).filter((x) => x.email)) {
-        await sendEmail({ to: p.email!, subject: org.locale === "en" ? `☀️ Morning brief · ${org.name}` : org.locale === "ar" ? `☀️ ملخص الصباح · ${org.name}` : `☀️ תדריך בוקר · ${org.name}`, html, text: summary }).catch(() => undefined);
+        await sendEmail({ orgId, to: p.email!, subject: org.locale === "en" ? `☀️ Morning brief · ${org.name}` : org.locale === "ar" ? `☀️ ملخص الصباح · ${org.name}` : `☀️ תדריך בוקר · ${org.name}`, html, text: summary }).catch(() => undefined);
       }
     }
   }
@@ -242,7 +242,7 @@ export async function messageContact(orgId: string, contactId: string, text: str
   const { emailConfigured, escapeHtml, sendEmail } = await import("@/lib/email/send");
   if (!c?.email || !emailConfigured()) return false;
   const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.7" dir="auto">${escapeHtml(text).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>').replace(/\n/g, "<br>")}</div>`;
-  const res = await sendEmail({ to: c.email as string, subject: text.split("\n")[0]!.slice(0, 150), html, text });
+  const res = await sendEmail({ to: c.email as string, subject: text.split("\n")[0]!.slice(0, 150), html, text, orgId });
   return res.sent;
 }
 

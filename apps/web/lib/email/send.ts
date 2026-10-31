@@ -20,7 +20,27 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
 
-export async function sendEmail(input: { to: string; subject: string; html: string; text: string; headers?: Record<string, string> }): Promise<EmailResult> {
+/**
+ * Wave 61 — every platform email arrives: Resend first; when it cannot deliver (sender domain not verified,
+ * wrong key, not configured) the email goes out from a connected mailbox instead:
+ *   • with `orgId` (an email on behalf of a business: campaigns, reminders, the agent's lead alerts) → that
+ *     business's own connected mailbox (Gmail / Outlook) — so it also comes from the business's address;
+ *   • without `orgId` (platform emails: billing, receipts) → the platform owner's connected mailbox.
+ */
+export async function sendEmail(input: { to: string; subject: string; html: string; text: string; headers?: Record<string, string>; orgId?: string | null; noFallback?: boolean }): Promise<EmailResult> {
+  const first = await sendEmailProvider(input);
+  // bulk campaigns never go through a personal mailbox (sending limits / spam) — Resend only
+  if (first.sent || input.noFallback) return first;
+  try {
+    const { sendViaMailboxFallback } = await import("./platform");
+    if ((await sendViaMailboxFallback({ to: input.to, subject: input.subject, html: input.html, text: input.text }, input.orgId ?? null)).ok) return { sent: true };
+  } catch {
+    /* keep the original result */
+  }
+  return first;
+}
+
+async function sendEmailProvider(input: { to: string; subject: string; html: string; text: string; headers?: Record<string, string> }): Promise<EmailResult> {
   if (!emailConfigured()) return { sent: false, reason: "not_configured" };
   const base = (process.env.EMAIL_PROVIDER_API_BASE || "https://api.resend.com").replace(/\/$/, "");
   try {

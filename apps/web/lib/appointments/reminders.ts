@@ -103,6 +103,6 @@ async function remindOne(d: Due, org: { locale: "he" | "ar" | "en"; tz: string; 
     .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>')
     .replace(/\n/g, "<br>")}</div>`;
   const subject = text.split("\n")[0]!.slice(0, 200);
-  const res = await sendEmail({ to, subject, html, text });
+  const res = await sendEmail({ to, subject, html, text, orgId: d.organization_id });
   return res.sent;
 }

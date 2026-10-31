@@ -87,6 +87,7 @@ async function runCampaignJob(admin: ReturnType<typeof createAdminClient>, job: 
       html,
       text: `${m.body}\n\n${footer}: ${unsub}`,
       headers: { "List-Unsubscribe": `<${base}/api/unsubscribe/${m.unsub_token}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+      noFallback: true,
     });
     return r.sent ? { ok: true } : { ok: false, error: r.reason ?? "provider_error" };
   }
@@ -113,7 +114,7 @@ async function runJob(admin: ReturnType<typeof createAdminClient>, job: JobRow):
       if (!emailConfigured()) return { ok: false, error: "email_not_configured", permanent: true };
       const p = job.payload as { to: string; subject: string; text: string };
       const html = `<div dir="auto" style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.6;white-space:pre-wrap">${escapeHtml(p.text ?? "")}</div>`;
-      const r = await sendEmail({ to: p.to, subject: p.subject || "—", html, text: p.text ?? "" });
+      const r = await sendEmail({ to: p.to, subject: p.subject || "—", html, text: p.text ?? "", orgId: job.organization_id });
       return r.sent ? { ok: true } : { ok: false, error: r.reason ?? "provider_error", permanent: r.reason === "not_configured" };
     }
     case "webhook": {

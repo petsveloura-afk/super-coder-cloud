@@ -124,7 +124,7 @@ async function sendReminder(d: Due, org: { locale: "he" | "ar" | "en"; tz: strin
   if (r.kind === "email") {
     const { sendEmail, escapeHtml } = await import("@/lib/email/send");
     const html = `<div dir="${org.locale === "en" ? "ltr" : "rtl"}" style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.7">${escapeHtml(text).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>').replace(/\n/g, "<br>")}</div>`;
-    const res = await sendEmail({ to: r.target, subject: `${l.head}: ${d.title}`.slice(0, 200), html, text });
+    const res = await sendEmail({ to: r.target, subject: `${l.head}: ${d.title}`.slice(0, 200), html, text, orgId: d.organization_id });
     return res.sent;
   }
   if (r.kind === "whatsapp") {

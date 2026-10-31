@@ -10,7 +10,7 @@ import { publicEnv } from "@/lib/env";
 import { isLocale, type Locale } from "@/lib/i18n/config";
 import { createClient } from "@/lib/supabase/server";
 import { dbErrorKey, formValues, type ActionState } from "@/lib/action-state";
-import { invitationEmail, sendEmail } from "@/lib/email/send";
+import { invitationEmail } from "@/lib/email/send";
 import { getT } from "@/lib/i18n/server";
 
 function loc(fd: FormData): Locale {
@@ -67,7 +67,9 @@ export async function createInvitationAction(
       roleLabel: t(`team.roles.${parsed.data.role}`),
       link,
     });
-    emailed = (await sendEmail({ to: parsed.data.email, ...mail })).sent;
+    // wave 61: Resend, else the platform owner's connected mailbox — invitations always arrive
+    const { sendPlatformEmail } = await import("@/lib/email/platform");
+    emailed = (await sendPlatformEmail({ to: parsed.data.email, ...mail })).sent;
   }
   return { ok: true, message: emailed ? "team.inviteEmailed" : "team.inviteCreated", data: { link, emailed } };
 }

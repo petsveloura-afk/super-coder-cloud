@@ -143,6 +143,7 @@ async function emailLeadToOwners(orgId: string, conversationId: string, lead: Le
   for (const p of (profiles ?? []) as { email: string | null }[]) {
     if (!p.email) continue;
     await sendEmail({
+      orgId, // wave 61: falls back to the business's connected mailbox
       to: p.email,
       subject: `${badge} ליד חדש: ${lead.name || title || ""} ${lead.need ? `· ${lead.need}` : ""}`.trim().slice(0, 150),
       text,

@@ -28,7 +28,7 @@ export async function sendToRecipient(orgId: string, r: RecipientRow, event: Not
   try {
     if (r.kind === "email") {
       const { sendEmail } = await import("@/lib/email/send");
-      const res = await sendEmail({ to: r.target, subject: notifySubject(event, payload), html: notifyEmailHtml(event, payload), text: notifyText(event, payload) });
+      const res = await sendEmail({ to: r.target, subject: notifySubject(event, payload), html: notifyEmailHtml(event, payload), text: notifyText(event, payload), orgId });
       if (res.sent) return { ok: true };
       // wave 61: the platform's email service could not deliver → send from the business's own connected mailbox
       try {
