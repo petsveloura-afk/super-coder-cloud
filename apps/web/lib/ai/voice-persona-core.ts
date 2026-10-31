@@ -106,6 +106,30 @@ export function defaultVoiceId(lang: "he" | "en" | "ar", env: Record<string, str
   return env.ELEVENLABS_VOICE_PRESET === "hebrew_male" ? PRESET_DEFS.hebrew_male.voice_id : PRESET_DEFS.hebrew_female.voice_id;
 }
 
+/** ElevenLabs' own premade voices: every account can use them through the API, the free plan too. */
+const PREMADE_IDS = new Set([PRESET_DEFS.soft_female.voice_id, PRESET_DEFS.authoritative_male.voice_id, PRESET_DEFS.energetic_sales.voice_id]);
+
+/**
+ * Wave 58 — the voices to try, in order: the chosen one, then a premade voice of the same gender. A
+ * library voice (Danit, Dorian) or a cloned voice needs a paid ElevenLabs plan through the API; when it is
+ * refused the agent still speaks naturally instead of falling back to a robotic voice.
+ */
+export function elevenVoiceChain(voiceId: string, v?: Pick<VoiceSettings, "preset"> | null): string[] {
+  if (!voiceId) return [];
+  if (PREMADE_IDS.has(voiceId)) return [voiceId];
+  const male = voiceId === PRESET_DEFS.hebrew_male.voice_id || v?.preset === "hebrew_male" || v?.preset === "authoritative_male" || v?.preset === "energetic_sales";
+  return [voiceId, male ? PRESET_DEFS.authoritative_male.voice_id : PRESET_DEFS.soft_female.voice_id];
+}
+
+/** Why ElevenLabs refused: a wrong key, a voice that needs a paid plan, or no credits left. */
+export function elevenFailReason(status: number, body: string): "key" | "paid" | "quota" | "other" {
+  const b = body.toLowerCase();
+  if (/quota|credits|character_limit|exceeds your/.test(b)) return "quota";
+  if (status === 402 || /paid_plan|payment_required|subscription|upgrade|library voices|free users/.test(b)) return "paid";
+  if (status === 401 || /invalid_api_key|unauthorized|missing_permissions/.test(b)) return "key";
+  return "other";
+}
+
 export const DEFAULT_VOICE: VoiceSettings = {
   preset: "default",
   voice_id: "",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AudioLines, Crown, Flame, Heart, Mic, Play, Save, SlidersHorizontal, Smile } from "lucide-react";
 import { toast } from "sonner";
@@ -33,6 +33,15 @@ export function VoicePersonaCard({ agentId, value, ttsReady }: { agentId: string
   const [glossary, setGlossary] = useState(value.glossary.join(", "));
   const [sample, setSample] = useState(t("voicePersona.sampleText"));
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // wave 58: play the sample as soon as it arrives; when the browser blocks autoplay, say how to play it
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!audioUrl || !el) return;
+    el.load();
+    el.play().catch(() => toast.message(t("voicePersona.tapToPlay")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioUrl]);
   const [saving, startSave] = useTransition();
   const [playing, startPlay] = useTransition();
   const current = (): VoiceSettings => ({ ...v, glossary: glossary.split(/[,\n]/).map((x) => x.trim()).filter((x) => x.length >= 2) });
@@ -48,6 +57,8 @@ export function VoicePersonaCard({ agentId, value, ttsReady }: { agentId: string
     startPlay(async () => {
       const r = await previewVoiceAction({ locale, voice: current(), text: sample });
       if (r.error || !r.data) return void toast.error(t(r.error ?? "voicePersona.previewFailed"));
+      // wave 58: the chosen voice needs a paid ElevenLabs plan → a premade voice spoke instead
+      if (r.data.fallback) toast.warning(t("voicePersona.fallbackNote"), { duration: 9000 });
       setAudioUrl(r.data.url);
     });
   const slider = (k: "stability" | "similarity_boost" | "style" | "speed", min: number, max: number, step: number) => {
@@ -100,7 +111,7 @@ export function VoicePersonaCard({ agentId, value, ttsReady }: { agentId: string
 
       {v.preset !== "default" ? (
         <div className="space-y-3 rounded-xl border border-line p-3">
-          <Field label={t("voicePersona.field.voice_id")} htmlFor={`voice-${agentId}-id`} hint={t(v.preset === "custom" ? "voice.hint.voice_id_custom" : "voice.hint.voice_id")}>
+          <Field label={t("voicePersona.field.voice_id")} htmlFor={`voice-${agentId}-id`} hint={t(v.preset === "custom" ? "voicePersona.hint.voice_id_custom" : "voicePersona.hint.voice_id")}>
             <Input id={`voice-${agentId}-id`} dir="ltr" value={v.voice_id} placeholder="21m00Tcm4TlvDq8ikWAM" onChange={(e) => setV((x) => ({ ...x, voice_id: e.target.value.trim() }))} />
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -142,7 +153,7 @@ export function VoicePersonaCard({ agentId, value, ttsReady }: { agentId: string
             <Play className="h-4 w-4 rtl:-scale-x-100" aria-hidden /> {t("voicePersona.play")}
           </Button>
         </div>
-        {audioUrl ? <audio src={audioUrl} controls autoPlay className="w-full" aria-label={t("voicePersona.sample")} /> : null}
+        {audioUrl ? <audio ref={audioRef} src={audioUrl} controls preload="auto" className="w-full" aria-label={t("voicePersona.sample")} data-testid="voice-sample-audio" /> : null}
       </div>
 
       <Button onClick={save} loading={saving} data-testid="voice-save">

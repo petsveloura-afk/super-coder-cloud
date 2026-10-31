@@ -28,7 +28,7 @@ export async function saveVoiceAction(input: { locale: string; agentId: string; 
 }
 
 /** Plays a short sample with the settings on screen (not saved). Returns a data: URL. */
-export async function previewVoiceAction(input: { locale: string; voice: unknown; text: string }): Promise<ActionState<{ url: string; provider: string }>> {
+export async function previewVoiceAction(input: { locale: string; voice: unknown; text: string }): Promise<ActionState<{ url: string; provider: string; fallback?: boolean }>> {
   const locale = loc(input.locale);
   const ctx = await getOrgContext(locale);
   if (!ctx.can("ai.manage")) return { error: "errors.forbidden" };
@@ -39,7 +39,17 @@ export async function previewVoiceAction(input: { locale: string; voice: unknown
   const { ttsConfigured } = await import("@/lib/ai/tts");
   if (!ttsConfigured()) return { error: "voicePersona.noKey" };
   const { synthesizePersonaVoice } = await import("@/lib/ai/voice-persona");
-  const audio = await synthesizePersonaVoice(text, locale, normalizeVoice(input.voice), { force: true, maxChars: 220 });
-  if (!audio) return { error: "voicePersona.previewFailed" };
-  return { ok: true, data: { url: `data:${audio.mime};base64,${audio.buf.toString("base64")}`, provider: audio.provider } };
+  // wave 58: say WHY ElevenLabs refused (wrong key / needs a paid plan / no credits) instead of a generic error
+  let fail: { status: number; body: string } | null = null;
+  const audio = await synthesizePersonaVoice(text, locale, normalizeVoice(input.voice), { force: true, maxChars: 220, preferMp3: true, onFail: (status, body) => void (fail ??= { status, body }) });
+  if (!audio) {
+    const f = fail as { status: number; body: string } | null;
+    if (f) {
+      const { elevenFailReason } = await import("@/lib/ai/voice-persona-core");
+      const reason = elevenFailReason(f.status, f.body);
+      if (reason !== "other") return { error: `voicePersona.err.${reason}` };
+    }
+    return { error: "voicePersona.previewFailed" };
+  }
+  return { ok: true, data: { url: `data:${audio.mime};base64,${audio.buf.toString("base64")}`, provider: audio.provider, ...(audio.fallback ? { fallback: true } : {}) } };
 }

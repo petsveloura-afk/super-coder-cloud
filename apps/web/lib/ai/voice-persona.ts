@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isOggOpus, spokenText } from "./voice-note-core";
-import { defaultVoiceId, elevenBody, hasPersona, normalizeVoice, openaiBody, type VoiceSettings } from "./voice-persona-core";
+import { defaultVoiceId, elevenBody, elevenVoiceChain, hasPersona, normalizeVoice, openaiBody, type VoiceSettings } from "./voice-persona-core";
 
 /**
  * Wave 55 — speaks with the agent's own voice persona:
@@ -14,6 +14,8 @@ export interface PersonaAudio {
   buf: Buffer;
   mime: string;
   provider: "elevenlabs" | "openai";
+  /** wave 58: the chosen voice was refused (e.g. needs a paid ElevenLabs plan) → a premade voice spoke */
+  fallback?: boolean;
 }
 
 /** The agent's voice settings (null before the migration ran or when none is set). */
@@ -30,29 +32,35 @@ export async function loadVoicePersona(agentId: string | null | undefined): Prom
 
 const langOf = (locale: string): "he" | "en" | "ar" => (locale === "en" ? "en" : locale === "ar" ? "ar" : "he");
 
-export async function synthesizePersonaVoice(text: string, locale: string, v: VoiceSettings, opts: { force?: boolean; maxChars?: number } = {}): Promise<PersonaAudio | null> {
+export async function synthesizePersonaVoice(text: string, locale: string, v: VoiceSettings, opts: { force?: boolean; maxChars?: number; onFail?: (status: number, body: string) => void; preferMp3?: boolean } = {}): Promise<PersonaAudio | null> {
   if (!opts.force && !hasPersona(v)) return null;
   const clean = spokenText(text, opts.maxChars ?? 700);
   if (!clean) return null;
   const env = process.env;
   const lang = langOf(locale);
-  const voiceId = v.voice_id || defaultVoiceId(lang, env); // wave 58
-  if (env.ELEVENLABS_API_KEY && voiceId) {
+  const primaryVoice = v.voice_id || defaultVoiceId(lang, env); // wave 58
+  const elevenKey = env.ELEVENLABS_API_KEY ?? "";
+  for (const voiceId of elevenKey ? elevenVoiceChain(primaryVoice, v) : []) {
     const base = (env.ELEVENLABS_API_BASE || "https://api.elevenlabs.io").replace(/\/$/, "");
     const model = env.ELEVENLABS_MODEL || "eleven_v3";
-    for (const format of ["opus_48000_64", "mp3_44100_64"]) {
+    // wave 58: a preview in the browser is MP3 first — every browser plays it (Safari can't play OGG)
+    for (const format of opts.preferMp3 ? ["mp3_44100_64", "opus_48000_64"] : ["opus_48000_64", "mp3_44100_64"]) {
       try {
         const res = await fetch(`${base}/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=${format}`, {
           method: "POST",
-          headers: { "xi-api-key": env.ELEVENLABS_API_KEY, "Content-Type": "application/json", Accept: format.startsWith("opus") ? "audio/ogg" : "audio/mpeg" },
+          headers: { "xi-api-key": elevenKey, "Content-Type": "application/json", Accept: format.startsWith("opus") ? "audio/ogg" : "audio/mpeg" },
           body: JSON.stringify(elevenBody(clean, v, model, lang)),
           signal: AbortSignal.timeout(40_000),
           cache: "no-store",
         });
         if (res.ok) {
           const buf = Buffer.from(await res.arrayBuffer());
-          if (format.startsWith("opus") ? isOggOpus(buf) : buf.length > 100) return { buf, mime: format.startsWith("opus") ? "audio/ogg" : "audio/mpeg", provider: "elevenlabs" };
-        } else console.error("elevenlabs persona tts failed", format, res.status, (await res.text().catch(() => "")).slice(0, 200));
+          if (format.startsWith("opus") ? isOggOpus(buf) : buf.length > 100) return { buf, mime: format.startsWith("opus") ? "audio/ogg" : "audio/mpeg", provider: "elevenlabs", ...(voiceId !== primaryVoice ? { fallback: true } : {}) };
+        } else {
+          const body = (await res.text().catch(() => "")).slice(0, 300);
+          console.error("elevenlabs persona tts failed", format, res.status, body);
+          opts.onFail?.(res.status, body);
+        }
       } catch (e) {
         console.error("elevenlabs persona tts failed", format, (e as Error).message);
       }
@@ -61,7 +69,7 @@ export async function synthesizePersonaVoice(text: string, locale: string, v: Vo
   if (env.OPENAI_API_KEY) {
     const base = (env.AI_OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
     const model = env.AI_OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
-    for (const format of ["opus", "mp3"] as const) {
+    for (const format of opts.preferMp3 ? (["mp3", "opus"] as const) : (["opus", "mp3"] as const)) {
       try {
         const res = await fetch(`${base}/audio/speech`, {
           method: "POST",

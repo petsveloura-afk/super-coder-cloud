@@ -45,3 +45,24 @@ describe("wave 58 — the platform setup wizard keeps its six steps", () => {
     expect(ui).toContain('data-testid="platform-setup-voice"');
   });
 });
+
+describe("wave 58 — the agent keeps a natural voice on the free ElevenLabs plan", () => {
+  it("library voices fall back to a premade voice of the same gender; premade voices need no fallback", async () => {
+    const { elevenVoiceChain, elevenFailReason } = await import("@/lib/ai/voice-persona-core");
+    expect(elevenVoiceChain("s0T0DT6EAPeX57MQpn3I", { preset: "hebrew_female" })).toEqual(["s0T0DT6EAPeX57MQpn3I", "EXAVITQu4vr4xnSDxMaL"]);
+    expect(elevenVoiceChain("PBHwEnXdzx0yfhIO2UCH", { preset: "hebrew_male" })).toEqual(["PBHwEnXdzx0yfhIO2UCH", "nPczCjzI2devNBz1zQrb"]);
+    expect(elevenVoiceChain("EXAVITQu4vr4xnSDxMaL", { preset: "soft_female" })).toEqual(["EXAVITQu4vr4xnSDxMaL"]);
+    expect(elevenVoiceChain("", null)).toEqual([]);
+    expect(elevenFailReason(402, "")).toBe("paid");
+    expect(elevenFailReason(400, '{"detail":{"status":"paid_plan_required"}}')).toBe("paid");
+    expect(elevenFailReason(401, '{"detail":{"status":"quota_exceeded"}}')).toBe("quota");
+    expect(elevenFailReason(401, '{"detail":{"status":"invalid_api_key"}}')).toBe("key");
+    expect(elevenFailReason(500, "boom")).toBe("other");
+  });
+
+  it("the voice id hint uses real translation keys (no raw key on screen)", () => {
+    const ui = readFileSync(join(__dirname, "../../components/ai/voice-persona-card.tsx"), "utf8");
+    expect(ui).not.toContain('"voice.hint.voice_id');
+    expect(ui).toContain("voicePersona.hint.voice_id");
+  });
+});

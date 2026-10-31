@@ -5612,7 +5612,14 @@
       "speaker_boost": "Higher clarity and similarity to the original voice",
       "openai_voice": "If ElevenLabs is unavailable, the agent keeps speaking with this voice and the same tone",
       "glossary": "Comma-separated. Helps transcription understand the business' names, products, slang and abbreviations."
-    }
+    },
+    "fallbackNote": "The voice you chose needs a paid ElevenLabs plan, so a natural fallback voice played. The agent keeps speaking with it until the plan is upgraded.",
+    "err": {
+      "key": "The ElevenLabs key is wrong or lacks permission — check ELEVENLABS_API_KEY",
+      "paid": "This voice needs a paid ElevenLabs plan (library voices aren't available on the free plan)",
+      "quota": "The ElevenLabs account is out of credits — top up or upgrade the plan"
+    },
+    "tapToPlay": "The sample is ready — press ▶ in the player to hear it (make sure the sound is on)"
   },
   "trial": {
     "start": "Try free for 7 days",

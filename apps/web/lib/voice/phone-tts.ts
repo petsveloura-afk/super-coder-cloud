@@ -2,7 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { publicEnv } from "@/lib/env";
 import { spokenText } from "@/lib/ai/voice-note-core";
-import { defaultVoiceId, elevenBody, hasPersona, normalizeVoice, openaiBody, type VoiceSettings } from "@/lib/ai/voice-persona-core";
+import { defaultVoiceId, elevenBody, elevenVoiceChain, hasPersona, normalizeVoice, openaiBody, type VoiceSettings } from "@/lib/ai/voice-persona-core";
 import { Pcm24kToUlaw8k } from "./realtime-core";
 
 /**
@@ -42,13 +42,14 @@ export async function phoneSpeechMp3(orgId: string, text: string, locale: string
   const env = process.env;
   const lang = langOf(locale);
   const v = await phoneVoice(orgId);
-  const voiceId = (hasPersona(v) ? v.voice_id : "") || defaultVoiceId(lang, env); // wave 58: never robotic for lack of a voice id
-  if (env.ELEVENLABS_API_KEY && voiceId) {
+  const primaryVoice = (hasPersona(v) ? v.voice_id : "") || defaultVoiceId(lang, env); // wave 58: never robotic for lack of a voice id
+  const elevenKey = env.ELEVENLABS_API_KEY ?? "";
+  for (const voiceId of elevenKey ? elevenVoiceChain(primaryVoice, v) : []) {
     try {
       const base = (env.ELEVENLABS_API_BASE || "https://api.elevenlabs.io").replace(/\/$/, "");
       const res = await fetch(`${base}/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_22050_32`, {
         method: "POST",
-        headers: { "xi-api-key": env.ELEVENLABS_API_KEY, "Content-Type": "application/json", Accept: "audio/mpeg" },
+        headers: { "xi-api-key": elevenKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
         body: JSON.stringify(elevenBody(clean, v, phoneModel(lang), lang)),
         signal: AbortSignal.timeout(12_000),
         cache: "no-store",
@@ -109,13 +110,14 @@ export async function phoneSpeechStream(orgId: string, text: string, locale: str
   const env = process.env;
   const lang = langOf(locale);
   const v = await phoneVoice(orgId);
-  const voiceId = (hasPersona(v) ? v.voice_id : "") || defaultVoiceId(lang, env); // wave 58: never robotic for lack of a voice id
-  if (env.ELEVENLABS_API_KEY && voiceId) {
+  const primaryVoice = (hasPersona(v) ? v.voice_id : "") || defaultVoiceId(lang, env); // wave 58: never robotic for lack of a voice id
+  const elevenKey = env.ELEVENLABS_API_KEY ?? "";
+  for (const voiceId of elevenKey ? elevenVoiceChain(primaryVoice, v) : []) {
     try {
       const base = (env.ELEVENLABS_API_BASE || "https://api.elevenlabs.io").replace(/\/$/, "");
       const res = await fetch(`${base}/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream?output_format=ulaw_8000&optimize_streaming_latency=3`, {
         method: "POST",
-        headers: { "xi-api-key": env.ELEVENLABS_API_KEY, "Content-Type": "application/json", Accept: "audio/basic" },
+        headers: { "xi-api-key": elevenKey, "Content-Type": "application/json", Accept: "audio/basic" },
         body: JSON.stringify(elevenBody(clean, v, phoneModel(lang), lang)),
         signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(25_000)]) : AbortSignal.timeout(25_000),
         cache: "no-store",
