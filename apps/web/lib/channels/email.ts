@@ -250,3 +250,26 @@ export async function sendEmailReply(acc: LoadedAccount, toAddress: string, text
     return { ok: false, error: message, permanent: /auth|invalid|535|534/i.test(message) };
   }
 }
+
+/**
+ * Wave 61 — a new email (not a reply) from the business's own connected mailbox (Gmail / Outlook / SMTP).
+ * Used for team updates when the platform's email service cannot deliver (e.g. a Resend sender domain that is
+ * not verified yet only delivers to the account owner).
+ */
+export async function sendMailboxEmail(acc: LoadedAccount, toAddress: string, subject: string, text: string, html?: string): Promise<ProviderResult> {
+  const cfg = acc.config as unknown as MailboxConfig;
+  try {
+    const auth = await authFor(cfg, acc.secrets);
+    const info = await smtpTransport(cfg, auth).sendMail({
+      from: cfg.display_name ? { name: cfg.display_name, address: cfg.address } : cfg.address,
+      to: toAddress,
+      subject: subject.slice(0, 200),
+      text,
+      html: html ?? renderEmailHtml(text, { brand: cfg.display_name || undefined }),
+    });
+    return { ok: true, externalId: (info.messageId as string | undefined) ?? undefined };
+  } catch (e) {
+    const message = ((e as Error).message || "smtp_failed").slice(0, 300);
+    return { ok: false, error: message, permanent: /auth|invalid|535|534/i.test(message) };
+  }
+}

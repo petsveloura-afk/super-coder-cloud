@@ -65,3 +65,6 @@ export async function ensureRegistered(acc: LoadedAccount, ownerPin?: string | n
     .then(() => undefined, () => undefined);
   return r;
 }
+
+// wave 61: plain-language reasons (pure helpers live in wa-register-core)
+export { explainRegisterError } from "./wa-register-core";

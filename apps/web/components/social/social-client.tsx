@@ -13,6 +13,11 @@ import { Chips, CalendarPanel, ComposerExtras, ExportButton, OverviewPanel, Sear
 import { StudioPanel } from "@/components/social/social-studio";
 import type { StudioSeed } from "@/components/social/social-studio";
 import { PostExtras, PostMediaBadges } from "@/components/social/post-extras";
+import { PostPower } from "@/components/social/post-power";
+import { BrainPanel, type BrainReview, type BrainTopPost } from "@/components/social/brain-panel";
+import type { AutopilotSettings, Learned } from "@/lib/social/brain-core";
+import { recyclePostAction } from "@/app/[locale]/(dashboard)/social/brain-actions";
+import { BrainCircuit, Flame, Heart, MessageCircle, Repeat2, Share2 } from "lucide-react";
 import { filterComments, filterPosts, filterReviews, type CommentFilter, type PostFilter, type ReviewFilter } from "@/lib/social/insights";
 import { approveAllDraftsAction, commentStatusAction, duplicatePostAction, postStatusAction, replyCommentAction, replyReviewAction, reviewSettingsAction, savePostAction, saveSocialSettingsAction } from "@/app/[locale]/(dashboard)/social/actions";
 
@@ -43,6 +48,22 @@ export interface PostRow {
   cta_type?: string | null;
   cta_value?: string | null;
   first_comment?: string | null;
+  // wave 61 — the social brain
+  pillar?: string | null;
+  origin?: string | null;
+  engagement?: number | null;
+  metrics?: { likes?: number; comments?: number; shares?: number; saves?: number } | null;
+  media_pending?: string | null;
+}
+/** wave 61 — everything the brain tab needs (optional: the page works without it) */
+export interface BrainView {
+  settings: AutopilotSettings;
+  learned: Learned | null;
+  topPosts: BrainTopPost[];
+  reviews: BrainReview[];
+  telegramBot: boolean;
+  videoReady: boolean;
+  brand: string;
 }
 export interface ReviewRow {
   id: string;
@@ -64,7 +85,7 @@ export interface SocialSettingsView {
   brand_voice: string;
 }
 
-type Tab = "comments" | "posts" | "reviews" | "settings" | "calendar" | "insights";
+type Tab = "comments" | "posts" | "reviews" | "settings" | "calendar" | "insights" | "brain";
 
 function when(locale: string, iso: string | null) {
   if (!iso) return "";
@@ -136,7 +157,7 @@ function CommentCard({ c, canReply }: { c: CommentRow; canReply: boolean }) {
   );
 }
 
-function PostEditor({ initial, onDone, presetAt }: { initial?: PostRow | null; onDone: () => void; presetAt?: string | null }) {
+function PostEditor({ initial, onDone, presetAt, brand }: { initial?: PostRow | null; onDone: () => void; presetAt?: string | null; brand?: string }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [body, setBody] = useState(initial?.body ?? "");
@@ -197,6 +218,8 @@ function PostEditor({ initial, onDone, presetAt }: { initial?: PostRow | null; o
         fb={fb}
         ig={ig}
       />
+      {/* wave 61 — 3D phone preview, Motion Studio (designed video / image), versions for every network, smart hashtags */}
+      <PostPower body={body} setBody={setBody} image={image} setImage={setImage} video={videoUrl} setVideo={setVideoUrl} fb={fb} ig={ig} brand={brand} />
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <label className="inline-flex items-center gap-2">
           <input type="checkbox" checked={fb} onChange={(e) => setFb(e.target.checked)} /> Facebook
@@ -257,12 +280,29 @@ function PostCard({ p, onEdit }: { p: PostRow; onEdit: () => void }) {
           </Badge>
         ) : null}
         <span className="text-muted">{p.platforms.map((x) => (x === "instagram" ? "Instagram" : "Facebook")).join(" · ")}</span>
+        {p.pillar ? <Badge tone="neutral">{p.pillar}</Badge> : null}
+        {p.origin === "review" || p.origin === "holiday" || p.origin === "evergreen" || p.origin === "autopilot" ? <Badge tone="accent">{t(`social.brain.origin_${p.origin}`)}</Badge> : null}
+        {p.media_pending ? <Badge tone="warning">{t("social.brain.mediaPending")}</Badge> : null}
         <span className="ms-auto text-subtle">{when(locale, p.scheduled_at)}</span>
       </div>
-      <p className="mt-2 line-clamp-6 whitespace-pre-wrap text-sm" dir="auto">
-        {p.body}
-      </p>
+      <div className={cn(p.image_url && !p.video_url ? "mt-2 flex gap-3" : "")}>
+        {p.image_url && !p.video_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={p.image_url} alt="" loading="lazy" className="mt-0.5 h-20 w-20 shrink-0 rounded-xl border border-line object-cover" />
+        ) : null}
+        <p className={cn("line-clamp-6 whitespace-pre-wrap text-sm", !(p.image_url && !p.video_url) && "mt-2")} dir="auto">
+          {p.body}
+        </p>
+      </div>
       <PostMediaBadges p={p} />
+      {(p.status === "published" || p.status === "partial") && p.metrics && typeof p.engagement === "number" ? (
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-[12px] text-muted" data-testid="post-metrics">
+          <span className="inline-flex items-center gap-1"><Heart className="h-3.5 w-3.5" /> {p.metrics.likes ?? 0}</span>
+          <span className="inline-flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" /> {p.metrics.comments ?? 0}</span>
+          <span className="inline-flex items-center gap-1"><Share2 className="h-3.5 w-3.5" /> {p.metrics.shares ?? 0}</span>
+          <span className="inline-flex items-center gap-1 font-semibold text-fg"><Flame className="h-3.5 w-3.5 text-gold" /> {t("social.brain.score", { n: p.engagement })}</span>
+        </div>
+      ) : null}
       {Object.values(p.results ?? {}).some((r) => r && r.ok === false) ? (
         <div className="mt-2 space-y-1 text-[12px]">
           <p className="text-danger">{Object.entries(p.results).filter(([, r]) => r && r.ok === false).map(([k, r]) => `${k}: ${r.error ?? ""}`).join(" · ")}</p>
@@ -305,6 +345,25 @@ function PostCard({ p, onEdit }: { p: PostRow; onEdit: () => void }) {
           <Button size="sm" variant="ghost" disabled={pending} onClick={duplicate}>
             <Copy className="h-3.5 w-3.5" /> {t("social.pro.duplicate")}
           </Button>
+          {p.status === "published" || p.status === "partial" ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() =>
+                start(async () => {
+                  const r = await recyclePostAction({ locale, id: p.id });
+                  if (r.error) toast.error(t(r.error));
+                  else {
+                    toast.success(t(r.message ?? "common.saved"));
+                    router.refresh();
+                  }
+                })
+              }
+            >
+              <Repeat2 className="h-3.5 w-3.5" /> {t("social.brain.recycle")}
+            </Button>
+          ) : null}
         </div>
       )}
     </li>
@@ -427,7 +486,7 @@ function SettingsPanel({ s, google }: { s: SocialSettingsView; google: { connect
   );
 }
 
-export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; reviews: ReviewRow[]; settings: SocialSettingsView; facebook: string | null; instagram: string | null; google: { connected: boolean; autoReplyPositive: boolean }; canReply: boolean; canPost: boolean; canSettings: boolean }) {
+export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; reviews: ReviewRow[]; settings: SocialSettingsView; facebook: string | null; instagram: string | null; google: { connected: boolean; autoReplyPositive: boolean }; canReply: boolean; canPost: boolean; canSettings: boolean; brain?: BrainView | null }) {
   const { t, locale } = useI18n();
   const [tab, setTab] = useState<Tab>("comments");
   const [editing, setEditing] = useState<PostRow | null | "new">(null);
@@ -442,6 +501,7 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
   const shownReviews = filterReviews(p.reviews, rf);
   const open = p.comments.filter((c) => c.status === "new" || c.status === "dm_sent").length;
   const tabs: { key: Tab; label: string; count?: number; show: boolean }[] = [
+    { key: "brain", label: t("social.tabs.brain"), show: p.canPost && Boolean(p.brain) },
     { key: "comments", label: t("social.tabs.comments"), count: open, show: true },
     { key: "posts", label: t("social.tabs.posts"), show: p.canPost },
     { key: "calendar", label: t("social.tabs.calendar"), show: p.canPost },
@@ -473,7 +533,7 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
           .filter((x) => x.show)
           .map((x) => (
             <button key={x.key} role="tab" aria-selected={tab === x.key} onClick={() => setTab(x.key)} className={cn("inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium transition", tab === x.key ? "bg-accent-solid text-accent-fg shadow-sm" : "text-muted hover:bg-surface-hover")} data-tab={x.key}>
-              {x.key === "settings" ? <Settings2 className="h-4 w-4" /> : x.key === "calendar" ? <CalendarDays className="h-4 w-4" /> : x.key === "insights" ? <LayoutDashboard className="h-4 w-4" /> : null}
+              {x.key === "brain" ? <BrainCircuit className="h-4 w-4" /> : x.key === "settings" ? <Settings2 className="h-4 w-4" /> : x.key === "calendar" ? <CalendarDays className="h-4 w-4" /> : x.key === "insights" ? <LayoutDashboard className="h-4 w-4" /> : null}
               {x.label}
               {x.count ? <span className="rounded-full bg-danger px-1.5 text-[11px] text-white">{x.count}</span> : null}
             </button>
@@ -507,7 +567,7 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
       {tab === "posts" ? (
         <div className="space-y-3">
           {editing ? (
-            <PostEditor initial={editing === "new" ? null : editing} presetAt={presetAt} onDone={() => { setEditing(null); setPresetAt(null); }} />
+            <PostEditor initial={editing === "new" ? null : editing} presetAt={presetAt} brand={p.brain?.brand} onDone={() => { setEditing(null); setPresetAt(null); }} />
           ) : (
             <div className="flex flex-wrap items-center gap-2">
               <Button onClick={() => setEditing("new")} data-testid="post-new">
@@ -597,6 +657,7 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
         )
       ) : null}
       {tab === "settings" ? <SettingsPanel s={p.settings} google={p.google} /> : null}
+      {tab === "brain" && p.brain ? <BrainPanel settings={p.brain.settings} learned={p.brain.learned} topPosts={p.brain.topPosts} reviews={p.brain.reviews} facebook={Boolean(p.facebook)} instagram={Boolean(p.instagram)} telegramBot={p.brain.telegramBot} videoReady={p.brain.videoReady} /> : null}
     </section>
   );
 }

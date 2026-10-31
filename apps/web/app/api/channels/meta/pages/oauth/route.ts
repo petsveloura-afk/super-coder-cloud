@@ -30,10 +30,17 @@ export async function GET(request: NextRequest) {
   const back = new URL(`/${locale}/integrations`, request.url);
   back.hash = "marketplace";
   const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
-  const finish = (status: string, detail?: string, extra?: (res: NextResponse) => void) => {
+  const finish = async (status: string, detail?: string, extra?: (res: NextResponse) => void) => {
     // wave 26: a failed WhatsApp full-page signup shows the whole reason on a plain page (the toast vanishes and cuts it)
+    // wave 61: the page speaks the business's language, explains what to do in Meta, and offers the QR connection
     if (isWa && status !== "connected") {
-      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WhatsApp</title></head><body style="font-family:system-ui,sans-serif;background:#080d19;color:#f8fafc;padding:24px;max-width:760px;margin:auto"><h3>WhatsApp: ${esc(status)}</h3><pre dir="ltr" style="white-space:pre-wrap;word-break:break-word;background:#111a2b;padding:14px;border-radius:12px">${esc(detail ?? "-")}</pre><p><a href="/${locale}/integrations" style="color:#6b95ff">Back</a></p></body></html>`;
+      const { getT } = await import("@/lib/i18n/server");
+      const { t } = await getT(locale);
+      const dir = locale === "en" ? "ltr" : "rtl";
+      const reason = detail && /^[a-z]+(\.[A-Za-z_]+)+$/.test(detail) ? t(detail) : detail ?? "";
+      const steps = (["verify", "techProvider", "manager", "retry"] as const).map((k) => `<li style="margin:6px 0">${esc(t(`integrations.wa.stuck.${k}`))}</li>`).join("");
+      const titleKey = status === "cancelled" ? "integrations.wa.page.cancelled" : status === "not_configured" ? "integrations.wa.page.notConfigured" : status === "forbidden" ? "errors.forbidden" : "integrations.wa.page.failed";
+      const html = `<!doctype html><html lang="${locale}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WhatsApp</title></head><body style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#080d19;color:#f8fafc;padding:24px;max-width:760px;margin:auto;line-height:1.6"><div style="background:#0f172a;border:1px solid #1e293b;border-radius:20px;padding:22px"><div style="font-size:30px">💬</div><h2 style="margin:6px 0 4px">${esc(t(titleKey))}</h2><p style="color:#cbd5e1">${esc(t("integrations.wa.stuckBody"))}</p><ol style="padding-inline-start:20px;color:#e2e8f0">${steps}</ol><p style="color:#86efac">${esc(t("integrations.wa.stuckQr"))}</p><p style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px"><a href="/${locale}/integrations#wa-hero" style="background:#2f63e8;color:#fff;padding:10px 16px;border-radius:12px;text-decoration:none;font-weight:600">${esc(t("integrations.wa.page.qr"))}</a><a href="/${locale}/integrations" style="color:#93b4ff;padding:10px 4px">${esc(t("integrations.wa.page.back"))}</a></p>${reason ? `<details style="margin-top:14px;color:#94a3b8"><summary style="cursor:pointer">${esc(t("notify.techDetails"))}</summary><pre dir="ltr" style="white-space:pre-wrap;word-break:break-word;background:#111a2b;padding:12px;border-radius:12px">${esc(status)}: ${esc(reason)}</pre></details>` : ""}</div></body></html>`;
       const r = new NextResponse(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
       r.cookies.set("scc_meta_oauth", "", { path: "/api/channels/meta/pages", maxAge: 0 });
       return r;

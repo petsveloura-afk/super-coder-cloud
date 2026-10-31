@@ -39,7 +39,9 @@ export async function sendEmail(input: { to: string; subject: string; html: stri
       cache: "no-store",
     });
     if (!res.ok) {
-      console.error("email provider error", res.status);
+      // wave 61: keep the provider's reason (e.g. "domain is not verified") in the server log for diagnosis
+      const why = await res.text().catch(() => "");
+      console.error("email provider error", res.status, why.slice(0, 300));
       return { sent: false, reason: "provider_error" };
     }
     return { sent: true };

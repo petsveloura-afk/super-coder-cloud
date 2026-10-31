@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
-import { SocialClient, type CommentRow, type PostRow, type ReviewRow, type SocialSettingsView } from "@/components/social/social-client";
+import { SocialClient, type BrainView, type CommentRow, type PostRow, type ReviewRow, type SocialSettingsView } from "@/components/social/social-client";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -40,6 +40,39 @@ export default async function SocialPage({ params }: { params: Promise<{ locale:
     google = { connected: Boolean(g && g.status === "active"), autoReplyPositive: Boolean((g?.config as { auto_reply_positive?: boolean } | undefined)?.auto_reply_positive) };
   }
   const acc = (accounts ?? []) as { kind: string; name: string }[];
+  // wave 61 — the social brain (separate, failure-tolerant reads: the page works even before the migration ran)
+  let brain: BrainView | null = null;
+  let postsPlus = (posts ?? []) as PostRow[];
+  if (ctx.can("campaigns.manage")) {
+    const { AUTOPILOT_DEFAULTS, normalizeAutopilot } = await import("@/lib/social/brain-core");
+    const [ap, br, extra, top, rv, tg, org] = await Promise.all([
+      supabase.from("social_autopilot").select("*").eq("organization_id", ctx.org.id).maybeSingle(),
+      supabase.from("social_brain").select("learned").eq("organization_id", ctx.org.id).maybeSingle(),
+      supabase.from("social_posts").select("id, pillar, origin, engagement, metrics, media_pending").eq("organization_id", ctx.org.id).neq("status", "canceled").order("scheduled_at", { ascending: false }).limit(60),
+      supabase.from("social_posts").select("id, body, engagement, image_url").eq("organization_id", ctx.org.id).in("status", ["published", "partial"]).not("engagement", "is", null).order("engagement", { ascending: false }).limit(3),
+      supabase.from("reviews").select("id, author, body, rating").eq("organization_id", ctx.org.id).gte("rating", 5).order("reviewed_at", { ascending: false, nullsFirst: false }).limit(5),
+      supabase.from("channel_accounts").select("id").eq("organization_id", ctx.org.id).eq("kind", "telegram").maybeSingle(),
+      supabase.from("organizations").select("name").eq("id", ctx.org.id).maybeSingle(),
+    ]);
+    const apRow = ap.error ? null : (ap.data as Record<string, unknown> | null);
+    const settingsAp = apRow ? { ...normalizeAutopilot(apRow), enabled: Boolean(apRow.enabled), last_planned_for: (apRow.last_planned_for as string | null) ?? null, last_error: (apRow.last_error as string | null) ?? null } : { ...AUTOPILOT_DEFAULTS };
+    const learned = br.error ? null : ((br.data?.learned ?? null) as BrainView["learned"]);
+    if (!extra.error && extra.data) {
+      const byId = new Map((extra.data as { id: string }[]).map((x) => [x.id, x]));
+      postsPlus = postsPlus.map((x) => ({ ...x, ...(byId.get(x.id) ?? {}) }));
+    }
+    const { stockVideoConfigured } = await import("@/lib/social/stock-video");
+    brain = {
+      settings: settingsAp,
+      learned: learned && typeof learned.posts === "number" ? learned : null,
+      topPosts: top.error ? [] : ((top.data ?? []) as BrainView["topPosts"]),
+      reviews: ((rv.data ?? []) as BrainView["reviews"]).filter((r) => (r.body ?? "").length >= 20),
+      telegramBot: Boolean(tg.data),
+      videoReady: stockVideoConfigured(),
+      brand: String((org.data as { name?: string } | null)?.name ?? ""),
+    };
+    if (ap.error) brain = null;
+  }
   const view: SocialSettingsView = {
     comment_drafts: settings?.comment_drafts ?? true,
     comment_auto_reply: settings?.comment_auto_reply ?? false,
@@ -61,7 +94,7 @@ export default async function SocialPage({ params }: { params: Promise<{ locale:
       />
       <SocialClient
         comments={(comments ?? []) as CommentRow[]}
-        posts={(posts ?? []) as PostRow[]}
+        posts={postsPlus}
         reviews={(reviews ?? []) as ReviewRow[]}
         settings={view}
         facebook={acc.find((a) => a.kind === "messenger")?.name ?? null}
@@ -70,6 +103,7 @@ export default async function SocialPage({ params }: { params: Promise<{ locale:
         canReply={ctx.can("inbox.reply")}
         canPost={ctx.can("campaigns.manage")}
         canSettings={ctx.can("settings.manage") || ctx.can("campaigns.manage")}
+        brain={brain}
       />
     </>
   );

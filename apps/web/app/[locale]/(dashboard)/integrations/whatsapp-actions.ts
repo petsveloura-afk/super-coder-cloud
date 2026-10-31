@@ -72,12 +72,42 @@ export async function registerWhatsAppAction(input: { locale: string; pin?: stri
   } catch {
     /* fall through to registering */
   }
-  const { ensureRegistered, needsPin } = await import("@/lib/channels/wa-register");
+  const { ensureRegistered, needsPin, explainRegisterError } = await import("@/lib/channels/wa-register");
   const r = await ensureRegistered(acc, pin || null);
   revalidatePath(`/${locale}/integrations`);
+  // wave 61: say exactly why Meta refused (coexistence not finished, too many attempts, missing permission …)
+  const why = !r.ok ? explainRegisterError(r.error) : null;
+  if (why && !needsPin(r.error)) return { error: why, messageParams: { detail: String(r.error ?? "").slice(0, 200) } };
   if (r.ok) {
     await clearStale();
     return { ok: true, message: "integrations.wa.registeredOk" };
   }
-  return { error: needsPin(r.error) ? "integrations.wa.needPin" : "integrations.wa.registerFailed" };
+  return { error: needsPin(r.error) ? "integrations.wa.needPin" : "integrations.wa.registerFailedDetail", messageParams: { detail: String(r.error ?? "").slice(0, 200) } };
+}
+
+/**
+ * Wave 61 — "what does Meta say about my number?": the official number's real state, in plain words, so the
+ * owner sees what is missing (registration, display-name approval, business verification, coexistence).
+ */
+export async function diagnoseWhatsAppAction(input: { locale: string }): Promise<ActionState<{ rows: { key: string; value: string; ok: boolean | null }[] }>> {
+  const locale = input.locale === "en" || input.locale === "ar" ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("integrations.manage")) return { error: "errors.forbidden" };
+  const { loadAccount } = await import("@/lib/channels/accounts");
+  const acc = await loadAccount(ctx.org.id, "whatsapp");
+  if (!acc) return { error: "integrations.wa.notOfficial" };
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { data: allowed } = await createAdminClient().rpc("public_rate_limit", { p_bucket: `wa-diag:${ctx.org.id}`, p_limit: 20, p_window_seconds: 3600 });
+  if (allowed === false) return { error: "errors.rateLimited" };
+  const base = (process.env.WHATSAPP_API_BASE || "https://graph.facebook.com/v21.0").replace(/\/$/, "");
+  try {
+    const res = await fetch(`${base}/${encodeURIComponent(acc.config.phone_number_id ?? "")}?fields=display_phone_number,verified_name,platform_type,status,code_verification_status,name_status,quality_rating,account_mode,messaging_limit_tier,is_official_business_account`, { headers: { Authorization: `Bearer ${acc.secrets.access_token ?? ""}` }, signal: AbortSignal.timeout(12_000), cache: "no-store" });
+    const j = (await res.json().catch(() => ({}))) as Record<string, unknown> & { error?: { message?: string } };
+    if (res.status === 401 || res.status === 403 || /token|session/i.test(j.error?.message ?? "")) return { error: "integrations.wa.tokenExpired" };
+    if (!res.ok) return { error: "integrations.wa.diagFailed", messageParams: { detail: String(j.error?.message ?? res.status).slice(0, 200) } };
+    const { waDiagnosis } = await import("@/lib/channels/wa-register-core");
+    return { ok: true, data: { rows: waDiagnosis(j) } };
+  } catch (e) {
+    return { error: "integrations.wa.diagFailed", messageParams: { detail: (e as Error).message.slice(0, 200) } };
+  }
 }

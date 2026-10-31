@@ -159,7 +159,7 @@ export function WhatsAppConnect(p: WaConnectProps) {
   const error = p.official.error ?? p.quick.error;
 
   return (
-    <section className="wa-hero mb-5 overflow-hidden rounded-[1.5rem] border border-line bg-surface" data-testid="wa-hero" data-hub="whatsapp">
+    <section id="wa-hero" className="wa-hero mb-5 overflow-hidden rounded-[1.5rem] border border-line bg-surface" data-testid="wa-hero" data-hub="whatsapp">
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
         <span className="wa-mark grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-white" aria-hidden>
           <MessageCircle className="h-7 w-7" strokeWidth={2.2} />
@@ -167,7 +167,12 @@ export function WhatsAppConnect(p: WaConnectProps) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="me-auto text-[19px] font-bold leading-tight">{t("integrations.wa.title")}</h2>
-            {error ? (
+            {error && p.official.error && p.quick.connected && !p.quick.error ? (
+              // wave 61: the official number waits for Meta, but WhatsApp itself works through QR
+              <Badge tone="warning">
+                <TriangleAlert className="me-1 inline h-3.5 w-3.5" /> {t("integrations.wa.partial")}
+              </Badge>
+            ) : error ? (
               <Badge tone="danger">
                 <TriangleAlert className="me-1 inline h-3.5 w-3.5" /> {t("integrations.channels.error")}
               </Badge>
@@ -196,7 +201,7 @@ export function WhatsAppConnect(p: WaConnectProps) {
             </p>
           ) : null}
           {/* wave 60: check & fix the official number with Meta (registration / two-step PIN) */}
-          {p.official.connected && p.canManage ? <WhatsAppFix problem={/133010|not registered|wa_not_registered/i.test(p.official.error ?? "")} /> : null}
+          {p.official.connected && p.canManage ? <WhatsAppFix problem={/133010|not registered|wa_not_registered/i.test(p.official.error ?? "")} qrConnected={p.quick.connected && !p.quick.error} /> : null}
         </div>
         {p.canManage ? (
           <div className="flex flex-col gap-2 sm:items-end">

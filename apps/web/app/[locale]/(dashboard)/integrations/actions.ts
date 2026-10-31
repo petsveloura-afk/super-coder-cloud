@@ -570,6 +570,10 @@ export async function testRecipientAction(input: { locale: string; id: string })
     .update(res.ok ? { last_sent_at: new Date().toISOString(), last_error: null } : { last_error: (res.error ?? "failed").slice(0, 300) })
     .eq("id", r.id);
   revalidatePath(`/${input.locale}/integrations`);
+  // wave 61: a plain explanation instead of an internal code
+  const friendly: Record<string, string> = { email_failed: "notify.why.email_failed", email_not_configured: "notify.why.email_not_configured", sms_not_connected: "notify.smsFallback", telegram_bot_not_connected: "notify.why.telegram_bot_not_connected" };
+  if (!res.ok && res.error && friendly[res.error]) return { error: friendly[res.error]! };
+  if (!res.ok && /133010|not registered/i.test(res.error ?? "")) return { error: "integrations.wa.notRegistered" };
   return res.ok ? { ok: true, message: "notify.testSent" } : { error: "notify.testFailed", messageParams: { detail: res.error ?? "" } };
 }
 

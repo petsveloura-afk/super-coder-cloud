@@ -273,3 +273,37 @@ export async function publishRichPost(input: RichPostInput): Promise<{ ok: boole
   }
   return result;
 }
+
+/**
+ * Wave 61 — real engagement of a published post (the social brain learns from it). Facebook: reactions,
+ * comments, shares; Instagram: likes, comments (+ saves / reach when the insights permission exists).
+ * Never throws; an unreadable post returns { ok: false }.
+ */
+export async function fetchPostMetrics(input: { platform: "facebook" | "instagram"; id: string; pageToken: string }): Promise<{ ok: boolean; metrics?: { likes: number; comments: number; shares: number; saves?: number; reach?: number }; error?: string }> {
+  const id = encodeURIComponent(input.id);
+  if (input.platform === "instagram") {
+    const r = await g(`/${id}?fields=like_count,comments_count`, { token: input.pageToken });
+    if (!r.ok) return { ok: false, error: r.error };
+    const d = r.data as { like_count?: number; comments_count?: number };
+    const metrics: { likes: number; comments: number; shares: number; saves?: number; reach?: number } = { likes: Number(d.like_count ?? 0), comments: Number(d.comments_count ?? 0), shares: 0 };
+    const ins = await g(`/${id}/insights?metric=saved,reach`, { token: input.pageToken });
+    if (ins.ok) {
+      for (const row of ((ins.data as { data?: { name?: string; values?: { value?: number }[] }[] }).data ?? [])) {
+        const v = Number(row.values?.[0]?.value ?? 0);
+        if (row.name === "saved") metrics.saves = v;
+        if (row.name === "reach") metrics.reach = v;
+      }
+    }
+    return { ok: true, metrics };
+  }
+  const r = await g(`/${id}?fields=reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares`, { token: input.pageToken });
+  if (!r.ok) {
+    // a video post id: likes / comments live on the video object
+    const v = await g(`/${id}?fields=likes.summary(total_count).limit(0),comments.summary(total_count).limit(0)`, { token: input.pageToken });
+    if (!v.ok) return { ok: false, error: r.error };
+    const dv = v.data as { likes?: { summary?: { total_count?: number } }; comments?: { summary?: { total_count?: number } } };
+    return { ok: true, metrics: { likes: Number(dv.likes?.summary?.total_count ?? 0), comments: Number(dv.comments?.summary?.total_count ?? 0), shares: 0 } };
+  }
+  const d = r.data as { reactions?: { summary?: { total_count?: number } }; comments?: { summary?: { total_count?: number } }; shares?: { count?: number } };
+  return { ok: true, metrics: { likes: Number(d.reactions?.summary?.total_count ?? 0), comments: Number(d.comments?.summary?.total_count ?? 0), shares: Number(d.shares?.count ?? 0) } };
+}

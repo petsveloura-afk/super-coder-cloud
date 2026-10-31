@@ -29,7 +29,20 @@ export async function sendToRecipient(orgId: string, r: RecipientRow, event: Not
     if (r.kind === "email") {
       const { sendEmail } = await import("@/lib/email/send");
       const res = await sendEmail({ to: r.target, subject: notifySubject(event, payload), html: notifyEmailHtml(event, payload), text: notifyText(event, payload) });
-      return res.sent ? { ok: true } : { ok: false, error: res.reason === "not_configured" ? "email_not_configured" : "email_failed" };
+      if (res.sent) return { ok: true };
+      // wave 61: the platform's email service could not deliver → send from the business's own connected mailbox
+      try {
+        const { loadAccount: loadMailbox } = await import("@/lib/channels/accounts");
+        const box = await loadMailbox(orgId, "email");
+        if (box && box.status !== "disabled") {
+          const { sendMailboxEmail } = await import("@/lib/channels/email");
+          const viaBox = await sendMailboxEmail(box, r.target, notifySubject(event, payload), notifyText(event, payload), notifyEmailHtml(event, payload));
+          if (viaBox.ok) return { ok: true };
+        }
+      } catch {
+        /* keep the original error below */
+      }
+      return { ok: false, error: res.reason === "not_configured" ? "email_not_configured" : "email_failed" };
     }
     const { loadAccount } = await import("@/lib/channels/accounts");
     if (r.kind === "telegram") {
@@ -41,19 +54,22 @@ export async function sendToRecipient(orgId: string, r: RecipientRow, event: Not
     }
     if (r.kind === "whatsapp") {
       const qr = await loadAccount(orgId, "whatsapp_qr");
+      let qrError = "";
       if (qr) {
         const { bridgeSend } = await import("@/lib/channels/wa-bridge");
         const res = await bridgeSend(qr, r.target, notifyText(event, payload));
         if (res.ok) return { ok: true };
+        qrError = String(res.error ?? "qr_failed");
       }
       const wa = await loadAccount(orgId, "whatsapp");
-      if (!wa) return { ok: false, error: "whatsapp_not_connected" };
+      if (!wa) return { ok: false, error: qrError ? `qr: ${qrError}`.slice(0, 300) : "whatsapp_not_connected" };
       const { whatsappSendText } = await import("@/lib/channels/providers");
       let res = await whatsappSendText(wa.secrets.access_token ?? "", wa.config.phone_number_id ?? "", r.target, notifyText(event, payload));
       // wave 60: the number was never registered on WhatsApp Cloud API → register once and retry
       const { isNotRegistered, ensureRegistered } = await import("@/lib/channels/wa-register");
       if (!res.ok && isNotRegistered(res.error) && (await ensureRegistered(wa)).ok) res = await whatsappSendText(wa.secrets.access_token ?? "", wa.config.phone_number_id ?? "", r.target, notifyText(event, payload));
-      return res.ok ? { ok: true } : { ok: false, error: res.error ?? "whatsapp_failed" };
+      // wave 61: keep BOTH reasons (QR + official) so the screen can say exactly what to fix
+      return res.ok ? { ok: true } : { ok: false, error: `${res.error ?? "whatsapp_failed"}${qrError ? ` | qr: ${qrError}` : ""}`.slice(0, 300) };
     }
     const sms = await loadAccount(orgId, "sms");
     if (!sms) {

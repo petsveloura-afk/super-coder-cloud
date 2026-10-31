@@ -164,7 +164,7 @@ export function TeamUpdates({ recipients, botUsername, business }: { recipients:
               // wave 60: the phone agent's transfer number is a call target, not a text update — no stale errors, no "test"
               const isCall = r.kind === "call";
               const err = isCall ? null : r.last_error;
-              const friendlyErr = !err ? null : /133010|not registered/i.test(err) ? t("integrations.wa.notRegistered") : /sms_not_connected/i.test(err) ? t("notify.smsFallback") : err;
+              const friendlyErr = !err ? null : /133010|not registered/i.test(err) ? t("integrations.wa.notRegistered") : /sms_not_connected/i.test(err) ? t("notify.smsFallback") : /^email_failed$/.test(err) ? t("notify.why.email_failed") : /^email_not_configured$/.test(err) ? t("notify.why.email_not_configured") : err;
               return (
                 <li key={r.id} className="space-y-2 px-4 py-3" data-recipient={r.kind} data-linked={waiting ? "0" : "1"}>
                   <div className="flex flex-wrap items-center gap-2">
@@ -195,6 +195,12 @@ export function TeamUpdates({ recipients, botUsername, business }: { recipients:
                         </a>
                       ) : null}
                     </p>
+                  ) : null}
+                  {err && friendlyErr !== err ? (
+                    <details className="text-[11px] text-subtle">
+                      <summary className="cursor-pointer">{t("notify.techDetails")}</summary>
+                      <code dir="ltr" className="block break-all">{err}</code>
+                    </details>
                   ) : null}
                   {isCall ? <p className="text-[11.5px] text-muted">{t("notify.transferHint")}</p> : null}
                   <div className="flex flex-wrap gap-2">

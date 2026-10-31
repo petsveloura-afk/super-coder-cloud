@@ -66,6 +66,12 @@ export async function publishDuePosts(budgetMs = 20_000): Promise<{ claimed: num
       results[platform] = r.ok ? r : { ...r, kind: classifyPublishError(r.error) };
       if (r.ok) ok++;
     }
+    // wave 61: the same post also goes to the business's Telegram channel (extra destination — never changes the status)
+    const tgChat = (p as { telegram_chat?: string | null }).telegram_chat;
+    if (tgChat && ok > 0 && !(p.results as { telegram?: { ok?: boolean } } | null | undefined)?.telegram?.ok) {
+      const { publishTelegram } = await import("./brain");
+      results.telegram = await publishTelegram(p.organization_id, tgChat, { body: p.body, image_url: p.image_url, video_url: p.video_url ?? null }).catch((e) => ({ ok: false, error: (e as Error).message }));
+    }
     const status = ok === p.platforms.length ? "published" : ok > 0 ? "partial" : "failed";
     const attempts = Number((p.results as { _attempts?: number } | null | undefined)?._attempts ?? 0) + 1;
     const failedKinds = Object.values(results).filter((r) => (r as { ok?: boolean }).ok === false).map((r) => (r as { kind?: string }).kind);
