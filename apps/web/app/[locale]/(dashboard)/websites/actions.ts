@@ -99,6 +99,9 @@ export async function buildSiteWithAIAction(input: { locale: string; brief: stri
   const r = await buildSiteWithAI({ orgId: ctx.org.id, userId: ctx.userId, locale, brief: brief.slice(0, 3000), wantFull: Boolean(input.full), template: typeof input.template === "string" ? input.template : undefined });
   if (!r.ok) return { error: r.error };
   revalidatePath(`/${locale}/websites`);
+  const rep = r.site.report;
+  // the agent's tools report: real business facts used, free photos placed, quality score after the fix pass
+  if (rep && (rep.facts || rep.images || rep.quality)) return { ok: true, message: "ai.siteBuiltPro", messageParams: { facts: rep.facts, images: rep.images, score: rep.quality?.after ?? 0 }, data: { id: r.site.id, downgraded: r.site.downgraded } };
   return { ok: true, message: "ai.siteBuilt", data: { id: r.site.id, downgraded: r.site.downgraded } };
 }
 

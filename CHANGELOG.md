@@ -1,5 +1,15 @@
 # Changelog
 
+## Meta for everyone, smarter site agent and social brain — 2026-11-02
+- **Facebook / Instagram without waiting for Meta's review** (Integrations → "2 more ways to connect"):
+  - *Join as a tester* — the platform invites the person to the platform app automatically (Meta app-roles API); when Meta refuses, the request waits for a platform admin with one-click "added".
+  - *Your own Meta app* — the business pastes App ID + App Secret (checked with Meta, stored encrypted), webhooks are configured automatically, then "Connect through my app" (full-page login, several Pages chooser). Works at once, independent of the platform app.
+  - The Page webhook accepts the business's own app (verify token by hash, signature by that app's secret) — and only for that business's Pages. The 1-minute sync checks the business's own app subscription.
+  - A failed one-click connection ("App not active") opens the alternatives automatically.
+- **Site agent with tools:** real business facts (contact, products & prices, real reviews, knowledge articles, social links) in the prompt and in the site; invented testimonials replaced with real reviews; site settings (footer, legal, WhatsApp button) filled; free photos for hero / about / gallery (Pexels → Pixabay → Openverse); quality audit + one AI fix pass; live build stages and a report (facts · photos · quality score).
+- **Social brain — deeper understanding:** learns which openings, weekdays, emoji use, calls to action and hashtag counts work; reads what customers asked in the inbox lately; knows the day/season of the post; real products & prices; self-checks every draft and rewrites a weak one once with concrete feedback. Shown in the brain panel.
+- **Design layer:** animated light border for featured sections, hover glow for tiles, gradient page titles, mesh headers, a breathing primary action (all off for reduced motion).
+
 ## Enterprise core — 2026-11-01
 - **Mission Control** (`/{locale}/health`): status of email, social, payments, delivery queue, websites, surveys and every channel, with reasons and fix links; failed deliveries with retry / cancel / retry-all; background job runs and grouped errors for platform admins.
 - **Observability:** structured JSON logger with PII/secret redaction (`lib/ops/log.ts`), server error capture (`instrumentation.ts`), browser error reports (`/api/errors`), grouped `app_errors`, optional Sentry via `SENTRY_DSN`; `/api/health` live checks (database, storage, queue lag).

@@ -44,15 +44,26 @@ export async function chooseMetaPageAction(input: { locale: string; sealed: stri
   if (!/^\d{3,40}$/.test(input.pageId)) return { error: "validation.invalidId" };
   const { openSecrets } = await import("@/lib/channels/secrets");
   let pages: { id: string; name: string; token: string; instagram: { id: string; username: string | null } | null }[] = [];
+  let ownApp = "";
   try {
     const box = openSecrets(input.sealed);
     if (box.org !== ctx.org.id || Date.now() - Number(box.at) > 10 * 60_000) return { error: "integrations.meta.expired" };
     pages = JSON.parse(box.pages ?? "[]");
+    ownApp = box.own_app ?? "";
   } catch {
     return { error: "integrations.meta.expired" };
   }
   const page = pages.find((p) => p.id === input.pageId);
   if (!page) return { error: "validation.invalidId" };
+  // the Pages came from the business's own Meta app — stored the same way, marked with that app
+  if (/^\d{5,30}$/.test(ownApp)) {
+    const { saveOwnPage } = await import("@/lib/channels/meta-own-save");
+    const s = await saveOwnPage(ctx.org.id, ctx.userId, page, ownApp);
+    if (!s.ok) return { error: "common.error" };
+    revalidatePath(`/${locale}/integrations`);
+    revalidatePath(`/${locale}/inbox`);
+    return { ok: true, message: s.both ? "integrations.meta.connectedBoth" : "integrations.meta.connectedPage", messageParams: { page: page.name, ig: page.instagram?.username ?? "" } };
+  }
   return savePage(locale, ctx.org.id, ctx.userId, page);
 }
 

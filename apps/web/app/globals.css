@@ -749,3 +749,69 @@ a, button, [role="button"], label { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   .num-pop, .feed-in, .ring-fill, .wave-bars > span { animation: none !important; }
 }
+
+/* ---------------------------------------------------------------- design layer: magnetic surfaces
+   An animated light that travels around featured sections, a soft glow ring on hover for interactive tiles,
+   glass section headers and a gentle "breathing" accent for the one action that matters on a screen.
+   Purely additive (new classes only); everything is off for prefers-reduced-motion. */
+@property --shine-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes shine-spin {
+  to { --shine-angle: 360deg; }
+}
+.shine-border {
+  position: relative;
+  isolation: isolate;
+}
+.shine-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from var(--shine-angle), transparent 0deg, color-mix(in oklab, var(--accent) 70%, transparent) 60deg, color-mix(in oklab, var(--teal) 55%, transparent) 120deg, transparent 180deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: shine-spin 6s linear infinite;
+  pointer-events: none;
+}
+.glow-ring {
+  transition: box-shadow 220ms ease, border-color 220ms ease, transform 220ms ease;
+}
+@media (hover: hover) {
+  .glow-ring:hover {
+    border-color: color-mix(in oklab, var(--accent) 45%, var(--border));
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 12%, transparent), var(--shadow-lg, var(--shadow));
+    transform: translateY(-2px);
+  }
+}
+.glass-head {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--surface) 92%, transparent), color-mix(in oklab, var(--surface) 70%, transparent));
+  backdrop-filter: blur(10px);
+}
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent-solid) 45%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in oklab, var(--accent-solid) 0%, transparent); }
+}
+.breathe { animation: breathe 2.6s ease-in-out infinite; }
+.text-gradient {
+  background-image: linear-gradient(90deg, var(--text), color-mix(in oklab, var(--accent) 80%, var(--text)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero-mesh {
+  background:
+    radial-gradient(60% 80% at 100% 0%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(50% 70% at 0% 100%, color-mix(in oklab, var(--teal) 12%, transparent), transparent 70%),
+    var(--surface);
+}
+@media (prefers-reduced-motion: reduce) {
+  .shine-border::before, .breathe { animation: none !important; }
+  .glow-ring:hover { transform: none !important; }
+}

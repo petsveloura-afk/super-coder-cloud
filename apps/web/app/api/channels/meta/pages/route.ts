@@ -24,6 +24,11 @@ export async function GET(request: NextRequest) {
   if (sp.get("hub.mode") === "subscribe" && same) {
     return new NextResponse(sp.get("hub.challenge") ?? "", { status: 200, headers: { "Content-Type": "text/plain" } });
   }
+  // a business that connected through its OWN Meta app: its app's webhook uses that business's verify token
+  if (sp.get("hub.mode") === "subscribe" && given) {
+    const { ownVerifyTokenKnown } = await import("@/lib/channels/meta-own");
+    if (await ownVerifyTokenKnown(given)) return new NextResponse(sp.get("hub.challenge") ?? "", { status: 200, headers: { "Content-Type": "text/plain" } });
+  }
   return new NextResponse("forbidden", { status: 403 });
 }
 
@@ -34,7 +39,16 @@ export async function POST(request: NextRequest) {
   const secrets = [process.env.META_APP_SECRET, process.env.META_IG_APP_SECRET, process.env.META_PAGES_APP_SECRET].filter((v): v is string => Boolean(v));
   const raw = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
-  if (!secrets.length || !secrets.some((secret) => verifyMetaSignature(raw, signature, secret))) {
+  let ownAppIds: Map<string, string> | null = null;
+  if (!secrets.some((secret) => verifyMetaSignature(raw, signature, secret))) {
+    // not the platform app — maybe the business's OWN Meta app: find the apps of the Pages in this body and check their secrets
+    const { webhookEntryIds } = await import("@/lib/channels/meta-own-core");
+    const { ownAppsForEntries } = await import("@/lib/channels/meta-own");
+    const own = await ownAppsForEntries(webhookEntryIds(raw)).catch(() => []);
+    const match = own.filter((a) => verifyMetaSignature(raw, signature, a.secret));
+    if (match.length) ownAppIds = new Map(match.map((a) => [a.orgId, a.appId]));
+  }
+  if (!ownAppIds && (!secrets.length || !secrets.some((secret) => verifyMetaSignature(raw, signature, secret)))) {
     console.error("meta pages webhook rejected: bad or missing signature (META_APP_SECRET must be the secret of the app that sends the webhook)");
     void import("@/lib/channels/meta-webhook-log").then((m) => m.logMetaWebhook("bad_signature", { detail: `signature header ${signature ? "present" : "missing"}; secrets configured: ${secrets.length}` }));
     return NextResponse.json({ ok: false }, { status: 401 });
@@ -78,9 +92,13 @@ export async function POST(request: NextRequest) {
       void import("@/lib/channels/meta-webhook-log").then((x) => x.logMetaWebhook("no_account", { object: m.platform, entry: m.accountId, detail: "message dropped: no connected account with this id" }));
       continue;
     }
+    // signed by a business's own app: it may only speak for that business's Pages
+    if (ownAppIds && !ownAppIds.has(acc.organization_id)) continue;
     if (m.echo) {
       // our own sends come back as echoes from our app — they are already stored
       if (m.echoAppId && m.echoAppId === (process.env.META_APP_ID ?? "")) continue;
+      // …or from the business's own Meta app
+      if (m.echoAppId && (m.echoAppId === acc.config?.own_app_id || m.echoAppId === ownAppIds?.get(acc.organization_id))) continue;
       // the echo of a reply our agent / inbox just sent can arrive before its message id is stored (or without our app id):
       // it must never switch the conversation to "a person answered" — compare with what we sent in the last minutes
       {
@@ -187,6 +205,7 @@ export async function POST(request: NextRequest) {
         console.error(`meta pages webhook: no connected ${c.platform} account for id ${c.accountId} — comment dropped`);
         continue;
       }
+      if (ownAppIds && !ownAppIds.has(acc.organization_id)) continue;
       await handleSocialComment(acc.organization_id, acc.id, c).catch((e) => console.error("social comment failed", (e as Error).message));
     }
   }

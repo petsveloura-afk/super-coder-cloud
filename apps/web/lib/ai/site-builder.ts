@@ -8,6 +8,8 @@ import { extractJson, normalizeAiSite, siteJsonInstructionsPro, siteSlug, SITE_L
 import { parseBuildDirectives, polishBuiltSite, siteBuildOverrides } from "./site-build-rules";
 import { FREE_TEMPLATES, ALL_TEMPLATES } from "@/lib/site/templates";
 import type { AIMessage, AIProviderName } from "./providers";
+import { applyFacts, factsCount, factsPrompt, settingsFromFacts, type SiteToolReport } from "./site-tools-core";
+import { siteBrain } from "./site-brain";
 
 /** What the organization's plan allows: every plan builds landing pages; paid plans full sites + AI images. */
 export async function aiSiteCaps(orgId: string): Promise<{ full: boolean; images: boolean; plan: string; proTemplates?: boolean; aiEditor?: boolean; customDomain?: boolean }> {
@@ -27,6 +29,8 @@ export interface BuiltSite {
   image: boolean;
   /** asked for a full site but the plan only allows a landing page */
   downgraded: boolean;
+  /** the agent's tools that worked on the site (facts, real reviews, free photos, quality pass) */
+  report?: SiteToolReport;
 }
 
 export type BuildSiteResult = { ok: true; site: BuiltSite } | { ok: false; error: string };
@@ -67,13 +71,24 @@ export async function buildSiteWithAI(input: {
 
   const ownerText = [input.brief, ...(input.conversation ?? []).filter((m) => m.role === "user").map((m) => m.content)].join("\n");
   const directives = parseBuildDirectives(ownerText);
+  // tool 1: the business's real facts (contact, products & prices, real reviews, knowledge) + the industry playbook
+  const t0 = Date.now();
+  const { loadBusinessFacts } = await import("./site-tools");
+  const facts = await loadBusinessFacts(input.orgId);
+  const factsText = factsPrompt(facts);
+  let playbook = "";
+  try {
+    playbook = siteBrain([input.brief, ownerText], []);
+  } catch {
+    playbook = "";
+  }
   const out = await runAI({
     orgId: input.orgId,
     feature: "site_builder",
     agentId: input.agentId ?? null,
     provider: input.provider,
     // wave 36: the owner's instructions (brief + what they said in the conversation) drive the result
-    system: [siteJsonInstructionsPro(mode, input.locale, ctx, caps.proTemplates ? ALL_TEMPLATES.map((t) => t.key) : FREE_TEMPLATES), "", siteBuildOverrides(directives, mode)].join("\n"),
+    system: [siteJsonInstructionsPro(mode, input.locale, ctx, caps.proTemplates ? ALL_TEMPLATES.map((t) => t.key) : FREE_TEMPLATES), "", siteBuildOverrides(directives, mode), factsText ? `\n${factsText}` : "", playbook ? `\n${playbook}` : ""].join("\n"),
     messages: [{ role: "user", content: userPrompt }],
     temperature: 0.6,
     maxTokens: mode === "full" ? 6000 : 3500,
@@ -90,6 +105,37 @@ export async function buildSiteWithAI(input: {
   site.theme = polished.site.theme;
   site.seo = polished.site.seo;
   site.blocks = polished.site.blocks;
+
+  // tool 2: real content — contact details and real reviews from the business's own account
+  const L = input.locale === "en" ? { contact: "Contact us", testimonials: "What our customers say" } : input.locale === "ar" ? { contact: "تواصل معنا", testimonials: "ماذا يقول عملاؤنا" } : { contact: "צרו קשר", testimonials: "מה הלקוחות אומרים" };
+  const withFacts = applyFacts(site as unknown as { name: string; blocks: { type: string; data: Record<string, unknown> }[] }, facts, L);
+  site.blocks = withFacts.site.blocks as unknown as typeof site.blocks;
+  let settings: Record<string, unknown> = settingsFromFacts(undefined, facts, input.locale === "en" || input.locale === "ar" ? input.locale : "he");
+  const report: SiteToolReport = { facts: factsCount(facts), realReviews: withFacts.changed.some((c) => c.startsWith("testimonials")), images: 0, quality: null, refined: false };
+
+  // tool 4: quality gate — the free site audit; what the AI can fix is fixed in ONE more pass (only when there is time)
+  try {
+    const { auditSite, combinedInstruction } = await import("@/lib/site/audit-core");
+    const before = auditSite({ name: site.name, status: "draft", seo: site.seo, blocks: site.blocks as unknown as { type: string; data: Record<string, unknown> }[], settings, theme: site.theme });
+    report.quality = { before: before.score, after: before.score };
+    const instruction = combinedInstruction(before);
+    if (instruction && before.score < 80 && Date.now() - t0 < 25_000) {
+      const { editSiteWithAI } = await import("./site-edit");
+      const edited = await editSiteWithAI({ orgId: input.orgId, locale: input.locale, instruction, site: { name: site.name, slug: "draft", status: "draft", theme: site.theme, seo: site.seo, blocks: site.blocks, settings } as never, proTemplates: Boolean(caps.proTemplates) });
+      if (edited.ok) {
+        const reFacts = applyFacts({ name: edited.site.name, blocks: edited.site.blocks as { type: string; data: Record<string, unknown> }[] }, facts, L);
+        const after = auditSite({ name: edited.site.name, status: "draft", seo: edited.site.seo, blocks: reFacts.site.blocks, settings, theme: edited.site.theme as { template?: string } });
+        if (after.score >= before.score && reFacts.site.blocks.length >= 3) {
+          site.blocks = reFacts.site.blocks as unknown as typeof site.blocks;
+          site.seo = edited.site.seo;
+          report.quality = { before: before.score, after: after.score };
+          report.refined = true;
+        }
+      }
+    }
+  } catch (e) {
+    console.error("site quality pass failed", (e as Error).message);
+  }
 
   // hero image (paid plans) — a failure never blocks the site
   let image = false;
@@ -109,6 +155,16 @@ export async function buildSiteWithAI(input: {
     }
   }
 
+  // tool 3: free photos for every slot still empty (hero without AI image, about, gallery) — never blocks the site
+  if (Date.now() - t0 < 70_000) {
+    const { freeSiteImages } = await import("./site-tools");
+    const filled = await freeSiteImages(input.orgId, site as unknown as { name: string; blocks: { type: string; data: Record<string, unknown> }[] }, site.imagePrompt || input.brief, 18_000);
+    site.blocks = filled.site.blocks as unknown as typeof site.blocks;
+    report.images = filled.placed + (image ? 1 : 0);
+    if (!image && site.blocks.some((b) => b.type === "hero" && typeof (b.data as { image_url?: string }).image_url === "string" && Boolean((b.data as { image_url?: string }).image_url))) image = true;
+  }
+  settings = { ...settings };
+
   // wave 13: the template the business picked wins (when the plan allows it)
   if (input.template) {
     const tpl = ALL_TEMPLATES.find((x) => x.key === input.template);
@@ -117,14 +173,14 @@ export async function buildSiteWithAI(input: {
   const slug = siteSlug(site.name, randomBytes(4).toString("hex"));
   const { data: row, error } = await supabase
     .from("sites")
-    .insert({ organization_id: input.orgId, name: site.name, slug, status: "draft", theme: site.theme, seo: site.seo, blocks: site.blocks, created_by: input.userId })
+    .insert({ organization_id: input.orgId, name: site.name, slug, status: "draft", theme: site.theme, seo: site.seo, blocks: site.blocks, settings, created_by: input.userId })
     .select("id, name, slug")
     .single();
   if (error || !row) {
     console.error("ai site insert failed", error?.message);
     return { ok: false, error: "errors.generic" };
   }
-  return { ok: true, site: { id: row.id as string, name: row.name as string, slug: row.slug as string, mode, image, downgraded: Boolean(input.wantFull) && !caps.full } };
+  return { ok: true, site: { id: row.id as string, name: row.name as string, slug: row.slug as string, mode, image, downgraded: Boolean(input.wantFull) && !caps.full, report } };
 }
 
 /** Image for an existing site's hero (paid plans) — returns the public URL. */

@@ -126,7 +126,7 @@ export async function syncMetaInbound(budgetMs = 25_000, opts: { orgId?: string;
         // 1. the Page must be subscribed to messages + feed — heal it when it is not
         const subs = await graphGet(`/${encodeURIComponent(pageId)}/subscribed_apps`, token);
         if (!subs.ok) note("subscribed_apps", subs);
-        else if (appId && missingPageFields(subs.data, appId).length) {
+        else if ((cfg.own_app_id || appId) && missingPageFields(subs.data, cfg.own_app_id || appId).length) {
           const fix = await subscribePage(pageId, token);
           if (fix.ok) result.resubscribed++;
           else state.problem ??= `subscribe: ${fix.error ?? ""}`.slice(0, 480);

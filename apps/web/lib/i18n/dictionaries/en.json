@@ -476,7 +476,8 @@
     "security_mfa_disabled": "Two-step sign-in turned off",
     "security_signed_out_others": "Signed out of all other devices",
     "contacts_erased": "Contact details erased (privacy)",
-    "contacts_privacy_export": "Contact data exported (privacy)"
+    "contacts_privacy_export": "Contact data exported (privacy)",
+    "integrations_meta_own_app": "Own Meta app connected"
   },
   "billing": {
     "title": "Billing & plans",
@@ -953,7 +954,8 @@
       "confirm": "Load a new template? The script, details and menu will be replaced (pricing is kept if already filled).",
       "loaded": "Template loaded: {name}. Edit and save."
     },
-    "badAnswer": "The AI did not return a valid answer — try again"
+    "badAnswer": "The AI did not return a valid answer — try again",
+    "siteBuiltPro": "Site built ✓ — {facts} real business details, {images} photos, quality score {score}/100"
   },
   "deals": {
     "pageTitle": "Deals & pipelines",
@@ -3495,6 +3497,14 @@
           "no_choice": "Choose a form or booking page"
         }
       }
+    },
+    "buildStages": {
+      "facts": "Reading your business details, products and reviews",
+      "copy": "Writing tailored marketing copy",
+      "design": "Choosing design, colors and structure",
+      "quality": "Checking quality and improving (SEO, calls to action, trust)",
+      "images": "Adding professional photos",
+      "save": "Saving a draft ready to preview"
     }
   },
   "admin": {
@@ -5175,7 +5185,23 @@
       "origin_holiday": "Holiday",
       "origin_evergreen": "Fresh version",
       "origin_autopilot": "Daily post",
-      "notifyDraft": "The daily post for {date} is ready and waiting for approval"
+      "notifyDraft": "The daily post for {date} is ready and waiting for approval",
+      "deep": {
+        "hook": "The opening that works best for you: {hook}",
+        "days": "Your audience is most active on: {days}",
+        "emojiYes": "A few emojis (2-4) lift engagement",
+        "emojiNo": "Emojis don't help here — keep them few",
+        "ctaYes": "Posts with a direct call to action do better",
+        "ctaNo": "Soft, value-first posts beat hard selling",
+        "tags": "Best hashtag count: about {n}",
+        "hooks": {
+          "question": "a question to the audience",
+          "number": "a number or statistic",
+          "emoji": "an emoji and a short line",
+          "story": "a short personal story",
+          "statement": "a bold statement"
+        }
+      }
     },
     "motion": {
       "template": "Motion template",
@@ -6364,5 +6390,98 @@
     "eraseNow": "Erase permanently",
     "erased": "The details were erased",
     "confirmNeeded": "Type ERASE to confirm"
+  },
+  "metaAlt": {
+    "title": "Facebook & Instagram — 2 more ways to connect right now",
+    "subtitle": "Until Meta approves the platform app, the regular button works only for authorized users. Here every business can connect today — pick the way that suits you.",
+    "connectedOwn": "Connected through your own app",
+    "tileLink": "Can't connect (\"App not active\")? There are 2 more ways →",
+    "savedWithHooks": "The app \"{name}\" was verified and saved, and real-time notifications were set up. Now click \"Connect through my app\".",
+    "savedNoHooks": "The app \"{name}\" was verified and saved. Real-time notifications could not be set up automatically — this does not block connecting (messages arrive through the 1-minute sync). Now click \"Connect through my app\".",
+    "hooksOk": "Real-time notifications are set up",
+    "removed": "The app details were removed",
+    "err": {
+      "unknown": "Meta returned an error. Try again or check the details.",
+      "notActive": "The app is not active yet for users without a role. Use one of the two ways under \"2 more ways to connect\".",
+      "redirect": "The redirect URL is not set in the app. Copy the URL from step 3 into Valid OAuth Redirect URIs and save.",
+      "secret": "The App Secret does not match the App ID. Copy it again from App Settings → Basic (click Show).",
+      "appId": "Meta does not know this App ID. Copy it again from App Settings → Basic.",
+      "scopes": "One of the permissions is not available in your app. Make sure you chose the \"Manage everything on your Page\" use case, or enter a Configuration ID under Advanced.",
+      "domain": "The domain is not set in the app. Add the platform address under App Settings → Basic → App Domains.",
+      "already": "This profile is already on the app — accept the invitation at developers.facebook.com/requests.",
+      "userNotFound": "Meta could not find this profile. Try a facebook.com/profile.php?id=… link — the request was also sent to the platform admin.",
+      "permission": "A permission is missing. Make sure you manage the Page and approved every permission in Facebook's window.",
+      "rate": "Meta is limiting requests right now. Try again in a few minutes.",
+      "network": "Meta can't be reached right now. Try again in a moment.",
+      "appIdFormat": "The App ID is a number of 5 digits or more (App Settings → Basic).",
+      "secretFormat": "The App Secret is 32 characters (letters a-f and digits). Click Show next to App Secret and copy it.",
+      "configFormat": "The Configuration ID is a number only.",
+      "noApp": "No app saved yet. Fill in App ID and App Secret and click \"Check & save\".",
+      "profileFormat": "That does not look like a Facebook profile link. Paste a link like facebook.com/your.name.",
+      "tooMany": "Several requests were already sent today. Try again tomorrow or use option 2."
+    },
+    "tester": {
+      "title": "Join as a tester",
+      "badge": "Easiest",
+      "body": "We add you to the platform app as a tester. After one approval the regular \"Connect Facebook & Instagram\" button works for you — before Meta approves the app for everyone.",
+      "s1": "Paste the personal Facebook profile link of the person who manages the Page and click \"Add me\".",
+      "s2": "Facebook sends an invitation. If asked — register as a Meta developer (free, one minute).",
+      "s3": "Accept the invitation at:",
+      "s4": "Come back and click the regular \"Connect Facebook & Instagram\".",
+      "profile": "Facebook profile link",
+      "cta": "Add me",
+      "hint": "A profile link looks like facebook.com/your.name or facebook.com/profile.php?id=1000… If the automatic invitation fails, the request goes to the platform admin, who adds you by hand.",
+      "unavailable": "This option becomes available once the platform admin sets up the Meta app. Meanwhile — use option 2.",
+      "invited": "Invitation sent! Accept it at developers.facebook.com/requests and then click \"Connect Facebook & Instagram\".",
+      "queued": "The request was sent to the platform admin — you'll get an invitation from Facebook soon. Accept it at developers.facebook.com/requests.",
+      "marked": "Marked as handled",
+      "status": {
+        "pending": "Waiting",
+        "invited": "Invited",
+        "failed": "Failed",
+        "done": "Added"
+      }
+    },
+    "own": {
+      "title": "Your own Meta app",
+      "badge": "Works at once",
+      "body": "Create a free Meta app (2 minutes), paste two keys here and connect. An app's owner has full access to their own Pages and Instagram even without Meta's approval — completely independent.",
+      "appSaved": "Your app is saved",
+      "status": {
+        "saved": "Ready to connect",
+        "connected": "Connected",
+        "error": "Error"
+      },
+      "hooksOn": "Real-time notifications on",
+      "hooksOff": "No real-time notifications (the 1-minute sync runs)",
+      "connect": "Connect through my app",
+      "reconnect": "Reconnect through my app",
+      "retryHooks": "Set up notifications again",
+      "manualHooks": "Manual setup",
+      "remove": "Remove the app",
+      "removeConfirm": "Remove the app details? The connected Page stays connected until you disconnect it.",
+      "manualBody": "If the automatic setup did not work: in your app → Webhooks → Page (and Instagram) → Subscribe, paste both values and choose messages, feed (Instagram: messages, comments).",
+      "steps": {
+        "create": "Open Meta for Developers → Create App. Choose the \"Manage everything on your Page\" use case, and if you have a business Instagram add the Instagram use case too. The app is free and yours.",
+        "keys": "In the app: App Settings → Basic. Copy App ID and App Secret here (click Show) and click \"Check & save\". We check them with Meta and set up notifications automatically.",
+        "redirect": "In the app: Facebook Login (or Facebook Login for Business) → Settings → Valid OAuth Redirect URIs — paste this URL and save:",
+        "connect": "After saving, the \"Connect through my app\" button appears above. Click it, approve in Facebook's window and pick the Page — messages, comments and posting work."
+      },
+      "links": {
+        "create": "Open Create App",
+        "keys": "My apps"
+      },
+      "secretKeep": "App Secret (paste again to update)",
+      "advanced": "Advanced: I have a Facebook Login for Business Configuration ID",
+      "save": "Check & save",
+      "privacy": "The keys are stored encrypted and never shown again. They are used only to connect your Page, and you can remove them at any time.",
+      "connected": "Connected through your app: {page}"
+    },
+    "admin": {
+      "title": "{n} tester requests waiting for manual handling",
+      "body": "Meta did not accept the automatic invitation. Add them under App Roles → Roles → Add People → Testers, then mark as handled.",
+      "done": "Mark as added",
+      "doneConfirm": "Mark that this profile was added as a tester of the app?"
+    }
   }
 }

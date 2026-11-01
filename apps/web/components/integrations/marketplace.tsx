@@ -101,7 +101,7 @@ function State({ on, error, pending }: { on: boolean; error?: string | null; pen
 
 function Tile({ icon: Icon, title, body, state, children, id, gradient, steps }: { icon: LucideIcon; title: string; body: string; state: React.ReactNode; children?: React.ReactNode; id: string; gradient: string; steps?: string }) {
   return (
-    <li className="group flex h-full min-w-0 flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-md" data-market={id}>
+    <li className="glow-ring group flex h-full min-w-0 flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-md" data-market={id}>
       <div className={cn("flex items-start gap-3 bg-gradient-to-br p-4", gradient)}>
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-surface/85 shadow-sm">
           <Icon className="h-5 w-5" />
@@ -264,6 +264,11 @@ function MetaTile({ p }: { p: MarketProps }) {
         ) : (
           <AdminSetup what="meta" />
         )
+      ) : null}
+      {p.canManage && !p.facebook.connected ? (
+        <a href="#meta-alt" className="block text-[12px] font-medium text-accent hover:underline" data-testid="meta-alt-link">
+          {t("metaAlt.tileLink")}
+        </a>
       ) : null}
     </Tile>
   );

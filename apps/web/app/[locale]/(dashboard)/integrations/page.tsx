@@ -13,6 +13,7 @@ import { ConnectHub, type HubProps } from "@/components/integrations/connect-hub
 import { ConversionsCard, type ConversionConn } from "@/components/integrations/conversions-card";
 import { IntegrationsNotice } from "@/components/integrations/integrations-notice";
 import { IntegrationsMarketplace, type MarketProps } from "@/components/integrations/marketplace";
+import { MetaAlternatives, type MetaAltProps } from "@/components/integrations/meta-alternatives";
 import { WhatsAppConnect } from "@/components/integrations/whatsapp-connect";
 import { TeamUpdates, type BusinessView, type RecipientView } from "@/components/integrations/team-updates";
 import { metaPublicConfig } from "@/lib/channels/meta";
@@ -166,6 +167,40 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
     };
   }
 
+  // Facebook / Instagram while the platform's Meta app is in review: tester invitation + the business's own Meta app
+  let metaAlt: MetaAltProps | null = null;
+  if (canChannels && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { loadOwnApp, platformAppReady } = await import("@/lib/channels/meta-own");
+    const admin = createAdminClient();
+    const fbRow = ch("messenger");
+    const [own, { data: reqs }, queue] = await Promise.all([
+      loadOwnApp(ctx.org.id).catch(() => null),
+      admin.from("meta_tester_requests").select("id, profile_ref, status, created_at").eq("organization_id", ctx.org.id).order("created_at", { ascending: false }).limit(5),
+      ctx.isPlatformAdmin
+        ? admin.from("meta_tester_requests").select("id, profile_ref, fb_user, last_error, created_at, organizations(name)").in("status", ["pending", "failed"]).order("created_at", { ascending: false }).limit(30)
+        : Promise.resolve({ data: [] as unknown[] }),
+    ]);
+    metaAlt = {
+      appUrl: baseUrl,
+      canManage: canChannels,
+      platformAdmin: ctx.isPlatformAdmin,
+      testerReady: platformAppReady(),
+      facebookConnected: Boolean(fbRow && fbRow.status !== "disabled"),
+      connectedMode: fbRow?.config.mode ?? null,
+      ownApp: own ? { appId: own.appId, appName: own.appName, configId: own.configId, status: own.status, webhooksOk: own.webhooksOk, lastError: own.lastError } : null,
+      requests: ((reqs ?? []) as MetaAltProps["requests"]),
+      adminQueue: ((queue.data ?? []) as { id: string; profile_ref: string; fb_user: string | null; last_error: string | null; created_at: string; organizations: { name?: string } | { name?: string }[] | null }[]).map((r) => ({
+        id: r.id,
+        profile_ref: r.profile_ref,
+        fb_user: r.fb_user,
+        last_error: r.last_error,
+        created_at: r.created_at,
+        org_name: (Array.isArray(r.organizations) ? r.organizations[0]?.name : r.organizations?.name) ?? "—",
+      })),
+    };
+  }
+
   // wave 59: connection health center (every connected channel, its real state, one-click fix)
   const health = canChannels && process.env.SUPABASE_SERVICE_ROLE_KEY ? await (await import("@/lib/channels/health")).loadChannelHealth(ctx.org.id) : null;
   return (
@@ -188,6 +223,11 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
       {market ? (
         <Suspense fallback={null}>
           <IntegrationsMarketplace {...market} />
+        </Suspense>
+      ) : null}
+      {metaAlt ? (
+        <Suspense fallback={null}>
+          <MetaAlternatives {...metaAlt} />
         </Suspense>
       ) : null}
       <Suspense fallback={null}>

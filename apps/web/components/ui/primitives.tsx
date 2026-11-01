@@ -185,7 +185,9 @@ export function PageHeader({ title, description, actions }: { title: string; des
   return (
     <div className="page-head page-enter mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <h1 className="title-bar text-[22px] font-bold tracking-tight text-fg sm:text-[26px]">{title}</h1>
+        <h1 className="title-bar text-[22px] font-bold tracking-tight text-fg sm:text-[26px]">
+          <span className="text-gradient">{title}</span>
+        </h1>
         {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
       </div>
       {actions ? <div className="page-actions flex flex-wrap items-center gap-2">{actions}</div> : null}

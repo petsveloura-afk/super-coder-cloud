@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ImageIcon, Lock, Sparkles, Wand2 } from "lucide-react";
+import { CheckCircle2, ImageIcon, Lock, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Card, Field, Select, Textarea } from "@/components/ui/primitives";
@@ -10,6 +10,27 @@ import { ALL_TEMPLATES } from "@/lib/site/templates";
 import { SECTION_KEYS, STYLE_KEYS, type SectionKey, type StyleKey } from "@/lib/ai/site-build-rules";
 import { cn } from "@/lib/utils";
 import { buildSiteWithAIAction } from "@/app/[locale]/(dashboard)/websites/actions";
+
+/** what the site agent is doing right now — its tools in order (shown while it builds, ~every 7 seconds) */
+const BUILD_STAGES = ["facts", "copy", "design", "quality", "images", "save"] as const;
+function BuildStages() {
+  const { t } = useI18n();
+  const [stage, setStage] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setStage((s) => Math.min(BUILD_STAGES.length - 1, s + 1)), 7000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <ol className="grid gap-1.5 rounded-2xl border border-accent/25 bg-accent-soft/30 p-3 sm:grid-cols-2" aria-live="polite" data-testid="site-build-stages">
+      {BUILD_STAGES.map((k, i) => (
+        <li key={k} className={cn("flex items-center gap-2 text-[12.5px] transition", i < stage ? "text-success" : i === stage ? "font-semibold text-fg" : "text-subtle")}>
+          {i < stage ? <CheckCircle2 className="h-3.5 w-3.5" /> : <span className={cn("h-2 w-2 rounded-full", i === stage ? "animate-pulse bg-accent" : "bg-line-strong")} />}
+          {t(`websites.buildStages.${k}`)}
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 /** "Describe your business → get a professional site" (draft). Full sites + AI images on paid plans. */
 export function AiSiteCard({ caps }: { caps: { full: boolean; images: boolean; proTemplates?: boolean } }) {
@@ -27,8 +48,8 @@ export function AiSiteCard({ caps }: { caps: { full: boolean; images: boolean; p
   const chip = (on: boolean) => cn("min-h-10 rounded-full border px-3.5 text-[13px] transition", on ? "border-accent bg-accent-soft font-medium text-accent" : "border-line text-muted hover:border-accent");
   const [pending, start] = useTransition();
   return (
-    <Card className="mb-4 overflow-hidden border-accent/30" data-testid="ai-site-card">
-      <div className="flex items-center gap-3 border-b border-line bg-accent-soft/40 px-5 py-3">
+    <Card className="shine-border mb-4 overflow-hidden border-accent/30" data-testid="ai-site-card">
+      <div className="hero-mesh flex items-center gap-3 border-b border-line px-5 py-3">
         <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-solid text-accent-fg">
           <Wand2 className="h-4 w-4" />
         </span>
@@ -104,7 +125,7 @@ export function AiSiteCard({ caps }: { caps: { full: boolean; images: boolean; p
               start(async () => {
                 const r = await buildSiteWithAIAction({ locale, brief: `${brief.trim().slice(0, 2700)}\n\nPreferences:\n${prefs}`, full, template: template || undefined });
                 if (r.error || !r.data) return void toast.error(t(r.error ?? "common.error"));
-                toast.success(t("ai.siteBuilt"));
+                toast.success(t(r.message ?? "ai.siteBuilt", r.messageParams));
                 router.push(`/${locale}/websites/${r.data.id}/preview`);
               })
             }
@@ -112,6 +133,7 @@ export function AiSiteCard({ caps }: { caps: { full: boolean; images: boolean; p
             <Sparkles className="h-4 w-4" /> {t(pending ? "websites.aiBuilding" : "websites.aiBuild")}
           </Button>
         </div>
+        {pending ? <BuildStages /> : null}
       </div>
     </Card>
   );

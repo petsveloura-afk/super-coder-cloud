@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { Badge, Button, Input, Select, Textarea } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 import { upcomingHolidays, type AutopilotSettings, type Learned } from "@/lib/social/brain-core";
+import type { DeepLearned } from "@/lib/social/brain-plus-core";
 import { ctaLabel, type CtaType } from "@/lib/social/post-core";
 import { planWeekAction, recyclePostAction, refreshBrainAction, saveAutopilotAction, smartPostNowAction, testTelegramChannelAction } from "@/app/[locale]/(dashboard)/social/brain-actions";
 
@@ -395,6 +396,21 @@ export function BrainPanel(p: { onCreated?: (id: string) => void; onShowPost?: (
                 <ul className="space-y-1 text-[12.5px] text-muted">
                   {l.bestLength ? <li>• {t(`social.brain.len_${l.bestLength}`)}</li> : null}
                   {l.questionsWork !== null ? <li>• {t(l.questionsWork ? "social.brain.questionsYes" : "social.brain.questionsNo")}</li> : null}
+                  {/* deeper patterns: the opening that works, best days, emojis, calls to action, hashtag count */}
+                  {(() => {
+                    const deep = (l as Learned & { deep?: DeepLearned }).deep;
+                    if (!deep) return null;
+                    const hooks = Object.entries(deep.hookScores ?? {}).sort((a, b) => b[1] - a[1]);
+                    return (
+                      <>
+                        {hooks.length >= 2 ? <li>• {t("social.brain.deep.hook", { hook: t(`social.brain.deep.hooks.${hooks[0]![0]}`) })}</li> : null}
+                        {deep.bestDays?.length ? <li>• {t("social.brain.deep.days", { days: deep.bestDays.map((d) => dayName(d)).join(" · ") })}</li> : null}
+                        {deep.emojiWorks !== null && deep.emojiWorks !== undefined ? <li>• {t(deep.emojiWorks ? "social.brain.deep.emojiYes" : "social.brain.deep.emojiNo")}</li> : null}
+                        {deep.ctaWorks !== null && deep.ctaWorks !== undefined ? <li>• {t(deep.ctaWorks ? "social.brain.deep.ctaYes" : "social.brain.deep.ctaNo")}</li> : null}
+                        {deep.hashtagSweetSpot !== null && deep.hashtagSweetSpot !== undefined ? <li>• {t("social.brain.deep.tags", { n: deep.hashtagSweetSpot })}</li> : null}
+                      </>
+                    );
+                  })()}
                 </ul>
               </div>
             ) : (

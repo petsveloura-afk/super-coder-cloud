@@ -68,12 +68,15 @@ export async function makeSmartPost(orgId: string, opts: MakeOpts): Promise<{ ok
   const org = await loadOrg(orgId);
   if (!org) return { ok: false, error: "no_org" };
   const admin = createAdminClient();
-  const [s, learned, { data: social }, { data: recentRows }, { data: accs }] = await Promise.all([
+  const [s, learned, { data: social }, { data: recentRows }, { data: accs }, { data: inbound }, { data: products }] = await Promise.all([
     loadAutopilot(orgId),
     loadLearned(orgId),
     admin.from("social_settings").select("brand_voice").eq("organization_id", orgId).maybeSingle(),
     admin.from("social_posts").select("body, pillar, origin, created_at").eq("organization_id", orgId).neq("status", "canceled").order("created_at", { ascending: false }).limit(20),
     admin.from("channel_accounts").select("kind").eq("organization_id", orgId).in("kind", ["messenger", "instagram"]),
+    // deeper understanding: what customers asked lately + the real products / prices
+    admin.from("messages").select("body").eq("organization_id", orgId).eq("direction", "in").gte("created_at", new Date(Date.now() - 21 * 86_400_000).toISOString()).order("created_at", { ascending: false }).limit(150),
+    admin.from("products").select("name, unit_price, description").eq("organization_id", orgId).eq("active", true).order("created_at").limit(8),
   ]);
   const recent = (recentRows ?? []) as { body: string; pillar: string | null; origin: string | null }[];
   const connected = new Set(((accs ?? []) as { kind: string }[]).map((a) => (a.kind === "messenger" ? "facebook" : a.kind)));
@@ -99,11 +102,19 @@ export async function makeSmartPost(orgId: string, opts: MakeOpts): Promise<{ ok
   const { runAISystem } = await import("@/lib/ai/run-system");
   const { marketingCopyRules } = await import("@/lib/ai/brain-pro");
   const { parseFullPost, buildSceneImagePrompt } = await import("./studio-core");
+  const plus = await import("./brain-plus-core");
+  const signals = plus.customerSignals(((inbound ?? []) as { body: string | null }[]).map((m) => m.body ?? ""));
+  const dayNames = Array.from({ length: 7 }, (_, d) => new Date(Date.UTC(2026, 10, 1 + d)).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" }));
+  const productLines = ((products ?? []) as { name: string; unit_price: number | string; description: string | null }[]).map((p) => `- ${p.name}${Number(p.unit_price) > 0 ? ` (${p.unit_price})` : ""}${p.description ? ` — ${p.description.slice(0, 120)}` : ""}`);
   const system = [
     `You are the senior social media manager of "${org.name}". Business information:\n${(org.agent?.instructions ?? "").slice(0, 5000)}`,
     social?.brand_voice ? `Brand voice: ${String(social.brand_voice).slice(0, 800)}` : "",
+    productLines.length ? `Real products / services (names and prices exactly as written):\n${productLines.join("\n")}` : "",
     marketingCopyRules(),
     brainBrief(learned),
+    plus.deeperBrief((learned as (Learned & { deep?: import("./brain-plus-core").DeepLearned }) | null)?.deep, dayNames),
+    plus.customerBrief(signals),
+    plus.dayContext(opts.date, org.locale),
     s.avoid ? `Never use these words or topics: ${s.avoid}` : "",
     recent.length ? `Recent posts (do NOT repeat their ideas, hooks or wording):\n${recent.slice(0, 8).map((r) => `- ${r.body.replace(/\s+/g, " ").slice(0, 140)}`).join("\n")}` : "",
     "NEVER invent prices, discounts, dates, names, addresses or facts that are not in the business information.",
@@ -112,6 +123,8 @@ export async function makeSmartPost(orgId: string, opts: MakeOpts): Promise<{ ok
     .join("\n\n");
   const task = autopilotTask({ pillar: opts.topic ? `${pillar} — ${opts.topic}` : pillar, platform: primary, lang: langName(org.locale), tone: s.tone, media, holiday, review: review ? { author: review.author, text: review.body, rating: review.rating } : null });
   let parts: ReturnType<typeof parseFullPost> = null;
+  let feedback = "";
+  let lastWeak: ReturnType<typeof parseFullPost> = null;
   for (let attempt = 0; attempt < 2 && !parts; attempt++) {
     const out = await runAISystem({
       orgId,
@@ -120,15 +133,26 @@ export async function makeSmartPost(orgId: string, opts: MakeOpts): Promise<{ ok
       provider: (org.agent?.provider as "openai" | "anthropic" | "gemini" | null) ?? undefined,
       model: org.agent?.model ?? undefined,
       system,
-      messages: [{ role: "user", content: attempt ? `${task}\nThe previous draft was too similar to a recent post — take a completely different angle and hook.` : task }],
+      messages: [{ role: "user", content: attempt ? (feedback ? `${task}\n\n${feedback}` : `${task}\nThe previous draft was too similar to a recent post — take a completely different angle and hook.`) : task }],
       temperature: attempt ? 0.95 : 0.8,
       maxTokens: 1400,
       patienceMs: 20_000,
     });
     if (!out.ok) return { ok: false, error: out.error };
     const p = parseFullPost(out.text, primary === "instagram" ? 2200 : 5000);
-    if (p && p.post.length >= 30 && (!isRepeat(p.post, recent.map((r) => r.body)) || attempt === 1)) parts = p;
+    if (p && p.post.length >= 30 && (!isRepeat(p.post, recent.map((r) => r.body)) || attempt === 1)) {
+      // self-check: a weak first draft (no hook / no call to action / wrong hashtags…) is rewritten once with concrete feedback
+      const q = plus.postQuality(p.post, primary);
+      if (attempt === 0 && q.score < 60) {
+        feedback = plus.qualityFeedback(q);
+        parts = null;
+        lastWeak = p;
+        continue;
+      }
+      parts = p;
+    }
   }
+  if (!parts && lastWeak) parts = lastWeak;
   if (!parts) return { ok: false, error: "ai.failed" };
   let body = mergeHashtags(parts.post, s.hashtags, primary);
   if (containsAvoided(body, s.avoid).length) {
@@ -397,7 +421,11 @@ export async function refreshBrain(orgId: string): Promise<boolean> {
     media: (r.video_url ? "video" : r.image_url ? "image" : "text") as "image" | "video" | "text",
     engagement: r.engagement,
   }));
-  const learned = learnFromPosts(rows, (org?.timezone as string | null) || "Asia/Jerusalem");
+  const tz = (org?.timezone as string | null) || "Asia/Jerusalem";
+  const base = learnFromPosts(rows, tz);
+  // deeper patterns (hooks, weekdays, emojis, calls to action, hashtag count) — stored with the rest
+  const { deeperLearning } = await import("./brain-plus-core");
+  const learned = { ...base, deep: deeperLearning(rows, tz) };
   const { error } = await admin.from("social_brain").upsert({ organization_id: orgId, learned, posts_analyzed: learned.posts, learned_at: new Date().toISOString() }, { onConflict: "organization_id" });
   return !error;
 }
