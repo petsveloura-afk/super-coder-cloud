@@ -13,13 +13,13 @@ export function countItems(result: unknown, depth = 0): number {
 
 /** Expected cadence of each scheduled job (minutes) — used to flag a job that stopped running. */
 export const JOB_CADENCE_MIN: Record<string, number> = {
-  social: 5,
+  social: 2,
   "social-brain": 5,
   growth: 5,
-  agents: 5,
-  "meta-sync": 5,
+  agents: 10,
+  "meta-sync": 1,
   followups: 5,
-  "billing-sweep": 5,
+  "billing-sweep": 60,
 };
 
 export type JobHealth = "ok" | "late" | "failing" | "never";

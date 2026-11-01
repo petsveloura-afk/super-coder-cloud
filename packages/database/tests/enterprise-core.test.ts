@@ -46,6 +46,13 @@ d("enterprise core (real Postgres)", () => {
     await expect(db.as(owner, (q) => q(`select public.start_job_run('x', 10)`))).rejects.toThrow();
   });
 
+  it("the database job clock validates its input and is not callable by users", async () => {
+    await expect(db.q(`select public.schedule_platform_jobs('http://insecure', 'secret-12345')`)).rejects.toThrow(/https/);
+    await expect(db.q(`select public.schedule_platform_jobs('https://x.example', 'short')`)).rejects.toThrow(/too short/);
+    await expect(db.as(owner, (q) => q(`select public.schedule_platform_jobs('https://x.example', 'secret-12345')`))).rejects.toThrow();
+    await expect(db.as(owner, (q) => q(`select public.unschedule_platform_jobs()`))).rejects.toThrow();
+  });
+
   it("app errors are grouped by fingerprint", async () => {
     await db.q(`select public.record_app_error('fp1', 'server', '/he/inbox', 'boom', 'd1', $1)`, [org]);
     await db.q(`select public.record_app_error('fp1', 'server', '/he/inbox', 'boom', 'd2', $1)`, [org]);

@@ -66,9 +66,16 @@ export async function testEmailAction(input: { locale: string }): Promise<Action
   const { data: u } = await a.auth.admin.getUserById(ctx.userId);
   const to = u?.user?.email;
   if (!to) return { error: "errors.generic" };
-  const { sendEmail, escapeHtml } = await import("@/lib/email/send");
-  const text = locale === "en" ? "✅ Test email from Super Coder Cloud — emails from your business arrive." : locale === "ar" ? "✅ رسالة اختبار من Super Coder Cloud — رسائل عملك تصل." : "✅ מייל בדיקה מ-Super Coder Cloud — המיילים של העסק מגיעים.";
-  const r = await sendEmail({ to, subject: text.slice(0, 60), html: `<p dir="auto" style="font-family:system-ui,sans-serif">${escapeHtml(text)}</p>`, text, orgId: ctx.org.id });
+  const { sendEmail } = await import("@/lib/email/send");
+  const { renderEmailHtml } = await import("@/lib/channels/email-core");
+  // a real, well-formed message (greeting, sentences, signature, no emoji / link-only body) — short emoji-only test
+  // mails are what spam filters flag first
+  const T = {
+    he: { subject: `בדיקת שליחת מיילים — ${ctx.org.name}`, body: `שלום,\n\nזו הודעת בדיקה ממערכת Super Coder Cloud של ${ctx.org.name}.\nאם ההודעה הגיעה לתיבת הדואר הנכנס — המיילים של העסק נשלחים כמו שצריך.\nאם היא הגיעה לספאם, סמנו אותה "לא ספאם" כדי שהבאות יגיעו לתיבה.\n\nבברכה,\n${ctx.org.name}` },
+    en: { subject: `Email delivery check — ${ctx.org.name}`, body: `Hello,\n\nThis is a test message from the Super Coder Cloud system of ${ctx.org.name}.\nIf it reached your inbox, your business emails are being delivered correctly.\nIf it landed in spam, mark it "Not spam" so the next ones reach the inbox.\n\nBest regards,\n${ctx.org.name}` },
+    ar: { subject: `فحص إرسال البريد — ${ctx.org.name}`, body: `مرحبًا،\n\nهذه رسالة اختبار من نظام Super Coder Cloud الخاص بـ ${ctx.org.name}.\nإذا وصلت إلى البريد الوارد فإن رسائل عملك تُرسل بشكل صحيح.\nإذا وصلت إلى الرسائل المزعجة، علّمها "ليست مزعجة" لتصل الرسائل التالية إلى الوارد.\n\nمع التحية،\n${ctx.org.name}` },
+  }[locale];
+  const r = await sendEmail({ to, subject: T.subject, html: renderEmailHtml(T.body, { brand: ctx.org.name }), text: T.body, orgId: ctx.org.id });
   return r.sent ? { ok: true, message: "ops.testSent", messageParams: { to } } : { error: "ops.testFailed" };
 }
 

@@ -87,7 +87,9 @@ export async function loadMissionControl(orgId: string, platformAdmin: boolean):
     surveys: { enabled: Boolean(s?.enabled), answered30d: ans.length, avg: surveyAverage(ans) },
   };
   const items = opsItems(facts);
-  const channelLevels: OpsLevel[] = health.rows.map((r) => (r.level === "error" ? "error" : r.level === "warning" ? "warn" : "ok"));
+  // the official WhatsApp number waiting for Meta is not an outage while WhatsApp works through QR
+  const qrOk = health.rows.some((r) => r.kind === "whatsapp_qr" && r.level !== "error");
+  const channelLevels: OpsLevel[] = health.rows.map((r) => (r.level === "error" ? (r.kind === "whatsapp" && qrOk ? "warn" : "error") : r.level === "warning" ? "warn" : "ok"));
   let jobs: JobRow[] | null = null;
   let errors: ErrorRow[] | null = null;
   if (platformAdmin) {
