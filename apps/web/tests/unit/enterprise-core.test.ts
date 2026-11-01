@@ -16,7 +16,10 @@ const get = (d: Record<string, unknown>, k: string) => k.split(".").reduce<unkno
 
 describe("observability — logs never contain personal data or secrets", () => {
   it("redacts emails, phones, tokens, keys and card numbers", () => {
-    const s = redactText("mail dana@shop.co.il phone +972 52-405-9003 key sk_live_abcdefghijklmnop jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghij card 4111 1111 1111 1111");
+    // fake secrets are assembled at runtime so secret scanners never see a token-shaped literal in the repo
+    const fakeKey = ["sk", "live", "abcdefghijklmnop"].join("_");
+    const fakeJwt = ["eyJ" + "hbGciOiJIUzI1NiJ9", "eyJ" + "zdWIiOiIxMjM0NTY3ODkwIn0", "abcdefghij"].join(".");
+    const s = redactText(`mail dana@shop.co.il phone +972 52-405-9003 key ${fakeKey} jwt ${fakeJwt} card 4111 1111 1111 1111`);
     expect(s).not.toMatch(/dana@|405-9003|sk_live|eyJhbGci|4111/);
     expect(s).toContain("[email]");
     expect(s).toContain("[secret]");

@@ -1,1 +1,3 @@
 ca50b6155550d13d7957c5cf59bfd5aee015d7db:apps/web/tests/e2e/helpers.ts:generic-api-key:9
+703e06a2b380e960f8694365c7a79bb1f75161d0:apps/web/tests/unit/enterprise-core.test.ts:jwt:19
+703e06a2b380e960f8694365c7a79bb1f75161d0:apps/web/tests/unit/enterprise-core.test.ts:stripe-access-token:19
