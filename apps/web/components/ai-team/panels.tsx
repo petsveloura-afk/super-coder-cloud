@@ -733,7 +733,17 @@ export function SettingsPanel({ data, onRefresh }: { data: TeamPageData; onRefre
       {data.canManage ? (
         <Card className="space-y-3 p-5">
           <label className="flex items-center gap-2 font-semibold">
-            <input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={s.enabled} onChange={(e) => act(async () => { const r = await setTeamEnabledAction({ locale, enabled: e.target.checked }); if (!r.error) setS({ ...s, enabled: e.target.checked }); return r; })} data-testid="team-enabled" />
+            <input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={s.enabled} onChange={(e) => {
+                // optimistic: the box follows the click at once (and the value is read before awaiting); reverts if the server refuses
+                const on = e.target.checked;
+                const before = s;
+                setS({ ...s, enabled: on });
+                void act(async () => {
+                  const r = await setTeamEnabledAction({ locale, enabled: on });
+                  if (r.error) setS(before);
+                  return r;
+                });
+              }} data-testid="team-enabled" />
             {t("aiTeam.settings.enabled")}
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
