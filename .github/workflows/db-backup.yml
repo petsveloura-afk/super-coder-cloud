@@ -51,6 +51,25 @@ jobs:
           openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in backup.tar.gz -out backup.tar.gz.enc -pass env:BACKUP_PASSPHRASE
           rm -rf backup backup.tar.gz
           ls -la backup.tar.gz.enc
+      # upgrade spec A5: prove the encrypted backup can be opened and is complete before keeping it
+      - name: Verify the backup (decrypt + contents)
+        if: steps.cfg.outputs.skip == 'false'
+        run: |
+          mkdir verify
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in backup.tar.gz.enc -out verify/b.tar.gz -pass env:BACKUP_PASSPHRASE
+          tar xzf verify/b.tar.gz -C verify
+          test -s verify/schema.sql || { echo "::error::schema.sql is empty"; exit 1; }
+          test -s verify/data.sql || { echo "::error::data.sql is empty"; exit 1; }
+          tables=$(grep -cE '^CREATE TABLE' verify/schema.sql || true)
+          copies=$(grep -cE '^(COPY|INSERT INTO)' verify/data.sql || true)
+          for t in organizations contacts conversations messages; do
+            grep -qE "CREATE TABLE (IF NOT EXISTS )?\"?public\"?\.\"?$t\"?" verify/schema.sql || { echo "::error::table $t missing from the backup"; exit 1; }
+          done
+          echo "### Database backup verified" >> "$GITHUB_STEP_SUMMARY"
+          echo "- tables in schema: $tables" >> "$GITHUB_STEP_SUMMARY"
+          echo "- data blocks: $copies" >> "$GITHUB_STEP_SUMMARY"
+          echo "- encrypted size: $(stat -c%s backup.tar.gz.enc) bytes" >> "$GITHUB_STEP_SUMMARY"
+          rm -rf verify
       - uses: actions/upload-artifact@v4
         if: steps.cfg.outputs.skip == 'false'
         with:

@@ -27,5 +27,15 @@ export async function updateSession(request: NextRequest, response: NextResponse
   const { data } = await supabase.auth.getClaims();
   const sub = data?.claims?.sub;
   const user = typeof sub === "string" && sub ? { id: sub } : null;
-  return { response: res, user };
+  // spec I1: a user who turned on two-step sign-in must enter the code before the app opens (local check, no network)
+  let needsMfa = false;
+  if (user) {
+    try {
+      const { data: a } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      needsMfa = a?.nextLevel === "aal2" && a.currentLevel !== "aal2";
+    } catch {
+      needsMfa = false;
+    }
+  }
+  return { response: res, user, needsMfa };
 }

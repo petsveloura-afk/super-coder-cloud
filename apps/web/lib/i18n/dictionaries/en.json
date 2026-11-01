@@ -39,7 +39,8 @@
     "agents": "AI team",
     "social": "Social & reviews",
     "guide": "User guide",
-    "calculators": "Calculators"
+    "calculators": "Calculators",
+    "health": "Mission Control"
   },
   "common": {
     "save": "Save",
@@ -465,7 +466,17 @@
     "billing_plan_changed": "Plan changed",
     "ai_agents_insert": "AI agent created",
     "routing_updated": "Lead routing updated",
-    "platform_overrides": "Platform admin overrides"
+    "platform_overrides": "Platform admin overrides",
+    "export": "Export CSV",
+    "delivery_canceled": "Delivery canceled",
+    "delivery_retried": "Delivery retried",
+    "delivery_retried_all": "All failed deliveries retried",
+    "surveys_settings": "Satisfaction survey settings updated",
+    "security_mfa_enabled": "Two-step sign-in turned on",
+    "security_mfa_disabled": "Two-step sign-in turned off",
+    "security_signed_out_others": "Signed out of all other devices",
+    "contacts_erased": "Contact details erased (privacy)",
+    "contacts_privacy_export": "Contact data exported (privacy)"
   },
   "billing": {
     "title": "Billing & plans",
@@ -4494,7 +4505,8 @@
     "integrations": "Integrations",
     "settings": "Settings",
     "billing": "Plan & billing",
-    "calculators": "Business calculators"
+    "calculators": "Business calculators",
+    "health": "Mission Control — what works and what needs fixing"
   },
   "conversions": {
     "title": "Ad platform conversions",
@@ -5223,6 +5235,18 @@
       "v_telegram": "Telegram",
       "v_whatsapp": "WhatsApp status",
       "v_linkedin": "LinkedIn"
+    },
+    "drawer": {
+      "title": "Your post is ready",
+      "subtitle": "Review, edit and publish — or keep it as a draft",
+      "publishNow": "Approve and publish now",
+      "newVersion": "Fresh version",
+      "delete": "Delete",
+      "new": "New",
+      "show": "Show",
+      "stageText": "Writing the text…",
+      "stageMedia": "Creating the image or video…",
+      "stageSave": "Saving and opening the editor…"
     }
   },
   "market": {
@@ -6156,5 +6180,189 @@
   },
   "reviewGate": {
     "negativeNotification": "😞 A customer rated {rating}/5 — get back to them personally now"
+  },
+  "apiDocs": {
+    "title": "API reference",
+    "getKey": "Create an API key"
+  },
+  "ops": {
+    "title": "Mission Control",
+    "subtitle": "Everything connected, what failed and what needs action — in one place, with one-click fixes",
+    "overall": {
+      "ok": "All systems normal",
+      "warn": "A few things to check",
+      "error": "Something needs attention now",
+      "off": "Nothing connected yet"
+    },
+    "checkedAt": "Last checked: {at}",
+    "recheck": "Check again",
+    "services": "Services",
+    "channels": "Channels",
+    "level": {
+      "ok": "OK",
+      "warn": "Check",
+      "error": "Failing",
+      "off": "Not connected"
+    },
+    "item": {
+      "email": "Email",
+      "social": "Social networks",
+      "payments": "Payments",
+      "deliveries": "Delivery queue",
+      "sites": "Websites & domains",
+      "surveys": "Satisfaction surveys"
+    },
+    "r": {
+      "mailboxError": "The connected mailbox stopped working — reconnect it",
+      "emailOff": "No email service and no connected mailbox",
+      "emailFailed": "{n} emails were not sent this week",
+      "emailMailbox": "Emails go out from the business mailbox",
+      "emailProvider": "Emails go out through the platform email service",
+      "socialOff": "Facebook and Instagram are not connected",
+      "autopilotError": "The last daily post was not created — retrying in a few minutes",
+      "socialFailed": "{n} posts were not published this week",
+      "socialAutopilot": "Connected, daily post is on",
+      "socialOk": "Connected and publishing",
+      "paymentsOk": "Payments are active",
+      "paymentsOff": "Payments are not active yet",
+      "dead": "{n} messages failed permanently — retry in one click",
+      "queueLate": "{n} messages waiting more than 15 minutes",
+      "retrying": "{n} messages retrying automatically",
+      "deliveriesOk": "All messages delivered",
+      "domainPending": "{n} domains waiting for verification",
+      "sitesOk": "{n} websites live",
+      "sitesOff": "No website published yet",
+      "surveysOff": "Surveys are off — turn them on to measure satisfaction",
+      "surveysLow": "Low average score ({avg} of 5) — review the answers",
+      "surveysOk": "{n} answers in the last 30 days"
+    },
+    "fix": "Fix now",
+    "sendTest": "Send a test email",
+    "testSent": "Test email sent to {to}",
+    "testFailed": "The test email was not sent — connect a business mailbox in Integrations",
+    "noChannels": "No channel connected yet.",
+    "connectNow": "Connect now",
+    "deliveries": "Failed deliveries (7 days)",
+    "retryAll": "Retry all",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "retried": "Queued again",
+    "retriedAll": "{count} messages queued again",
+    "canceled": "Delivery canceled",
+    "noFailures": "No failed deliveries ✓",
+    "job": {
+      "failed": "Retrying",
+      "dead": "Failed"
+    },
+    "kind": {
+      "email": "Email",
+      "webhook": "Webhook",
+      "http": "HTTP",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "sms": "SMS",
+      "action": "Action",
+      "messenger": "Messenger",
+      "instagram": "Instagram"
+    },
+    "jobs": "Background jobs (platform admin)",
+    "jobsHint": "Jobs run every 5 minutes from GitHub Actions. A run that does not finish within 2 minutes counts as stuck.",
+    "jobHealth": {
+      "ok": "Running",
+      "late": "Not run for a while",
+      "failing": "Failing",
+      "never": "Never run"
+    },
+    "lastRun": "Last run: {at}",
+    "items": "{n} items",
+    "errors": "Recent errors (platform admin)",
+    "noErrors": "No open errors ✓",
+    "markResolved": "Resolved",
+    "resolved": "Marked as resolved",
+    "errorTitle": "Something went wrong on this screen",
+    "errorBody": "The error was recorded automatically. You can try again — the rest of the system keeps working.",
+    "eventId": "Event id",
+    "copyId": "Copy id",
+    "copied": "Copied",
+    "report": "Report to support"
+  },
+  "surveys": {
+    "title": "Satisfaction surveys",
+    "body": "After a conversation is closed, the customer gets one question with a one-click rating — on the channel they used. A low score alerts the team right away.",
+    "enable": "Send a survey automatically after a closed conversation",
+    "kind": "Survey type",
+    "kinds": {
+      "csat": "Satisfaction (1–5)",
+      "nps": "Recommendation NPS (0–10)",
+      "ces": "Effort (1–7)"
+    },
+    "delay": "Send after (minutes)",
+    "cooldown": "Don't ask again for (days)",
+    "question": "Custom question (optional)",
+    "defaultQ": {
+      "csat": "How satisfied were you with the service you received?",
+      "nps": "How likely are you to recommend us to a friend or colleague?",
+      "ces": "How easy was it to get what you needed from us?"
+    },
+    "stats": "{n} answers in 30 days · average {avg} of 5",
+    "noAnswers": "No answers yet",
+    "pageTitle": "Rate the service",
+    "notFound": "The link is invalid or expired",
+    "alreadyAnswered": "We already have your answer — thank you!",
+    "commentPh": "Anything to add? (optional)",
+    "send": "Send",
+    "thanks": "Thank you! Your answer helps us improve",
+    "invalid": "Invalid rating",
+    "lowScoreNotification": "A customer gave a low score ({kind} {score}) — worth following up"
+  },
+  "views": {
+    "saveCurrent": "Save view",
+    "name": "View name",
+    "namePh": "e.g. VIP customers",
+    "shareTeam": "Share with the team",
+    "shared": "Shared",
+    "delete": "Delete view",
+    "saved": "View saved",
+    "deleted": "View deleted",
+    "tooMany": "You can save up to 20 views",
+    "hint": "Filter and search — then save the view to reuse it"
+  },
+  "security": {
+    "title": "Security",
+    "subtitle": "Two-step sign-in and connected devices",
+    "mfaTitle": "Two-step sign-in",
+    "mfaBody": "Every sign-in also asks for a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password). Even someone who knows your password cannot get in.",
+    "on": "On",
+    "off": "Off",
+    "enable": "Turn on two-step sign-in",
+    "scan": "Scan the code with your authenticator app and type the 6 digits it shows.",
+    "orCode": "Or type it manually:",
+    "qrAlt": "QR code for the authenticator app",
+    "codeLabel": "6-digit code",
+    "confirm": "Confirm and turn on",
+    "enabled": "Two-step sign-in is on ✓",
+    "disabled": "Two-step sign-in is off",
+    "disable": "Turn off",
+    "app": "Authenticator app",
+    "badCode": "Wrong or expired code — try the next code in the app",
+    "needCode": "To turn it off, sign in again with the code from the app",
+    "enrollFailed": "Could not start — try again",
+    "sessionsTitle": "Connected devices",
+    "sessionsBody": "Forgot to sign out on another computer? Sign out of every other device in one click — this device stays signed in.",
+    "signOutOthers": "Sign out of all other devices",
+    "othersOut": "All other devices were signed out",
+    "loginTitle": "Two-step sign-in",
+    "loginBody": "Type the 6-digit code from your authenticator app",
+    "verify": "Sign in"
+  },
+  "privacy": {
+    "export": "Export data",
+    "erase": "Erase details",
+    "eraseTitle": "Erase this contact's details",
+    "eraseBody": "Name, email, phone, notes and message texts are erased permanently. The business keeps statistics without identifying details. This cannot be undone.",
+    "typeErase": "To confirm, type ERASE",
+    "eraseNow": "Erase permanently",
+    "erased": "The details were erased",
+    "confirmNeeded": "Type ERASE to confirm"
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { cronRoute } from "@/lib/ops/job-runs";
 import { timingSafeEqual } from "node:crypto";
 
 export const dynamic = "force-dynamic";
@@ -37,5 +38,7 @@ async function handle(request: NextRequest) {
   return NextResponse.json({ ok: true, socialPosts: result, metaSync, metaWebhook }, { headers: { "Cache-Control": "no-store" } });
 }
 
-export const GET = handle;
-export const POST = handle;
+// spec A4: every run is recorded in job_runs and never overlaps itself
+const recorded = cronRoute("social", handle);
+export const GET = recorded;
+export const POST = recorded;

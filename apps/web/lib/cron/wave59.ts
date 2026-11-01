@@ -8,6 +8,14 @@ import "server-only";
 export function wave59Steps(): [string, () => Promise<Record<string, unknown>>][] {
   return [
     [
+      // upgrade spec D4: satisfaction surveys after a closed conversation (one per contact per cooldown)
+      "surveys",
+      async () => {
+        const { sendDueSurveys } = await import("@/lib/surveys");
+        return { ...(await sendDueSurveys(6_000)) };
+      },
+    ],
+    [
       "coach",
       async () => {
         const { runWeeklyCoach } = await import("@/lib/ai/coach");

@@ -16,6 +16,7 @@ import { ConversationPolicyCard, LeadRoutingCard, MyChannelsCard, type MyChannel
 import { memberOptions } from "@/lib/lookups";
 import { CalendarCard, type CalendarConn } from "@/components/settings/calendar-card";
 import { PushCard } from "@/components/settings/push-card";
+import { SecurityCard } from "@/components/settings/security-card";
 import { vapidReady } from "@/lib/push/webpush-core";
 import { ProfileProCard, type MyStats } from "@/components/settings/profile-pro";
 
@@ -135,6 +136,11 @@ export default async function SettingsPage({ params, searchParams }: { params: P
         <div id="push" className="scroll-mt-20">
           <PushCard vapidKey={vapidReady() ? (process.env.VAPID_PUBLIC_KEY ?? null) : null} />
         </div>
+        {/* spec I1 / I2: two-step sign-in + sign out other devices */}
+        <Card id="security" className="scroll-mt-24">
+          <CardHeader title={t("security.title")} description={t("security.subtitle")} />
+          <SecurityCard />
+        </Card>
         <Card id="calendar" className="scroll-mt-24">
           <CardHeader title={t("calendar.title")} description={t("calendar.subtitle")} />
           <CalendarCard
@@ -192,7 +198,15 @@ export default async function SettingsPage({ params, searchParams }: { params: P
 
         {audit ? (
           <Card>
-            <CardHeader title={t("settings.auditLog")} />
+            <CardHeader
+              title={t("settings.auditLog")}
+              action={
+                // spec I5: export the audit log (CSV, last 90 days)
+                <a href={`/api/v1/audit/export?org=${ctx.org.id}&days=90`} className="inline-flex h-9 items-center rounded-xl border border-line px-3 text-[12.5px] font-medium hover:bg-surface-hover" data-testid="audit-export">
+                  {t("audit.export")}
+                </a>
+              }
+            />
             {audit.length === 0 ? (
               <p className="p-5 text-sm text-subtle">{t("settings.auditEmpty")}</p>
             ) : (

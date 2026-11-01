@@ -5,7 +5,7 @@ import { updateSession } from "@/lib/supabase/proxy-session";
 
 /** Routes reachable without a session (after the /{locale} prefix). */
 // wave 21: "/legal" — the platform's privacy policy, terms and data-deletion pages (Meta / Google app review)
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/offline", "/setup", "/f", "/book", "/c", "/s", "/q", "/help", "/t", "/chat", "/a", "/legal"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/offline", "/setup", "/f", "/book", "/c", "/s", "/q", "/help", "/t", "/chat", "/a", "/legal", "/r", "/docs"];
 
 /* ---------------- wave 13: websites on their own domain / subdomain ---------------- */
 const hostCache = new Map<string, { at: number; v: { slug: string; lang: string } | null }>();
@@ -102,6 +102,12 @@ export async function proxy(request: NextRequest) {
   if (!session.user && !isPublic) {
     const url = new URL(`/${locale}/login`, request.url);
     if (subPath !== "/") url.searchParams.set("next", `/${locale}${subPath === "/" ? "" : subPath}${search}`);
+    return NextResponse.redirect(url);
+  }
+  // spec I1: second sign-in step for accounts with an authenticator app
+  if (session.user && session.needsMfa && !isPublic && subPath !== "/mfa") {
+    const url = new URL(`/${locale}/mfa`, request.url);
+    url.searchParams.set("next", `/${locale}${subPath === "/" ? "" : subPath}${search}`);
     return NextResponse.redirect(url);
   }
   if (session.user && (subPath === "/login" || subPath === "/signup")) {

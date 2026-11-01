@@ -16,7 +16,8 @@ import { PostExtras, PostMediaBadges } from "@/components/social/post-extras";
 import { PostPower } from "@/components/social/post-power";
 import { BrainPanel, type BrainReview, type BrainTopPost } from "@/components/social/brain-panel";
 import type { AutopilotSettings, Learned } from "@/lib/social/brain-core";
-import { recyclePostAction } from "@/app/[locale]/(dashboard)/social/brain-actions";
+import { getPostAction, recyclePostAction } from "@/app/[locale]/(dashboard)/social/brain-actions";
+import { Dialog } from "@/components/ui/dialog";
 import { BrainCircuit, Flame, Heart, MessageCircle, Repeat2, Share2 } from "lucide-react";
 import { filterComments, filterPosts, filterReviews, type CommentFilter, type PostFilter, type ReviewFilter } from "@/lib/social/insights";
 import { approveAllDraftsAction, commentStatusAction, duplicatePostAction, postStatusAction, replyCommentAction, replyReviewAction, reviewSettingsAction, savePostAction, saveSocialSettingsAction } from "@/app/[locale]/(dashboard)/social/actions";
@@ -157,7 +158,7 @@ function CommentCard({ c, canReply }: { c: CommentRow; canReply: boolean }) {
   );
 }
 
-function PostEditor({ initial, onDone, presetAt, brand }: { initial?: PostRow | null; onDone: () => void; presetAt?: string | null; brand?: string }) {
+export function PostEditor({ initial, onDone, presetAt, brand }: { initial?: PostRow | null; onDone: () => void; presetAt?: string | null; brand?: string }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [body, setBody] = useState(initial?.body ?? "");
@@ -247,7 +248,64 @@ function PostEditor({ initial, onDone, presetAt, brand }: { initial?: PostRow | 
   );
 }
 
-function PostCard({ p, onEdit }: { p: PostRow; onEdit: () => void }) {
+/**
+ * W1-B1 — the post that was just created opens here at once: the full editor (text, media, Motion Studio, phone
+ * preview, versions, hashtags, schedule) plus one-click actions — publish now, a fresh version, duplicate, delete.
+ */
+function PostDrawer({ post, onClose, brand }: { post: PostRow; onClose: () => void; brand?: string }) {
+  const { t, locale } = useI18n();
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const act = (fn: () => Promise<{ error?: string; message?: string; messageParams?: Record<string, string | number> }>, close = true) =>
+    start(async () => {
+      const r = await fn();
+      if (r.error) toast.error(t(r.error, r.messageParams));
+      else {
+        toast.success(t(r.message ?? "common.saved", r.messageParams));
+        router.refresh();
+        if (close) onClose();
+      }
+    });
+  const editable = ["draft", "scheduled", "failed"].includes(post.status);
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()} title={t("social.drawer.title")} description={t("social.drawer.subtitle")} className="sm:max-w-3xl">
+      <div className="space-y-3" data-testid="post-drawer">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone={post.status === "draft" ? "warning" : post.status === "published" ? "success" : "accent"}>{t(`social.postStatus.${post.status}`)}</Badge>
+          {post.pillar ? <Badge tone="neutral">{post.pillar}</Badge> : null}
+          <span className="text-[12px] text-subtle">{when(locale, post.scheduled_at)}</span>
+          <span className="ms-auto flex flex-wrap gap-1.5">
+            {editable ? (
+              <Button size="sm" loading={pending} onClick={() => act(() => postStatusAction({ locale, id: post.id, action: "now" }))} data-testid="drawer-publish">
+                <Send className="h-3.5 w-3.5 rtl:-scale-x-100" /> {t("social.drawer.publishNow")}
+              </Button>
+            ) : null}
+            <Button size="sm" variant="secondary" disabled={pending} onClick={() => act(() => recyclePostAction({ locale, id: post.id }))}>
+              <Repeat2 className="h-3.5 w-3.5" /> {t("social.drawer.newVersion")}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={pending} onClick={() => act(() => duplicatePostAction({ locale, id: post.id }))}>
+              <Copy className="h-3.5 w-3.5" /> {t("social.pro.duplicate")}
+            </Button>
+            {editable ? (
+              <Button size="sm" variant="ghost" className="text-danger" disabled={pending} onClick={() => act(() => postStatusAction({ locale, id: post.id, action: "cancel" }))}>
+                <Trash2 className="h-3.5 w-3.5" /> {t("social.drawer.delete")}
+              </Button>
+            ) : null}
+          </span>
+        </div>
+        {editable ? (
+          <PostEditor initial={post} brand={brand} onDone={onClose} />
+        ) : (
+          <p className="whitespace-pre-wrap rounded-xl border border-line bg-surface p-3 text-sm" dir="auto">
+            {post.body}
+          </p>
+        )}
+      </div>
+    </Dialog>
+  );
+}
+
+function PostCard({ p, onEdit, isNew = false }: { p: PostRow; onEdit: () => void; isNew?: boolean }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -271,7 +329,12 @@ function PostCard({ p, onEdit }: { p: PostRow; onEdit: () => void }) {
       }
     });
   return (
-    <li className="rounded-2xl border border-line bg-surface p-4" data-post={p.status}>
+    <li id={`post-${p.id}`} className={cn("rounded-2xl border border-line bg-surface p-4 transition-shadow duration-700", isNew && "border-accent shadow-[0_0_0_3px_var(--accent-soft)]")} data-post={p.status} data-new={isNew ? "1" : undefined}>
+      {isNew ? (
+        <span className="mb-2 inline-flex items-center gap-1 rounded-full bg-accent-solid px-2 py-0.5 text-[11px] font-semibold text-accent-fg">
+          <Sparkles className="h-3 w-3" /> {t("social.drawer.new")}
+        </span>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2 text-[12px]">
         <Badge tone={p.status === "published" ? "success" : p.status === "failed" ? "danger" : p.status === "draft" ? "warning" : "accent"}>{t(`social.postStatus.${p.status}`)}</Badge>
         {p.source === "agent" ? (
@@ -490,6 +553,14 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
   const { t, locale } = useI18n();
   const [tab, setTab] = useState<Tab>("comments");
   const [editing, setEditing] = useState<PostRow | null | "new">(null);
+  // W1-B1: the post created by the brain opens in the drawer and is highlighted in the calendar
+  const [drawer, setDrawer] = useState<PostRow | null>(null);
+  const [newId, setNewId] = useState<string | null>(null);
+  const openCreated = async (id: string) => {
+    setNewId(id);
+    const r = await getPostAction({ locale, id });
+    if (r.data?.post) setDrawer(r.data.post as unknown as PostRow);
+  };
   const [presetAt, setPresetAt] = useState<string | null>(null);
   const [pf, setPf] = useState<PostFilter>({ status: "all", platform: "all", q: "" });
   const [cf, setCf] = useState<CommentFilter>({ status: "all", sentiment: "all", platform: "all", q: "" });
@@ -604,7 +675,7 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
               {shownPosts.length ? (
                 <ul className="grid gap-3 lg:grid-cols-2">
                   {shownPosts.map((x) => (
-                    <PostCard key={x.id} p={x} onEdit={() => setEditing(x)} />
+                    <PostCard key={x.id} p={x} isNew={x.id === newId} onEdit={() => setEditing(x)} />
                   ))}
                 </ul>
               ) : (
@@ -657,7 +728,8 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
         )
       ) : null}
       {tab === "settings" ? <SettingsPanel s={p.settings} google={p.google} /> : null}
-      {tab === "brain" && p.brain ? <BrainPanel settings={p.brain.settings} learned={p.brain.learned} topPosts={p.brain.topPosts} reviews={p.brain.reviews} facebook={Boolean(p.facebook)} instagram={Boolean(p.instagram)} telegramBot={p.brain.telegramBot} videoReady={p.brain.videoReady} /> : null}
+      {drawer ? <PostDrawer post={drawer} brand={p.brain?.brand} onClose={() => { setDrawer(null); router.refresh(); }} /> : null}
+      {tab === "brain" && p.brain ? <BrainPanel onCreated={(id) => void openCreated(id)} onShowPost={(id) => { setNewId(id); setTab("posts"); setTimeout(() => document.getElementById(`post-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 350); }} settings={p.brain.settings} learned={p.brain.learned} topPosts={p.brain.topPosts} reviews={p.brain.reviews} facebook={Boolean(p.facebook)} instagram={Boolean(p.instagram)} telegramBot={p.brain.telegramBot} videoReady={p.brain.videoReady} /> : null}
     </section>
   );
 }

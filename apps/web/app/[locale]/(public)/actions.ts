@@ -275,3 +275,20 @@ export async function markArticleHelpful(input: { id: string }): Promise<PublicR
   await createAnonClient().rpc("kb_article_helpful", { p_id: input.id });
   return { ok: true };
 }
+
+/** Spec D4 — a customer's survey answer (public, token-only, rate-limited). */
+export async function answerSurveyAction(input: { token: string; score: number; comment?: string }): Promise<{ ok?: boolean; error?: string }> {
+  const token = String(input.token ?? "");
+  if (!/^[a-f0-9]{16,64}$/i.test(token) || !Number.isInteger(input.score)) return { error: "surveys.invalid" };
+  const { createClient: createServerClient } = await import("@/lib/supabase/server");
+  const supabase = await createServerClient();
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { data: allowed } = await createAdminClient().rpc("public_rate_limit", { p_bucket: `survey:${token}`, p_limit: 5, p_window_seconds: 600 });
+    if (allowed === false) return { error: "errors.rateLimited" };
+  }
+  const { data, error } = await supabase.rpc("answer_survey", { p_token: token, p_score: input.score, p_comment: String(input.comment ?? "").slice(0, 1000) });
+  if (error) return { error: "errors.generic" };
+  if (data === "ok" || data === "already") return { ok: true };
+  return { error: data === "not_found" ? "surveys.notFound" : "surveys.invalid" };
+}

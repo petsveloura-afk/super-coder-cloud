@@ -14,6 +14,7 @@ import { contactSearchFilter, sanitizeSearch } from "@/lib/search";
 import { formatDate, formatNumber, formatPhone } from "@/lib/format";
 import { cn, initials } from "@/lib/utils";
 import { ScreenPulse } from "@/components/ui/screen-pulse";
+import { SavedViews, type SavedViewRow } from "@/components/ui/saved-views";
 import { contactsPulse } from "@/lib/insights/screens-core";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -92,6 +93,8 @@ export default async function ContactsPage({ params, searchParams }: { params: P
   };
 
   const canWrite = ctx.can("contacts.write");
+  const { data: viewRows } = await supabase.from("saved_views").select("id, name, filters, shared, user_id").eq("organization_id", ctx.org.id).eq("entity", "contacts").order("created_at").limit(30);
+  const views: SavedViewRow[] = ((viewRows ?? []) as { id: string; name: string; filters: Record<string, string>; shared: boolean; user_id: string }[]).map((v) => ({ id: v.id, name: v.name, filters: v.filters ?? {}, shared: v.shared, mine: v.user_id === ctx.userId }));
   const Prev = locale === "en" ? ChevronLeft : ChevronRight;
   const Next = locale === "en" ? ChevronRight : ChevronLeft;
 
@@ -116,6 +119,8 @@ export default async function ContactsPage({ params, searchParams }: { params: P
         }
       />
       <ScreenPulse screen="contacts" pulse={pulse} locale={locale} t={t} />
+      {/* spec B4: saved views (personal / shared) */}
+      <SavedViews entity="contacts" base="/crm" views={views} current={{ q: q || undefined, status: query.status, hot: hotOnly ? "1" : undefined }} />
 
       {/* Filters */}
       <Card className="mb-4 p-3">

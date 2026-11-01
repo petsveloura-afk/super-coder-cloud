@@ -38,6 +38,8 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "support", label: "nav.support", section: "ops", phase: null, permission: "tickets.read" },
   { key: "finance", label: "nav.finance", section: "ops", phase: null, permission: "finance.read" },
   { key: "integrations", label: "nav.integrations", section: "ops", phase: null, permission: "integrations.manage" },
+  // upgrade spec A1: Mission Control — what is connected, what failed, what needs action
+  { key: "health", label: "nav.health", section: "ops", phase: null, permission: "settings.manage" },
   { key: "team", label: "nav.team", section: "ops", phase: null, permission: "members.read" },
   { key: "billing", label: "nav.billing", section: "ops", phase: null, permission: "billing.read" },
   // wave 23: the user guide (29 steps with marked screenshots and search) — every member

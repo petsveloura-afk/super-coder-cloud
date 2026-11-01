@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { cronRoute } from "@/lib/ops/job-runs";
 import { timingSafeEqual } from "node:crypto";
 import { runFollowups } from "@/lib/ai/followups";
 import { runPendingReplies } from "@/lib/ai/autopilot";
@@ -33,5 +34,7 @@ async function handle(request: NextRequest) {
   return NextResponse.json({ ok: true, ...summary, pending, watchdog, bizHealth, healed, schedules }, { headers: { "Cache-Control": "no-store" } });
 }
 
-export const GET = handle;
-export const POST = handle;
+// spec A4: every run is recorded in job_runs and never overlaps itself
+const recorded = cronRoute("followups", handle);
+export const GET = recorded;
+export const POST = recorded;

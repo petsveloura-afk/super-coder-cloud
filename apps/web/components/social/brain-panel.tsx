@@ -65,7 +65,7 @@ function Bar({ label, value, max, hint }: { label: string; value: number; max: n
   );
 }
 
-export function BrainPanel(p: { settings: AutopilotSettings; learned: Learned | null; topPosts: BrainTopPost[]; reviews: BrainReview[]; facebook: boolean; instagram: boolean; telegramBot: boolean; videoReady: boolean }) {
+export function BrainPanel(p: { onCreated?: (id: string) => void; onShowPost?: (id: string) => void; settings: AutopilotSettings; learned: Learned | null; topPosts: BrainTopPost[]; reviews: BrainReview[]; facebook: boolean; instagram: boolean; telegramBot: boolean; videoReady: boolean }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [s, setS] = useState(p.settings);
@@ -77,17 +77,30 @@ export function BrainPanel(p: { settings: AutopilotSettings; learned: Learned | 
   const set = <K extends keyof AutopilotSettings>(k: K, v: AutopilotSettings[K]) => setS((x) => ({ ...x, [k]: v }));
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const holidays = useMemo(() => upcomingHolidays(today, 45).slice(0, 4), [today]);
-  const run = (key: string, fn: () => Promise<{ error?: string; message?: string; messageParams?: Record<string, string | number> }>) =>
+  // W1-B1: real progress stages while the post is written and illustrated, and the result opens right away
+  const [stage, setStage] = useState(0);
+  const [failed, setFailed] = useState<{ key: string; retry: () => void; message: string } | null>(null);
+  const run = (key: string, fn: () => Promise<{ error?: string; message?: string; messageParams?: Record<string, string | number>; data?: unknown }>) =>
     start(async () => {
       setBusy(key);
+      setFailed(null);
+      setStage(0);
+      const timers = [setTimeout(() => setStage(1), 6000), setTimeout(() => setStage(2), 16000)];
       try {
         const r = await fn();
-        if (r.error) toast.error(t(r.error, r.messageParams));
-        else {
-          toast.success(t(r.message ?? "common.saved", r.messageParams));
+        if (r.error) {
+          toast.error(t(r.error, r.messageParams));
+          setFailed({ key, retry: () => run(key, fn), message: t(r.error, r.messageParams) });
+        } else {
+          const id = (r.data as { id?: string } | undefined)?.id;
+          if (id) {
+            toast.success(t(r.message ?? "common.saved", r.messageParams), { action: p.onShowPost ? { label: t("social.drawer.show"), onClick: () => p.onShowPost?.(id) } : undefined });
+            p.onCreated?.(id);
+          } else toast.success(t(r.message ?? "common.saved", r.messageParams));
           router.refresh();
         }
       } finally {
+        timers.forEach(clearTimeout);
         setBusy(null);
       }
     });
@@ -170,7 +183,23 @@ export function BrainPanel(p: { settings: AutopilotSettings; learned: Learned | 
           <Button className="mt-2 w-full" onClick={() => run("now", () => smartPostNowAction({ locale, topic }))} loading={busy === "now"} disabled={pending && busy !== "now"} data-testid="brain-now">
             <Sparkles className="h-4 w-4" /> {t("social.brain.nowBtn")}
           </Button>
-          {busy === "now" ? <p className="mt-2 text-[12px] text-subtle">{t("social.brain.working")}</p> : null}
+          {busy === "now" ? (
+            <ol className="mt-2 space-y-1 text-[12px]" aria-live="polite" data-testid="brain-stages">
+              {["social.drawer.stageText", "social.drawer.stageMedia", "social.drawer.stageSave"].map((k, i) => (
+                <li key={k} className={cn("flex items-center gap-1.5", i < stage ? "text-success" : i === stage ? "font-semibold text-accent" : "text-subtle")}>
+                  <span aria-hidden>{i < stage ? "✓" : i === stage ? "•" : "○"}</span> {t(k)}
+                </li>
+              ))}
+            </ol>
+          ) : null}
+          {failed?.key === "now" && busy !== "now" ? (
+            <div className="mt-2 rounded-xl border border-danger/30 bg-danger-soft/40 p-2 text-[12px]" role="alert">
+              <p className="text-danger">{failed.message}</p>
+              <Button size="sm" variant="secondary" className="mt-1.5" onClick={failed.retry}>
+                {t("common.retry")}
+              </Button>
+            </div>
+          ) : null}
         </div>
         <div className="rounded-2xl border border-line bg-surface p-4">
           <p className="flex items-center gap-2 font-semibold">

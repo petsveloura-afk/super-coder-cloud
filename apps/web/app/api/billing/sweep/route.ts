@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { cronRoute } from "@/lib/ops/job-runs";
 import { timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { publicEnv } from "@/lib/env";
@@ -43,5 +44,7 @@ async function handle(request: NextRequest) {
   return NextResponse.json({ ok: true, due: due.length, reminded });
 }
 
-export const GET = handle;
-export const POST = handle;
+// spec A4: every run is recorded in job_runs and never overlaps itself
+const recorded = cronRoute("billing-sweep", handle);
+export const GET = recorded;
+export const POST = recorded;

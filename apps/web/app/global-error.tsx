@@ -6,6 +6,8 @@ import { useEffect } from "react";
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error(error);
+    // report the crash once (grouped in Mission Control)
+    void fetch("/api/errors", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: `[global] ${error.message || "error"}`.slice(0, 1000), route: window.location.pathname, digest: error.digest }), keepalive: true }).catch(() => undefined);
   }, [error]);
   return (
     <html lang="he" dir="rtl">

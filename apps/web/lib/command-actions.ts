@@ -28,6 +28,7 @@ export const COMMAND_ACTIONS: CommandAction[] = [
   { key: "kb", href: "/support/kb", keywords: ["מאגר ידע", "שאלות", "kb", "knowledge", "faq", "معرفة"] },
   { key: "integrations", href: "/integrations", perm: "integrations.manage", keywords: ["חיבור", "אינטגרציה", "פיקסל", "integration", "pixel", "تكامل"] },
   { key: "settings", href: "/settings", keywords: ["הגדרות", "settings", "إعدادات"] },
+  { key: "health", href: "/health", perm: "settings.manage", keywords: ["מצב", "תקלות", "בריאות", "בדיקה", "health", "status", "errors", "حالة"] },
   { key: "calculators", href: "/calculators", keywords: ["מחשבון", "מעמ", "מע\"מ", "רווח", "הלוואה", "calculator", "vat", "margin", "حاسبة"] },
   { key: "billing", href: "/billing", keywords: ["מנוי", "חבילה", "תשלום", "billing", "plan", "اشتراك"] },
 ];

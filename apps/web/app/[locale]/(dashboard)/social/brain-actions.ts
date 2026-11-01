@@ -239,3 +239,20 @@ export async function testTelegramChannelAction(input: { locale: string; chat: s
   if (r.ok) return { ok: true, message: "social.brain.channelOk" };
   return { error: r.error === "telegram_not_connected" ? "social.brain.noBot" : "social.brain.channelFail" };
 }
+
+/** W1-B1 — one post with everything the editor needs (opened right after "create a post now"). */
+export async function getPostAction(input: { locale: string; id: string }): Promise<ActionState<{ post: Record<string, unknown> }>> {
+  const locale = loc(input.locale);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("campaigns.manage")) return { error: "errors.forbidden" };
+  if (!uuidSchema.safeParse(input.id).success) return { error: "validation.invalidId" };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("social_posts")
+    .select("id, platforms, body, image_url, scheduled_at, status, source, results, link_url, video_url, cta_type, cta_value, first_comment, pillar, origin, engagement, metrics, media_pending, headline")
+    .eq("id", input.id)
+    .eq("organization_id", ctx.org.id)
+    .maybeSingle();
+  if (error || !data) return { error: "errors.notFound" };
+  return { ok: true, data: { post: data as Record<string, unknown> } };
+}

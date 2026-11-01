@@ -9,6 +9,7 @@ import { Badge, Card, CardHeader, Ltr } from "@/components/ui/primitives";
 import { ContactDialog } from "@/components/crm/contact-form";
 import { StatusBadge } from "@/components/crm/status-badge";
 import { AddNoteForm, DeleteContactButton } from "@/components/crm/contact-detail-client";
+import { PrivacyTools } from "@/components/crm/privacy-tools";
 import { ContactAIAssistant } from "@/components/crm/ai-assistant";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
@@ -184,6 +185,8 @@ export default async function ContactDetailPage({ params, searchParams }: { para
             {ctx.can("inbox.reply") && ctx.can("contacts.write") && contact.phone && connectedChannels.includes("sms") ? <AgentCallButton contactId={contact.id} /> : null}
             {ctx.can("contacts.write") ? <ContactDialog contact={contact} /> : null}
             {ctx.can("contacts.delete") ? <DeleteContactButton id={contact.id} /> : null}
+            {/* spec I4: personal data export + anonymization */}
+            <PrivacyTools id={contact.id} canExport={ctx.can("contacts.export")} canErase={ctx.can("contacts.delete")} />
           </div>
         </div>
       </Card>

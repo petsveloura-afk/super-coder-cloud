@@ -42,7 +42,7 @@ import {
 const langName = (l: string) => (l === "en" ? "English" : l === "ar" ? "Arabic" : "Hebrew");
 
 export async function loadAutopilot(orgId: string): Promise<AutopilotSettings> {
-  const { data } = await createAdminClient().from("social_autopilot").select("*").eq("organization_id", orgId).maybeSingle();
+  const { data } = await createAdminClient().from("social_autopilot").select("enabled, mode, post_time, days, platforms, media, style, tone, pillars, hashtags, avoid, cta_type, cta_value, holidays, reviews_to_posts, telegram_chat, last_planned_for, last_error").eq("organization_id", orgId).maybeSingle();
   if (!data) return { ...AUTOPILOT_DEFAULTS };
   return { ...normalizeAutopilot(data as Record<string, unknown>), enabled: Boolean((data as { enabled?: boolean }).enabled), last_planned_for: ((data as { last_planned_for?: string | null }).last_planned_for ?? null) as string | null };
 }

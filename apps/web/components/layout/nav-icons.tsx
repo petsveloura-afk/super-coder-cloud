@@ -25,6 +25,7 @@ import {
   BookOpen,
   Zap,
   PhoneCall,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 
@@ -59,4 +60,6 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   operator: Zap,
   // wave 57
   phone: PhoneCall,
+  // upgrade spec A1
+  health: Activity,
 };

@@ -46,7 +46,7 @@ export default async function SocialPage({ params }: { params: Promise<{ locale:
   if (ctx.can("campaigns.manage")) {
     const { AUTOPILOT_DEFAULTS, normalizeAutopilot } = await import("@/lib/social/brain-core");
     const [ap, br, extra, top, rv, tg, org] = await Promise.all([
-      supabase.from("social_autopilot").select("*").eq("organization_id", ctx.org.id).maybeSingle(),
+      supabase.from("social_autopilot").select("enabled, mode, post_time, days, platforms, media, style, tone, pillars, hashtags, avoid, cta_type, cta_value, holidays, reviews_to_posts, telegram_chat, last_planned_for, last_error").eq("organization_id", ctx.org.id).maybeSingle(),
       supabase.from("social_brain").select("learned").eq("organization_id", ctx.org.id).maybeSingle(),
       supabase.from("social_posts").select("id, pillar, origin, engagement, metrics, media_pending").eq("organization_id", ctx.org.id).neq("status", "canceled").order("scheduled_at", { ascending: false }).limit(60),
       supabase.from("social_posts").select("id, body, engagement, image_url").eq("organization_id", ctx.org.id).in("status", ["published", "partial"]).not("engagement", "is", null).order("engagement", { ascending: false }).limit(3),
