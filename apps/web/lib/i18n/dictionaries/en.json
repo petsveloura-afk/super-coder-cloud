@@ -40,7 +40,8 @@
     "social": "Social & reviews",
     "guide": "User guide",
     "calculators": "Calculators",
-    "health": "Mission Control"
+    "health": "Mission Control",
+    "aiTeam": "My AI team"
   },
   "common": {
     "save": "Save",
@@ -79,7 +80,8 @@
     "profile": "Profile",
     "none": "None",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "add": "Add"
   },
   "auth": {
     "signIn": "Sign in",
@@ -412,7 +414,8 @@
     "offline": "You're offline",
     "offlineBody": "Content will come back as soon as you reconnect.",
     "goHome": "Back to home",
-    "rateLimited": "Too many requests. Try again in a few minutes."
+    "rateLimited": "Too many requests. Try again in a few minutes.",
+    "itemGone": "This item no longer exists or you don't have access to it"
   },
   "pwaPro": {
     "title": "Install the app on your home screen",
@@ -955,7 +958,9 @@
       "loaded": "Template loaded: {name}. Edit and save."
     },
     "badAnswer": "The AI did not return a valid answer — try again",
-    "siteBuiltPro": "Site built ✓ — {facts} real business details, {images} photos, quality score {score}/100"
+    "siteBuiltPro": "Site built ✓ — {facts} real business details, {images} photos, quality score {score}/100",
+    "self_check_timeout": "Checking the reply took too long — the original reply was used",
+    "empty_retry_timeout": "The model did not answer in time — try again"
   },
   "deals": {
     "pageTitle": "Deals & pipelines",
@@ -4516,7 +4521,8 @@
     "settings": "Settings",
     "billing": "Plan & billing",
     "calculators": "Business calculators",
-    "health": "Mission Control — what works and what needs fixing"
+    "health": "Mission Control — what works and what needs fixing",
+    "aiTeam": "Digital team"
   },
   "conversions": {
     "title": "Ad platform conversions",
@@ -6482,6 +6488,443 @@
       "body": "Meta did not accept the automatic invitation. Add them under App Roles → Roles → Add People → Testers, then mark as handled.",
       "done": "Mark as added",
       "doneConfirm": "Mark that this profile was added as a tester of the app?"
+    }
+  },
+  "aiTeam": {
+    "err": {
+      "approvalGone": "This approval was already handled or canceled",
+      "executeFailed": "Approved, but running it failed: {detail}",
+      "flagOff": "The AI team is not enabled for this business yet",
+      "goalShort": "Write a goal of at least a few words",
+      "noManager": "There is no manager in the team — add a general manager",
+      "notDraft": "The plan was already approved or canceled",
+      "notPending": "The task is not waiting to run",
+      "notWaiting": "The task is not waiting for an answer",
+      "off": "The AI team is off — turn it on in the settings",
+      "planUnreadable": "The manager could not build a plan — try phrasing the goal differently",
+      "stopped": "Emergency stop is on — the team is frozen",
+      "tooMany": "You reached the maximum number of employees (40)"
+    },
+    "msg": {
+      "answered": "Answer sent — the employee continues",
+      "approved": "Approved and done",
+      "bulk": "{done} approved, {failed} failed",
+      "canceled": "Task canceled",
+      "duplicated": "Employee duplicated (paused until you activate)",
+      "off": "Team turned off",
+      "on": "Team turned on",
+      "planned": "The plan is ready — review and approve",
+      "rejected": "Rejected — the employee will learn from it",
+      "released": "Emergency stop released",
+      "started": "Plan approved — {n} tasks on the board",
+      "stopped": "Emergency stop — the whole team is frozen",
+      "taskCreated": "Task added to the board",
+      "hired": "The employee joined the team"
+    },
+    "status": {
+      "done": "Done",
+      "awaiting_approval": "Waiting for your approval",
+      "awaiting_input": "Waiting for your answer",
+      "failed": "Failed",
+      "blocked": "Blocked",
+      "pending": "Pending",
+      "in_progress": "Working",
+      "draft": "Proposal",
+      "canceled": "Canceled"
+    },
+    "title": "My team",
+    "subtitle": "Professional digital employees: they know the business, remember, work on their own and ask for approval when needed",
+    "offBanner": "The team is off. Turn it on to get a ready starter team (manager, lead, support, sales, marketing, data and quality control).",
+    "turnOn": "Turn the team on",
+    "flagOff": {
+      "title": "The AI team is not enabled yet",
+      "body": "This feature is opened to businesses gradually. The platform admin can enable it in one click.",
+      "enable": "Enable for this business",
+      "enabled": "Enabled — loading the team…"
+    },
+    "summary": {
+      "members": "{n} employees",
+      "working": "{n} working",
+      "approvals": "{n} waiting for approval",
+      "questions": "{n} questions for you"
+    },
+    "tabs": {
+      "team": "Team",
+      "goals": "Goals & tasks",
+      "approvals": "Approvals",
+      "memory": "Memory",
+      "playbooks": "Playbooks",
+      "meeting": "Team meeting & performance",
+      "activity": "Activity",
+      "settings": "Settings"
+    },
+    "views": {
+      "label": "View",
+      "presentation": "3D presentation",
+      "grid": "Grid",
+      "tree": "Org chart"
+    },
+    "pres": {
+      "prev": "Previous",
+      "next": "Next",
+      "slides": "Team members",
+      "pause": "Pause rotation",
+      "play": "Auto rotate"
+    },
+    "card": {
+      "workingOn": "Working on",
+      "free": "Free for the next task",
+      "edit": "Click to edit"
+    },
+    "live": {
+      "idle": "Available",
+      "working": "Working now",
+      "waiting": "Waiting for you",
+      "success": "Just finished",
+      "error": "Got stuck",
+      "paused": "Paused"
+    },
+    "roles": {
+      "manager": "General manager",
+      "team_lead": "Team lead",
+      "customer_service": "Customer service",
+      "sales": "Sales & leads",
+      "marketing": "Marketing & social",
+      "content_writer": "Content writer",
+      "web_builder": "Web builder & designer",
+      "analyst": "Data analyst",
+      "project_coordinator": "Project coordinator",
+      "quality_control": "Quality control",
+      "collections": "Collections & finance",
+      "reputation": "Reputation & reviews",
+      "custom": "Custom role"
+    },
+    "roleAbout": {
+      "manager": "Takes a goal, builds a plan with dependencies, assigns the team and reports",
+      "team_lead": "Coordinates a domain and approves outputs before they go up",
+      "customer_service": "Answers customers fast and with empathy; escalates when needed",
+      "sales": "Qualifies leads, replies, follows up and books meetings",
+      "marketing": "Social content from what works, a content calendar and campaigns",
+      "content_writer": "Persuasive, accurate texts in the brand voice",
+      "web_builder": "Converting sites and landing pages with a quality check",
+      "analyst": "What happened, why and what to do — real numbers only",
+      "project_coordinator": "Schedules, tasks and meetings in order",
+      "quality_control": "Reviews every customer-facing output before sending",
+      "collections": "Polite, timely collection of open invoices",
+      "reputation": "A professional reply to every review",
+      "custom": "You define: name, role, instructions, tools and tone"
+    },
+    "hire": {
+      "title": "Hire an employee",
+      "short": "A ready role or your own",
+      "body": "Pick a role. Then set the name, look, tone, instructions, tools and autonomy, and have a test chat before activating.",
+      "cta": "Hire to the team"
+    },
+    "empty": {
+      "title": "No employees yet",
+      "body": "Turn the team on in the settings or hire the first employee"
+    },
+    "editor": {
+      "unnamed": "New employee",
+      "name": "Name",
+      "title": "Job title (optional)",
+      "role": "Role",
+      "reportsTo": "Reports to",
+      "avatar": "Look",
+      "color": "Colour",
+      "tone": "Personality & tone",
+      "toneHint": "e.g. warm, to the point, light humour",
+      "instructions": "Personal instructions",
+      "instructionsHint": "What matters to you, on top of the role playbook",
+      "maxSteps": "Max steps per task",
+      "maxCredits": "Max credits per task",
+      "noHistory": "No tasks yet",
+      "testHint": "Test chat: ask how they would answer a customer or handle a task. No action is performed in this chat.",
+      "testEmpty": "Write a message to start",
+      "testPlaceholder": "e.g. A customer asks the price of a haircut — what do you answer?",
+      "pause": "Pause",
+      "activate": "Activate",
+      "duplicate": "Duplicate",
+      "unsaved": "Unsaved change",
+      "tabs": {
+        "profile": "Profile & look",
+        "personality": "Personality & instructions",
+        "tools": "Tools & permissions",
+        "autonomy": "Autonomy",
+        "memory": "Memory",
+        "history": "History",
+        "performance": "Performance",
+        "test": "Test chat"
+      },
+      "av": {
+        "accessory": "Accessory",
+        "face": "Expression",
+        "hair": "Hair",
+        "skin": "Skin"
+      },
+      "avv": {
+        "none": "None",
+        "tie": "Tie",
+        "headset": "Headset",
+        "pen": "Pen",
+        "chart": "Chart",
+        "brush": "Brush",
+        "clipboard": "Clipboard",
+        "shield": "Shield",
+        "coin": "Coin",
+        "star": "Star",
+        "megaphone": "Megaphone",
+        "laptop": "Laptop",
+        "spark": "Spark",
+        "smile": "Smile",
+        "cheer": "Cheer",
+        "calm": "Calm",
+        "focus": "Focus",
+        "short": "Short",
+        "long": "Long",
+        "curly": "Curly",
+        "bun": "Bun",
+        "light": "Light",
+        "tan": "Tan",
+        "brown": "Brown",
+        "dark": "Dark"
+      }
+    },
+    "autonomy": {
+      "suggest": "Suggest only",
+      "approve": "Acts, asks approval for sensitive actions",
+      "auto": "Autonomous",
+      "suggestBody": "Every action, even internal, waits for your approval.",
+      "approveBody": "Internal actions (tasks, notes, drafts) run; anything customers see or money waits for approval. The default.",
+      "autoBody": "Works alone internally; customer / money actions only if you explicitly tick them below.",
+      "explicit": "Actions allowed without approval (explicit choice):",
+      "noSensitive": "This employee has no sensitive tools."
+    },
+    "sens": {
+      "internal": "Internal",
+      "customer": "Customer-facing",
+      "money": "Money",
+      "irreversible": "Irreversible",
+      "read": "Read only"
+    },
+    "tools": {
+      "crm_find_contacts": "Find contacts",
+      "crm_contact_brief": "Customer card",
+      "tasks_open": "Open tasks",
+      "analytics_day_metrics": "Yesterday's numbers",
+      "deals_stuck": "Stuck deals",
+      "inbox_unanswered": "Customers waiting",
+      "reviews_recent": "Recent reviews",
+      "social_performance": "Post performance",
+      "sites_list": "My websites",
+      "finance_overdue": "Overdue invoices",
+      "crm_add_note": "Add a note",
+      "crm_add_tag": "Tag a customer",
+      "crm_remember": "Remember about a customer",
+      "crm_create_task": "Create a task",
+      "deals_create": "Open a deal",
+      "deals_move": "Update a deal",
+      "campaigns_draft": "Campaign draft",
+      "social_draft_post": "Post draft (social brain)",
+      "social_plan_week": "Plan a week of posts",
+      "sites_build": "Build a website (draft)",
+      "sites_audit": "Website health check",
+      "agents_run_analyst": "Run the analyst agent",
+      "agents_run_sales_manager": "Run the sales manager",
+      "agents_run_marketing": "Run the marketing agent",
+      "agents_run_collections": "Run the collections agent",
+      "reviews_draft_reply": "Review reply draft",
+      "team_handoff": "Hand to a colleague",
+      "team_ask_user": "Ask you a question",
+      "inbox_send_message": "Send a customer message",
+      "calendar_book": "Book a meeting",
+      "social_schedule_post": "Schedule a post",
+      "collections_send_reminder": "Payment reminder"
+    },
+    "goal": {
+      "title": "A goal for the team",
+      "hint": "Write what you want to achieve. The manager builds a plan — who does what, in which order — and you approve before it starts.",
+      "placeholder": "e.g. Bring 20 Instagram leads this month",
+      "cta": "Plan it",
+      "review": "Plan to approve",
+      "after": "after",
+      "parallel": "in parallel",
+      "approve": "Approve & start",
+      "estimate": "Estimate: about {n} credits"
+    },
+    "questions": {
+      "title": "Your employees ask",
+      "answer": "Your answer",
+      "handled": "I handled it",
+      "escalate": {
+        "legal": "A customer raised a legal issue — it needs your personal handling.",
+        "refund": "A customer asks for a refund — your decision.",
+        "health_safety": "A health / safety matter — please handle it yourself.",
+        "wants_human": "The customer asked to speak with a person."
+      }
+    },
+    "proposals": {
+      "title": "The team's initiatives",
+      "start": "Start",
+      "dismiss": "Not now"
+    },
+    "board": {
+      "pending": "To do",
+      "in_progress": "Working",
+      "awaiting": "Waiting for you",
+      "done": "Finished"
+    },
+    "task": {
+      "direct": "A direct task",
+      "who": "To whom",
+      "placeholder": "e.g. Check this week's reviews",
+      "add": "Add to the board",
+      "runNow": "Run now"
+    },
+    "approvals": {
+      "emptyTitle": "Nothing to approve",
+      "emptyBody": "When an employee wants to send something to a customer or do a sensitive action, it appears here with their reasoning.",
+      "selectAll": "Select all",
+      "select": "Select",
+      "approveSelected": "Approve selected ({n})",
+      "why": "Why",
+      "edit": "Edit the text",
+      "notePlaceholder": "A note for the employee (optional) — they learn from it",
+      "approve": "Approve",
+      "approveEdited": "Approve with my edit",
+      "reject": "Reject"
+    },
+    "mem": {
+      "week": "What we learned this week",
+      "weekEmpty": "No new learnings this week yet",
+      "confirm": "Confirm",
+      "revoke": "Cancel it",
+      "shared": "Shared by the team",
+      "search": "Search memory",
+      "who": "Whose",
+      "all": "All",
+      "statusLabel": "Status",
+      "kindLabel": "Kind",
+      "empty": "No memories yet",
+      "reset": "Reset this employee's memory",
+      "resetShared": "Reset the shared memory",
+      "addTitle": "Add something the team should know",
+      "addPlaceholder": "e.g. No discounts above 10%",
+      "status": {
+        "active": "Active",
+        "proposed": "Proposed — awaiting you",
+        "revoked": "Canceled",
+        "expired": "Expired"
+      },
+      "kind": {
+        "fact": "Fact",
+        "preference": "Preference",
+        "forbidden": "Forbidden",
+        "policy": "Policy",
+        "approved_style": "Approved style",
+        "rejected": "Rejected",
+        "correction": "Your correction",
+        "outcome": "Outcome"
+      },
+      "layer": {
+        "episodic": "What happened",
+        "semantic": "Lasting knowledge"
+      },
+      "resetSure": "Are you sure? This cannot be undone.",
+      "resetYes": "Yes, reset"
+    },
+    "pb": {
+      "kpis": "Success measures",
+      "sop": "Standard procedure",
+      "standards": "Professional standards",
+      "templates": "Output templates",
+      "forbidden": "Never",
+      "checklist": "Quality checklist",
+      "escalation": "When to hand to a person",
+      "good": "Good example",
+      "bad": "Bad example",
+      "extra": "Your instructions for this role",
+      "extraHint": "Added on top of the playbook; they never cancel the 'never' list"
+    },
+    "meeting": {
+      "title": "The weekly team meeting",
+      "none": "The first meeting is produced next Sunday morning.",
+      "factsOnly": "Numbers only (the model was not available to phrase it)",
+      "done": "{n} tasks done",
+      "credits": "{n} credits",
+      "learned": "{n} learnings"
+    },
+    "perf": {
+      "title": "Team performance — 30 days"
+    },
+    "metrics": {
+      "employee": "Employee",
+      "done": "Done",
+      "approval": "Approved as is",
+      "rejection": "Rejected",
+      "avg": "Avg. time (min)",
+      "credits": "Credits",
+      "escalations": "Escalations",
+      "edited": "Edited",
+      "failed": "Failed"
+    },
+    "activity": {
+      "emptyTitle": "No activity yet",
+      "emptyBody": "Here you see live what each employee understood, planned, did and learned.",
+      "system": "System"
+    },
+    "phase": {
+      "understand": "Understanding",
+      "context": "Context",
+      "plan": "Plan",
+      "execute": "Execution",
+      "self_check": "Self-check",
+      "peer_review": "Peer review",
+      "deliver": "Delivery",
+      "learn": "Summary & learning",
+      "initiative": "Initiative",
+      "approval": "Approval",
+      "system": "System"
+    },
+    "stop": {
+      "title": "Emergency stop",
+      "body": "Freezes the whole team at once: no task or action runs until you release it.",
+      "on": "The team is frozen right now.",
+      "cta": "Stop everything",
+      "release": "Release",
+      "banner": "Emergency stop is on — the team is frozen. Release it in Settings."
+    },
+    "settings": {
+      "enabled": "Team is on",
+      "pref": "Model preference",
+      "prefHint": "Which AI engine is tried first for each kind of work",
+      "prefs": {
+        "quality": "Best quality",
+        "balanced": "Balanced",
+        "speed": "Speed",
+        "cost": "Lowest cost"
+      },
+      "cap": "Daily credit cap",
+      "capHint": "Used in the last 24 hours: {n}",
+      "depth": "Max handoff depth",
+      "steps": "Max steps per task",
+      "initiative": "Initiative: the team spots leads, reviews, waiting customers and stuck deals by itself"
+    },
+    "admin": {
+      "title": "Platform admin",
+      "flagOffOrg": "Turn off for this business",
+      "flagOnAll": "Turn on for all businesses",
+      "flagOffAll": "Turn off for all businesses",
+      "routingHint": "Routing table: per kind of work, models by priority (one provider/model per line). Empty = automatic by capability.",
+      "kinds": {
+        "plan": "Planning & decisions",
+        "review": "Quality review",
+        "write": "Writing",
+        "site": "Sites & code",
+        "classify": "Classification & extraction",
+        "summarize": "Summaries & reports",
+        "vision": "Images"
+      }
     }
   }
 }

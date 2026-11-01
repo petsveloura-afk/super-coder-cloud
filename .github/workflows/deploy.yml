@@ -80,3 +80,16 @@ jobs:
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -v url="$URL" -v secret="$CRON_SECRET" -q -t -f - <<'SQL'
           select public.schedule_platform_jobs(:'url', :'secret');
           SQL
+      # the digital team's clock (every 5 minutes, inside the database). Safe to repeat; never fails the deploy.
+      - name: Start the digital team clock
+        if: steps.cfg.outputs.skip == 'false'
+        continue-on-error: true
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "::warning::CRON_SECRET secret not set — the team clock was not started."; exit 0; fi
+          URL="${APP_URL:-https://super-coder-cloud.vercel.app}"
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -v url="$URL" -v secret="$CRON_SECRET" -q -t -f - <<'SQL'
+          select public.schedule_team_job(:'url', :'secret');
+          SQL

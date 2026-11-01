@@ -15,7 +15,7 @@ import type { AIOutcome } from "./run";
 export async function runAISystem(input: {
   orgId: string;
   /** waves 15-18: background insights, voice/vision understanding, KB answers, phone agent */
-  feature: "autopilot" | "insights" | "vision" | "transcribe" | "voice" | "kb" | "social" | "marketing" | "sales_manager" | "brief" | "collections" | "review_reply";
+  feature: "autopilot" | "insights" | "vision" | "transcribe" | "voice" | "kb" | "social" | "marketing" | "sales_manager" | "brief" | "collections" | "review_reply" | "copilot";
   agentId?: string | null;
   provider?: AIProviderName;
   model?: string;
@@ -25,6 +25,9 @@ export async function runAISystem(input: {
   maxTokens?: number;
   /** wait for a busy provider (background replies) — default 45s */
   patienceMs?: number;
+  /** digital team model routing: the engine to try first for this kind of work (the router's chain still follows) */
+  routeProvider?: string | null;
+  routeModel?: string | null;
 }): Promise<AIOutcome> {
   const provider = pickProvider(input.provider) ?? (routerExtrasConfigured() ? input.provider ?? "gemini" : null);
   if (!provider) return { ok: false, error: "ai.notConfigured" };
@@ -42,8 +45,8 @@ export async function runAISystem(input: {
     // AI router: agent's provider first, then every configured provider; each key/model once,
     // limited ones rest (shared across instances) — answers in seconds or reports "busy" fast
     const routedArgs = {
-      preferred: input.provider ?? provider,
-      model,
+      preferred: input.routeProvider || input.provider || provider,
+      model: input.routeProvider && input.routeModel ? input.routeModel : model,
       system: input.system,
       messages: input.messages,
       temperature: input.temperature ?? 0.4,

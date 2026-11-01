@@ -64,7 +64,9 @@ export default async function LocaleLayout({
             position={dir === "rtl" ? "top-left" : "top-right"}
             dir={dir}
             theme={theme}
-            toastOptions={{ className: "!rounded-xl !border-line !bg-elevated !text-fg" }}
+            toastOptions={{ className: "!rounded-xl !border-line !bg-elevated !text-fg !shadow-lg" }}
+            closeButton
+            visibleToasts={4}
           />
           <InstallAppCapture />
         </I18nProvider>

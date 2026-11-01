@@ -12,6 +12,8 @@ export interface NavItem {
   permission?: Permission;
   /** Only shown to platform administrators (not an org permission). */
   platformOnly?: boolean;
+  /** Only shown when this feature flag is on for the business (new features stay invisible until enabled). */
+  flag?: string;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -27,6 +29,8 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "agents", label: "nav.agents", section: "growth", phase: null, permission: "ai.use" },
   // wave 54: the AI Operator — say what should happen, approve, done
   { key: "operator", label: "nav.operator", section: "growth", phase: null, permission: "ai.use" },
+  // the digital team (behind the feature flag team_v1)
+  { key: "ai-team", label: "nav.aiTeam", section: "growth", phase: null, permission: "ai.use", flag: "team_v1" },
   // wave 57: the phone agent in one place (number, voice, transfer, test call, calls)
   { key: "phone", label: "nav.phone", section: "growth", phase: null, permission: "ai.use" },
   { key: "social", label: "nav.social", section: "growth", phase: null, permission: "inbox.read" },

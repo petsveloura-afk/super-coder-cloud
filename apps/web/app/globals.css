@@ -815,3 +815,94 @@ a, button, [role="button"], label { -webkit-tap-highlight-color: transparent; }
   .shine-border::before, .breathe { animation: none !important; }
   .glow-ring:hover { transform: none !important; }
 }
+
+/* ---------------------------------------------------------------- the digital team: avatars + 3D presentation
+   Breathing (idle), busy bobbing + typing dots (working), amber pulse (waiting), pop (success), shake (error);
+   the 3D carousel ring with depth, reflections and a glowing floor. Off for prefers-reduced-motion. */
+@keyframes av-breathe { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-1.5px) scale(1.012); } }
+@keyframes av-bob { 0%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-3px) rotate(-1.5deg); } 75% { transform: translateY(-1px) rotate(1.5deg); } }
+@keyframes av-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes av-dot { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+@keyframes av-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--warning) 55%, transparent); } 50% { box-shadow: 0 0 0 9px color-mix(in oklab, var(--warning) 0%, transparent); } }
+@keyframes av-pop { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes av-shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-3px); } 40%, 80% { transform: translateX(3px); } }
+@keyframes av-halo { 0%, 100% { opacity: .95; } 50% { opacity: .75; } }
+.agent-avatar .av-body { transform-origin: 50% 90%; transform-box: fill-box; }
+.agent-avatar .av-eyes { transform-origin: 50% 44%; transform-box: fill-box; animation: av-blink 4.6s infinite; }
+.av-idle .av-body { animation: av-breathe 3.4s ease-in-out infinite; }
+.av-working .av-body { animation: av-bob 1.1s ease-in-out infinite; }
+.av-working .av-halo { animation: av-halo 1.1s ease-in-out infinite; }
+.av-waiting { border-radius: 9999px; animation: av-pulse 1.8s ease-in-out infinite; }
+.av-success .av-badge, .av-waiting .av-badge, .av-error .av-badge { animation: av-pop 420ms cubic-bezier(.2,.8,.2,1) both; }
+.av-error .av-body { animation: av-shake 600ms ease-in-out 2; }
+.av-paused { filter: grayscale(1) opacity(.65); }
+.av-dots i { width: 5px; height: 5px; border-radius: 9999px; background: var(--accent); display: block; animation: av-dot 1.1s infinite; }
+.av-dots i:nth-child(2) { animation-delay: .15s; }
+.av-dots i:nth-child(3) { animation-delay: .3s; }
+
+.team-stage { perspective: 1400px; perspective-origin: 50% 35%; }
+.team-ring { transform-style: preserve-3d; transition: transform 900ms cubic-bezier(.2,.8,.2,1); }
+.team-ring.dragging { transition: none; }
+.team-card3d { position: absolute; inset: 0; margin: auto; backface-visibility: hidden; transform-style: preserve-3d; transition: filter 400ms ease, opacity 400ms ease; }
+.team-card3d .team-reflect { position: absolute; inset-inline: 8%; top: 100%; height: 40%; transform: scaleY(-1); opacity: .18; filter: blur(2px); -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,.6), transparent); mask-image: linear-gradient(to bottom, rgba(0,0,0,.6), transparent); pointer-events: none; }
+.team-floor { background: radial-gradient(50% 60% at 50% 50%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 70%); transform: rotateX(78deg); }
+@keyframes team-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.team-front { animation: team-float 4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .agent-avatar *, .agent-avatar, .av-dots i, .team-front { animation: none !important; }
+  .team-ring { transition: none !important; }
+}
+/* avatar thumbnails (pickers): the look without the motion */
+.av-still, .av-still * { animation: none !important; }
+
+/* ---------------------------------------------------------------- design upgrade: tokens + consistent states
+   Extends the existing system (nothing replaced): motion / radius / elevation tokens, and one consistent set of
+   hover / focus / active / disabled states for the dashboard (scoped to main[data-shell], so public websites are
+   untouched). Every motion is off for prefers-reduced-motion. */
+:root {
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 360ms;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.12);
+  --shadow-xl: 0 32px 64px -28px rgb(0 0 0 / 0.55);
+  --focus-ring: 0 0 0 3px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+[data-theme="light"] {
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.06);
+  --shadow-xl: 0 32px 64px -28px rgb(16 24 40 / 0.28);
+}
+@keyframes route-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.route-fade { animation: route-fade var(--dur-slow) var(--ease-out) both; }
+
+main[data-shell] table tbody tr { transition: background-color var(--dur-fast) ease; }
+@media (hover: hover) {
+  main[data-shell] table tbody tr:hover { background: color-mix(in oklab, var(--surface-hover) 70%, transparent); }
+}
+main[data-shell] [role="tab"]:focus-visible,
+main[data-shell] [role="radio"]:focus-visible,
+main[data-shell] summary:focus-visible,
+main[data-shell] a:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-md); }
+main[data-shell] a:not([class]) { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in oklab, var(--accent) 50%, transparent); }
+main[data-shell] input:disabled,
+main[data-shell] select:disabled,
+main[data-shell] textarea:disabled { cursor: not-allowed; opacity: 0.65; }
+main[data-shell] input[type="checkbox"],
+main[data-shell] input[type="radio"] { cursor: pointer; }
+main[data-shell] details > summary { cursor: pointer; transition: color var(--dur-fast) ease; }
+main[data-shell] details > summary:hover { color: var(--text); }
+main[data-shell] button:active:not(:disabled) { transition-duration: 60ms; }
+main[data-shell] [aria-busy="true"] { cursor: progress; }
+
+@media (prefers-reduced-motion: reduce) {
+  .route-fade { animation: none !important; }
+  main[data-shell] table tbody tr { transition: none !important; }
+}

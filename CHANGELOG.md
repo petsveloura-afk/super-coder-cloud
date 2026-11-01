@@ -1,5 +1,14 @@
 # Changelog
 
+## Digital team, stage-1 audit, model routing, design + performance — 2026-11-02
+- **Stage 1 audit:** all 289 server actions and 78 API routes reviewed (identity, permission, validation, translations); fixes: two missing translations, AI studio permission + "deleted" truth; a permanent CI guard (`tests/unit/actions-audit.test.ts`); table in `docs/audit/stage1-actions.md`.
+- **Digital team (behind the `team_v1` flag):** 12 roles + custom, a playbook file per role (he + en), the 8-phase work cycle (understand → context → plan → execute → self-check → peer review → deliver → summarize/learn), the manager's dependency-graph planning and assignment by load, handoffs with full context, structured messages, one approval queue, autonomy levels with explicit per-action autonomy, emergency stop, depth / step / credit limits and loop detection, prompt-injection defence, an append-only activity log, three-layer memory with confidence, expiry, contradiction resolution and owner-confirmed learning, daily initiative and the weekly team meeting, metrics per employee. The existing agents and capabilities are the team's tools (CRM, inbox with its guard, social brain, site builder, business agents, reviews, calendar).
+- **Model routing by kind of work** on top of the existing router (plan / review / write / site / classify / summarize / vision), database routing table, per-business preference, automatic fallback logged.
+- **"My team" screen** (`/ai-team`): 3D presentation (rotating ring, drag / swipe / keyboard, auto-rotate, add card), grid, org chart, animated customizable avatars (idle / working / waiting / success / error), full editor (profile + look, personality, tools, autonomy, memory, history, performance, test chat), hire gallery, goals + plan approval + live board, approvals (bulk, edit, reject with a reason), memory screen, playbooks, weekly meeting + performance, live activity, settings with the emergency stop.
+- **Design:** motion / radius / elevation tokens, consistent hover / focus / disabled states in the dashboard, soft route transitions, toasts with close.
+- **Performance:** additive indexes (inbound messages per business 37 ms → 0.65 ms on 600k rows), the team screen in its own lazy chunk, optimistic approvals.
+- **Tests:** 17 evaluation scenarios + 5 orchestrator checks, unit tests for every core, database tests (isolation, append-only log, constraints), an E2E spec for the team.
+
 ## Meta for everyone, smarter site agent and social brain — 2026-11-02
 - **Facebook / Instagram without waiting for Meta's review** (Integrations → "2 more ways to connect"):
   - *Join as a tester* — the platform invites the person to the platform app automatically (Meta app-roles API); when Meta refuses, the request waits for a platform admin with one-click "added".

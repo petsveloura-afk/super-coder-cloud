@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import * as DM from "@radix-ui/react-dropdown-menu";
 import { Bell, Check, ChevronDown, ChevronsLeft, ChevronsRight, LogOut, Menu, Plus, Search, ShieldCheck, UserRound } from "lucide-react";
 import type { Permission } from "@scc/shared/permissions";
@@ -29,6 +29,8 @@ export interface ShellProps {
   /** wave 20: open conversations with unread messages (badge on the inbox tab) */
   unreadInbox?: number;
   isPlatformAdmin: boolean;
+  /** feature flags on for this business (optional — no flags means only the regular menu) */
+  flags?: string[];
   children: ReactNode;
 }
 
@@ -38,8 +40,12 @@ const SECTIONS: { key: NavSection; label: "nav.sectionCore" | "nav.sectionGrowth
   { key: "ops", label: "nav.sectionOps" },
 ];
 
+/** feature flags that are on for the business (items with a `flag` stay hidden until it is on) */
+const FlagsContext = createContext<string[]>([]);
+
 function useVisibleItems(permissions: Permission[], isPlatformAdmin = false) {
-  return NAV_ITEMS.filter((i) => (!i.platformOnly || isPlatformAdmin) && (!i.permission || permissions.includes(i.permission)));
+  const flags = useContext(FlagsContext);
+  return NAV_ITEMS.filter((i) => (!i.platformOnly || isPlatformAdmin) && (!i.permission || permissions.includes(i.permission)) && (!i.flag || flags.includes(i.flag)));
 }
 
 function NavLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed?: boolean; onNavigate?: () => void }) {
@@ -367,6 +373,14 @@ function readSidebar() {
 }
 
 export function AppShell(props: ShellProps) {
+  return (
+    <FlagsContext.Provider value={props.flags ?? []}>
+      <AppShellInner {...props} />
+    </FlagsContext.Provider>
+  );
+}
+
+function AppShellInner(props: ShellProps) {
   const { t, locale } = useI18n();
   const collapsed = useSyncExternalStore(subscribeSidebar, readSidebar, () => false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -441,8 +455,11 @@ export function AppShell(props: ShellProps) {
           ) : null}
         </header>
 
-        <main className="mb-bottomnav flex-1 px-4 py-6 sm:px-6 lg:mb-0 lg:px-8 lg:py-8">
-          <div className="mx-auto w-full max-w-[1240px]">{props.children}</div>
+        <main className="mb-bottomnav flex-1 px-4 py-6 sm:px-6 lg:mb-0 lg:px-8 lg:py-8" data-shell>
+          {/* design upgrade: every screen change fades in softly (re-keyed by path; off for reduced motion) */}
+          <div key={pathname} className="route-fade mx-auto w-full max-w-[1240px]">
+            {props.children}
+          </div>
         </main>
       </div>
 

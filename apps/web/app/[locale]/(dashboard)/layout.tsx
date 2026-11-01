@@ -11,11 +11,13 @@ export default async function DashboardLayout({ children, params }: { children: 
   const ctx = await getOrgContext(locale);
   const supabase = await createClient();
   // wave 20: the bell and the inbox tab both show a live count (one round trip)
-  const [{ count }, { count: inboxCount }] = await Promise.all([
+  const [{ count }, { count: inboxCount }, teamOn] = await Promise.all([
     supabase.from("notifications").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).is("read_at", null),
     ctx.can("inbox.read")
       ? supabase.from("conversations").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).eq("status", "open").gt("unread_count", 0)
       : Promise.resolve({ count: 0 }),
+    // the digital team's menu item appears only when its feature flag is on for the business
+    ctx.can("ai.use") ? import("@/lib/team/runner").then((m) => m.teamFlagOn(ctx.org.id)).catch(() => false) : Promise.resolve(false),
   ]);
 
   return (
@@ -28,6 +30,7 @@ export default async function DashboardLayout({ children, params }: { children: 
       unreadNotifications={count ?? 0}
       unreadInbox={inboxCount ?? 0}
       isPlatformAdmin={ctx.isPlatformAdmin}
+      flags={teamOn ? ["team_v1"] : []}
     >
       {children}
       {/* wave 23: help for the screen you are on → the matching step of the user guide */}

@@ -26,6 +26,7 @@ import {
   Zap,
   PhoneCall,
   Activity,
+  Network,
   type LucideIcon,
 } from "lucide-react";
 
@@ -55,6 +56,8 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   admin: ShieldCheck,
   // wave 19
   agents: Sparkles,
+  // the digital team
+  "ai-team": Network,
   social: Share2,
   // wave 54
   operator: Zap,

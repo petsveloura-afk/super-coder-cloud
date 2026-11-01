@@ -132,6 +132,8 @@ export async function agentChatAction(
     history = [];
   }
   if (!agentId.success || !message.success) return { error: "validation.required", data: { reply: "", history } };
+  // audit fix: explicit permission check on the server (before, a member without AI access got a generic AI error)
+  if (!ctx.can("ai.use")) return { error: "errors.forbidden", data: { reply: "", history } };
 
   const supabase = await createClient();
   const { data: agent } = await supabase

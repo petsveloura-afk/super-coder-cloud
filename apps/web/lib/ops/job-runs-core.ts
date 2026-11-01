@@ -20,6 +20,8 @@ export const JOB_CADENCE_MIN: Record<string, number> = {
   "meta-sync": 1,
   followups: 5,
   "billing-sweep": 60,
+  // the digital team's clock (businesses without the team are skipped at once)
+  team: 5,
 };
 
 export type JobHealth = "ok" | "late" | "failing" | "never";

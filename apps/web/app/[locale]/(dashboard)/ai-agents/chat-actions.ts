@@ -73,11 +73,15 @@ export async function loadConversationAction(input: { locale: string; conversati
 
 export async function deleteConversationAction(input: { locale: string; conversationId: string }): Promise<Result<null>> {
   const ctx = await getOrgContext(loc(input.locale));
+  // audit fix: the permission is checked on the server too (the database already refused, but the screen showed "deleted")
+  if (!ctx.can("ai.use")) return { ok: false, error: "errors.forbidden" };
   const id = uuidSchema.safeParse(input.conversationId);
   if (!id.success) return { ok: false, error: "validation.invalidId" };
   const supabase = await createClient();
-  const { error } = await supabase.from("ai_conversations").delete().eq("id", id.data).eq("organization_id", ctx.org.id);
+  const { data, error } = await supabase.from("ai_conversations").delete().eq("id", id.data).eq("organization_id", ctx.org.id).select("id");
   if (error) return { ok: false, error: "errors.generic" };
+  // nothing deleted = not this person's conversation (or already gone) — say so instead of a false success
+  if (!data?.length) return { ok: false, error: "errors.itemGone" };
   return { ok: true, data: null };
 }
 
