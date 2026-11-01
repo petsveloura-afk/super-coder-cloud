@@ -6925,6 +6925,10 @@
         "summarize": "Summaries & reports",
         "vision": "Images"
       }
+    },
+    "planLocked": {
+      "adminTitle": "This business isn't on a plan that includes the team yet",
+      "adminBody": "The digital team is available on Pro and up, or with a 7-day free trial (once per business). To test it here: start the trial above, or move this business to a matching plan."
     }
   }
 }

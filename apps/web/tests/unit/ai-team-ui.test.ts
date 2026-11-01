@@ -24,6 +24,20 @@ describe("My team screen — wiring", () => {
     for (const f of ["loading.tsx", "error.tsx"]) expect(existsSync(join(root, "app/[locale]/(dashboard)/ai-team", f))).toBe(true);
     expect(existsSync(join(root, "app/[locale]/(wide)/docs/zz-team-preview"))).toBe(false);
   });
+  it("paid feature: the page, the actions and the background runner all require the ai_team plan feature (or its trial)", () => {
+    const p = read("app/[locale]/(dashboard)/ai-team/page.tsx");
+    expect(p).toContain('featureAccess(ctx.org.id, "ai_team")');
+    expect(p).toContain('<FeatureLock locale={locale} feature="ai_team"');
+    const a = read("app/[locale]/(dashboard)/ai-team/actions.ts");
+    expect(a).toContain('orgHasFeature(ctx.org.id, "ai_team")');
+    // stopping / turning off stays allowed after the plan ended
+    expect(a).toContain('gate(locale, "ai.use", { plan: false })');
+    expect(a).toContain('gate(locale, "ai.manage", { plan: Boolean(input.enabled) })');
+    const r = read("lib/team/runner.ts");
+    expect(r).toContain('orgHasFeatureAdmin(orgId, "ai_team")');
+    expect(r).toContain('return { notRun: "plan_locked" }');
+    expect(r).toMatch(/teamFlagOn\(orgId\)\)\) continue;\s*if \(!\(await teamPlanOn\(orgId\)\)\) continue;/);
+  });
   it("3D presentation: perspective ring, keyboard, drag, auto-rotate, add card, reduced motion", () => {
     const p = read("components/ai-team/presentation-3d.tsx");
     for (const x of ["team-stage", "rotateY", "translateZ", "onKeyDown", "onPointerDown", "setAuto", 'data-testid={s.kind === "member"', "card-add", "prefers-reduced-motion"]) expect(p, x).toContain(x);

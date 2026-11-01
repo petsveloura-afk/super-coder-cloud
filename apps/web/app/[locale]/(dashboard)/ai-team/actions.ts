@@ -22,12 +22,18 @@ async function admin() {
   return createAdminClient();
 }
 
-async function gate(locale: "he" | "en" | "ar", perm: "ai.use" | "ai.manage") {
+async function gate(locale: "he" | "en" | "ar", perm: "ai.use" | "ai.manage", opts: { plan?: boolean } = {}) {
   const ctx = await getOrgContext(locale);
   if (!ctx.can(perm)) return { error: "errors.forbidden" as const };
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "common.error" as const };
   const { teamFlagOn } = await import("@/lib/team/runner");
   if (!(await teamFlagOn(ctx.org.id))) return { error: "aiTeam.err.flagOff" as const };
+  // paid feature: the digital team is part of the existing "ai_team" plan feature (Pro and up, or the 7-day trial).
+  // Stopping / turning the team off is always allowed, also after the plan or the trial ended.
+  if (opts.plan !== false) {
+    const { orgHasFeature } = await import("@/lib/billing/features");
+    if (!(await orgHasFeature(ctx.org.id, "ai_team"))) return { error: "plans.locked.ai_team.title" as const };
+  }
   return { ctx };
 }
 
@@ -42,7 +48,7 @@ async function audit(orgId: string, userId: string, summary: string, details: Re
 
 export async function setTeamEnabledAction(input: { locale: string; enabled: boolean }): Promise<ActionState<{ seeded: number }>> {
   const locale = loc(input.locale);
-  const g = await gate(locale, "ai.manage");
+  const g = await gate(locale, "ai.manage", { plan: Boolean(input.enabled) });
   if ("error" in g) return { error: g.error };
   const a = await admin();
   const { error } = await a.from("team_settings").upsert({ organization_id: g.ctx.org.id, enabled: Boolean(input.enabled), updated_by: g.ctx.userId, updated_at: new Date().toISOString() }, { onConflict: "organization_id" });
@@ -60,7 +66,7 @@ export async function setTeamEnabledAction(input: { locale: string; enabled: boo
 export async function emergencyStopAction(input: { locale: string; on: boolean }): Promise<ActionState> {
   const locale = loc(input.locale);
   // the emergency stop is allowed to anyone who can use the team (stopping is always safe)
-  const g = await gate(locale, "ai.use");
+  const g = await gate(locale, "ai.use", { plan: false });
   if ("error" in g) return { error: g.error };
   if (!input.on && !g.ctx.can("ai.manage")) return { error: "errors.forbidden" };
   const a = await admin();

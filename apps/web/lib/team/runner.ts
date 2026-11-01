@@ -42,6 +42,12 @@ export async function teamFlagOn(orgId: string): Promise<boolean> {
   return own ? own.enabled : Boolean(rows.find((r) => r.organization_id === null)?.enabled);
 }
 
+/** The digital team is a paid feature: the existing "ai_team" plan feature (Pro and up, or an active 7-day trial). */
+export async function teamPlanOn(orgId: string): Promise<boolean> {
+  const { orgHasFeatureAdmin } = await import("@/lib/billing/features");
+  return orgHasFeatureAdmin(orgId, "ai_team").catch(() => false);
+}
+
 export async function loadSettings(orgId: string): Promise<TeamSettingsRow> {
   const { data } = await db().from("team_settings").select("enabled, emergency_stop, routing_pref, daily_credit_cap, max_depth, max_steps, initiative").eq("organization_id", orgId).maybeSingle();
   return data ? { ...DEFAULT_SETTINGS, ...(data as Partial<TeamSettingsRow>) } : { ...DEFAULT_SETTINGS };
@@ -242,6 +248,7 @@ export async function writeMemories(orgId: string, memberId: string | null, item
 
 export async function runTask(orgId: string, taskId: string, opts: { interactive: boolean; actorUser: string | null }): Promise<Outcome | { notRun: string }> {
   if (!(await teamFlagOn(orgId))) return { notRun: "team_flag_off" };
+  if (!(await teamPlanOn(orgId))) return { notRun: "plan_locked" };
   const a = db();
   // claim: only a pending task, once
   const { data: claimed } = await a.from("team_tasks").update({ status: "in_progress", started_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("organization_id", orgId).eq("id", taskId).eq("status", "pending").select("id, parent_id, goal_id, title, brief, assignee_id, depth, steps_used, credits_used, review_rounds, result, created_by").maybeSingle();
@@ -549,6 +556,7 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
   for (const { organization_id: orgId } of (data ?? []) as { organization_id: string }[]) {
     if (Date.now() - started > budgetMs) break;
     if (!(await teamFlagOn(orgId))) continue;
+    if (!(await teamPlanOn(orgId))) continue;
     result.orgs++;
     const { data: org } = await a.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
     const tz = (org?.timezone as string) || "Asia/Jerusalem";

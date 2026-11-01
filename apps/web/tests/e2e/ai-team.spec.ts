@@ -32,6 +32,11 @@ test("My team: flag, starter team, 3D presentation, hire + edit, approvals, emer
     await page.goto("/he/ai-team");
     await expect(page.locator('a[href="/he/ai-team"]').first()).toBeVisible();
 
+    // paid feature: a new business (free plan) sees the lock with the 7-day free trial → start the trial
+    await expect(page.getByTestId("locked-ai_team")).toBeVisible();
+    await page.getByTestId("trial-ai_team").click();
+    await expect(page.getByTestId("tab-settings")).toBeVisible();
+
     // turn the team on → the starter team appears in the 3D presentation
     await page.getByTestId("tab-settings").click();
     await page.getByTestId("team-enabled").check();

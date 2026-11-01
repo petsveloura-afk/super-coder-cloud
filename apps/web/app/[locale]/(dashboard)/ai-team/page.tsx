@@ -6,6 +6,8 @@ import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { loadTeamPageData } from "@/lib/team/page-data";
 import { FlagEnable } from "@/components/ai-team/flag-enable";
+import { FeatureLock, TrialNote } from "@/components/billing/feature-gate";
+import { featureAccess } from "@/lib/billing/features";
 
 // the team screen is heavy (3D presentation, editor, panels) — loaded as its own chunk
 const TeamScreen = dynamic(() => import("@/components/ai-team/team-screen").then((m) => m.TeamScreen), { loading: () => <div className="skeleton h-[480px] rounded-[32px]" aria-hidden /> });
@@ -40,11 +42,25 @@ export default async function AiTeamPage({ params }: { params: Promise<{ locale:
     );
   }
 
+  // paid feature: the existing "ai_team" plan feature (Pro and up) with its 7-day free trial — without it, the lock + trial
+  const access = await featureAccess(ctx.org.id, "ai_team");
+  const canTrial = ctx.can("billing.manage") || ctx.can("ai.manage");
+  if (!access.allowed) {
+    return (
+      <>
+        <PageHeader title={t("aiTeam.title")} description={t("aiTeam.subtitle")} />
+        <FeatureLock locale={locale} feature="ai_team" plan="pro" access={access} canTrial={canTrial} />
+        {ctx.isPlatformAdmin ? <Card className="mt-4"><EmptyState icon={<Network className="h-6 w-6" />} title={t("aiTeam.planLocked.adminTitle")} body={t("aiTeam.planLocked.adminBody")} /></Card> : null}
+      </>
+    );
+  }
+
   const data = await loadTeamPageData(ctx.org.id, { canManage: ctx.can("ai.manage"), platformAdmin: ctx.isPlatformAdmin });
 
   return (
     <>
       <PageHeader title={t("aiTeam.title")} description={t("aiTeam.subtitle")} />
+      <TrialNote locale={locale} access={access} />
       <TeamScreen data={data} />
     </>
   );
