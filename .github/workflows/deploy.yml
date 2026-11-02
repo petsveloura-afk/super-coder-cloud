@@ -50,7 +50,7 @@ jobs:
         run: supabase migration list --db-url "$SUPABASE_DB_URL"
       - name: Apply migrations
         if: steps.cfg.outputs.skip == 'false'
-        run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all --yes
       # wave 44: starts the 30-second Facebook / Instagram message clock inside the database (Supabase pg_cron + pg_net),
       # so customers' messages are fetched and answered even when nobody is logged in. Safe to repeat on every deploy
       # (it replaces its own job). Needs the CRON_SECRET repo secret (the same one the other jobs use); never fails the deploy.
