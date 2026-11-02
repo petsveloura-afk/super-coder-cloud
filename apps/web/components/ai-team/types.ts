@@ -155,4 +155,10 @@ export interface TeamPageData {
   ops?: TeamOpsData;
   sla?: TeamSlaData;
   templates?: { id: string; role: string; brief: string }[];
+  /** upgrade 7: versioned business facts (absent when the migration was not run) */
+  facts?: TeamFactsData;
+}
+
+export interface TeamFactsData {
+  rows: import("@/lib/team/business-facts-core").FactVersion[];
 }

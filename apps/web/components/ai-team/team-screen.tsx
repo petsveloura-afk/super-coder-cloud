@@ -11,6 +11,7 @@ import { ROLES, ROLE_KEYS, type RoleKey } from "@/lib/team/roles";
 import { Presentation3D } from "./presentation-3d";
 import { TeamGrid, TeamTree } from "./views";
 import { MemberEditor, type EditorDraft } from "./member-editor";
+import { FactsPanel } from "./facts-panel";
 import { ActivityPanel, ApprovalsPanel, GoalsPanel, HireGallery, MeetingPanel, MemoryPanel, PlaybooksPanel, SettingsPanel } from "./panels";
 import type { TeamMemberView, TeamPageData } from "./types";
 
@@ -42,7 +43,7 @@ function writePref(key: string, v: string) {
 }
 
 export function TeamScreen({ data }: { data: TeamPageData }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const [, startRefresh] = useTransition();
   const [tab, setTab] = useState<Tab>("team");
@@ -172,6 +173,11 @@ export function TeamScreen({ data }: { data: TeamPageData }) {
       ) : null}
       {tab === "goals" ? <GoalsPanel data={data} onRefresh={refresh} /> : null}
       {tab === "approvals" ? <ApprovalsPanel data={data} onRefresh={refresh} /> : null}
+      {tab === "memory" && data.facts ? (
+        <div className="mb-4">
+          <FactsPanel facts={data.facts} canManage={data.canManage} locale={locale} now={data.now} onRefresh={refresh} />
+        </div>
+      ) : null}
       {tab === "memory" ? <MemoryPanel data={data} onRefresh={refresh} /> : null}
       {tab === "playbooks" ? <PlaybooksPanel data={data} roles={ROLE_KEYS} onRefresh={refresh} /> : null}
       {tab === "meeting" ? <MeetingPanel data={data} /> : null}

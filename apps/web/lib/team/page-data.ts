@@ -80,5 +80,13 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     /* the operations card is optional — the screen works without it */
   }
 
+  try {
+    const { loadFacts } = await import("@/lib/team/business-facts");
+    const f = await loadFacts(org, { fresh: true });
+    if (f.available) data.facts = { rows: f.rows };
+  } catch {
+    /* the business facts card is optional — the screen works without it */
+  }
+
   return data;
 }

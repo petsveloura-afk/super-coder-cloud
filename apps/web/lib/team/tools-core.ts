@@ -5,6 +5,7 @@
  * validated. The server executors live in lib/team/tools.ts.
  */
 import { UPGRADE4_TOOLS } from "./tools-plus-core";
+import { UPGRADE7_TOOLS } from "./tools-plus7-core";
 
 export type ToolKind = "read" | "write";
 /** internal: only inside the business · customer: visible to customers · money: involves payment · irreversible */
@@ -64,6 +65,7 @@ export const TOOLS: ToolSpec[] = [
 
 // upgrade 4: additional tools (market intelligence) are appended; nothing above is changed
 TOOLS.push(...UPGRADE4_TOOLS);
+TOOLS.push(...UPGRADE7_TOOLS);
 
 export const TOOL_MAP: Record<string, ToolSpec> = Object.fromEntries(TOOLS.map((t) => [t.key, t]));
 

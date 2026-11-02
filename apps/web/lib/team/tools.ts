@@ -258,6 +258,13 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
         const { runMarketTool } = await import("./market-intel");
         return runMarketTool(orgId, tool, args);
       }
+      case "facts.lookup":
+      case "facts.history":
+      case "facts.record": {
+        // upgrade 7: versioned business facts (the model can never claim the owner's authority)
+        const { runFactsTool } = await import("./business-facts");
+        return runFactsTool(orgId, tool, args, { lang: ctx.locale === "en" || ctx.locale === "ar" ? ctx.locale : "he" });
+      }
       default:
         return { ok: false, summary: "", error: "unknown_tool" };
     }

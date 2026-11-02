@@ -7,6 +7,7 @@ import { cleanRoutingRow, routeFor, type RoutingPref, type TaskKind } from "./ro
 import { initiatives, knownFacts, meetingFacts, memberStats, profilePrompt, type MemberStats, type ProfileFacts, type Signals } from "./insight-core";
 import { TOOL_MAP, validateArgs } from "./tools-core";
 import { withRoleExtras } from "./tools-plus-core";
+import { withRoleExtras7 } from "./tools-plus7-core";
 import { automatedContactIds, runTeamTool } from "./tools";
 import { playbookPrompt } from "./playbooks";
 import { REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt } from "./doctrine";
@@ -183,7 +184,7 @@ interface MemberRow {
 const MEMBER_COLS = "id, role_key, name, tone, instructions, tools, autonomy, auto_actions, status, limits, reports_to, linked";
 
 function toEngine(m: MemberRow): EngineMember {
-  return { id: m.id, role: isRoleKey(m.role_key) ? m.role_key : "custom", name: m.name, tone: m.tone, instructions: m.instructions, tools: withRoleExtras(m.role_key, m.tools), autonomy: m.autonomy, auto_actions: m.auto_actions, status: m.status, limits: { max_steps: m.limits?.max_steps, max_credits: m.limits?.max_credits } };
+  return { id: m.id, role: isRoleKey(m.role_key) ? m.role_key : "custom", name: m.name, tone: m.tone, instructions: m.instructions, tools: withRoleExtras7(m.role_key, withRoleExtras(m.role_key, m.tools)), autonomy: m.autonomy, auto_actions: m.auto_actions, status: m.status, limits: { max_steps: m.limits?.max_steps, max_credits: m.limits?.max_credits } };
 }
 
 async function members(orgId: string): Promise<MemberRow[]> {
@@ -340,7 +341,9 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
       const allMemories = await memoriesFor(orgId, member.id);
       // a long memory list is narrowed to what shares terms with the task (hard rules always stay)
       const memories = allMemories.length > 150 ? candidatesFor(buildIndex(allMemories), `${claimed.title as string} ${(claimed.brief as string) ?? ""}`, 80) : allMemories;
-      return { profile: profilePrompt(profile), known: knownFacts(profile), memories, playbookExtra: (extra?.extra as string) ?? "", reviewer: reviewerRow && reviewerRow.id !== member.id ? toEngine(reviewerRow) : null, reviewerExtra: (reviewerExtra as { extra?: string } | null)?.extra ?? "" };
+      // upgrade 7: versioned business facts relevant to this task (empty when none / migration not run)
+      const factsBlock = await import("./business-facts").then((m) => m.factsPromptFor(orgId, `${claimed.title as string} ${(claimed.brief as string) ?? ""}`)).catch(() => "");
+      return { profile: factsBlock ? `${profilePrompt(profile)}\n\n${factsBlock}` : profilePrompt(profile), known: knownFacts(profile), memories, playbookExtra: (extra?.extra as string) ?? "", reviewer: reviewerRow && reviewerRow.id !== member.id ? toEngine(reviewerRow) : null, reviewerExtra: (reviewerExtra as { extra?: string } | null)?.extra ?? "" };
     },
   };
   const task: EngineTask = { id: taskId, title: claimed.title as string, brief: (claimed.brief as string) ?? "", depth: claimed.depth as number, steps_used: claimed.steps_used as number, credits_used: claimed.credits_used as number, review_rounds: claimed.review_rounds as number, chain: await chainOf(orgId, (claimed.parent_id as string | null) ?? null), answer: ((claimed.result as Record<string, unknown>)?.answer as string | undefined) ?? null };

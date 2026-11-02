@@ -6743,7 +6743,10 @@
       "collections_send_reminder": "Payment reminder",
       "market_scan": "Market & competitor scan (public sources)",
       "market_what_changed": "What changed among competitors",
-      "market_record": "Record a competitor finding"
+      "market_record": "Record a competitor finding",
+      "facts_lookup": "Look up business facts",
+      "facts_history": "History of a fact",
+      "facts_record": "Record a business fact"
     },
     "goal": {
       "title": "A goal for the team",
@@ -7023,6 +7026,50 @@
       "analyst_weekly": "Weekly business report",
       "reputation_reviews": "Handle new reviews",
       "manager_daily_brief": "Owner's morning brief"
+    },
+    "facts": {
+      "title": "Business facts",
+      "about": "Prices, hours, policies and contact details the team relies on. Every change is saved as a new version with its source and date, and what you confirmed is never overwritten.",
+      "waiting": "Waiting for your decision",
+      "now": "Today",
+      "suggested": "Suggested",
+      "accept": "Approve the new value",
+      "reject": "Keep the current one",
+      "history": "History",
+      "empty": "No facts saved yet. Add a price, hours or a policy and the team will rely on them.",
+      "addTitle": "Add or update a fact",
+      "labelPh": "e.g. Haircut price",
+      "valuePh": "e.g. 120 ILS",
+      "kindLabel": "Type",
+      "confirmed": "Confirmed by you",
+      "unconfirmed": "Unconfirmed",
+      "stale": "May be outdated",
+      "until": "until",
+      "same": "This value is already saved",
+      "kind": {
+        "price": "Price",
+        "hours": "Hours",
+        "policy": "Policy",
+        "contact": "Contact",
+        "offer": "Offer",
+        "other": "Other"
+      },
+      "source": {
+        "owner": "Owner",
+        "crm": "CRM",
+        "document": "Document",
+        "agent": "Team member",
+        "web": "Public website"
+      },
+      "status": {
+        "current": "In force",
+        "proposed": "Proposed",
+        "superseded": "Replaced",
+        "rejected": "Declined"
+      },
+      "err": {
+        "migration": "Saving facts has not been enabled on the system yet. Contact the system administrator."
+      }
     }
   }
 }
