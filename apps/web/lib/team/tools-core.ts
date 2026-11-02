@@ -4,6 +4,8 @@
  * describes them: what they do, how sensitive they are, which permission they need and how their arguments are
  * validated. The server executors live in lib/team/tools.ts.
  */
+import { UPGRADE4_TOOLS } from "./tools-plus-core";
+
 export type ToolKind = "read" | "write";
 /** internal: only inside the business · customer: visible to customers · money: involves payment · irreversible */
 export type Sensitivity = "internal" | "customer" | "money" | "irreversible";
@@ -59,6 +61,9 @@ export const TOOLS: ToolSpec[] = [
   { key: "social.schedule_post", kind: "write", sensitivity: "customer", permission: "campaigns.manage", args: { "post_id!": "uuid", when_iso: "iso" }, about: "Schedule an existing post draft for publishing." },
   { key: "collections.send_reminder", kind: "write", sensitivity: "money", permission: "finance.write", args: { "contact_id!": "uuid", "text!": "string" }, about: "Send a payment reminder to a customer." },
 ];
+
+// upgrade 4: additional tools (market intelligence) are appended; nothing above is changed
+TOOLS.push(...UPGRADE4_TOOLS);
 
 export const TOOL_MAP: Record<string, ToolSpec> = Object.fromEntries(TOOLS.map((t) => [t.key, t]));
 

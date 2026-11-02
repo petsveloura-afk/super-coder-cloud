@@ -269,3 +269,28 @@ export function orchestratorEvals(): { id: string; pass: boolean; failures: stri
   out.push({ id: "assign-fallback-lead", pass: fallback.z === "l1", failures: fallback.z === "l1" ? [] : ["no fallback to the lead"] });
   return out;
 }
+
+/* ------------------------------------------------------------------ upgrade 4 — evals for the new capabilities (additive) */
+EVAL_SCENARIOS.push(
+  {
+    id: "u4-market-changes",
+    role: "analyst",
+    title: "Upgrade 4: the analyst reads what changed among competitors (read-only, no approval) and reports it with its source",
+    task: { title: "What did our competitors change since last time?" },
+    script: [
+      plan({ steps: [{ tool: "market.what_changed", args: {}, why: "compare with the previous scan" }], more: true }),
+      plan({ deliverable: { type: "text", customer_facing: false, instructions: "short competitor update with sources" } }),
+      "שינויים אצל מתחרים: ראו מקור וביטחון לכל ממצא.",
+    ],
+    member: { tools: [...ROLES.analyst.tools, "market.what_changed", "market.scan", "market.record"] },
+    check: (o, r) => [...expect(r.tools.some((t) => t.tool === "market.what_changed"), "did not read the competitor changes"), ...expect(r.approvals.length === 0, "a read-only research tool asked for approval"), ...expect(o.status === "done", `status ${o.status}`)],
+  },
+  {
+    id: "u4-market-not-allowed-for-service",
+    role: "customer_service",
+    title: "Upgrade 4: a customer-service employee cannot run market research (not in its tools)",
+    task: { title: "Check competitor prices" },
+    script: [plan({ steps: [{ tool: "market.scan", args: { query: "prices" }, why: "x" }] }), plan({ deliverable: { type: "none", customer_facing: false, instructions: "" } })],
+    check: (_o, r) => [...expect(!r.tools.some((t) => t.tool === "market.scan"), "tool outside the role ran")],
+  },
+);

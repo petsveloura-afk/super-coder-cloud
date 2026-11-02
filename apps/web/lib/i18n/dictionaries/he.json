@@ -6740,7 +6740,10 @@
       "inbox_send_message": "שליחת הודעה ללקוח",
       "calendar_book": "קביעת פגישה",
       "social_schedule_post": "תזמון פוסט לפרסום",
-      "collections_send_reminder": "תזכורת תשלום"
+      "collections_send_reminder": "תזכורת תשלום",
+      "market_scan": "סריקת שוק ומתחרים (מקורות ציבוריים)",
+      "market_what_changed": "מה השתנה אצל מתחרים",
+      "market_record": "תיעוד ממצא על מתחרה"
     },
     "goal": {
       "title": "מטרה לצוות",

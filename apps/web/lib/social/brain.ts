@@ -335,7 +335,12 @@ export async function planWeek(orgId: string, count = 7): Promise<{ ok: true; co
     patienceMs: 25_000,
   });
   if (!out.ok) return { ok: false, error: out.error };
-  const plan = parseWeekPlan(out.text, slots.length);
+  let plan = parseWeekPlan(out.text, slots.length);
+  // upgrade 4: only when the strict parser found nothing — recover every complete post from a slightly broken / cut-off answer
+  if (!plan.length) {
+    const { parseWeekPlanTolerant } = await import("@/lib/team/json-repair-core");
+    plan = parseWeekPlanTolerant(out.text, slots.length);
+  }
   if (!plan.length) return { ok: false, error: "ai.failed" };
   const primary: "facebook" | "instagram" = s.platforms.includes("instagram") ? "instagram" : "facebook";
   const rows = plan.map((p, i) => ({

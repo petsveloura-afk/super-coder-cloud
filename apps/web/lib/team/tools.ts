@@ -251,6 +251,13 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
         if (error) return { ok: false, summary: "", error: error.message };
         return data?.length ? { ok: true, summary: `post scheduled for ${when.slice(0, 16)}`, link: "/social" } : { ok: false, summary: "", error: "post_not_found_or_not_draft" };
       }
+      case "market.scan":
+      case "market.record":
+      case "market.what_changed": {
+        // upgrade 4: market intelligence (public sources only; says plainly when no search provider is configured)
+        const { runMarketTool } = await import("./market-intel");
+        return runMarketTool(orgId, tool, args);
+      }
       default:
         return { ok: false, summary: "", error: "unknown_tool" };
     }

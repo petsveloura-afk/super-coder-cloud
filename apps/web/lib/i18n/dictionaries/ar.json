@@ -6740,7 +6740,10 @@
       "inbox_send_message": "إرسال رسالة لعميل",
       "calendar_book": "حجز موعد",
       "social_schedule_post": "جدولة منشور",
-      "collections_send_reminder": "تذكير بالدفع"
+      "collections_send_reminder": "تذكير بالدفع",
+      "market_scan": "مسح السوق والمنافسين (مصادر عامة)",
+      "market_what_changed": "ما الذي تغيّر لدى المنافسين",
+      "market_record": "تسجيل معلومة عن منافس"
     },
     "goal": {
       "title": "هدف للفريق",

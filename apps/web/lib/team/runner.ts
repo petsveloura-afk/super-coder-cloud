@@ -6,6 +6,7 @@ import { learnFromFeedback, supersededBy, type MemoryItem } from "./memory-core"
 import { cleanRoutingRow, routeFor, type RoutingPref, type TaskKind } from "./routing-core";
 import { initiatives, knownFacts, meetingFacts, memberStats, profilePrompt, type MemberStats, type ProfileFacts, type Signals } from "./insight-core";
 import { TOOL_MAP, validateArgs } from "./tools-core";
+import { withRoleExtras } from "./tools-plus-core";
 import { automatedContactIds, runTeamTool } from "./tools";
 import { playbookPrompt } from "./playbooks";
 import { REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt } from "./doctrine";
@@ -181,7 +182,7 @@ interface MemberRow {
 const MEMBER_COLS = "id, role_key, name, tone, instructions, tools, autonomy, auto_actions, status, limits, reports_to, linked";
 
 function toEngine(m: MemberRow): EngineMember {
-  return { id: m.id, role: isRoleKey(m.role_key) ? m.role_key : "custom", name: m.name, tone: m.tone, instructions: m.instructions, tools: m.tools, autonomy: m.autonomy, auto_actions: m.auto_actions, status: m.status, limits: { max_steps: m.limits?.max_steps, max_credits: m.limits?.max_credits } };
+  return { id: m.id, role: isRoleKey(m.role_key) ? m.role_key : "custom", name: m.name, tone: m.tone, instructions: m.instructions, tools: withRoleExtras(m.role_key, m.tools), autonomy: m.autonomy, auto_actions: m.auto_actions, status: m.status, limits: { max_steps: m.limits?.max_steps, max_credits: m.limits?.max_credits } };
 }
 
 async function members(orgId: string): Promise<MemberRow[]> {

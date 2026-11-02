@@ -6740,7 +6740,10 @@
       "inbox_send_message": "Send a customer message",
       "calendar_book": "Book a meeting",
       "social_schedule_post": "Schedule a post",
-      "collections_send_reminder": "Payment reminder"
+      "collections_send_reminder": "Payment reminder",
+      "market_scan": "Market & competitor scan (public sources)",
+      "market_what_changed": "What changed among competitors",
+      "market_record": "Record a competitor finding"
     },
     "goal": {
       "title": "A goal for the team",
