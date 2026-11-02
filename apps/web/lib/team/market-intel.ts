@@ -2,7 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ToolRun } from "./engine-core";
 import { enabledProviders, parseBrave, parseDuckHtml, parseGoogleCse, parseSearxng, parseSerper, parseTavily, searxngInstances, duckBlocked, type SearchHit, type SearchProviderId } from "./search-providers-core";
-import { changesBrief, diffScans, externalContent, findingKey, isPublicSourceUrl, MARKET_RULES, normalizeFinding, scanDay, searchAvailability, splitScans, type StoredFinding } from "./market-intel-core";
+import { changesBrief, diffScans, externalContent, findingKey, MARKET_RULES, normalizeFinding, scanDay, searchAvailability, splitScans, type StoredFinding } from "./market-intel-core";
 
 /**
  * Upgrade 4 / 4c — market intelligence executors. Public sources only; every query is scoped to the business.

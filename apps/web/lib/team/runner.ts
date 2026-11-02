@@ -12,6 +12,7 @@ import { playbookPrompt } from "./playbooks";
 import { REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt } from "./doctrine";
 import { SAFETY_RULES, asData } from "./safety-core";
 import { healthyRoute, maintainTeam, noteModelResult } from "./runner-plus";
+import { pickResumable, resumeBudget } from "./resume-core";
 import { cachedProfile, loadOps, recentToolCalls, runDailyOps, writeShared } from "./runner-ops";
 import { isQuietHour, findDuplicateTask } from "./ops-core";
 import { redactSensitive, needsDoubleApproval } from "./safety-plus-core";
@@ -620,6 +621,20 @@ async function weeklyMeeting(orgId: string, tz: string) {
   await logActivity(orgId, null, manager.id, "learn", "Weekly team meeting summary is ready.", { done: facts.done });
 }
 
+/** upgrade 5: tasks held by the daily credit cap go back to the queue by themselves once credits are available (oldest first, a few per tick) */
+export async function resumeHeldTasks(orgId: string): Promise<number> {
+  const a = db();
+  const settings = await loadSettings(orgId);
+  const n = resumeBudget(settings.daily_credit_cap, await dayCredits(orgId));
+  if (n <= 0) return 0;
+  const { data } = await a.from("team_tasks").select("id, status, error, created_at").eq("organization_id", orgId).eq("status", "blocked").eq("error", "daily_credit_cap").order("created_at").limit(20);
+  const picked = pickResumable((data ?? []) as { id: string; status: string; error: string | null; created_at: string }[], n);
+  for (const r of picked) {
+    await a.from("team_tasks").update({ status: "pending", error: null, finished_at: null, updated_at: new Date().toISOString() }).eq("organization_id", orgId).eq("id", r.id).eq("status", "blocked").eq("error", "daily_credit_cap");
+  }
+  return picked.length;
+}
+
 /** the team clock (cron): for every business with the team on — run ready tasks, initiative once a day, meeting weekly */
 export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: number; blocked: number }> {
   const started = Date.now();
@@ -633,6 +648,7 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
     result.orgs++;
     const { data: org } = await a.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
     const tz = (org?.timezone as string) || "Asia/Jerusalem";
+    await resumeHeldTasks(orgId).catch(() => 0);
     const { data: tasks } = await a.from("team_tasks").select("id, status, depends_on, priority").eq("organization_id", orgId).in("status", ["pending", "done", "failed", "canceled", "in_progress", "awaiting_approval", "awaiting_input", "blocked"]).gte("updated_at", new Date(Date.now() - 30 * 86_400_000).toISOString()).order("priority").limit(500);
     const { ready, blocked } = readyTasks((tasks ?? []) as { id: string; status: string; depends_on: string[] }[]);
     for (const b of blocked) {

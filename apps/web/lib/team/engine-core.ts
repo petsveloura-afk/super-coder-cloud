@@ -310,6 +310,8 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
   const ran: ActionEvent[] = [];
   const recipients = new Set<string>();
   let frozen: string | null = null;
+  // upgrade 5: the daily credit cap stopped the planned steps before any ran — the task is HELD (and resumed by itself), not "done"
+  let capHold = false;
 
   // 1 + 3 — understand and plan (bounded act rounds: read → decide → write)
   const results: { tool: string; ok: boolean; summary: string }[] = [];
@@ -361,6 +363,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
       const b2 = stop();
       if (b2) {
         await deps.log("system", `Stopped the remaining steps: ${b2.replace(/_/g, " ")}.`, { reason: b2 }, false);
+        if (b2 === "daily_credit_cap") capHold = true;
         break;
       }
       out.steps++;
@@ -447,6 +450,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
     if (!parsed.more) break;
   }
   if (!plan) return fail("failed", "no_plan", "No plan.");
+  if (capHold && results.length === 0 && plan.steps.length > 0) return fail("blocked", "daily_credit_cap", "Held: the daily credit cap was reached before any step ran — the task resumes by itself when credits are available.");
 
   const lessonIssues: string[] = [];
   // the deliverable (text / report / message …)
