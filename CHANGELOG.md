@@ -1,5 +1,12 @@
 # Changelog
 
+## Team upgrade 6 — reliability fixes (additive, nothing removed) — 2026-11-02
+- **"The plan could not be read" fixed at the root:** the strict JSON reader stays first; when a weak / fallback model answers with slightly broken JSON (literal newlines, unescaped quotes, trailing commas, smart quotes, a cut-off answer), a tolerant recovery (`firstJsonObjectTolerant`) rescues it. Used for the employee plan, the reviewer verdict and the manager's goal plan. Nothing is invented from a cut-off answer.
+- **Chains no longer stay blocked forever:** tasks blocked only because a dependency failed (`dependency_failed`) come back by themselves once the dependency is retried / pending / done (`reviveBlockedDependents`, runs with the team clock).
+- **Summaries in the business language:** "N action(s) done / Assumptions" is now Hebrew / Arabic / English by the business locale; a rule tells every employee to use only that language's script.
+- **Faster:** independent reads in `runTask` run together, one organization query instead of two; "run now" gets `maxDuration = 60` so a longer task is not cut off by the platform.
+- Tests: `tests/unit/team-upgrade6-plan-recovery.test.ts`.
+
 ## Digital team, stage-1 audit, model routing, design + performance — 2026-11-02
 - **Stage 1 audit:** all 289 server actions and 78 API routes reviewed (identity, permission, validation, translations); fixes: two missing translations, AI studio permission + "deleted" truth; a permanent CI guard (`tests/unit/actions-audit.test.ts`); table in `docs/audit/stage1-actions.md`.
 - **Digital team (behind the `team_v1` flag):** 12 roles + custom, a playbook file per role (he + en), the 8-phase work cycle (understand → context → plan → execute → self-check → peer review → deliver → summarize/learn), the manager's dependency-graph planning and assignment by load, handoffs with full context, structured messages, one approval queue, autonomy levels with explicit per-action autonomy, emergency stop, depth / step / credit limits and loop detection, prompt-injection defence, an append-only activity log, three-layer memory with confidence, expiry, contradiction resolution and owner-confirmed learning, daily initiative and the weekly team meeting, metrics per employee. The existing agents and capabilities are the team's tools (CRM, inbox with its guard, social brain, site builder, business agents, reviews, calendar).

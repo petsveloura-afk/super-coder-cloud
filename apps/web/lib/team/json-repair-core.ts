@@ -125,3 +125,64 @@ export function diagnosePlanAnswer(raw: string): "empty" | "no_json" | "truncate
   if (!/\]\s*$/.test(t) && open > close) return "truncated";
   return parseWeekPlanTolerant(t).length ? "ok" : "malformed";
 }
+
+/**
+ * Upgrade 6 (additive) — tolerant recovery of ONE JSON object (the employee's plan, the reviewer's verdict, the manager's
+ * goal plan). Used ONLY after the strict `firstJsonObject` returned null, so a valid answer behaves exactly as before.
+ * Handles: code fences / prose around the object, literal newlines and unescaped quotes inside strings, trailing commas,
+ * smart quotes used as JSON quotes, and an answer cut off mid-way (it is closed at the last complete value — nothing is invented).
+ */
+function closeOpenStructures(s: string): string {
+  const stack: string[] = [];
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i]!;
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === "{") stack.push("}");
+    else if (ch === "[") stack.push("]");
+    else if ((ch === "}" || ch === "]") && stack.length) stack.pop();
+  }
+  let out = s;
+  if (inStr) out += '"';
+  out = out.replace(/[,:\s]+$/, "");
+  // a dangling key without a value ("key") would break the parse → the caller trims back and retries
+  return out + stack.reverse().join("");
+}
+
+export function firstJsonObjectTolerant(raw: string): Record<string, unknown> | null {
+  const txt = unfence((raw ?? "").replace(/[\u201C\u201D]/g, '"'));
+  const start = txt.indexOf("{");
+  if (start < 0) return null;
+  const body = txt.slice(start);
+  const attempt = (s: string): Record<string, unknown> | null => {
+    try {
+      const v = JSON.parse(stripTrailingCommas(escapeControlInStrings(s)));
+      return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  };
+  // 1 — the whole object as written (after cleanup)
+  const end = body.lastIndexOf("}");
+  if (end > 0) {
+    const whole = attempt(body.slice(0, end + 1));
+    if (whole) return whole;
+  }
+  // 2 — cut off: close what is open, trimming back to the previous comma until it parses (bounded)
+  let cur = body;
+  for (let i = 0; i < 60 && cur.length > 2; i++) {
+    const closed = attempt(closeOpenStructures(cur));
+    if (closed) return closed;
+    const cut = cur.lastIndexOf(",");
+    if (cut <= 0) break;
+    cur = cur.slice(0, cut);
+  }
+  return null;
+}

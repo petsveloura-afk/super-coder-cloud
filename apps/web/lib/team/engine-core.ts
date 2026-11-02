@@ -12,7 +12,8 @@
  *   7 deliver      by autonomy and sensitivity: executed, or one approval with the employee's reasoning
  *   8 summarize    a short report + episodic memory
  */
-import { firstJsonObject } from "@/lib/operator/operator-core";
+import { firstJsonObject as firstJsonObjectStrict } from "@/lib/operator/operator-core";
+import { firstJsonObjectTolerant } from "./json-repair-core";
 import { ROLES, type RoleKey, type Autonomy } from "./roles";
 import { playbookPrompt } from "./playbooks";
 import { TOOL_MAP, toolsPrompt, validateArgs } from "./tools-core";
@@ -181,13 +182,23 @@ export function parsePlanModel(raw: string): PlanModel | null {
   };
 }
 
+// upgrade 6: strict parse first (unchanged behaviour); only when it fails, a tolerant recovery (weak / fallback models)
+const firstJsonObject = (raw: string): unknown => firstJsonObjectStrict(raw) ?? firstJsonObjectTolerant(raw);
+
+/** upgrade 6: summary wording per business language (English text is exactly what it was before) */
+const REPORT_TEXT: Record<"he" | "en" | "ar", { done: (n: number) => string; notDone: (n: number) => string; waiting: (n: number) => string; handed: (n: number) => string; assumptions: string }> = {
+  en: { done: (n) => `${n} action(s) done`, notDone: (n) => `${n} not done`, waiting: (n) => `${n} waiting for approval`, handed: (n) => `${n} handed over`, assumptions: "Assumptions" },
+  he: { done: (n) => `בוצעו ${n} פעולות`, notDone: (n) => `${n} לא בוצעו`, waiting: (n) => `${n} ממתינות לאישורך`, handed: (n) => `${n} הועברו לעובד אחר`, assumptions: "הנחות" },
+  ar: { done: (n) => `تم تنفيذ ${n} إجراءات`, notDone: (n) => `${n} لم تُنفَّذ`, waiting: (n) => `${n} بانتظار موافقتك`, handed: (n) => `${n} حُوّلت لموظف آخر`, assumptions: "افتراضات" },
+};
+
 const LANG = { he: "Hebrew", en: "English", ar: "Arabic" } as const;
 
 /** the employee's system prompt: identity + playbook + safety + business + memory + tools */
 export function employeeSystem(m: EngineMember, ctx: TeamContext, lang: "he" | "en" | "ar", task: string): string {
   const mem = recall(ctx.memories.filter((x) => !isClientSubject(x.subject)), task, m.id, 12);
   return [
-    `You are ${m.name}, ${m.role.replace(/_/g, " ")} in this business's team. You work like a senior professional employee of the business — not a chatbot. Write everything the business or its customers will read in ${LANG[lang]}.`,
+    `You are ${m.name}, ${m.role.replace(/_/g, " ")} in this business's team. You work like a senior professional employee of the business — not a chatbot. Write everything the business or its customers will read in ${LANG[lang]}, using ONLY that language's script — never mix in words from another language or script (keep brand names, tool keys and JSON keys as they are).`,
     m.tone ? `Your personality and tone: ${m.tone.slice(0, 400)}` : "",
     playbookPrompt(m.role, ctx.playbookExtra),
     WORKING_DOCTRINE,
@@ -550,7 +561,15 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
   // 8 — summarize + learn
   const did = results.filter((r) => r.ok).length;
   const failed = results.filter((r) => !r.ok).length;
-  out.report = [plan.understanding || task.title, `${did} action(s) done${failed ? `, ${failed} not done` : ""}${out.approvals.length ? `, ${out.approvals.length} waiting for approval` : ""}${out.handoffs.length ? `, ${out.handoffs.length} handed over` : ""}.`, plan.assumptions.length ? `Assumptions: ${plan.assumptions.join("; ")}` : ""].filter(Boolean).join(" ");
+  // upgrade 6: the summary is written in the business language (it was English even for Hebrew businesses)
+  const L = REPORT_TEXT[deps.lang] ?? REPORT_TEXT.en;
+  out.report = [
+    plan.understanding || task.title,
+    `${L.done(did)}${failed ? `, ${L.notDone(failed)}` : ""}${out.approvals.length ? `, ${L.waiting(out.approvals.length)}` : ""}${out.handoffs.length ? `, ${L.handed(out.handoffs.length)}` : ""}.`,
+    plan.assumptions.length ? `${L.assumptions}: ${plan.assumptions.join("; ")}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   await deps.remember([{ layer: "episodic", kind: "outcome", content: `${task.title}: ${out.report}`.slice(0, 1500), subject: null, confidence: 0.6, status: "active" }]);
   // upgrade 3 (additive): what this conversation taught about THIS customer, and what the whole team can learn from the review
   try {

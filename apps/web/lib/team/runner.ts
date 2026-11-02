@@ -281,15 +281,15 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
   // claim: only a pending task, once
   const { data: claimed } = await a.from("team_tasks").update({ status: "in_progress", started_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("organization_id", orgId).eq("id", taskId).eq("status", "pending").select("id, parent_id, goal_id, title, brief, assignee_id, depth, steps_used, credits_used, review_rounds, result, created_by").maybeSingle();
   if (!claimed) return { notRun: "not_pending" };
-  const settings = await loadSettings(orgId);
-  const all = await members(orgId);
+  // upgrade 6: independent reads start together (was one after another)
+  const [settings, all] = await Promise.all([loadSettings(orgId), members(orgId)]);
   const row = all.find((m) => m.id === claimed.assignee_id);
   if (!row) {
     await a.from("team_tasks").update({ status: "blocked", error: "no_assignee", updated_at: new Date().toISOString() }).eq("id", taskId);
     return { notRun: "no_assignee" };
   }
   const member = toEngine(row);
-  const { data: org } = await a.from("organizations").select("locale").eq("id", orgId).maybeSingle();
+  const { data: org } = await a.from("organizations").select("locale, timezone").eq("id", orgId).maybeSingle();
   const lang = (org?.locale === "en" || org?.locale === "ar" ? org.locale : "he") as "he" | "en" | "ar";
   const actorUser = opts.actorUser ?? (claimed.created_by as string | null) ?? null;
   const reviewerRow = all.find((m) => m.role_key === "quality_control" && m.status === "active") ?? all.find((m) => m.id === row.reports_to && m.status === "active") ?? null;
@@ -300,7 +300,7 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
   ]);
   const log = (phase: string, summary: string, details: Record<string, unknown> = {}, ok = true) => logActivity(orgId, taskId, member.id, phase, summary, details, ok);
   const ops = await loadOps(orgId);
-  const { data: orgTz } = await a.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
+  const orgTz = org; // same row (one query instead of two)
   const deps: EngineDeps = {
     ops: { quietEnabled: ops.quiet.enabled, quietNow: ops.quiet.enabled && isQuietHour(Date.now(), (orgTz?.timezone as string) || "Asia/Jerusalem", ops.quiet.start, ops.quiet.end), rateLimits: ops.protect.rateLimits, anomalyFreeze: ops.protect.anomalyFreeze, recipientCap: ops.protect.recipientCap },
     recentCalls: (tool, sinceMs) => recentToolCalls(orgId, member.id, tool, sinceMs),

@@ -17,6 +17,9 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return { title: t("aiTeam.title") };
 }
 
+// a task started from this screen ("run now") may take a while — give the server action the same room as the team clock
+export const maxDuration = 60;
+
 /** The digital team ("My team"). Behind the feature flag team_v1 — without it the page explains and changes nothing. */
 export default async function AiTeamPage({ params }: { params: Promise<{ locale: string }> }) {
   const locale = await resolveLocale(params);

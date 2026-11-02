@@ -84,10 +84,37 @@ export async function retryFailedTasks(orgId: string): Promise<number> {
   return n;
 }
 
+/**
+ * upgrade 6: tasks blocked ONLY because a dependency had failed (error "dependency_failed") come back by themselves once
+ * none of their dependencies is failed / canceled any more (e.g. the dependency was retried and is pending, running or done).
+ * Before, one temporary AI failure left the whole chain blocked forever. A dependency that stays failed keeps them blocked.
+ */
+export async function reviveBlockedDependents(orgId: string): Promise<number> {
+  const a = db();
+  const { data } = await a.from("team_tasks").select("id, depends_on").eq("organization_id", orgId).eq("status", "blocked").eq("error", "dependency_failed").limit(50);
+  const rows = (data ?? []) as { id: string; depends_on: string[] | null }[];
+  if (!rows.length) return 0;
+  const depIds = [...new Set(rows.flatMap((r) => r.depends_on ?? []))];
+  if (!depIds.length) return 0;
+  const { data: deps } = await a.from("team_tasks").select("id, status").eq("organization_id", orgId).in("id", depIds);
+  const status = new Map(((deps ?? []) as { id: string; status: string }[]).map((d) => [d.id, d.status]));
+  let n = 0;
+  for (const r of rows) {
+    const ds = (r.depends_on ?? []).map((d) => status.get(d));
+    if (ds.some((x) => x === "failed" || x === "canceled" || x === "blocked")) continue;
+    const { data: done } = await a.from("team_tasks").update({ status: "pending", error: null, finished_at: null, updated_at: new Date().toISOString() }).eq("organization_id", orgId).eq("id", r.id).eq("status", "blocked").eq("error", "dependency_failed").select("id");
+    if (done?.length) n++;
+  }
+  return n;
+}
+
 /** both, for the team clock; never throws */
 export async function maintainTeam(orgId: string): Promise<{ recovered: number; retried: number }> {
   try {
-    return { recovered: await recoverStuckTasks(orgId), retried: await retryFailedTasks(orgId) };
+    const recovered = await recoverStuckTasks(orgId);
+    const retried = await retryFailedTasks(orgId);
+    await reviveBlockedDependents(orgId).catch(() => 0);
+    return { recovered, retried };
   } catch {
     return { recovered: 0, retried: 0 };
   }
