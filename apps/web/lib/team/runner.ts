@@ -11,6 +11,10 @@ import { playbookPrompt } from "./playbooks";
 import { REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt } from "./doctrine";
 import { SAFETY_RULES, asData } from "./safety-core";
 import { healthyRoute, maintainTeam, noteModelResult } from "./runner-plus";
+import { cachedProfile, loadOps, recentToolCalls, runDailyOps, writeShared } from "./runner-ops";
+import { isQuietHour, findDuplicateTask } from "./ops-core";
+import { redactSensitive, needsDoubleApproval } from "./safety-plus-core";
+import { buildIndex, candidatesFor, clientSubject } from "./memory-plus-core";
 
 /**
  * The digital team — server runner. Connects the pure engine to the database, the existing AI router (with
@@ -240,7 +244,9 @@ async function chainOf(orgId: string, parentId: string | null): Promise<{ role: 
 }
 
 async function logActivity(orgId: string, taskId: string | null, memberId: string | null, phase: string, summary: string, details: Record<string, unknown> = {}, ok = true, actorUser: string | null = null) {
-  await db().from("team_activity").insert({ organization_id: orgId, task_id: taskId, member_id: memberId, actor_user: actorUser, phase, summary: summary.slice(0, 1000) || "—", details, ok }).then(
+  // upgrade 3: card / ID / IBAN / secret-looking numbers never reach the log (e-mail and phone stay — the team needs them)
+  const mask = (x: unknown): unknown => (typeof x === "string" ? redactSensitive(x).text : Array.isArray(x) ? x.map(mask) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x as Record<string, unknown>).map(([k, v]) => [k, mask(v)])) : x);
+  await db().from("team_activity").insert({ organization_id: orgId, task_id: taskId, member_id: memberId, actor_user: actorUser, phase, summary: redactSensitive(summary).text.slice(0, 1000) || "—", details: mask(details) as Record<string, unknown>, ok }).then(
     () => undefined,
     () => undefined,
   );
@@ -291,7 +297,13 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
     reviewerRow ? a.from("team_playbooks").select("extra").eq("organization_id", orgId).eq("role_key", reviewerRow.role_key).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const log = (phase: string, summary: string, details: Record<string, unknown> = {}, ok = true) => logActivity(orgId, taskId, member.id, phase, summary, details, ok);
+  const ops = await loadOps(orgId);
+  const { data: orgTz } = await a.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
   const deps: EngineDeps = {
+    ops: { quietEnabled: ops.quiet.enabled, quietNow: ops.quiet.enabled && isQuietHour(Date.now(), (orgTz?.timezone as string) || "Asia/Jerusalem", ops.quiet.start, ops.quiet.end), rateLimits: ops.protect.rateLimits, anomalyFreeze: ops.protect.anomalyFreeze, recipientCap: ops.protect.recipientCap },
+    recentCalls: (tool, sinceMs) => recentToolCalls(orgId, member.id, tool, sinceMs),
+    share: (items) => writeShared(orgId, items),
+    rememberClient: (contactId, items) => writeShared(orgId, items.map((i) => ({ ...i, subject: i.subject.startsWith(clientSubject(contactId)) ? i.subject : `${clientSubject(contactId)}:${i.subject}` }))),
     lang,
     interactive: opts.interactive,
     ai: teamAi(orgId, settings.routing_pref, (kind, chosen, used) => routes.push({ kind, chosen, used })),
@@ -306,6 +318,12 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
       const l = await loads(orgId);
       const target = all.filter((m) => m.role_key === input.role && m.status === "active").sort((x, y) => (l.get(x.id) ?? 0) - (l.get(y.id) ?? 0))[0];
       if (!target) return { ok: false, error: "no_employee_with_role" };
+      // upgrade 3: the same work is not handed over twice (only between employees — the owner's own tasks are never blocked)
+      if (ops.dedupe) {
+        const { data: open } = await a.from("team_tasks").select("id, title, assignee_id").eq("organization_id", orgId).eq("assignee_id", target.id).in("status", ["pending", "in_progress", "awaiting_approval", "awaiting_input"]).limit(200);
+        const dup = findDuplicateTask({ role: input.role, title: input.title }, ((open ?? []) as { id: string; title: string }[]).map((o) => ({ id: o.id, role: input.role, title: o.title })));
+        if (dup) return { ok: true, taskId: dup };
+      }
       const { data } = await a.from("team_tasks").insert({ organization_id: orgId, parent_id: taskId, goal_id: claimed.goal_id ?? null, title: input.title.slice(0, 300), brief: input.brief.slice(0, 6000), assignee_id: target.id, depth: (claimed.depth as number) + 1, origin: "handoff", created_by: actorUser }).select("id").single();
       if (!data) return { ok: false, error: "create_failed" };
       await a.from("team_messages").insert({ organization_id: orgId, task_id: data.id, from_member: member.id, to_member: target.id, kind: "handoff", body: { title: input.title, brief: input.brief.slice(0, 2000), from_task: taskId } });
@@ -316,8 +334,11 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
     },
     remember: (items) => writeMemories(orgId, member.id, items),
     context: async (): Promise<TeamContext> => {
-      const profile = await loadProfile(orgId);
-      return { profile: profilePrompt(profile), known: knownFacts(profile), memories: await memoriesFor(orgId, member.id), playbookExtra: (extra?.extra as string) ?? "", reviewer: reviewerRow && reviewerRow.id !== member.id ? toEngine(reviewerRow) : null, reviewerExtra: (reviewerExtra as { extra?: string } | null)?.extra ?? "" };
+      const profile = await cachedProfile(orgId, () => loadProfile(orgId));
+      const allMemories = await memoriesFor(orgId, member.id);
+      // a long memory list is narrowed to what shares terms with the task (hard rules always stay)
+      const memories = allMemories.length > 150 ? candidatesFor(buildIndex(allMemories), `${claimed.title as string} ${(claimed.brief as string) ?? ""}`, 80) : allMemories;
+      return { profile: profilePrompt(profile), known: knownFacts(profile), memories, playbookExtra: (extra?.extra as string) ?? "", reviewer: reviewerRow && reviewerRow.id !== member.id ? toEngine(reviewerRow) : null, reviewerExtra: (reviewerExtra as { extra?: string } | null)?.extra ?? "" };
     },
   };
   const task: EngineTask = { id: taskId, title: claimed.title as string, brief: (claimed.brief as string) ?? "", depth: claimed.depth as number, steps_used: claimed.steps_used as number, credits_used: claimed.credits_used as number, review_rounds: claimed.review_rounds as number, chain: await chainOf(orgId, (claimed.parent_id as string | null) ?? null), answer: ((claimed.result as Record<string, unknown>)?.answer as string | undefined) ?? null };
@@ -434,7 +455,7 @@ async function refreshGoal(orgId: string, goalId: string) {
 
 export async function decideApproval(orgId: string, approvalId: string, decision: { kind: "approve" | "reject" | "edit"; note?: string; text?: string }, userId: string): Promise<{ ok: boolean; error?: string; result?: string }> {
   const a = db();
-  const { data: ap } = await a.from("team_approvals").select("id, task_id, member_id, tool, payload, preview, status").eq("organization_id", orgId).eq("id", approvalId).maybeSingle();
+  const { data: ap } = await a.from("team_approvals").select("id, task_id, member_id, tool, payload, preview, status, sensitivity").eq("organization_id", orgId).eq("id", approvalId).maybeSingle();
   if (!ap || ap.status !== "pending") return { ok: false, error: "aiTeam.err.approvalGone" };
   const settings = await loadSettings(orgId);
   if (settings.emergency_stop && decision.kind !== "reject") return { ok: false, error: "aiTeam.err.stopped" };
@@ -446,6 +467,19 @@ export async function decideApproval(orgId: string, approvalId: string, decision
     else payload.text = decision.text;
   }
   const now = new Date().toISOString();
+  // upgrade 3: money / irreversible actions need a SECOND explicit confirmation (a fresh click). Without the new column
+  // (migration not run) this step is skipped and the single approval works exactly as before.
+  if (decision.kind !== "reject" && needsDoubleApproval(String(ap.sensitivity ?? ""))) {
+    const { data: conf, error: confErr } = await a.from("team_approvals").select("confirmations").eq("id", ap.id).maybeSingle();
+    const have = confErr ? null : Number((conf as { confirmations?: number } | null)?.confirmations ?? 0);
+    if (have !== null && have < 1) {
+      const patch: Record<string, unknown> = { confirmations: 1 };
+      if (decision.kind === "edit" && decision.text) patch.payload = payload; // the edited text is what the second click confirms
+      await a.from("team_approvals").update(patch).eq("id", ap.id).eq("status", "pending");
+      await logActivity(orgId, ap.task_id as string, ap.member_id as string, "approval", `First confirmation (${String(ap.sensitivity)}) — a second confirmation is needed before it runs.`, { tool: ap.tool, sensitivity: ap.sensitivity }, true, userId);
+      return { ok: true, result: "second_needed" };
+    }
+  }
   if (decision.kind === "reject") {
     await a.from("team_approvals").update({ status: "rejected", decided_by: userId, decided_at: now, decision_note: decision.note?.slice(0, 1000) ?? null }).eq("id", ap.id);
     await writeMemories(orgId, (ap.member_id as string | null) ?? null, learnFromFeedback({ tool: ap.tool as string, preview: before, feedback: { kind: "rejected", note: decision.note } }));
@@ -605,6 +639,19 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
       result.blocked++;
     }
     await maintainTeam(orgId);
+    if (Date.now() - started < budgetMs - 20_000) {
+      // upgrade 3: morning / weekly digest + daily memory upkeep (idempotent; never blocks the work below)
+      try {
+        const { loadTeamHealth } = await import("./runner-plus");
+        const st = await loadSettings(orgId);
+        const h = await loadTeamHealth(orgId, st);
+        const { data: orgRow } = await a.from("organizations").select("locale").eq("id", orgId).maybeSingle();
+        const l = (orgRow?.locale === "en" || orgRow?.locale === "ar" ? orgRow.locale : "he") as "he" | "en" | "ar";
+        await runDailyOps(orgId, tz, l, h.verdict.level);
+      } catch {
+        /* optional */
+      }
+    }
     for (const t of ready.slice(0, 3)) {
       if (Date.now() - started > budgetMs - 15_000) break;
       const r = await runTask(orgId, t.id, { interactive: false, actorUser: null });

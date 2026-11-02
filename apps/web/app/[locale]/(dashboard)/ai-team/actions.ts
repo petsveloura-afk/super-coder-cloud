@@ -7,6 +7,7 @@ import { dbErrorKey, type ActionState } from "@/lib/action-state";
 import { ROLES, ROLE_KEYS, isRoleKey } from "@/lib/team/roles";
 import { TOOL_MAP } from "@/lib/team/tools-core";
 import { TASK_KINDS } from "@/lib/team/routing-core";
+import { cleanOps } from "@/lib/team/ops-settings-core";
 
 /**
  * The digital team — server actions. Configuring the team needs ai.manage; giving goals, running tasks and deciding
@@ -102,6 +103,19 @@ export async function saveTeamSettingsAction(input: { locale: string } & z.input
   const { error } = await (await admin()).from("team_settings").upsert({ organization_id: g.ctx.org.id, ...p.data, updated_by: g.ctx.userId, updated_at: new Date().toISOString() }, { onConflict: "organization_id" });
   if (error) return { error: "common.error" };
   await audit(g.ctx.org.id, g.ctx.userId, "Team settings saved", p.data);
+  path(locale);
+  return { ok: true, message: "common.saved" };
+}
+
+/** upgrade 3: quiet hours, SLA target, digests, duplicate removal and protections (one JSON object, always cleaned) */
+export async function saveOpsAction(input: { locale: string; ops: unknown }): Promise<ActionState> {
+  const locale = loc(input.locale);
+  const g = await gate(locale, "ai.manage");
+  if ("error" in g) return { error: g.error };
+  const ops = cleanOps(input.ops);
+  const { error } = await (await admin()).from("team_settings").upsert({ organization_id: g.ctx.org.id, ops, updated_by: g.ctx.userId, updated_at: new Date().toISOString() }, { onConflict: "organization_id" });
+  if (error) return { error: "common.error" };
+  await audit(g.ctx.org.id, g.ctx.userId, "Team operations settings saved", ops as unknown as Record<string, unknown>);
   path(locale);
   return { ok: true, message: "common.saved" };
 }
@@ -282,6 +296,7 @@ export async function decideApprovalAction(input: { locale: string; id: string; 
   const r = await decideApproval(g.ctx.org.id, p.data.id, { kind: p.data.kind, note: p.data.note, text: p.data.text }, g.ctx.userId);
   path(locale);
   if (!r.ok) return { error: r.error ?? "common.error", messageParams: { detail: r.result ?? "" } };
+  if (r.result === "second_needed") return { ok: true, message: "aiTeam.msg.confirmAgain" };
   return { ok: true, message: p.data.kind === "reject" ? "aiTeam.msg.rejected" : "aiTeam.msg.approved" };
 }
 
@@ -294,7 +309,14 @@ export async function approveManyAction(input: { locale: string; ids: string[] }
   const g = await gate(locale, "ai.use");
   if ("error" in g) return { error: g.error };
   if (!g.ctx.can("ai.use")) return { error: "errors.forbidden" };
+  // upgrade 3: money / irreversible approvals need their own second click — bulk approval skips them
+  const { data: sens } = await (await admin()).from("team_approvals").select("id, sensitivity").eq("organization_id", g.ctx.org.id).in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+  const doubles = new Set(((sens ?? []) as { id: string; sensitivity: string }[]).filter((x) => x.sensitivity === "money" || x.sensitivity === "irreversible").map((x) => x.id));
   for (const id of ids) {
+    if (doubles.has(id)) {
+      failed++;
+      continue;
+    }
     const r = await decideApprovalAction({ locale, id, kind: "approve" });
     if (r.ok) done++;
     else failed++;

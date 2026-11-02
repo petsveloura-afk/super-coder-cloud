@@ -21,8 +21,10 @@ import { memoryPrompt, recall, type MemoryItem } from "./memory-core";
 import { SAFETY_RULES, asData, escalationSignal, inventedPrices, leaks } from "./safety-core";
 import { DIAGNOSTIC_METHOD, GOAL_PLANNING_GUIDE, REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt, isDiagnosticTask } from "./doctrine";
 import type { TaskKind } from "./routing-core";
-import { injectionNotice, injectionVerdict, redactSensitive } from "./safety-plus-core";
-import { interactionGuidance, interactionPrompt } from "./interaction-core";
+import { checkRate, detectAnomalies, injectionNotice, injectionVerdict, needsDoubleApproval, rateLimitFor, recipientCapExceeded, redactSensitive, shouldFreeze, type ActionEvent } from "./safety-plus-core";
+import { interactionGuidance, interactionPrompt, ownerPrompt, ownerStyle } from "./interaction-core";
+import { clientMemories, clientMemoryPrompt, isClientSubject, learnFromInteraction, lessonToMemory } from "./memory-plus-core";
+import { handoffPackage } from "./ops-core";
 
 export interface EngineMember {
   id: string;
@@ -94,11 +96,20 @@ export interface EngineDeps {
   ai(kind: TaskKind, system: string, user: string, maxTokens: number): Promise<AiResult>;
   runTool(tool: string, args: Record<string, string | number>): Promise<ToolRun>;
   log(phase: Phase, summary: string, details?: Record<string, unknown>, ok?: boolean): Promise<void>;
-  approval(input: { tool: string; payload: Record<string, unknown>; preview: string; reason: string; sensitivity: string }): Promise<string | null>;
+  approval(input: { tool: string; payload: Record<string, unknown>; preview: string; reason: string; sensitivity: string; /** upgrade 3: needs two explicit confirmations */ double?: boolean }): Promise<string | null>;
   handoff(input: { role: string; title: string; brief: string }): Promise<{ ok: boolean; taskId?: string; error?: string }>;
   message(kind: "request" | "answer" | "clarify" | "handoff" | "report" | "review", toMember: string | null, body: Record<string, unknown>): Promise<void>;
   remember(items: { layer: "episodic" | "semantic"; kind: MemoryItem["kind"]; content: string; subject?: string | null; confidence: number; status: "active" | "proposed" }[]): Promise<void>;
   context(): Promise<TeamContext>;
+  /** upgrade 3 (all optional — without them the engine behaves exactly as before) */
+  /** a lesson for the WHOLE team (shared memory, proposed until the owner confirms) */
+  share?(items: { layer: "episodic" | "semantic"; kind: MemoryItem["kind"]; content: string; subject?: string | null; confidence: number; status: "active" | "proposed"; tags?: string[] }[]): Promise<void>;
+  /** per-customer memory (keyed by contact; never mixed between customers) */
+  rememberClient?(contactId: string, items: { layer: "episodic" | "semantic"; kind: MemoryItem["kind"]; content: string; subject: string; confidence: number; status: "active" | "proposed" }[]): Promise<void>;
+  /** epoch ms of this employee's earlier calls of a tool (for the rate limit across tasks) */
+  recentCalls?(tool: string, sinceMs: number): Promise<number[]>;
+  /** the business's operating rules */
+  ops?: { quietNow: boolean; quietEnabled: boolean; rateLimits: boolean; anomalyFreeze: boolean; recipientCap: number };
 }
 
 export type Phase = "understand" | "context" | "plan" | "execute" | "self_check" | "peer_review" | "deliver" | "learn" | "initiative" | "approval" | "system";
@@ -174,7 +185,7 @@ const LANG = { he: "Hebrew", en: "English", ar: "Arabic" } as const;
 
 /** the employee's system prompt: identity + playbook + safety + business + memory + tools */
 export function employeeSystem(m: EngineMember, ctx: TeamContext, lang: "he" | "en" | "ar", task: string): string {
-  const mem = recall(ctx.memories, task, m.id, 12);
+  const mem = recall(ctx.memories.filter((x) => !isClientSubject(x.subject)), task, m.id, 12);
   return [
     `You are ${m.name}, ${m.role.replace(/_/g, " ")} in this business's team. You work like a senior professional employee of the business — not a chatbot. Write everything the business or its customers will read in ${LANG[lang]}.`,
     m.tone ? `Your personality and tone: ${m.tone.slice(0, 400)}` : "",
@@ -264,6 +275,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
     out.status = "awaiting_input";
     out.question = `escalate:${signal}`;
     await deps.log("understand", `Needs a person: ${signal.replace(/_/g, " ")}.`, { signal });
+    await deps.message("handoff", null, { package: handoffPackage({ reason: signal, taskTitle: task.title, lastMessages: [task.brief], recommended: "Handle this one personally." }) }).catch(() => undefined);
     return out;
   }
   // upgrade 2 (additive): a clearly upset customer, or a repeat complaint, also goes to a person
@@ -274,6 +286,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
       out.status = "awaiting_input";
       out.question = `escalate:${ig.escalate}`;
       await deps.log("understand", `Needs a person: ${ig.escalate.replace(/_/g, " ")}.`, { signal: ig.escalate, emotion: ig.read.emotion });
+      await deps.message("handoff", null, { package: handoffPackage({ reason: ig.escalate, taskTitle: task.title, understanding: `${ig.read.emotion}, urgency ${Math.round(ig.read.urgency * 100)}%`, lastMessages: [task.brief], recommended: "Call or write to the customer personally, acknowledge the problem first." }) }).catch(() => undefined);
       return out;
     }
   }
@@ -292,6 +305,11 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
   ]
     .filter(Boolean)
     .join("\n");
+
+  // upgrade 3 (additive): protections that watch this run — rate limits, a recipient cap, unusual behaviour freezes WRITE actions only
+  const ran: ActionEvent[] = [];
+  const recipients = new Set<string>();
+  let frozen: string | null = null;
 
   // 1 + 3 — understand and plan (bounded act rounds: read → decide → write)
   const results: { tool: string; ok: boolean; summary: string }[] = [];
@@ -384,8 +402,30 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
         await deps.log("execute", h.ok ? `Handed "${title}" to ${role}.` : `Handoff failed: ${h.error}`, { role, title }, h.ok);
         continue;
       }
+      // upgrade 3: write actions only (reads always continue)
+      const spec = TOOL_MAP[step.tool]!;
+      if (spec.kind !== "read" && deps.ops) {
+        let blockedBy: string | null = null;
+        if (frozen && deps.ops.anomalyFreeze) blockedBy = `paused_${frozen}`;
+        if (!blockedBy && deps.ops.rateLimits) {
+          const prior = (await deps.recentCalls?.(step.tool, 60_000).catch(() => [] as number[])) ?? [];
+          const mine = ran.filter((e) => e.tool === step.tool).map((e) => e.at);
+          const rc = checkRate([...prior, ...mine], Date.now(), rateLimitFor(step.tool, spec.sensitivity, spec.kind));
+          if (!rc.ok) blockedBy = `rate_limited_${Math.ceil(rc.retryAfterMs / 1000)}s`;
+        }
+        const cid = typeof v.args.contact_id === "string" ? v.args.contact_id : "";
+        if (!blockedBy && cid && spec.sensitivity !== "internal") {
+          recipients.add(cid);
+          if (recipientCapExceeded(recipients.size, deps.ops.recipientCap)) blockedBy = "recipient_cap";
+        }
+        if (blockedBy) {
+          results.push({ tool: step.tool, ok: false, summary: `held: ${blockedBy}` });
+          await deps.log("execute", `Held back: ${step.tool} (${blockedBy.replace(/_/g, " ")}).`, { tool: step.tool, protection: blockedBy }, false);
+          continue;
+        }
+      }
       if (d.do === "approve") {
-        const id = await deps.approval({ tool: step.tool, payload: v.args, preview: JSON.stringify(v.args).slice(0, 1500), reason: step.why || d.why, sensitivity: d.sensitivity });
+        const id = await deps.approval({ tool: step.tool, payload: v.args, preview: JSON.stringify(v.args).slice(0, 1500), reason: step.why || d.why, sensitivity: d.sensitivity, double: needsDoubleApproval(d.sensitivity) });
         if (id) out.approvals.push(id);
         results.push({ tool: step.tool, ok: true, summary: "waiting for the owner's approval" });
         await deps.log("approval", `Waiting for approval: ${step.tool} — ${step.why || d.why}`, { tool: step.tool, why: d.why });
@@ -393,12 +433,22 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
       }
       const r = await (prefetch.get(step) ?? retryTool(deps, step.tool, v.args));
       results.push({ tool: step.tool, ok: r.ok, summary: r.ok ? r.summary : r.error ?? "failed" });
+      if (spec.kind !== "read") {
+        // only WRITE actions count: five reads in a row are normal work, five identical writes are not
+        ran.push({ tool: step.tool, at: Date.now(), ok: r.ok });
+        const an = detectAnomalies(ran, member.tools, Date.now());
+        if (!frozen && deps.ops?.anomalyFreeze && shouldFreeze(an)) {
+          frozen = an[0]!.kind;
+          await deps.log("system", `Unusual behaviour (${an.map((x) => x.detail).join("; ")}) — write actions are paused until a person looks.`, { anomalies: an }, false);
+        }
+      }
       await deps.log("execute", r.ok ? `${step.tool}: ${r.summary.slice(0, 300)}` : `${step.tool} failed: ${(r.error ?? "").slice(0, 200)}`, { tool: step.tool, link: r.link ?? null }, r.ok);
     }
     if (!parsed.more) break;
   }
   if (!plan) return fail("failed", "no_plan", "No plan.");
 
+  const lessonIssues: string[] = [];
   // the deliverable (text / report / message …)
   if (plan.deliverable.type !== "none") {
     const customer = plan.deliverable.customer_facing;
@@ -409,6 +459,8 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
         results.length ? `What you found / did:\n${results.map((r) => `- ${r.tool}: ${asData(r.tool, r.summary, 1500)}`).join("\n")}` : "",
         `Write the final ${plan!.deliverable.type} now. ${plan!.deliverable.instructions}`,
         customer ? "It goes to a CUSTOMER: short, warm, accurate, only facts from the business profile, one clear next step." : "It goes to the OWNER: concise, factual, mark assumptions.",
+        customer && plan!.deliverable.contact_id ? clientMemoryPrompt(clientMemories(ctx.memories, plan!.deliverable.contact_id)) : "",
+        !customer && task.answer ? ownerPrompt(ownerStyle([task.answer, task.title])) : "",
         !customer && (plan!.deliverable.type === "report" || isDiagnosticTask(taskText)) ? REPORT_STANDARD : "",
         draft ? `Your previous draft:\n${asData("draft", draft, 3000)}\nFix exactly these points:\n${fixes.map((f, i) => `${i + 1}. ${f}`).join("\n")}` : "",
         "Answer with the final text only (no JSON, no preface).",
@@ -446,6 +498,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
           break;
         }
         reviewDisagreement = verdict.issues;
+        for (const i of verdict.issues.slice(0, 2)) if (!lessonIssues.includes(i)) lessonIssues.push(i);
         const fix = await deps.ai("write", system, writePrompt(verdict.issues.length ? verdict.issues : ["Improve per the reviewer."], draft), 1200);
         out.credits += fix.credits;
         if (fix.ok) draft = fix.text.trim();
@@ -468,9 +521,11 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
         const unresolved = reviewDisagreement.length > 0 || issues.length > 0;
         if (d.do === "blocked") {
           await deps.log("deliver", `Cannot send: ${d.why.replace(/_/g, " ")}.`, { tool }, false);
-        } else if (d.do === "approve" || unresolved) {
-          const reason = unresolved ? `Quality review did not fully approve: ${[...reviewDisagreement, ...issues].slice(0, 3).join("; ")}` : plan.deliverable.instructions || plan.understanding;
-          const id = await deps.approval({ tool, payload: v.args, preview: draft.slice(0, 1500), reason, sensitivity: d.do === "approve" ? d.sensitivity : TOOL_MAP[tool]!.sensitivity });
+        } else if (d.do === "approve" || unresolved || (deps.ops?.quietEnabled && deps.ops.quietNow && customer)) {
+          const quiet = !unresolved && d.do !== "approve";
+          const reason = unresolved ? `Quality review did not fully approve: ${[...reviewDisagreement, ...issues].slice(0, 3).join("; ")}` : quiet ? "Quiet hours — a customer message waits for the owner." : plan.deliverable.instructions || plan.understanding;
+          const sens = d.do === "approve" ? d.sensitivity : TOOL_MAP[tool]!.sensitivity;
+          const id = await deps.approval({ tool, payload: v.args, preview: draft.slice(0, 1500), reason, sensitivity: sens, double: needsDoubleApproval(sens) });
           if (id) out.approvals.push(id);
           await deps.log("deliver", unresolved ? "Sent to the owner to decide (review disagreement)." : "Waiting for the owner's approval to send.", { tool });
         } else {
@@ -493,6 +548,20 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
   const failed = results.filter((r) => !r.ok).length;
   out.report = [plan.understanding || task.title, `${did} action(s) done${failed ? `, ${failed} not done` : ""}${out.approvals.length ? `, ${out.approvals.length} waiting for approval` : ""}${out.handoffs.length ? `, ${out.handoffs.length} handed over` : ""}.`, plan.assumptions.length ? `Assumptions: ${plan.assumptions.join("; ")}` : ""].filter(Boolean).join(" ");
   await deps.remember([{ layer: "episodic", kind: "outcome", content: `${task.title}: ${out.report}`.slice(0, 1500), subject: null, confidence: 0.6, status: "active" }]);
+  // upgrade 3 (additive): what this conversation taught about THIS customer, and what the whole team can learn from the review
+  try {
+    const cid = plan.deliverable.contact_id;
+    if (cid && deps.rememberClient && customerRole) {
+      const ig = interactionGuidance({ message: `${task.title}\n${task.brief}`.slice(0, 2000) });
+      const items = learnFromInteraction({ contactId: cid, emotion: ig.read.emotion, objection: ig.objection, register: ig.style.register });
+      if (items.length) await deps.rememberClient(cid, items);
+    }
+    if (deps.share && lessonIssues.length) {
+      await deps.share([lessonToMemory({ fromRole: member.role, content: lessonIssues.slice(0, 2).join("; "), forRoles: [member.role] })]);
+    }
+  } catch {
+    /* learning is a bonus — it never fails a finished task */
+  }
   await deps.message("report", null, { report: out.report, status: out.status });
   await deps.log("learn", out.report.slice(0, 900), { status: out.status, credits: out.credits, steps: out.steps });
   return out;

@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ToolRun } from "./engine-core";
-import { isAutomatedSender } from "./safety-core";
+import { isAutomatedSenderPlus as isAutomatedSender } from "./safety-plus-core";
 import { orFilterFor, planWeekLadder, planWeekRetryable, smartContactQuery } from "./ops-core";
 
 /** upgrade 2: when the exact search finds nothing — match each word separately and understand "leads" / "customers" */

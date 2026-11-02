@@ -117,6 +117,22 @@ export interface TeamHealthData {
   failed24h: number;
 }
 
+/** upgrade 3: operating rules + first-response time + work templates (all optional on the screen) */
+export interface TeamOpsData {
+  quiet: { enabled: boolean; start: number; end: number };
+  sla: { targetMin: number };
+  digest: { daily: boolean; weekly: boolean };
+  dedupe: boolean;
+  protect: { rateLimits: boolean; anomalyFreeze: boolean; recipientCap: number };
+}
+export interface TeamSlaData {
+  targetMin: number;
+  total: number;
+  breached: number;
+  warning: number;
+  avgMinutes: number;
+}
+
 export interface TeamPageData {
   /** server time of the snapshot (live states + relative times use it) */
   now: number;
@@ -136,4 +152,7 @@ export interface TeamPageData {
   toolCatalog: { key: string; kind: string; sensitivity: string; about: string }[];
   dayCredits: number;
   health?: TeamHealthData;
+  ops?: TeamOpsData;
+  sla?: TeamSlaData;
+  templates?: { id: string; role: string; brief: string }[];
 }

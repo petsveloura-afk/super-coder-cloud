@@ -6519,7 +6519,8 @@
       "started": "Plan approved — {n} tasks on the board",
       "stopped": "Emergency stop — the whole team is frozen",
       "taskCreated": "Task added to the board",
-      "hired": "The employee joined the team"
+      "hired": "The employee joined the team",
+      "confirmAgain": "First confirmation recorded. This is a money or irreversible action — click approve once more to run it."
     },
     "status": {
       "done": "Done",
@@ -6795,7 +6796,9 @@
       "who": "To whom",
       "placeholder": "e.g. Check this week's reviews",
       "add": "Add to the board",
-      "runNow": "Run now"
+      "runNow": "Run now",
+      "template": "From a work template",
+      "noTemplate": "No template"
     },
     "approvals": {
       "emptyTitle": "Nothing to approve",
@@ -6982,6 +6985,41 @@
         "tool": "A tool failed",
         "unknown": "Unknown reason"
       }
+    },
+    "ops": {
+      "title": "Operations and protections",
+      "about": "Quiet hours, response time, reports and the team's protections. The defaults are safe.",
+      "quiet": "Quiet hours",
+      "quietHint": "During these hours customer messages wait for your approval. Internal work continues.",
+      "from": "From hour",
+      "to": "To hour",
+      "slaTitle": "Customer response time",
+      "slaTarget": "First-response target (minutes)",
+      "slaTotal": "Conversations in the last 3 days",
+      "slaBreached": "Breaches",
+      "slaWarning": "Close to breach",
+      "slaAvg": "Average (minutes)",
+      "digest": "Management reports",
+      "daily": "Morning report",
+      "weekly": "Weekly report (Sundays)",
+      "dedupe": "Remove duplicate tasks between employees",
+      "protect": "Protections",
+      "rateLimits": "Rate limits per employee and tool",
+      "anomaly": "Pause write actions on unusual behaviour",
+      "cap": "Max customers messaged in one task",
+      "save": "Save operations settings"
+    },
+    "tpl": {
+      "cs_followup_open": "Follow up on open conversations",
+      "cs_complaints": "Review unhappy customers",
+      "sales_stale_leads": "Revive stale leads",
+      "sales_pipeline_review": "Review open deals",
+      "marketing_week_plan": "Plan next week's content",
+      "marketing_campaign_check": "Check running campaigns",
+      "collections_overdue": "Overdue invoices and reminders",
+      "analyst_weekly": "Weekly business report",
+      "reputation_reviews": "Handle new reviews",
+      "manager_daily_brief": "Owner's morning brief"
     }
   }
 }

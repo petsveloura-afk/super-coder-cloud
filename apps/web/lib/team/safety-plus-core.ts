@@ -7,6 +7,8 @@
  *   - double approval for money / irreversible actions
  */
 
+import { isAutomatedSender } from "./safety-core";
+
 /* ------------------------------------------------------------------ PII masking */
 
 function luhn(digits: string): boolean {
@@ -205,4 +207,20 @@ export type DoubleState = "first_needed" | "second_needed" | "done";
 export function doubleApprovalState(required: boolean, confirmations: number): DoubleState {
   if (!required) return confirmations >= 1 ? "done" : "first_needed";
   return confirmations >= 2 ? "done" : confirmations === 1 ? "second_needed" : "first_needed";
+}
+
+/* ------------------------------------------------------------------ automated senders (wider net) */
+
+const AUTO_LOCAL_PLUS = /^(mail-?delivery(-subsystem)?|auto-?reply|autoresponder|auto-?response|out-?of-?office|do_?not_?reply|no_reply|unsubscribe|daemon|root|admin-?notifications?|noreply\d*|donotreply\d*)([+._-].*)?$/i;
+const AUTO_TEXT = /(out of office|automatic reply|auto-?reply|undeliverable|delivery status notification|mailer-daemon|מחוץ למשרד|תשובה אוטומטית|הודעה אוטומטית|رد تلقائي|خارج المكتب)/i;
+
+/**
+ * isAutomatedSender (safety-core, unchanged) plus no-reply variants, mail-delivery robots and "out of office" auto-replies.
+ * Role mailboxes such as info@ / support@ / sales@ are people, so they are NOT matched.
+ */
+export function isAutomatedSenderPlus(input: { email?: string | null; name?: string | null; company?: string | null; subject?: string | null }): boolean {
+  if (isAutomatedSender(input)) return true;
+  const local = (input.email ?? "").trim().toLowerCase().split("@")[0] ?? "";
+  if (local && AUTO_LOCAL_PLUS.test(local)) return true;
+  return AUTO_TEXT.test(`${input.name ?? ""} ${input.subject ?? ""}`);
 }

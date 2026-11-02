@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { AgentAvatar } from "./avatar";
 import { HealthPanel } from "./health-panel";
+import { OpsPanel } from "./ops-panel";
 import type { ActivityView, ApprovalView, MemoryView, StatsView, TeamMemberView, TeamPageData, TeamTaskView } from "./types";
 import { PLAYBOOKS } from "@/lib/team/playbooks";
 import {
@@ -61,7 +62,7 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
   const { t, locale } = useI18n();
   const [goal, setGoal] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [taskFor, setTaskFor] = useState<{ memberId: string; title: string }>({ memberId: data.members[0]?.id ?? "", title: "" });
+  const [taskFor, setTaskFor] = useState<{ memberId: string; title: string; brief?: string }>({ memberId: data.members[0]?.id ?? "", title: "" });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const goals = data.tasks.filter((x) => x.plan && (x.plan as { goal?: boolean }).goal);
   const drafts = goals.filter((g) => g.status === "draft");
@@ -273,8 +274,27 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
               </option>
             ))}
           </Select>
-          <Input value={taskFor.title} onChange={(e) => setTaskFor({ ...taskFor, title: e.target.value })} placeholder={t("aiTeam.task.placeholder")} className="flex-1" />
-          <Button disabled={taskFor.title.trim().length < 3 || !taskFor.memberId} loading={busy === "task"} onClick={() => run("task", async () => { const r = await createTaskAction({ locale, memberId: taskFor.memberId, title: taskFor.title }); if (!r.error) setTaskFor({ ...taskFor, title: "" }); return r; })}>
+          {data.templates?.length ? (
+            <Select
+              value=""
+              onChange={(e) => {
+                const tpl = data.templates?.find((x) => x.id === e.target.value);
+                if (tpl) setTaskFor({ ...taskFor, title: t(`aiTeam.tpl.${tpl.id}`), brief: tpl.brief });
+              }}
+              className="sm:w-56"
+              aria-label={t("aiTeam.task.template")}
+              data-testid="task-template"
+            >
+              <option value="">{t("aiTeam.task.template")}</option>
+              {data.templates.filter((x) => x.role === data.members.find((m) => m.id === taskFor.memberId)?.role_key).map((x) => (
+                <option key={x.id} value={x.id}>
+                  {t(`aiTeam.tpl.${x.id}`)}
+                </option>
+              ))}
+            </Select>
+          ) : null}
+          <Input value={taskFor.title} onChange={(e) => setTaskFor({ ...taskFor, title: e.target.value, brief: e.target.value ? taskFor.brief : undefined })} placeholder={t("aiTeam.task.placeholder")} className="flex-1" />
+          <Button disabled={taskFor.title.trim().length < 3 || !taskFor.memberId} loading={busy === "task"} onClick={() => run("task", async () => { const r = await createTaskAction({ locale, memberId: taskFor.memberId, title: taskFor.title, brief: taskFor.brief }); if (!r.error) setTaskFor({ ...taskFor, title: "", brief: undefined }); return r; })}>
             {t("aiTeam.task.add")}
           </Button>
         </div>
@@ -774,6 +794,7 @@ export function SettingsPanel({ data, onRefresh }: { data: TeamPageData; onRefre
   return (
     <div className="space-y-4" data-testid="settings-panel">
       {data.health ? <HealthPanel health={data.health} /> : null}
+      {data.ops ? <OpsPanel ops={data.ops} sla={data.sla} canManage={data.canManage} locale={locale} onRefresh={onRefresh} /> : null}
       <Card className={cn("p-5", s.emergency_stop && "border-danger/50 bg-danger/5")}>
         <div className="flex flex-wrap items-center gap-3">
           <AlertOctagon className={cn("h-8 w-8", s.emergency_stop ? "text-danger" : "text-muted")} />

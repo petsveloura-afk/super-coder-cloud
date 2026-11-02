@@ -70,5 +70,15 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     /* the health card is optional — the screen works without it */
   }
 
+  try {
+    const ops = await import("@/lib/team/runner-ops");
+    const { WORK_TEMPLATES } = await import("@/lib/team/ops-core");
+    data.ops = await ops.loadOps(org);
+    data.sla = await ops.loadSla(org, data.ops.sla.targetMin).catch(() => undefined);
+    data.templates = WORK_TEMPLATES.map((x) => ({ id: x.id, role: x.role, brief: x.brief }));
+  } catch {
+    /* the operations card is optional — the screen works without it */
+  }
+
   return data;
 }
