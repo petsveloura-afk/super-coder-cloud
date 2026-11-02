@@ -62,5 +62,13 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     dayCredits: taskRows.filter((x) => Date.parse(x.updated_at) > now - 86_400_000).reduce((s, x) => s + (x.credits_used || 0), 0),
   };
 
+  try {
+    const { loadTeamHealth } = await import("@/lib/team/runner-plus");
+    const h = await loadTeamHealth(org, settings);
+    data.health = { level: h.verdict.level, issues: h.verdict.issues, models: h.models, failures: h.failures, stuck: h.stuck, failed24h: h.failed24h };
+  } catch {
+    /* the health card is optional — the screen works without it */
+  }
+
   return data;
 }

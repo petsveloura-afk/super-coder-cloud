@@ -21,6 +21,8 @@ import { memoryPrompt, recall, type MemoryItem } from "./memory-core";
 import { SAFETY_RULES, asData, escalationSignal, inventedPrices, leaks } from "./safety-core";
 import { DIAGNOSTIC_METHOD, GOAL_PLANNING_GUIDE, REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt, isDiagnosticTask } from "./doctrine";
 import type { TaskKind } from "./routing-core";
+import { injectionNotice, injectionVerdict, redactSensitive } from "./safety-plus-core";
+import { interactionGuidance, interactionPrompt } from "./interaction-core";
 
 export interface EngineMember {
   id: string;
@@ -264,12 +266,32 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
     await deps.log("understand", `Needs a person: ${signal.replace(/_/g, " ")}.`, { signal });
     return out;
   }
+  // upgrade 2 (additive): a clearly upset customer, or a repeat complaint, also goes to a person
+  const customerRole = member.role === "customer_service" || member.role === "sales" || member.role === "reputation";
+  if (!signal && customerRole) {
+    const ig = interactionGuidance({ message: `${task.title}\n${task.brief}`.slice(0, 2000) });
+    if (ig.escalate) {
+      out.status = "awaiting_input";
+      out.question = `escalate:${ig.escalate}`;
+      await deps.log("understand", `Needs a person: ${ig.escalate.replace(/_/g, " ")}.`, { signal: ig.escalate, emotion: ig.read.emotion });
+      return out;
+    }
+  }
 
   // 2 — context
   const ctx = await deps.context();
   await deps.log("context", `Loaded the business profile, ${ctx.memories.length} memories and the ${member.role.replace(/_/g, " ")} playbook.`, { memories: ctx.memories.length, reviewer: ctx.reviewer?.name ?? null });
   const system = employeeSystem(member, ctx, deps.lang, `${task.title} ${task.brief}`);
-  const taskText = [`TASK: ${task.title}`, task.brief ? asData("task brief", task.brief, 4000) : "", task.answer ? `The owner answered your question: ${asData("owner answer", task.answer, 1500)}` : ""].filter(Boolean).join("\n");
+  // upgrade 2 (additive): sensitive numbers are masked before the prompt, the customer's emotion / style / objection guide the tone, an attack-like text is flagged as data
+  const taskText = [
+    `TASK: ${task.title}`,
+    task.brief ? asData("task brief", redactSensitive(task.brief).text, 4000) : "",
+    task.answer ? `The owner answered your question: ${asData("owner answer", redactSensitive(task.answer).text, 1500)}` : "",
+    customerRole && task.brief ? interactionPrompt({ message: task.brief.slice(0, 1500) }) : "",
+    task.brief ? injectionNotice(injectionVerdict(task.brief)) : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   // 1 + 3 — understand and plan (bounded act rounds: read → decide → write)
   const results: { tool: string; ok: boolean; summary: string }[] = [];
@@ -300,6 +322,23 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
       await deps.log("plan", `${parsed.steps.length} steps · deliverable: ${parsed.deliverable.type}${parsed.deliverable.customer_facing ? " (customer-facing)" : ""} · est. ${parsed.estimate.credits} credits`, { steps: parsed.steps.map((s) => ({ tool: s.tool, why: s.why })), risks: parsed.risks });
     }
     // 4 — execute
+    // upgrade 2 (additive): independent read-only tools start together (same checks as below); results are consumed in plan order
+    const prefetch = new Map<PlanStep, Promise<ToolRun>>();
+    {
+      const reads = parsed.steps
+        .filter((st) => {
+          const spec = TOOL_MAP[st.tool];
+          if (!spec || spec.kind !== "read") return false;
+          return validateArgs(st.tool, st.args).ok && decide(st.tool, member, settings, { interactive: deps.interactive }).do === "execute";
+        })
+        .slice(0, Math.max(0, maxSteps - out.steps));
+      if (reads.length > 1) {
+        for (const st of reads) {
+          const vv = validateArgs(st.tool, st.args);
+          if (vv.ok) prefetch.set(st, retryTool(deps, st.tool, vv.args));
+        }
+      }
+    }
     for (const step of parsed.steps) {
       const b2 = stop();
       if (b2) {
@@ -352,7 +391,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
         await deps.log("approval", `Waiting for approval: ${step.tool} — ${step.why || d.why}`, { tool: step.tool, why: d.why });
         continue;
       }
-      const r = await retryTool(deps, step.tool, v.args);
+      const r = await (prefetch.get(step) ?? retryTool(deps, step.tool, v.args));
       results.push({ tool: step.tool, ok: r.ok, summary: r.ok ? r.summary : r.error ?? "failed" });
       await deps.log("execute", r.ok ? `${step.tool}: ${r.summary.slice(0, 300)}` : `${step.tool} failed: ${(r.error ?? "").slice(0, 200)}`, { tool: step.tool, link: r.link ?? null }, r.ok);
     }

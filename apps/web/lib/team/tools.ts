@@ -2,6 +2,18 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ToolRun } from "./engine-core";
 import { isAutomatedSender } from "./safety-core";
+import { orFilterFor, planWeekLadder, planWeekRetryable, smartContactQuery } from "./ops-core";
+
+/** upgrade 2: when the exact search finds nothing — match each word separately and understand "leads" / "customers" */
+async function smartFindContacts(db: ReturnType<typeof createAdminClient>, orgId: string, text: string) {
+  const sq = smartContactQuery(text);
+  if (!sq.status && !sq.tokens.length) return [];
+  const base = db.from("contacts").select("id, first_name, last_name, email, phone, company_name, status").eq("organization_id", orgId);
+  let query = sq.status ? base.eq("status", sq.status) : base;
+  for (const t of sq.tokens) query = query.or(orFilterFor(t));
+  const { data } = await query.order("created_at", { ascending: false }).limit(8);
+  return (data ?? []) as { id: string; first_name: string; last_name: string | null; email: string | null; phone: string | null; company_name: string | null; status: string }[];
+}
 
 /**
  * The digital team — tool executors. Every tool calls a REAL capability of the platform and every query is scoped
@@ -34,7 +46,8 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
         if (q.length < 2) return { ok: false, summary: "", error: "query_too_short" };
         const { data, error } = await db.from("contacts").select("id, first_name, last_name, email, phone, company_name, status").eq("organization_id", orgId).or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,company_name.ilike.%${q}%`).limit(8);
         if (error) return { ok: false, summary: "", error: error.message };
-        const rows = (data ?? []) as { id: string; first_name: string; last_name: string | null; email: string | null; phone: string | null; company_name: string | null; status: string }[];
+        let rows = (data ?? []) as { id: string; first_name: string; last_name: string | null; email: string | null; phone: string | null; company_name: string | null; status: string }[];
+        if (!rows.length) rows = await smartFindContacts(db, orgId, q).catch(() => []);
         return { ok: true, data: rows, summary: rows.length ? rows.map((r) => `${r.first_name} ${r.last_name ?? ""}`.trim() + ` (id ${r.id}, ${r.status}${r.company_name ? `, ${r.company_name}` : ""})`).join("; ") : "no contacts found" };
       }
       case "crm.contact_brief": {
@@ -179,8 +192,15 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
       }
       case "social.plan_week": {
         const { planWeek } = await import("@/lib/social/brain");
-        const r = await planWeek(orgId, 7);
-        return r.ok ? { ok: true, summary: `${r.count} post drafts planned for the week`, link: "/social" } : { ok: false, summary: "", error: r.error };
+        // upgrade 2: a full week that the AI could not answer in one piece is retried smaller (7 → 3 → 1), never thrown
+        let lastError = "ai.failed";
+        for (const n of planWeekLadder(7)) {
+          const r = await planWeek(orgId, n).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : "ai.failed" }));
+          if (r.ok) return { ok: true, summary: `${r.count} post drafts planned${n < 7 ? ` (smaller batch of ${n} after the full week could not be generated)` : " for the week"}`, link: "/social" };
+          lastError = r.error;
+          if (!planWeekRetryable(r.error)) break;
+        }
+        return { ok: false, summary: "", error: lastError };
       }
       case "sites.build": {
         if (!ctx.interactive || !ctx.actorUser) return { ok: false, summary: "", error: "needs_screen" };

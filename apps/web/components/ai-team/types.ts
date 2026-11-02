@@ -107,6 +107,16 @@ export interface TeamSettingsView {
   initiative: boolean;
 }
 
+/** upgrade 2: the team health card (optional — absent when the data could not be loaded) */
+export interface TeamHealthData {
+  level: "ok" | "degraded" | "down";
+  issues: string[];
+  models: { key: string; circuit: "closed" | "open" | "half_open"; openForMs: number; lastError: string | null; failRate: number; total: number }[];
+  failures: { id: string; title: string; reason: string; error: string | null; at: string | null }[];
+  stuck: number;
+  failed24h: number;
+}
+
 export interface TeamPageData {
   /** server time of the snapshot (live states + relative times use it) */
   now: number;
@@ -125,4 +135,5 @@ export interface TeamPageData {
   models: { provider: string; model: string }[];
   toolCatalog: { key: string; kind: string; sensitivity: string; about: string }[];
   dayCredits: number;
+  health?: TeamHealthData;
 }

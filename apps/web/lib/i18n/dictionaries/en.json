@@ -6772,7 +6772,11 @@
         "legal": "A customer raised a legal issue — it needs your personal handling.",
         "refund": "A customer asks for a refund — your decision.",
         "health_safety": "A health / safety matter — please handle it yourself.",
-        "wants_human": "The customer asked to speak with a person."
+        "wants_human": "The customer asked to speak with a person.",
+        "angry_customer": "A very upset customer — please handle this personally.",
+        "repeat_complaint": "A repeat complaint from a customer — please handle it personally.",
+        "sensitive_situation": "A sensitive situation for a customer — please handle it yourself.",
+        "long_wait": "A customer has been waiting a long time for an answer."
       }
     },
     "proposals": {
@@ -6941,6 +6945,43 @@
     "planLocked": {
       "adminTitle": "This business isn't on a plan that includes the team yet",
       "adminBody": "The digital team is available on Pro and up, or with a 7-day free trial (once per business). To test it here: start the trial above, or move this business to a matching plan."
+    },
+    "health": {
+      "title": "Team health",
+      "level": {
+        "ok": "Healthy",
+        "degraded": "Minor issues",
+        "down": "Not running"
+      },
+      "issue": {
+        "emergency_stop": "Emergency stop is on",
+        "team_off": "The team is turned off",
+        "stuck_tasks": "Some tasks got stuck mid-run",
+        "many_failures": "Many failures in the last 24 hours",
+        "all_models_down": "All AI models are unavailable right now",
+        "some_models_down": "Some AI models are being skipped for a while",
+        "clock_late": "The team's automatic clock is running late"
+      },
+      "models": "AI models",
+      "noModels": "No model data collected yet.",
+      "circuit": {
+        "closed": "Healthy",
+        "open": "Skipped for now",
+        "half_open": "Being tested"
+      },
+      "minutes": "min",
+      "failures": "Latest failures",
+      "noFailures": "No failures in the last 24 hours.",
+      "reason": {
+        "policy": "Blocked by permissions or a stop",
+        "budget": "Reached the step or credit limit",
+        "ai_unreadable": "The AI returned an unreadable answer",
+        "ai_busy": "AI engines are busy (will retry)",
+        "network": "Network problem (will retry)",
+        "input": "Missing or invalid input",
+        "tool": "A tool failed",
+        "unknown": "Unknown reason"
+      }
     }
   }
 }

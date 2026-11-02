@@ -10,6 +10,7 @@ import { automatedContactIds, runTeamTool } from "./tools";
 import { playbookPrompt } from "./playbooks";
 import { REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt } from "./doctrine";
 import { SAFETY_RULES, asData } from "./safety-core";
+import { healthyRoute, maintainTeam, noteModelResult } from "./runner-plus";
 
 /**
  * The digital team — server runner. Connects the pure engine to the database, the existing AI router (with
@@ -138,10 +139,20 @@ export async function availableModels(): Promise<{ provider: string; model: stri
 function teamAi(orgId: string, pref: RoutingPref, onRoute: (kind: TaskKind, chosen: string, used: string) => void): EngineDeps["ai"] {
   return async (kind, system, user, maxTokens) => {
     const [avail, overrides] = await Promise.all([availableModels(), routingOverrides()]);
-    const route = routeFor(kind, avail, { pref, override: overrides[kind] });
+    const route = await healthyRoute(routeFor(kind, avail, { pref, override: overrides[kind] }));
     const first = route[0];
     const { runAISystem } = await import("@/lib/ai/run-system");
     const res = await runAISystem({ orgId, feature: "copilot", system, messages: [{ role: "user", content: user }], temperature: kind === "classify" || kind === "review" || kind === "plan" ? 0.2 : 0.6, maxTokens, patienceMs: 30_000, routeProvider: first?.provider ?? null, routeModel: first?.model ?? null });
+    // upgrade 2: the circuit breaker learns from every call (a model that keeps failing is skipped for a while)
+    if (first) {
+      const firstKey = `${first.provider}/${first.model}`;
+      const usedKey = res.ok ? `${res.provider}/${res.model}` : "";
+      if (res.ok && usedKey === firstKey) void noteModelResult(first.provider, first.model, true);
+      else {
+        void noteModelResult(first.provider, first.model, false, res.ok ? "fallback_used" : res.error);
+        if (res.ok && res.provider && res.model) void noteModelResult(String(res.provider), String(res.model), true);
+      }
+    }
     if (res.ok) onRoute(kind, first ? `${first.provider}/${first.model}` : "router", `${res.provider}/${res.model}`);
     return res.ok ? { ok: true, text: res.text, credits: res.credits ?? 1, provider: res.provider, model: res.model } : { ok: false, text: "", credits: 0, error: res.error };
   };
@@ -593,6 +604,7 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
       await a.from("team_tasks").update({ status: "blocked", error: "dependency_failed", updated_at: new Date().toISOString() }).eq("id", b.id).eq("status", "pending");
       result.blocked++;
     }
+    await maintainTeam(orgId);
     for (const t of ready.slice(0, 3)) {
       if (Date.now() - started > budgetMs - 15_000) break;
       const r = await runTask(orgId, t.id, { interactive: false, actorUser: null });

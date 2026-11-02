@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { AgentAvatar } from "./avatar";
+import { HealthPanel } from "./health-panel";
 import type { ActivityView, ApprovalView, MemoryView, StatsView, TeamMemberView, TeamPageData, TeamTaskView } from "./types";
 import { PLAYBOOKS } from "@/lib/team/playbooks";
 import {
@@ -772,6 +773,7 @@ export function SettingsPanel({ data, onRefresh }: { data: TeamPageData; onRefre
   };
   return (
     <div className="space-y-4" data-testid="settings-panel">
+      {data.health ? <HealthPanel health={data.health} /> : null}
       <Card className={cn("p-5", s.emergency_stop && "border-danger/50 bg-danger/5")}>
         <div className="flex flex-wrap items-center gap-3">
           <AlertOctagon className={cn("h-8 w-8", s.emergency_stop ? "text-danger" : "text-muted")} />
