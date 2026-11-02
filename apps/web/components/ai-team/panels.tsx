@@ -65,6 +65,7 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
   const goals = data.tasks.filter((x) => x.plan && (x.plan as { goal?: boolean }).goal);
   const drafts = goals.filter((g) => g.status === "draft");
   const active = goals.filter((g) => ["in_progress", "blocked"].includes(g.status));
+  const progressGoals = [...active, ...goals.filter((g) => ["done", "failed"].includes(g.status)).slice(0, 4)];
   const questions = data.tasks.filter((x) => x.status === "awaiting_input");
   const proposals = data.tasks.filter((x) => x.status === "draft" && x.origin === "initiative");
   const live = active.length > 0 || data.tasks.some((x) => x.status === "in_progress");
@@ -97,6 +98,14 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
         </div>
         <div className="space-y-2 p-4">
           <Textarea rows={3} value={goal} onChange={(e) => setGoal(e.target.value)} placeholder={t("aiTeam.goal.placeholder")} data-testid="goal-input" />
+          <div className="flex flex-wrap items-center gap-1.5" data-testid="goal-suggestions">
+            <span className="text-[11.5px] text-subtle">{t("aiTeam.goal.suggestHint")}</span>
+            {["s1", "s2", "s3", "s4", "s5", "s6"].map((k) => (
+              <button key={k} type="button" onClick={() => setGoal(t(`aiTeam.goal.suggest.${k}`))} className="max-w-full truncate rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-muted transition-colors hover:border-accent hover:text-accent" title={t(`aiTeam.goal.suggest.${k}`)}>
+                {t(`aiTeam.goal.suggest.${k}`)}
+              </button>
+            ))}
+          </div>
           <Button loading={busy === "plan"} disabled={goal.trim().length < 5 || !data.settings.enabled || data.settings.emergency_stop} onClick={() => run("plan", async () => { const r = await planGoalAction({ locale, goal }); if (!r.error) setGoal(""); return r; })} data-testid="goal-plan">
             <Sparkles className="h-4 w-4" /> {t("aiTeam.goal.cta")}
           </Button>
@@ -202,6 +211,46 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
                   <Button size="sm" variant="ghost" onClick={() => run(`x${p.id}`, () => cancelTaskAction({ locale, taskId: p.id }))}>
                     {t("aiTeam.proposals.dismiss")}
                   </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      ) : null}
+
+      {progressGoals.length ? (
+        <Card className="p-4" data-testid="goal-progress">
+          <h3 className="mb-3 flex items-center gap-2 font-semibold">
+            <Target className="h-4 w-4 text-accent" /> {t("aiTeam.goal.progressTitle")}
+          </h3>
+          <ul className="space-y-3">
+            {progressGoals.map((g) => {
+              const kids = data.tasks.filter((x) => x.goal_id === g.id && x.id !== g.id);
+              const done = kids.filter((x) => x.status === "done").length;
+              const pct = kids.length ? Math.round((done / kids.length) * 100) : 0;
+              const summary = String((g.result as { summary?: string } | null)?.summary ?? "");
+              const m = memberOf(data.members, g.assignee_id);
+              return (
+                <li key={g.id} className="feed-in rounded-2xl border border-line p-3 text-[13px]">
+                  <div className="flex items-center gap-2">
+                    {m ? <AgentAvatar spec={m.avatar} state={g.status === "in_progress" ? "working" : g.status === "done" ? "success" : "idle"} size={30} /> : null}
+                    <span className="min-w-0 flex-1 font-semibold">{g.title}</span>
+                    <Badge tone={g.status === "in_progress" ? "accent" : "neutral"}>{t(`aiTeam.status.${g.status}`)}</Badge>
+                  </div>
+                  {kids.length ? (
+                    <div className="mt-2">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+                        <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${pct}%` }} />
+                      </div>
+                      <p className="mt-1 text-[11.5px] text-muted">{t("aiTeam.goal.tasksDone", { done, total: kids.length })}</p>
+                    </div>
+                  ) : null}
+                  {summary ? (
+                    <details className="mt-2 rounded-xl bg-accent-soft/40 p-2.5" open={g.status === "done"}>
+                      <summary className="cursor-pointer text-[12.5px] font-semibold text-accent">{t("aiTeam.goal.summaryTitle")}</summary>
+                      <p className="mt-2 whitespace-pre-wrap text-[12.5px] leading-6">{summary}</p>
+                    </details>
+                  ) : null}
                 </li>
               );
             })}
@@ -711,9 +760,14 @@ export function SettingsPanel({ data, onRefresh }: { data: TeamPageData; onRefre
   const [s, setS] = useState(data.settings);
   const [routes, setRoutes] = useState<Record<string, string>>(Object.fromEntries(data.routing.map((r) => [r.kind, r.models.map((m) => `${m.provider}/${m.model}`).join("\n")])));
   const act = async (fn: () => Promise<{ error?: string; message?: string }>) => {
-    const r = await fn();
-    if (r.error) toast.error(t(r.error));
-    else toast.success(t(r.message ?? "common.saved"));
+    try {
+      const r = await fn();
+      if (r.error) toast.error(t(r.error));
+      else toast.success(t(r.message ?? "common.saved"));
+    } catch (e) {
+      console.error("[ai-team] settings action failed", e);
+      toast.error(t("common.error"));
+    }
     onRefresh();
   };
   return (
@@ -739,9 +793,14 @@ export function SettingsPanel({ data, onRefresh }: { data: TeamPageData; onRefre
                 const before = s;
                 setS({ ...s, enabled: on });
                 void act(async () => {
-                  const r = await setTeamEnabledAction({ locale, enabled: on });
-                  if (r.error) setS(before);
-                  return r;
+                  try {
+                    const r = await setTeamEnabledAction({ locale, enabled: on });
+                    if (r.error) setS(before);
+                    return r;
+                  } catch (err) {
+                    setS(before);
+                    throw err;
+                  }
                 });
               }} data-testid="team-enabled" />
             {t("aiTeam.settings.enabled")}

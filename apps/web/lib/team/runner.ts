@@ -6,8 +6,9 @@ import { learnFromFeedback, supersededBy, type MemoryItem } from "./memory-core"
 import { cleanRoutingRow, routeFor, type RoutingPref, type TaskKind } from "./routing-core";
 import { initiatives, knownFacts, meetingFacts, memberStats, profilePrompt, type MemberStats, type ProfileFacts, type Signals } from "./insight-core";
 import { TOOL_MAP, validateArgs } from "./tools-core";
-import { runTeamTool } from "./tools";
+import { automatedContactIds, runTeamTool } from "./tools";
 import { playbookPrompt } from "./playbooks";
+import { REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt } from "./doctrine";
 import { SAFETY_RULES, asData } from "./safety-core";
 
 /**
@@ -183,8 +184,10 @@ async function loads(orgId: string): Promise<Map<string, number>> {
 /** a starter team (manager → lead → workers + quality control), linked to the existing agents */
 export async function seedStarterTeam(orgId: string, userId: string, lang: "he" | "en" | "ar"): Promise<number> {
   const a = db();
-  const { count } = await a.from("team_members").select("id", { count: "exact", head: true }).eq("organization_id", orgId);
-  if ((count ?? 0) > 0) return 0;
+  // idempotent: only the starter roles the business does not have yet are added (hand-hired employees are kept)
+  const { data: existing } = await a.from("team_members").select("id, role_key").eq("organization_id", orgId).order("position");
+  const have = (existing ?? []) as { id: string; role_key: string }[];
+  if (STARTER_TEAM.every((r) => have.some((m) => m.role_key === r))) return 0;
   const { data: agent } = await a.from("ai_agents").select("id").eq("organization_id", orgId).eq("enabled", true).order("created_at").limit(1).maybeSingle();
   const NAMES: Record<string, Record<RoleKey, string>> = {
     he: { manager: "נועה — מנהלת", team_lead: "איתי — ראש צוות", customer_service: "מאיה — שירות", sales: "דניאל — מכירות", marketing: "שירה — שיווק", content_writer: "יואב — תוכן", web_builder: "עומר — אתרים", analyst: "תמר — נתונים", project_coordinator: "רון — תיאום", quality_control: "גל — בקרת איכות", collections: "אבי — גבייה", reputation: "ליה — מוניטין", custom: "עובד/ת" },
@@ -192,8 +195,11 @@ export async function seedStarterTeam(orgId: string, userId: string, lang: "he" 
     ar: { manager: "نوعا — مديرة", team_lead: "إيتاي — قائد فريق", customer_service: "مايا — خدمة", sales: "دانيال — مبيعات", marketing: "شيرا — تسويق", content_writer: "يوآف — محتوى", web_builder: "عومر — مواقع", analyst: "تمار — بيانات", project_coordinator: "رون — تنسيق", quality_control: "غال — جودة", collections: "أفي — تحصيل", reputation: "ليا — سمعة", custom: "موظف" },
   };
   const ids = new Map<RoleKey, string>();
-  let pos = 0;
+  for (const m of have) if (!ids.has(m.role_key as RoleKey)) ids.set(m.role_key as RoleKey, m.id);
+  let pos = have.length;
+  let added = 0;
   for (const role of STARTER_TEAM) {
+    if (ids.has(role)) continue;
     const def = ROLES[role];
     const reportsTo = def.reportsTo ? ids.get(def.reportsTo) ?? ids.get("manager") ?? null : null;
     const { data } = await a
@@ -201,9 +207,12 @@ export async function seedStarterTeam(orgId: string, userId: string, lang: "he" 
       .insert({ organization_id: orgId, role_key: role, name: NAMES[lang]![role], avatar: def.avatar, tools: def.tools, autonomy: def.autonomy, reports_to: reportsTo, position: pos++, linked: role === "customer_service" && agent ? { ai_agent_id: agent.id } : {}, created_by: userId })
       .select("id")
       .single();
-    if (data) ids.set(role, data.id as string);
+    if (data) {
+      ids.set(role, data.id as string);
+      added++;
+    }
   }
-  return ids.size;
+  return added;
 }
 
 async function chainOf(orgId: string, parentId: string | null): Promise<{ role: string; title: string }[]> {
@@ -338,7 +347,7 @@ export async function planGoal(orgId: string, goal: string, actorUser: string): 
   const l = await loads(orgId);
   const profile = await loadProfile(orgId);
   const roles = all.filter((m) => m.role_key !== "manager").map((m) => ({ role: (isRoleKey(m.role_key) ? m.role_key : "custom") as RoleKey, name: m.name, load: l.get(m.id) ?? 0 }));
-  const system = [`You are ${manager.name}, the general manager of this business's AI team.`, playbookPrompt("manager"), SAFETY_RULES, `THE BUSINESS:\n${profilePrompt(profile)}`].join("\n\n");
+  const system = [`You are ${manager.name}, the general manager of this business's AI team.`, playbookPrompt("manager"), WORKING_DOCTRINE, expertisePrompt("manager"), SAFETY_RULES, `THE BUSINESS:\n${profilePrompt(profile)}`].join("\n\n");
   const ai = teamAi(orgId, settings.routing_pref, () => undefined);
   const res = await ai("plan", system, goalPrompt(goal, roles), 1800);
   if (!res.ok) return { ok: false, error: res.error ?? "ai.failed" };
@@ -377,6 +386,22 @@ export async function confirmGoal(orgId: string, goalId: string, actorUser: stri
   return { ok: true, created: ids.size };
 }
 
+/** the manager's executive summary of a finished goal: one prioritised answer instead of a list of task reports (best effort) */
+async function synthesizeGoal(orgId: string, managerId: string | null, title: string, rows: { title: string; status: string; result: { report?: string; output?: string } }[]): Promise<string | null> {
+  const done = rows.filter((r) => r.status === "done");
+  if (done.length < 2) return null;
+  const settings = await loadSettings(orgId);
+  if (!settings.enabled || settings.emergency_stop) return null;
+  const { data: m } = managerId ? await db().from("team_members").select("name").eq("id", managerId).maybeSingle() : { data: null };
+  const profile = await loadProfile(orgId);
+  const system = [`You are ${(m?.name as string) ?? "the manager"}, the general manager of this business's AI team. Write for the business owner in the business's language.`, WORKING_DOCTRINE, expertisePrompt("manager"), SAFETY_RULES, `THE BUSINESS:\n${profilePrompt(profile)}`].join("\n\n");
+  const material = done.map((r, i) => `${i + 1}. ${r.title}\n${asData("task result", String(r.result?.output ?? r.result?.report ?? "").slice(0, 2500), 2500)}`).join("\n\n");
+  const user = [`GOAL: ${title.slice(0, 300)}`, "Your team finished its tasks. Their results:", material, "Now synthesise ONE executive summary for the owner. Combine the findings, resolve contradictions, rank what matters by impact and effort, and say what is still unknown.", REPORT_STANDARD, "Answer with the final text only."].join("\n\n");
+  const ai = teamAi(orgId, settings.routing_pref, () => undefined);
+  const res = await ai("summarize", system, user, 2200);
+  return res.ok && res.text.trim().length > 20 ? res.text.trim().slice(0, 8000) : null;
+}
+
 /** goal status from its tasks; when all are done the manager writes the summary report */
 async function refreshGoal(orgId: string, goalId: string) {
   const a = db();
@@ -389,7 +414,8 @@ async function refreshGoal(orgId: string, goalId: string) {
   if (open.length) return;
   const failed = rows.filter((r) => r.status === "failed" || r.status === "blocked");
   const report = rows.map((r) => `${r.status === "done" ? "✅" : "⚠️"} ${r.title}: ${(r.result?.report ?? r.status).slice(0, 300)}`).join("\n");
-  await a.from("team_tasks").update({ status: failed.length === rows.length ? "failed" : "done", result: { ...((goal.result as Record<string, unknown>) ?? {}), report, done: rows.length - failed.length, failed: failed.length }, finished_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", goalId);
+  const synthesis = await synthesizeGoal(orgId, goal.assignee_id as string | null, goal.title as string, rows).catch(() => null);
+  await a.from("team_tasks").update({ status: failed.length === rows.length ? "failed" : "done", result: { ...((goal.result as Record<string, unknown>) ?? {}), report, ...(synthesis ? { summary: synthesis } : {}), done: rows.length - failed.length, failed: failed.length }, finished_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", goalId);
   await logActivity(orgId, goalId, goal.assignee_id as string, "learn", `Goal finished: ${rows.length - failed.length}/${rows.length} tasks done.`, { failed: failed.length });
 }
 
@@ -462,7 +488,8 @@ async function signals(orgId: string, tz: string): Promise<Signals> {
   const t = (v: string | null) => (v ? Date.parse(v) : 0);
   const rows = (convs ?? []) as { contact_id: string | null; last_customer_at: string; last_human_at: string | null; last_ai_at: string | null; last_auto_at: string | null }[];
   const answered = new Set(rows.filter((c) => Math.max(t(c.last_human_at), t(c.last_ai_at), t(c.last_auto_at)) > 0).map((c) => c.contact_id));
-  const waiting = rows.filter((c) => t(c.last_customer_at) < Date.now() - 30 * 60_000 && t(c.last_customer_at) > Math.max(t(c.last_human_at), t(c.last_ai_at), t(c.last_auto_at))).length;
+  const robots = await automatedContactIds(orgId, rows.map((c) => c.contact_id)).catch(() => new Set<string>());
+  const waiting = rows.filter((c) => !(c.contact_id && robots.has(c.contact_id)) && t(c.last_customer_at) < Date.now() - 30 * 60_000 && t(c.last_customer_at) > Math.max(t(c.last_human_at), t(c.last_ai_at), t(c.last_auto_at))).length;
   let leadsY = 0;
   let leadsAvg = 0;
   try {

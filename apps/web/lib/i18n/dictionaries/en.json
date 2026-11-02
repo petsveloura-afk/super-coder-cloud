@@ -6750,7 +6750,19 @@
       "after": "after",
       "parallel": "in parallel",
       "approve": "Approve & start",
-      "estimate": "Estimate: about {n} credits"
+      "estimate": "Estimate: about {n} credits",
+      "progressTitle": "Goals in progress and summaries",
+      "summaryTitle": "Executive summary",
+      "tasksDone": "{done} of {total} tasks done",
+      "suggestHint": "Goal ideas (click to fill the box):",
+      "suggest": {
+        "s1": "Run a deep review of why our advertising and marketing is not performing well enough, and propose a prioritised improvement plan",
+        "s2": "Analyse the sales funnel from first enquiry to close, find where we lose the most customers and fix it",
+        "s3": "Grow enquiries from social media by 30% next month, with a content calendar and one experiment",
+        "s4": "Find what is stalling open deals and prepare a follow-up plan for every open deal",
+        "s5": "Improve our reputation: answer every review and build a process for getting new reviews",
+        "s6": "Audit the website and landing pages and propose changes that raise the conversion rate"
+      }
     },
     "questions": {
       "title": "Your employees ask",

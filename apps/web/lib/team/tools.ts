@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ToolRun } from "./engine-core";
+import { isAutomatedSender } from "./safety-core";
 
 /**
  * The digital team — tool executors. Every tool calls a REAL capability of the platform and every query is scoped
@@ -10,6 +11,18 @@ import type { ToolRun } from "./engine-core";
 type Args = Record<string, string | number>;
 const s = (v: unknown) => (v === undefined || v === null ? "" : String(v));
 const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+
+/** ids of the contacts that are robots / notification senders (never customers) — used to keep the team away from them */
+export async function automatedContactIds(orgId: string, ids: (string | null)[]): Promise<Set<string>> {
+  const list = [...new Set(ids.filter((x): x is string => Boolean(x)))].slice(0, 300);
+  const out = new Set<string>();
+  if (!list.length) return out;
+  const { data } = await createAdminClient().from("contacts").select("id, first_name, last_name, email, company_name").eq("organization_id", orgId).in("id", list);
+  for (const c of (data ?? []) as { id: string; first_name: string | null; last_name: string | null; email: string | null; company_name: string | null }[]) {
+    if (isAutomatedSender({ email: c.email, name: `${c.first_name ?? ""} ${c.last_name ?? ""}`, company: c.company_name })) out.add(c.id);
+  }
+  return out;
+}
 
 export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: { actorUser: string | null; locale: string; interactive: boolean }): Promise<ToolRun> {
   const db = createAdminClient();
@@ -66,8 +79,11 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
         // waiting = the customer wrote last (after every human / AI / automatic answer)
         const rows = ((data ?? []) as { id: string; title: string | null; channel: string; contact_id: string | null; last_customer_at: string; last_human_at: string | null; last_ai_at: string | null; last_auto_at: string | null }[])
           .filter((c) => t(c.last_customer_at) > Math.max(t(c.last_human_at), t(c.last_ai_at), t(c.last_auto_at)))
-          .slice(0, 10);
-        return { ok: true, data: rows, summary: rows.length ? rows.map((c) => `${c.title ?? "customer"} on ${c.channel} (contact ${c.contact_id ?? "—"}, waiting since ${c.last_customer_at.slice(0, 16)})`).join("; ") : "no customer is waiting", link: "/inbox" };
+          ;
+        // robots (security alerts, no-reply notifications, newsletters) are not customers waiting for an answer
+        const robots = await automatedContactIds(orgId, rows.map((c) => c.contact_id));
+        const people = rows.filter((c) => !(c.contact_id && robots.has(c.contact_id))).slice(0, 10);
+        return { ok: true, data: people, summary: people.length ? people.map((c) => `${c.title ?? "customer"} on ${c.channel} (contact ${c.contact_id ?? "—"}, waiting since ${c.last_customer_at.slice(0, 16)})`).join("; ") + (robots.size ? `. (${robots.size} automated sender(s) ignored — not customers)` : "") : "no customer is waiting", link: "/inbox" };
       }
       case "reviews.recent": {
         const days = Math.max(1, Math.min(120, Number(args.days) || 14));
@@ -109,8 +125,9 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
       }
       case "crm.add_tag": {
         const name = s(args.tag).replace(/^#/, "").slice(0, 40);
-        const { data: c } = await db.from("contacts").select("id").eq("organization_id", orgId).eq("id", s(args.contact_id)).maybeSingle();
+        const { data: c } = await db.from("contacts").select("id, first_name, last_name, email, company_name").eq("organization_id", orgId).eq("id", s(args.contact_id)).maybeSingle();
         if (!c) return { ok: false, summary: "", error: "contact_not_found" };
+        if (isAutomatedSender({ email: c.email as string | null, name: `${(c.first_name as string | null) ?? ""} ${(c.last_name as string | null) ?? ""}`, company: c.company_name as string | null })) return { ok: false, summary: "", error: "automated_sender_not_a_customer" };
         await db.from("tags").upsert({ organization_id: orgId, name }, { onConflict: "organization_id,name", ignoreDuplicates: true });
         const { data: tag } = await db.from("tags").select("id").eq("organization_id", orgId).eq("name", name).maybeSingle();
         if (!tag) return { ok: false, summary: "", error: "tag_failed" };

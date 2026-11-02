@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getOrgContext } from "@/lib/auth";
-import type { ActionState } from "@/lib/action-state";
+import { dbErrorKey, type ActionState } from "@/lib/action-state";
 import { ROLES, ROLE_KEYS, isRoleKey } from "@/lib/team/roles";
 import { TOOL_MAP } from "@/lib/team/tools-core";
 import { TASK_KINDS } from "@/lib/team/routing-core";
@@ -52,11 +52,19 @@ export async function setTeamEnabledAction(input: { locale: string; enabled: boo
   if ("error" in g) return { error: g.error };
   const a = await admin();
   const { error } = await a.from("team_settings").upsert({ organization_id: g.ctx.org.id, enabled: Boolean(input.enabled), updated_by: g.ctx.userId, updated_at: new Date().toISOString() }, { onConflict: "organization_id" });
-  if (error) return { error: "common.error" };
+  if (error) {
+    console.error("[ai-team] setTeamEnabledAction upsert failed", error);
+    return { error: dbErrorKey(error) };
+  }
   let seeded = 0;
   if (input.enabled) {
-    const { seedStarterTeam } = await import("@/lib/team/runner");
-    seeded = await seedStarterTeam(g.ctx.org.id, g.ctx.userId, locale);
+    // seeding the starter team must never make turning the team on fail
+    try {
+      const { seedStarterTeam } = await import("@/lib/team/runner");
+      seeded = await seedStarterTeam(g.ctx.org.id, g.ctx.userId, locale);
+    } catch (e) {
+      console.error("[ai-team] seedStarterTeam failed", e);
+    }
   }
   await audit(g.ctx.org.id, g.ctx.userId, input.enabled ? "Team turned on" : "Team turned off", { seeded });
   path(locale);

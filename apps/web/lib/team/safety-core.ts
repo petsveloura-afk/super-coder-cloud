@@ -66,3 +66,25 @@ export function escalationSignal(text: string): string | null {
   if (/(נציג אנושי|בן אדם|לדבר עם מישהו|human agent|real person|speak to (a )?(human|person|manager)|موظف حقيقي)/i.test(t)) return "wants_human";
   return null;
 }
+
+/**
+ * An automated sender (no-reply mailbox, security / login notification, newsletter, billing robot) is NOT a customer:
+ * the team must never wait for it, answer it or message it. Conservative on purpose — real people are never skipped
+ * because of a generic word; only no-reply style addresses and well-known service senders match.
+ */
+const AUTO_LOCAL = /^(no-?reply|do-?not-?reply|donotreply|notifications?|notify|alerts?|mailer(-daemon)?|postmaster|bounces?|newsletter|updates?|auto(mated)?|system|security|verify|account-security|billing-noreply)([+._-].*)?$/i;
+const AUTO_SERVICES = ["supabase", "vercel", "render", "github", "gitlab", "zapier", "facebookmail", "metamail", "google", "googlemail", "stripe", "paypal", "linkedin", "twitter", "instagram", "amazonses", "amazon", "amazonaws", "microsoft", "apple", "cloudflare", "namecheap", "godaddy", "mailchimp", "sendgrid", "intercom", "hubspot", "notion", "slack", "zoom", "atlassian", "figma", "shopify", "wix", "sentry", "datadog"];
+const AUTO_SERVICE = new RegExp(`(^|\\.)(${AUTO_SERVICES.join("|")})\\.[a-z.]+$`, "i");
+const AUTO_TITLE = /^(supabase( auth)?|vercel|render|github|gitlab|zapier|facebook|meta|google|stripe|paypal|linkedin|twitter|instagram|amazon|aws|microsoft|apple|cloudflare|mailchimp|sendgrid|slack|zoom|notion|figma|shopify|wix)\b/i;
+
+export function isAutomatedSender(input: { email?: string | null; name?: string | null; company?: string | null }): boolean {
+  const email = (input.email ?? "").trim().toLowerCase();
+  if (email.includes("@")) {
+    const [local, domain] = email.split("@");
+    if (AUTO_LOCAL.test(local ?? "")) return true;
+    if (AUTO_SERVICE.test(domain ?? "")) return true;
+    return false;
+  }
+  const label = `${input.name ?? ""}`.trim();
+  return (label.length > 0 && AUTO_TITLE.test(label)) || AUTO_TITLE.test(`${input.company ?? ""}`.trim());
+}

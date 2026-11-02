@@ -19,6 +19,7 @@ import { TOOL_MAP, toolsPrompt, validateArgs } from "./tools-core";
 import { budgetStop, decide, isLoop } from "./policy-core";
 import { memoryPrompt, recall, type MemoryItem } from "./memory-core";
 import { SAFETY_RULES, asData, escalationSignal, inventedPrices, leaks } from "./safety-core";
+import { DIAGNOSTIC_METHOD, GOAL_PLANNING_GUIDE, REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt, isDiagnosticTask } from "./doctrine";
 import type { TaskKind } from "./routing-core";
 
 export interface EngineMember {
@@ -176,6 +177,9 @@ export function employeeSystem(m: EngineMember, ctx: TeamContext, lang: "he" | "
     `You are ${m.name}, ${m.role.replace(/_/g, " ")} in this business's team. You work like a senior professional employee of the business — not a chatbot. Write everything the business or its customers will read in ${LANG[lang]}.`,
     m.tone ? `Your personality and tone: ${m.tone.slice(0, 400)}` : "",
     playbookPrompt(m.role, ctx.playbookExtra),
+    WORKING_DOCTRINE,
+    expertisePrompt(m.role),
+    isDiagnosticTask(task) ? DIAGNOSTIC_METHOD : "",
     m.instructions ? `The owner's own instructions for you:\n${m.instructions.slice(0, 6000)}` : "",
     SAFETY_RULES,
     ctx.profile ? `THE BUSINESS (live profile from the platform):\n${ctx.profile}` : "",
@@ -193,6 +197,7 @@ const PLAN_FORMAT = [
   ' "deliverable": {"type": "none|text|report|message|review_reply|reminder", "customer_facing": true|false, "contact_id": "uuid when the deliverable is a message/reminder to a customer", "review_id": "uuid for review_reply", "instructions": "what the final output must contain"},',
   ' "risks": ["…"], "estimate": {"credits": n, "minutes": n}}',
   "Use only your tools. Read before you write. Never invent ids — get them from read tools. Prefer the smallest plan that does the job well.",
+  "Plan like a senior professional: put ALL the relevant read tools in the first round so you decide on evidence (set more=true), then write; in \"understanding\" state the measurable goal; in \"assumptions\" list every assumption; in \"risks\" list what could make the result wrong; in deliverable.instructions say exactly which sections the output needs.",
 ].join("\n");
 
 async function retryTool(deps: EngineDeps, tool: string, args: Record<string, string | number>): Promise<ToolRun> {
@@ -365,12 +370,14 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
         results.length ? `What you found / did:\n${results.map((r) => `- ${r.tool}: ${asData(r.tool, r.summary, 1500)}`).join("\n")}` : "",
         `Write the final ${plan!.deliverable.type} now. ${plan!.deliverable.instructions}`,
         customer ? "It goes to a CUSTOMER: short, warm, accurate, only facts from the business profile, one clear next step." : "It goes to the OWNER: concise, factual, mark assumptions.",
+        !customer && (plan!.deliverable.type === "report" || isDiagnosticTask(taskText)) ? REPORT_STANDARD : "",
         draft ? `Your previous draft:\n${asData("draft", draft, 3000)}\nFix exactly these points:\n${fixes.map((f, i) => `${i + 1}. ${f}`).join("\n")}` : "",
         "Answer with the final text only (no JSON, no preface).",
       ]
         .filter(Boolean)
         .join("\n\n");
-    let w = await deps.ai(customer ? "write" : "summarize", system, writePrompt(), 1200);
+    const outTokens = !customer && (plan.deliverable.type === "report" || isDiagnosticTask(taskText)) ? 2200 : 1200;
+    let w = await deps.ai(customer ? "write" : "summarize", system, writePrompt(), outTokens);
     out.credits += w.credits;
     if (!w.ok) return fail("failed", w.error ?? "ai_failed", "Could not write the output (AI busy).");
     let draft = w.text.trim();
@@ -378,7 +385,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
     let issues = selfCheck(draft, { customerFacing: customer, known: ctx.known, lang: deps.lang, forbidden });
     await deps.log("self_check", issues.length ? `Self-check found ${issues.length} issue(s) — fixing.` : "Self-check passed.", { issues }, !issues.length);
     if (issues.length && !stop()) {
-      w = await deps.ai("write", system, writePrompt(issues, draft), 1200);
+      w = await deps.ai("write", system, writePrompt(issues, draft), outTokens);
       out.credits += w.credits;
       if (w.ok) draft = w.text.trim();
       issues = selfCheck(draft, { customerFacing: customer, known: ctx.known, lang: deps.lang, forbidden });
@@ -550,6 +557,7 @@ export function goalPrompt(goal: string, roles: { role: RoleKey; name: string; l
   return [
     `GOAL from the owner: ${asData("goal", goal, 2000)}`,
     `Your team (role · name · open tasks): ${roles.map((r) => `${r.role} · ${r.name} · ${r.load}`).join(" | ")}`,
+    GOAL_PLANNING_GUIDE,
     "Make an execution plan with REAL dependencies (independent tasks run in parallel). 3–8 tasks, each owned by one role from the team. Customer-facing work is reviewed by quality control automatically — do not add review tasks.",
     'Answer JSON only: {"understanding": "the goal, measurable", "question": null or "ONE question if you truly cannot plan without it", "tasks": [{"key": "short_id", "title": "verb + output", "brief": "what exactly, with context", "role": "role_key", "depends_on": ["key"], "priority": 1-4}], "risks": ["…"], "estimate": credits}',
   ].join("\n");
