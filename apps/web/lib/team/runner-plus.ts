@@ -108,12 +108,24 @@ export async function reviveBlockedDependents(orgId: string): Promise<number> {
   return n;
 }
 
+/**
+ * upgrade 6b: a task that stayed blocked by a failed dependency for more than 3 days is closed as canceled (nothing is deleted —
+ * it stays in the history with the reason "expired_blocked"), so the board does not fill with dead items.
+ */
+export async function expireStaleBlocked(orgId: string): Promise<number> {
+  const a = db();
+  const cutoff = new Date(Date.now() - 3 * 86_400_000).toISOString();
+  const { data } = await a.from("team_tasks").update({ status: "canceled", error: "expired_blocked", finished_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("organization_id", orgId).eq("status", "blocked").eq("error", "dependency_failed").lt("updated_at", cutoff).select("id");
+  return data?.length ?? 0;
+}
+
 /** both, for the team clock; never throws */
 export async function maintainTeam(orgId: string): Promise<{ recovered: number; retried: number }> {
   try {
     const recovered = await recoverStuckTasks(orgId);
     const retried = await retryFailedTasks(orgId);
     await reviveBlockedDependents(orgId).catch(() => 0);
+    await expireStaleBlocked(orgId).catch(() => 0);
     return { recovered, retried };
   } catch {
     return { recovered: 0, retried: 0 };

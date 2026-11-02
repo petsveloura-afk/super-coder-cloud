@@ -5,6 +5,8 @@
 - **Chains no longer stay blocked forever:** tasks blocked only because a dependency failed (`dependency_failed`) come back by themselves once the dependency is retried / pending / done (`reviveBlockedDependents`, runs with the team clock).
 - **Summaries in the business language:** "N action(s) done / Assumptions" is now Hebrew / Arabic / English by the business locale; a rule tells every employee to use only that language's script.
 - **Faster:** independent reads in `runTask` run together, one organization query instead of two; "run now" gets `maxDuration = 60` so a longer task is not cut off by the platform.
+- **One repair attempt (6b):** when the plan is unreadable even after tolerant recovery, the employee is asked ONCE more for valid JSON before the task fails (logged, bounded by the same budget limits).
+- **Dead items close by themselves (6b):** a task blocked by a failed dependency for more than 3 days becomes `canceled` with the reason `expired_blocked` (kept in history, nothing deleted).
 - Tests: `tests/unit/team-upgrade6-plan-recovery.test.ts`.
 
 ## Digital team, stage-1 audit, model routing, design + performance — 2026-11-02

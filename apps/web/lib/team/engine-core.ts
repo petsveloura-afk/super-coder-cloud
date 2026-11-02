@@ -337,8 +337,16 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
     const res = await deps.ai("plan", system, prompt, 1500);
     out.credits += res.credits;
     if (!res.ok) return fail("failed", res.error ?? "ai_failed", "The AI did not answer (all engines busy) — the task will be retried.");
-    const parsed = parsePlanModel(res.text);
-    if (!parsed) return fail("failed", "plan_unreadable", "The plan could not be read.");
+    let parsedRaw = parsePlanModel(res.text);
+    if (!parsedRaw && !stop()) {
+      // upgrade 6b: ONE repair attempt — the model is told its answer was unreadable and asked for the JSON only
+      const fix = await deps.ai("plan", system, `${prompt}\n\nYour previous answer could not be read as JSON. Answer again with ONE valid JSON object only — no text before or after it, no code fences, double quotes only, escape quotes and line breaks inside strings.`, 1500);
+      out.credits += fix.credits;
+      if (fix.ok) parsedRaw = parsePlanModel(fix.text);
+      await deps.log("system", parsedRaw ? "The first answer was unreadable — the second attempt worked." : "The first answer was unreadable and the second attempt failed too.", {}, !!parsedRaw);
+    }
+    if (!parsedRaw) return fail("failed", "plan_unreadable", "The plan could not be read.");
+    const parsed = parsedRaw;
     plan = parsed;
     out.plan = parsed;
     if (round === 0) {
