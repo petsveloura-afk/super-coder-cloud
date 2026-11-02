@@ -881,7 +881,13 @@ a, button, [role="button"], label { -webkit-tap-highlight-color: transparent; }
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
 }
-.route-fade { animation: route-fade var(--dur-slow) var(--ease-out) both; }
+/* opacity only and no forwards fill: an animated or filled transform would make this wrapper the containing block of
+   every position:fixed child (help button, sticky save bars, dialogs) and push them off screen */
+@keyframes route-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.route-fade { animation: route-fade-in var(--dur-slow) var(--ease-out) backwards; }
 
 main[data-shell] table tbody tr { transition: background-color var(--dur-fast) ease; }
 @media (hover: hover) {

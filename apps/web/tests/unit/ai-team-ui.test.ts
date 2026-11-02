@@ -38,6 +38,16 @@ describe("My team screen — wiring", () => {
     expect(r).toContain('return { notRun: "plan_locked" }');
     expect(r).toMatch(/teamFlagOn\(orgId\)\)\) continue;\s*if \(!\(await teamPlanOn\(orgId\)\)\) continue;/);
   });
+  it("the route transition never makes the page wrapper a containing block for fixed elements (opacity only, no forwards fill)", () => {
+    const css = read("app/globals.css");
+    const rule = css.match(/\.route-fade \{ animation: ([^;]+);/)?.[1] ?? "";
+    expect(rule).toContain("route-fade-in");
+    expect(rule).toContain("backwards");
+    expect(rule).not.toMatch(/\bboth\b|\bforwards\b/);
+    const kf = css.match(/@keyframes route-fade-in \{([\s\S]*?)\n\}/)?.[1] ?? "";
+    expect(kf).toContain("opacity");
+    expect(kf).not.toContain("transform");
+  });
   it("3D presentation: perspective ring, keyboard, drag, auto-rotate, add card, reduced motion", () => {
     const p = read("components/ai-team/presentation-3d.tsx");
     for (const x of ["team-stage", "rotateY", "translateZ", "onKeyDown", "onPointerDown", "setAuto", 'data-testid={s.kind === "member"', "card-add", "prefers-reduced-motion"]) expect(p, x).toContain(x);
