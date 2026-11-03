@@ -9,6 +9,7 @@ import { TOOL_MAP, validateArgs } from "./tools-core";
 import { withRoleExtras } from "./tools-plus-core";
 import { withRoleExtras7 } from "./tools-plus7-core";
 import { withRoleExtras7c } from "./tools-plus7c-core";
+import { withRoleExtrasOrg8 } from "./tools-org8-core";
 import { automatedContactIds, runTeamTool } from "./tools";
 import { playbookPrompt } from "./playbooks";
 import { REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt } from "./doctrine";
@@ -186,7 +187,7 @@ interface MemberRow {
 const MEMBER_COLS = "id, role_key, name, tone, instructions, tools, autonomy, auto_actions, status, limits, reports_to, linked";
 
 function toEngine(m: MemberRow): EngineMember {
-  return { id: m.id, role: isRoleKey(m.role_key) ? m.role_key : "custom", name: m.name, tone: m.tone, instructions: m.instructions, tools: withRoleExtras7c(m.role_key, withRoleExtras7(m.role_key, withRoleExtras(m.role_key, m.tools))), autonomy: m.autonomy, auto_actions: m.auto_actions, status: m.status, limits: { max_steps: m.limits?.max_steps, max_credits: m.limits?.max_credits } };
+  return { id: m.id, role: isRoleKey(m.role_key) ? m.role_key : "custom", name: m.name, tone: m.tone, instructions: m.instructions, tools: withRoleExtrasOrg8(m.role_key, withRoleExtras7c(m.role_key, withRoleExtras7(m.role_key, withRoleExtras(m.role_key, m.tools)))), autonomy: m.autonomy, auto_actions: m.auto_actions, status: m.status, limits: { max_steps: m.limits?.max_steps, max_credits: m.limits?.max_credits } };
 }
 
 async function members(orgId: string): Promise<MemberRow[]> {
@@ -292,6 +293,8 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
     return { notRun: "no_assignee" };
   }
   const member = toEngine(row);
+  // upgrade 8 / stage B: a department head may also propose procedure changes (this run only; fails soft)
+  await import("./runner-org8").then((m) => m.grantHeadTools(orgId, member)).catch(() => undefined);
   const { data: org } = await a.from("organizations").select("locale, timezone").eq("id", orgId).maybeSingle();
   const lang = (org?.locale === "en" || org?.locale === "ar" ? org.locale : "he") as "he" | "en" | "ar";
   const actorUser = opts.actorUser ?? (claimed.created_by as string | null) ?? null;
@@ -373,8 +376,10 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
       const memories = allMemories.length > 150 ? candidatesFor(buildIndex(allMemories), `${claimed.title as string} ${(claimed.brief as string) ?? ""}`, 80) : allMemories;
       // upgrade 7: versioned business facts relevant to this task (empty when none / migration not run)
       const goalsBlock = member.role === "manager" || member.role === "analyst" ? await import("./goals").then((m) => m.goalsPromptFor(orgId, lang)).catch(() => "") : "";
+      // upgrade 8 / stage B: the matching company procedure (its own block; empty when none fits)
+      const orgBlock = await import("./runner-org8").then((m) => m.orgContextFor(orgId, member, `${claimed.title as string} ${(claimed.brief as string) ?? ""}`, lang)).catch(() => "");
       const factsBlock0 = await import("./business-facts").then((m) => m.factsPromptFor(orgId, `${claimed.title as string} ${(claimed.brief as string) ?? ""}`)).catch(() => "");
-      const factsBlock = [factsBlock0, goalsBlock, extraCtx].filter(Boolean).join("\n\n");
+      const factsBlock = [factsBlock0, goalsBlock, extraCtx, orgBlock].filter(Boolean).join("\n\n");
       return { profile: factsBlock ? `${profilePrompt(profile)}\n\n${factsBlock}` : profilePrompt(profile), known: knownFacts(profile), memories, playbookExtra: (extra?.extra as string) ?? "", reviewer: reviewerRow && reviewerRow.id !== member.id ? toEngine(reviewerRow) : null, reviewerExtra: (reviewerExtra as { extra?: string } | null)?.extra ?? "" };
     },
   };
@@ -387,6 +392,17 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
   })();
   const task: EngineTask = { id: taskId, title: claimed.title as string, brief: safeBrief, depth: claimed.depth as number, steps_used: claimed.steps_used as number, credits_used: claimed.credits_used as number, review_rounds: claimed.review_rounds as number, chain: await chainOf(orgId, (claimed.parent_id as string | null) ?? null), answer: ((claimed.result as Record<string, unknown>)?.answer as string | undefined) ?? null };
   const engineSettings: EngineSettings = { enabled: settings.enabled, emergency_stop: settings.emergency_stop, max_depth: settings.max_depth, max_steps: settings.max_steps, daily_credit_cap: settings.daily_credit_cap, day_credits: await dayCredits(orgId) };
+  // upgrade 8 / stage B1: the department's credit budget is honoured IN ADDITION to the daily cap (the tighter one wins)
+  try {
+    const dc = await import("./runner-org8").then((m) => m.deptCapFor(orgId, member.id, { cap: engineSettings.daily_credit_cap, used: engineSettings.day_credits }, lang));
+    if (dc) {
+      engineSettings.daily_credit_cap = dc.cap;
+      engineSettings.day_credits = dc.used;
+      await log("system", dc.line, { department_budget: true });
+    }
+  } catch {
+    /* optional */
+  }
   // upgrade 8 (part B contract): pre-task hook — extra context, or a stop that needs the owner's approval (a failure never stops the task)
   try {
     const pre = await preTask({ orgId, taskId, memberRole: member.role, title: task.title, brief: task.brief, lang });

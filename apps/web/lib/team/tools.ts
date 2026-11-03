@@ -277,6 +277,12 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
         const { runFactsTool } = await import("./business-facts");
         return runFactsTool(orgId, tool, args, { lang: ctx.locale === "en" || ctx.locale === "ar" ? ctx.locale : "he" });
       }
+      case "sop.lookup":
+      case "sop.propose": {
+        // upgrade 8 / stage B: standard operating procedures (the model can only PROPOSE a change; the owner decides)
+        const { runOrgTool } = await import("./org8-data");
+        return runOrgTool(orgId, tool, args, { lang: ctx.locale === "en" || ctx.locale === "ar" ? ctx.locale : "he" });
+      }
       default:
         return { ok: false, summary: "", error: "unknown_tool" };
     }
