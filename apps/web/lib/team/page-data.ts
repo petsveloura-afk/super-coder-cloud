@@ -142,5 +142,15 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     /* the stability card is optional — the screen works without it */
   }
 
+  try {
+    // upgrade 8 / stage B4: ONE department-agreement (SLA) line is added to the morning brief that is SHOWN (the stored report is unchanged)
+    const { data: orgRowB } = await a.from("organizations").select("locale").eq("id", org).maybeSingle();
+    const langB = (orgRowB?.locale === "en" || orgRowB?.locale === "ar" ? orgRowB.locale : "he") as "he" | "en" | "ar";
+    const slaLine = await import("@/lib/team/runner-org8").then((m) => m.slaBriefLine(org, langB));
+    if (slaLine && data.plus7) data.plus7 = { ...data.plus7, brief: { text: `${data.plus7.brief?.text ?? ""}${data.plus7.brief?.text ? "\n" : ""}• ${slaLine}` } };
+  } catch {
+    /* the agreements line is optional — the screen works without it */
+  }
+
   return data;
 }

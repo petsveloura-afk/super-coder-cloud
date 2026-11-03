@@ -7187,6 +7187,9 @@
         "errOver": "Successes cannot exceed trials",
         "errNotRunning": "A sample can only be entered for a running experiment"
       }
+    },
+    "org8": {
+      "slaAlert": "Department SLA breach: {line}"
     }
   }
 }

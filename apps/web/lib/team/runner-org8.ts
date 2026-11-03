@@ -48,10 +48,68 @@ export async function orgContextFor(orgId: string, _member: { id: string; role: 
   const parts: string[] = [];
   try {
     const { sopPromptFor } = await import("./org8-data");
-    const b = await sopPromptFor(orgId, taskText, lang);
+    const raci = await raciForPrompt(orgId, taskText, lang);
+    const b = await sopPromptFor(orgId, taskText, lang, raci);
     if (b) parts.push(b);
   } catch {
     /* optional */
   }
   return parts.join("\n\n");
+}
+
+/* ------------------------------------------------------------------ stage B3 — the approval matrix (can only tighten) */
+
+/**
+ * Does the approval matrix hold this action for the owner? Called by runner.ts for every tool the engine already decided to EXECUTE
+ * (an action that already waits for approval, or is blocked, never comes here — so the matrix can only add an approval). Fails soft:
+ * any error → null → the action runs exactly as before.
+ */
+export async function raciHold(orgId: string, tool: string, args: Record<string, string | number>, lang: Lang = "he"): Promise<{ reason: string; sensitivity: "customer" | "money"; ruleId: string } | null> {
+  try {
+    const { TOOL_MAP } = await import("./tools-core");
+    const spec = TOOL_MAP[tool];
+    if (!spec || spec.kind === "read") return null;
+    const [{ matrixFor }, { matrixCheck, holdReason, tighten }] = await Promise.all([import("./org8-stageb-data"), import("./raci-core")]);
+    const hit = matrixCheck(tool, args, await matrixFor(orgId));
+    if (!hit) return null;
+    // the combination rule lives in raci-core: only an "execute" can become an approval
+    const d = tighten({ do: "execute" }, hit);
+    if (d.do !== "approve") return null;
+    return { reason: holdReason(hit, lang), sensitivity: hit.sensitivity === "money" ? "money" : "customer", ruleId: hit.ruleId };
+  } catch {
+    return null;
+  }
+}
+
+/** the responsibility line of the procedure block: { R, A, C, I } for the procedure that fits the task; null when none fits */
+export async function raciForPrompt(orgId: string, taskText: string, lang: Lang): Promise<{ R?: string; A?: string; C?: string[]; I?: string[] } | null> {
+  try {
+    const [{ loadRaciState }, { raciForTask, raciPromptOpt }] = await Promise.all([import("./org8-stageb-data"), import("./raci-core")]);
+    const st = await loadRaciState(orgId);
+    return raciPromptOpt(raciForTask(taskText, st.roles, lang));
+  } catch {
+    return null;
+  }
+}
+
+/* ------------------------------------------------------------------ stage B4 — department SLA */
+
+/** the one SLA line for the morning brief / weekly report (null when everything is fine or nothing can be measured) */
+export async function slaBriefLine(orgId: string, lang: Lang): Promise<string | null> {
+  try {
+    const { slaLineFor } = await import("./org8-stageb-data");
+    return await slaLineFor(orgId, lang);
+  } catch {
+    return null;
+  }
+}
+
+/** the daily organisation tick (runner.ts calls it once per tick; it never throws and never blocks the clock) */
+export async function orgDailyTick(orgId: string, lang: Lang): Promise<void> {
+  try {
+    const { slaAlertTick } = await import("./org8-stageb-data");
+    await slaAlertTick(orgId, lang);
+  } catch {
+    /* optional */
+  }
 }

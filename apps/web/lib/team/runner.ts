@@ -333,6 +333,16 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
           /* the guard never blocks the team by failing */
         }
       }
+      // upgrade 8 / stage B3: the approval matrix (a discount above X, a deal above Y, a message to many …) can only ADD an owner approval
+      try {
+        const hold = await import("./runner-org8").then((m) => m.raciHold(orgId, tool, args, lang));
+        if (hold) {
+          const id = await deps.approval({ tool, payload: args, preview: JSON.stringify(args).slice(0, 1500), reason: hold.reason.slice(0, 400), sensitivity: hold.sensitivity });
+          return { ok: true, summary: id ? "held for the owner's approval (approval matrix)" : "held (approval matrix)" };
+        }
+      } catch {
+        /* the matrix never blocks the team by failing */
+      }
       const r = await runTeamTool(orgId, tool, args, { actorUser, locale: lang, interactive: opts.interactive });
       // customer text read by a tool passes the inbound guard before it reaches the worker's context
       if (r.ok && r.summary && ["inbox.unanswered", "crm.contact_brief", "reviews.recent", "crm.find_contacts"].includes(tool)) {
@@ -763,6 +773,8 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
     const lang8 = await a.from("organizations").select("locale").eq("id", orgId).maybeSingle().then((r) => (r.data?.locale === "en" || r.data?.locale === "ar" ? r.data.locale : "he") as "he" | "en" | "ar", () => "he" as const);
     await plus8?.ensureQueueTask(orgId, lang8, (await loadOps(orgId).catch(() => null))?.sla.targetMin ?? 60).catch(() => false);
     await dailyTick(orgId, lang8).catch(() => undefined);
+    // upgrade 8 / stage B4: department agreements (SLA) — one owner alert a day per breach (fails soft)
+    await import("./runner-org8").then((m) => m.orgDailyTick(orgId, lang8)).catch(() => undefined);
     // upgrade 7: goals snapshot + alert, morning brief, weekly / monthly report (once a day per business, idempotent)
     await import("./runner-plus7").then((m) => m.dailyPlus7(orgId, tz)).catch(() => undefined);
     if (Date.now() - started < budgetMs - 20_000) {

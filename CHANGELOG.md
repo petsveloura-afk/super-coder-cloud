@@ -1,5 +1,10 @@
 # Changelog
 
+## Team upgrade 8 / stage B (B3–B7) — שדרוג 8, שלב ב (ב3–ב7): responsibility, department agreements, job profiles, meetings, organisation screen (additive, nothing removed) — 2026-11-04
+
+- **B3 — responsibility and approvals (`raci-core.ts`):** a RACI row (who does it / approves / is consulted / informed) for each of the 18 default procedures, and an **approval matrix**: extra owner-approval rules by action type and size (a discount above 10% or above an amount, a new deal above 20,000, a message to "all customers", running an agent that reaches many people). Enforced in `runner.ts` (`runTool`) through `runner-org8.raciHold`: an action the policy already decided to execute becomes an owner approval when the matrix hits. **The matrix can only tighten:** `tighten()` never turns an approval or a block into an execute; the final approver of anything a customer sees, money or irreversible is always the owner; an owner-approved procedure cannot be re-assigned to an employee. The responsibility line is added to the procedure block of the employee's context. Owner overrides: tables `team_raci_roles` / `team_raci_matrix` (migration `20261105000010`).
+- **B4 — department agreements (`dept-sla-core.ts`):** six default agreements (e.g. marketing → sales within 60 minutes), measured automatically from the handoff messages and the tasks they created (created → started). A handoff still waiting past its limit is a breach now. One line in the morning brief that the screen shows (added at display time in `page-data.ts`; the stored report is unchanged; the weekly report gets its section in B6) and ONE owner notification a day per breach (`team_sla_alerts`, unique per agreement and day). Owner overrides: `team_dept_sla` (migration `20261105000011`).
+
 ## Team upgrade 8 / part A, stage A — stability and fixes for the live failures (additive, nothing removed) — 2026-11-03
 
 - **Fix (bookkeeping bug):** a call that succeeded through a fallback no longer records `fallback_used` as a failure of the first model (`stability-core.healthUpdates`, used in `runner.ts`). A model that really failed still counts; the engine that answered counts as healthy.

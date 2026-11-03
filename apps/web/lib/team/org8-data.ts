@@ -217,13 +217,13 @@ export async function decideSop(orgId: string, id: string, accept: boolean, user
 }
 
 /** the procedure block for the employee's prompt; "" when nothing fits. Works without the table (the defaults in code). Never throws. */
-export async function sopPromptFor(orgId: string, taskText: string, lang: Lang): Promise<string> {
+export async function sopPromptFor(orgId: string, taskText: string, lang: Lang, raci: { R?: string; A?: string; C?: string[]; I?: string[] } | null = null): Promise<string> {
   try {
     const { rows } = await loadSops(orgId);
     const views = effectiveSops(rows, lang);
     const hits = sopFor(taskText, views, { max: 1 });
     if (!hits.length) return "";
-    return sopPrompt(hits);
+    return sopPrompt(hits, { raci });
   } catch {
     return "";
   }
