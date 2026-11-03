@@ -152,5 +152,17 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     /* the agreements line is optional — the screen works without it */
   }
 
+  try {
+    // upgrade 8 / stage B6: the weekly report that is SHOWN gets a split by department (the stored report is unchanged)
+    if (data.plus7?.report) {
+      const { data: orgRowC } = await a.from("organizations").select("locale").eq("id", org).maybeSingle();
+      const langC = (orgRowC?.locale === "en" || orgRowC?.locale === "ar" ? orgRowC.locale : "he") as "he" | "en" | "ar";
+      const text = await import("@/lib/team/org8-profiles-data").then((m) => m.weeklyTextWithDeptSplit(org, data.plus7!.report!.title, data.plus7!.report!.text, langC));
+      data.plus7 = { ...data.plus7, report: { ...data.plus7.report!, text } };
+    }
+  } catch {
+    /* the department split is optional — the screen works without it */
+  }
+
   return data;
 }

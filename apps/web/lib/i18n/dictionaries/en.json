@@ -7189,7 +7189,39 @@
       }
     },
     "org8": {
-      "slaAlert": "Department SLA breach: {line}"
+      "slaAlert": "Department SLA breach: {line}",
+      "card": {
+        "title": "Employee card",
+        "dept": "Department",
+        "mission": "Department mission",
+        "resp": "Responsibilities",
+        "auth": "Authority",
+        "forb": "Forbidden",
+        "procs": "Relevant procedures",
+        "owns": "Owns",
+        "perf": "Performance (30 days)",
+        "open": "Open",
+        "load": "Load",
+        "edit": "Adapt for this employee",
+        "save": "Save",
+        "cancel": "Cancel",
+        "custom": "Adapted by the owner",
+        "hint": "One line per item. Wording only: permissions and approval rules do not change.",
+        "addForb": "Extra prohibitions",
+        "saveFail": "Saving failed, the change was undone",
+        "migration": "Available after running migration 20261105000012",
+        "reset": "Back to the default"
+      },
+      "meet": {
+        "daily": "Morning meeting",
+        "weekly": "Weekly meeting",
+        "queue": "Queue",
+        "blocked": "Blocked",
+        "urgent": "Urgent",
+        "decision": "Decision for today",
+        "none": "None",
+        "split": "By department"
+      }
     }
   }
 }
