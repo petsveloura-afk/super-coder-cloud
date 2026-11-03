@@ -139,6 +139,12 @@ export function finishPatch(status: string, error: string | null): { status: str
 export async function orderForTick<T extends { id: string; assignee_id?: string | null; priority?: number }>(orgId: string, ready: T[], slots = 3, prioritize?: (xs: T[]) => T[]): Promise<T[]> {
   try {
     let list = ready;
+    // the tick's own query does not select the employee: look it up for the ready tasks (fails soft → no spreading by employee)
+    if (ready.length && ready.every((t) => t.assignee_id === undefined)) {
+      const { data: who } = await db().from("team_tasks").select("id, assignee_id").eq("organization_id", orgId).in("id", ready.map((t) => t.id));
+      const byId = new Map(((who ?? []) as { id: string; assignee_id: string | null }[]).map((r) => [r.id, r.assignee_id]));
+      list = ready.map((t) => ({ ...t, assignee_id: byId.get(t.id) ?? null }));
+    }
     // the customer-service employee's tasks first (the waiting-customers queue)
     const { data } = await db().from("team_members").select("id").eq("organization_id", orgId).eq("role_key", "customer_service");
     const service = new Set(((data ?? []) as { id: string }[]).map((m) => m.id));
