@@ -136,6 +136,8 @@ export interface TeamSlaData {
 export interface TeamPageData {
   /** server time of the snapshot (live states + relative times use it) */
   now: number;
+  /** upgrade 8: the business id (passed to the part-B panels) */
+  orgId?: string;
   canManage: boolean;
   platformAdmin: boolean;
   settings: TeamSettingsView;
@@ -159,6 +161,15 @@ export interface TeamPageData {
   facts?: TeamFactsData;
   /** upgrade 7 / stages C–J (each part absent when its migration was not run) */
   plus7?: TeamPlus7Data;
+  /** upgrade 8: stability (skipped engines, tasks needing attention, response queue) — absent when it could not be loaded */
+  plus8?: TeamPlus8Data;
+}
+
+export interface TeamPlus8Data {
+  skipped: { key: string; reason: string; text: string; help: string | null }[];
+  attention: { id: string; title: string; status: string; label: string; action: string; reason: string; ageDays: number }[];
+  staleBlocked: number;
+  response?: { targetMin: number; line: string; alert: { level: "none" | "warn" | "alert"; text: string }; queue: { id: string; waitingMin: number; state: "ok" | "warning" | "breached" }[] };
 }
 
 export interface TeamPlus7Data {

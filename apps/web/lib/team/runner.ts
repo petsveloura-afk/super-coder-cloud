@@ -19,6 +19,7 @@ import { cachedProfile, loadOps, recentToolCalls, runDailyOps, writeShared } fro
 import { isQuietHour, findDuplicateTask } from "./ops-core";
 import { redactSensitive, needsDoubleApproval } from "./safety-plus-core";
 import { buildIndex, candidatesFor, clientSubject } from "./memory-plus-core";
+import { guardInbound, guardOutbound, prioritizeTasks, preTask, dailyTick } from "./plus8b-hooks";
 
 /**
  * The digital team — server runner. Connects the pure engine to the database, the existing AI router (with
@@ -147,20 +148,20 @@ export async function availableModels(): Promise<{ provider: string; model: stri
 function teamAi(orgId: string, pref: RoutingPref, onRoute: (kind: TaskKind, chosen: string, used: string) => void): EngineDeps["ai"] {
   return async (kind, system, user, maxTokens) => {
     const [avail, overrides] = await Promise.all([availableModels(), routingOverrides()]);
-    const route = await healthyRoute(routeFor(kind, avail, { pref, override: overrides[kind] }));
+    const route0 = await healthyRoute(routeFor(kind, avail, { pref, override: overrides[kind] }));
+    // upgrade 8: engines that cannot help right now (no key, wrong kind of work, resting, over quota) are left out of THIS attempt
+    const route = await import("./runner-plus8").then((m) => m.guardTeamRoute(kind, route0)).catch(() => route0);
     const first = route[0];
     const { runAISystem } = await import("@/lib/ai/run-system");
+    const plus8 = await import("./runner-plus8").catch(() => null);
+    plus8?.markCallStart(first?.provider);
     const res = await runAISystem({ orgId, feature: "copilot", system, messages: [{ role: "user", content: user }], temperature: kind === "classify" || kind === "review" || kind === "plan" ? 0.2 : 0.6, maxTokens, patienceMs: 30_000, routeProvider: first?.provider ?? null, routeModel: first?.model ?? null });
     // upgrade 2: the circuit breaker learns from every call (a model that keeps failing is skipped for a while)
-    if (first) {
-      const firstKey = `${first.provider}/${first.model}`;
-      const usedKey = res.ok ? `${res.provider}/${res.model}` : "";
-      if (res.ok && usedKey === firstKey) void noteModelResult(first.provider, first.model, true);
-      else {
-        void noteModelResult(first.provider, first.model, false, res.ok ? "fallback_used" : res.error);
-        if (res.ok && res.provider && res.model) void noteModelResult(String(res.provider), String(res.model), true);
-      }
-    }
+    // upgrade 8 (bug fix): a call that SUCCEEDED through a fallback no longer counts as a failure of the first engine
+    // (it used to be written as "fallback_used" every time, which made every model look sick) — see stability-core.healthUpdates
+    const updates = plus8?.healthUpdatesFor({ first: first ? { provider: first.provider, model: first.model } : null, used: res.ok && res.provider && res.model ? { provider: String(res.provider), model: String(res.model) } : null, ok: res.ok, error: res.ok ? null : res.error }) ?? [];
+    for (const u of updates) void noteModelResult(u.provider, u.model, u.ok, u.error);
+    void plus8?.markCallEnd(res.ok ? String(res.provider ?? first?.provider ?? "") : first?.provider, res.ok, res.ok ? null : res.error);
     if (res.ok) onRoute(kind, first ? `${first.provider}/${first.model}` : "router", `${res.provider}/${res.model}`);
     return res.ok ? { ok: true, text: res.text, credits: res.credits ?? 1, provider: res.provider, model: res.model } : { ok: false, text: "", credits: 0, error: res.error };
   };
@@ -303,6 +304,8 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
   const log = (phase: string, summary: string, details: Record<string, unknown> = {}, ok = true) => logActivity(orgId, taskId, member.id, phase, summary, details, ok);
   const ops = await loadOps(orgId);
   const orgTz = org; // same row (one query instead of two)
+  // upgrade 8 (part B contract): extra context from the pre-task hook (empty with the stub) — added to the worker's business context
+  let extraCtx = "";
   const deps: EngineDeps = {
     ops: { quietEnabled: ops.quiet.enabled, quietNow: ops.quiet.enabled && isQuietHour(Date.now(), (orgTz?.timezone as string) || "Asia/Jerusalem", ops.quiet.start, ops.quiet.end), rateLimits: ops.protect.rateLimits, anomalyFreeze: ops.protect.anomalyFreeze, recipientCap: ops.protect.recipientCap },
     recentCalls: (tool, sinceMs) => recentToolCalls(orgId, member.id, tool, sinceMs),
@@ -311,7 +314,33 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
     lang,
     interactive: opts.interactive,
     ai: teamAi(orgId, settings.routing_pref, (kind, chosen, used) => routes.push({ kind, chosen, used })),
-    runTool: (tool, args) => runTeamTool(orgId, tool, args, { actorUser, locale: lang, interactive: opts.interactive }),
+    runTool: async (tool, args) => {
+      // upgrade 8 (part B contract): text that leaves the business passes the outbound guard; if it is not ok it becomes an approval
+      const outTool = TOOL_MAP[tool] && (TOOL_MAP[tool]!.sensitivity === "customer" || TOOL_MAP[tool]!.sensitivity === "money");
+      const key = typeof args.text === "string" ? "text" : typeof args.body === "string" ? "body" : null;
+      if (outTool && key) {
+        try {
+          const g = guardOutbound(String(args[key]));
+          if (!g.ok) {
+            const id = await deps.approval({ tool, payload: { ...args, [key]: g.text }, preview: g.text.slice(0, 1500), reason: g.reasons.join("; ").slice(0, 400) || "outbound_guard", sensitivity: TOOL_MAP[tool]!.sensitivity });
+            return { ok: true, summary: id ? "held for the owner's approval (outbound check)" : "held (outbound check)" };
+          }
+          if (g.text !== args[key]) args = { ...args, [key]: g.text };
+        } catch {
+          /* the guard never blocks the team by failing */
+        }
+      }
+      const r = await runTeamTool(orgId, tool, args, { actorUser, locale: lang, interactive: opts.interactive });
+      // customer text read by a tool passes the inbound guard before it reaches the worker's context
+      if (r.ok && r.summary && ["inbox.unanswered", "crm.contact_brief", "reviews.recent", "crm.find_contacts"].includes(tool)) {
+        try {
+          r.summary = guardInbound(r.summary).text;
+        } catch {
+          /* optional */
+        }
+      }
+      return r;
+    },
     log: (phase, summary, details, ok) => log(phase, summary, details, ok),
     approval: async (input) => {
       const { data } = await a.from("team_approvals").insert({ organization_id: orgId, task_id: taskId, member_id: member.id, tool: input.tool, payload: input.payload, preview: input.preview.slice(0, 4000), reason: input.reason.slice(0, 2000), sensitivity: ["internal", "customer", "irreversible", "money"].includes(input.sensitivity) ? input.sensitivity : "customer" }).select("id").single();
@@ -345,12 +374,33 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
       // upgrade 7: versioned business facts relevant to this task (empty when none / migration not run)
       const goalsBlock = member.role === "manager" || member.role === "analyst" ? await import("./goals").then((m) => m.goalsPromptFor(orgId, lang)).catch(() => "") : "";
       const factsBlock0 = await import("./business-facts").then((m) => m.factsPromptFor(orgId, `${claimed.title as string} ${(claimed.brief as string) ?? ""}`)).catch(() => "");
-      const factsBlock = [factsBlock0, goalsBlock].filter(Boolean).join("\n\n");
+      const factsBlock = [factsBlock0, goalsBlock, extraCtx].filter(Boolean).join("\n\n");
       return { profile: factsBlock ? `${profilePrompt(profile)}\n\n${factsBlock}` : profilePrompt(profile), known: knownFacts(profile), memories, playbookExtra: (extra?.extra as string) ?? "", reviewer: reviewerRow && reviewerRow.id !== member.id ? toEngine(reviewerRow) : null, reviewerExtra: (reviewerExtra as { extra?: string } | null)?.extra ?? "" };
     },
   };
-  const task: EngineTask = { id: taskId, title: claimed.title as string, brief: (claimed.brief as string) ?? "", depth: claimed.depth as number, steps_used: claimed.steps_used as number, credits_used: claimed.credits_used as number, review_rounds: claimed.review_rounds as number, chain: await chainOf(orgId, (claimed.parent_id as string | null) ?? null), answer: ((claimed.result as Record<string, unknown>)?.answer as string | undefined) ?? null };
+  const safeBrief = (() => {
+    try {
+      return guardInbound(((claimed.brief as string) ?? "")).text;
+    } catch {
+      return (claimed.brief as string) ?? "";
+    }
+  })();
+  const task: EngineTask = { id: taskId, title: claimed.title as string, brief: safeBrief, depth: claimed.depth as number, steps_used: claimed.steps_used as number, credits_used: claimed.credits_used as number, review_rounds: claimed.review_rounds as number, chain: await chainOf(orgId, (claimed.parent_id as string | null) ?? null), answer: ((claimed.result as Record<string, unknown>)?.answer as string | undefined) ?? null };
   const engineSettings: EngineSettings = { enabled: settings.enabled, emergency_stop: settings.emergency_stop, max_depth: settings.max_depth, max_steps: settings.max_steps, daily_credit_cap: settings.daily_credit_cap, day_credits: await dayCredits(orgId) };
+  // upgrade 8 (part B contract): pre-task hook — extra context, or a stop that needs the owner's approval (a failure never stops the task)
+  try {
+    const pre = await preTask({ orgId, taskId, memberRole: member.role, title: task.title, brief: task.brief, lang });
+    if (pre.extraContext) extraCtx = pre.extraContext.slice(0, 4000);
+    if (pre.blocked) {
+      const reason = pre.blocked.reason.slice(0, 600);
+      const id = await deps.approval({ tool: "team.ask_user", payload: { question: reason }, preview: reason, reason, sensitivity: "internal" });
+      await a.from("team_tasks").update({ status: "awaiting_approval", result: { ...((claimed.result as Record<string, unknown>) ?? {}), approvals: id ? [id] : [], held_by: "pre_task" }, updated_at: new Date().toISOString() }).eq("id", taskId);
+      await log("approval", reason, { held_by: "pre_task" });
+      return { status: "awaiting_approval", report: reason, output: null, question: null, credits: 0, steps: task.steps_used, approvals: id ? [id] : [], handoffs: [], error: null, plan: null } as Outcome;
+    }
+  } catch {
+    /* part B is optional — the task runs as usual */
+  }
   // upgrade 7 (stages D + E): understanding + decision layer around the unchanged work cycle (fails soft)
   const { layerDeps, foldHeld } = await import("./runner-plus7");
   const layer = await layerDeps(orgId, deps, member, task);
@@ -360,10 +410,14 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
   const fallbacks = routes.filter((r) => r.chosen !== "router" && r.chosen !== r.used);
   if (fallbacks.length) await log("system", `Model fallback used ${fallbacks.length}× (${fallbacks.map((f) => `${f.kind}: ${f.chosen} → ${f.used}`).join("; ")}).`, { routes: fallbacks });
   const status = out.status === "done" && out.handoffs.length ? "done" : out.status === "blocked" ? "blocked" : out.status;
-  await a
-    .from("team_tasks")
-    .update({
-      status: status === "awaiting_input" ? "awaiting_input" : status,
+  // upgrade 8: a task that only needs a connection is "requires_connection" (not "failed"); the failure kind is stored for the screen
+  const fin = await import("./runner-plus8").then((m) => m.finishPatch(status, out.error)).catch(() => ({ status } as { status: string; failure_kind?: string }));
+  const writeFinal = (withKind: boolean) =>
+    a
+      .from("team_tasks")
+      .update({
+      status: fin.status === "awaiting_input" ? "awaiting_input" : fin.status,
+      ...(withKind && fin.failure_kind ? { failure_kind: fin.failure_kind } : {}),
       question: out.question,
       steps_used: out.steps,
       credits_used: (claimed.credits_used as number) + out.credits,
@@ -371,9 +425,16 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
       result: { ...((claimed.result as Record<string, unknown>) ?? {}), report: out.report, output: out.output, approvals: out.approvals, handoffs: out.handoffs, routes: routes.slice(0, 12) },
       error: out.error,
       updated_at: new Date().toISOString(),
-      finished_at: ["done", "failed", "blocked"].includes(status) ? new Date().toISOString() : null,
+      finished_at: ["done", "failed", "blocked", "requires_connection"].includes(fin.status) ? new Date().toISOString() : null,
     })
-    .eq("id", taskId);
+      .eq("id", taskId);
+  const wrote = await writeFinal(true);
+  // migration 8 not applied yet (status CHECK / column missing): write the original status exactly as before
+  if (wrote.error) {
+    fin.status = status;
+    delete fin.failure_kind;
+    await writeFinal(false);
+  }
   if (claimed.goal_id) await refreshGoal(orgId, claimed.goal_id as string);
   return out;
 }
@@ -391,7 +452,12 @@ export async function planGoal(orgId: string, goal: string, actorUser: string): 
   const l = await loads(orgId);
   const profile = await loadProfile(orgId);
   const roles = all.filter((m) => m.role_key !== "manager").map((m) => ({ role: (isRoleKey(m.role_key) ? m.role_key : "custom") as RoleKey, name: m.name, load: l.get(m.id) ?? 0 }));
-  const system = [`You are ${manager.name}, the general manager of this business's AI team.`, playbookPrompt("manager"), WORKING_DOCTRINE, expertisePrompt("manager"), SAFETY_RULES, `THE BUSINESS:\n${profilePrompt(profile)}`].join("\n\n");
+  // upgrade 8: the same goal is not planned twice, and new titles are written in the business's language
+  const plus8 = await import("./runner-plus8").catch(() => null);
+  const existingGoal = plus8 ? await plus8.existingTaskFor(orgId, { title: goal, assignee: manager.id }) : null;
+  if (existingGoal) return { ok: true, goalId: existingGoal };
+  const titleLang = profile.locale === "en" || profile.locale === "ar" ? profile.locale : "he";
+  const system = [`You are ${manager.name}, the general manager of this business's AI team.`, playbookPrompt("manager"), WORKING_DOCTRINE, expertisePrompt("manager"), SAFETY_RULES, plus8 ? plus8.titleInstruction(titleLang) : "", `THE BUSINESS:\n${profilePrompt(profile)}`].filter(Boolean).join("\n\n");
   const ai = teamAi(orgId, settings.routing_pref, () => undefined);
   const res = await ai("plan", system, goalPrompt(goal, roles), 1800);
   if (!res.ok) return { ok: false, error: res.error ?? "ai.failed" };
@@ -417,7 +483,14 @@ export async function confirmGoal(orgId: string, goalId: string, actorUser: stri
   const plan = (goal.plan ?? {}) as { tasks?: { key: string; title: string; brief: string; role: string; depends_on: string[]; priority: number; assignee: string | null }[] };
   const tasks = plan.tasks ?? [];
   const ids = new Map<string, string>();
+  const plus8 = await import("./runner-plus8").catch(() => null);
   for (const t of tasks) {
+    // upgrade 8: an open task with the same intent for the same employee is reused instead of creating a duplicate
+    const same = plus8 ? await plus8.existingTaskFor(orgId, { title: t.title, assignee: t.assignee }) : null;
+    if (same) {
+      ids.set(t.key, same);
+      continue;
+    }
     const { data } = await a.from("team_tasks").insert({ organization_id: orgId, parent_id: goalId, goal_id: goalId, plan_key: t.key.slice(0, 40), title: t.title, brief: t.brief, assignee_id: t.assignee, priority: t.priority, status: "pending", depth: 1, origin: "goal", created_by: actorUser }).select("id").single();
     if (data) ids.set(t.key, data.id as string);
   }
@@ -452,11 +525,12 @@ async function refreshGoal(orgId: string, goalId: string) {
   const { data: goal } = await a.from("team_tasks").select("id, title, status, assignee_id, result").eq("id", goalId).maybeSingle();
   if (!goal || !["in_progress", "blocked"].includes(goal.status as string)) return;
   const { data } = await a.from("team_tasks").select("id, title, status, result").eq("goal_id", goalId).neq("id", goalId);
-  const rows = (data ?? []) as { id: string; title: string; status: string; result: { report?: string } }[];
+  const rows = ((data ?? []) as { id: string; title: string; status: string; result: { report?: string } }[]).filter((r) => r.status !== "merged");
   if (!rows.length) return;
-  const open = rows.filter((r) => !["done", "failed", "canceled", "blocked"].includes(r.status));
+  // upgrade 8: "merged" duplicates are ignored, "requires_connection" counts as stopped (not as still running)
+  const open = rows.filter((r) => !["done", "failed", "canceled", "blocked", "requires_connection", "merged"].includes(r.status));
   if (open.length) return;
-  const failed = rows.filter((r) => r.status === "failed" || r.status === "blocked");
+  const failed = rows.filter((r) => r.status === "failed" || r.status === "blocked" || r.status === "requires_connection");
   const report = rows.map((r) => `${r.status === "done" ? "✅" : "⚠️"} ${r.title}: ${(r.result?.report ?? r.status).slice(0, 300)}`).join("\n");
   const synthesis = await synthesizeGoal(orgId, goal.assignee_id as string | null, goal.title as string, rows).catch(() => null);
   await a.from("team_tasks").update({ status: failed.length === rows.length ? "failed" : "done", result: { ...((goal.result as Record<string, unknown>) ?? {}), report, ...(synthesis ? { summary: synthesis } : {}), done: rows.length - failed.length, failed: failed.length }, finished_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", goalId);
@@ -659,13 +733,20 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
     const { data: org } = await a.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
     const tz = (org?.timezone as string) || "Asia/Jerusalem";
     await resumeHeldTasks(orgId).catch(() => 0);
-    const { data: tasks } = await a.from("team_tasks").select("id, status, depends_on, priority").eq("organization_id", orgId).in("status", ["pending", "done", "failed", "canceled", "in_progress", "awaiting_approval", "awaiting_input", "blocked"]).gte("updated_at", new Date(Date.now() - 30 * 86_400_000).toISOString()).order("priority").limit(500);
+    const { data: tasks } = await a.from("team_tasks").select("id, status, depends_on, priority, assignee_id").eq("organization_id", orgId).in("status", ["pending", "done", "failed", "canceled", "in_progress", "awaiting_approval", "awaiting_input", "blocked"]).gte("updated_at", new Date(Date.now() - 30 * 86_400_000).toISOString()).order("priority").limit(500);
     const { ready, blocked } = readyTasks((tasks ?? []) as { id: string; status: string; depends_on: string[] }[]);
     for (const b of blocked) {
       await a.from("team_tasks").update({ status: "blocked", error: "dependency_failed", updated_at: new Date().toISOString() }).eq("id", b.id).eq("status", "pending");
       result.blocked++;
     }
     await maintainTeam(orgId);
+    // upgrade 8: chains blocked only by a dependency that is no longer failed come back; waiting customers get the service employee first;
+    // the part-B daily tick (stub = nothing) runs once per tick, and a failure in any of them never stops the clock
+    const plus8 = await import("./runner-plus8").catch(() => null);
+    await plus8?.reviveChains(orgId).catch(() => 0);
+    const lang8 = await a.from("organizations").select("locale").eq("id", orgId).maybeSingle().then((r) => (r.data?.locale === "en" || r.data?.locale === "ar" ? r.data.locale : "he") as "he" | "en" | "ar", () => "he" as const);
+    await plus8?.ensureQueueTask(orgId, lang8, (await loadOps(orgId).catch(() => null))?.sla.targetMin ?? 60).catch(() => false);
+    await dailyTick(orgId, lang8).catch(() => undefined);
     // upgrade 7: goals snapshot + alert, morning brief, weekly / monthly report (once a day per business, idempotent)
     await import("./runner-plus7").then((m) => m.dailyPlus7(orgId, tz)).catch(() => undefined);
     if (Date.now() - started < budgetMs - 20_000) {
@@ -681,7 +762,8 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
         /* optional */
       }
     }
-    for (const t of ready.slice(0, 3)) {
+    const toRun = plus8 ? await plus8.orderForTick(orgId, ready as ((typeof ready)[number] & { assignee_id?: string | null })[], 3, (xs) => prioritizeTasks(xs)) : ready.slice(0, 3);
+    for (const t of toRun) {
       if (Date.now() - started > budgetMs - 15_000) break;
       const r = await runTask(orgId, t.id, { interactive: false, actorUser: null });
       if (!("notRun" in r)) result.ran++;

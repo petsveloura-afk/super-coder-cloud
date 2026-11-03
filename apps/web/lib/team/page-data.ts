@@ -41,6 +41,7 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
   const models = opts.platformAdmin ? await runner.availableModels().catch(() => []) : [];
   const data: TeamPageData = {
     now,
+    orgId: org,
     canManage: opts.canManage,
     platformAdmin: opts.platformAdmin,
     settings,
@@ -110,6 +111,35 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     };
   } catch {
     /* the upgrade-7 cards are optional — the screen works without them */
+  }
+
+  try {
+    // upgrade 8 (stage A): stability — skipped engines, tasks that need attention (with the one action), the waiting-customers queue,
+    // and DISPLAY translation of old English titles / log lines into the business's language (the database is not changed)
+    const { data: orgRow8 } = await a.from("organizations").select("locale").eq("id", org).maybeSingle();
+    const lang8 = (orgRow8?.locale === "en" || orgRow8?.locale === "ar" ? orgRow8.locale : "he") as "he" | "en" | "ar";
+    const [{ localizeTitle, localizeLog }, { explainToolFailure, reasonCode }, p8, { statsLine, slaAlertText }] = await Promise.all([import("@/lib/team/title-i18n-core"), import("@/lib/team/tool-failure-core"), import("@/lib/team/runner-plus8"), import("@/lib/team/response-queue-core")]);
+    data.tasks = data.tasks.map((x) => ({ ...x, title: localizeTitle(x.title, lang8) }));
+    data.activity = data.activity.map((x) => ({ ...x, summary: localizeLog(x.summary, lang8) }));
+    data.members = data.members.map((m) => ({ ...m, working_on: m.working_on ? localizeTitle(m.working_on, lang8) : m.working_on }));
+    const [skipped, { data: bad }, resp] = await Promise.all([
+      opts.platformAdmin || opts.canManage ? p8.loadSkippedProviders(lang8) : Promise.resolve([]),
+      a.from("team_tasks").select("id, title, status, error, updated_at").eq("organization_id", org).in("status", ["failed", "blocked", "requires_connection"]).gte("updated_at", new Date(now - 30 * 86_400_000).toISOString()).order("updated_at", { ascending: false }).limit(40),
+      p8.loadResponseQueue(org, data.ops?.sla.targetMin ?? 60),
+    ]);
+    const badRows = (bad ?? []) as { id: string; title: string; status: string; error: string | null; updated_at: string }[];
+    data.plus8 = {
+      skipped,
+      attention: badRows.slice(0, 12).map((r) => {
+        const e = explainToolFailure(r.error, lang8);
+        const generic = r.status === "requires_connection" || reasonCode(r.error).startsWith("tool_");
+        return { id: r.id, title: localizeTitle(r.title, lang8), status: r.status, label: generic ? e.label : "", action: generic ? e.action : "", reason: reasonCode(r.error), ageDays: Math.floor((now - Date.parse(r.updated_at)) / 86_400_000) };
+      }),
+      staleBlocked: badRows.filter((r) => (r.status === "blocked" || r.status === "requires_connection") && now - Date.parse(r.updated_at) > 3 * 86_400_000).length,
+      response: resp ? { targetMin: resp.targetMin, line: statsLine(resp.stats, resp.targetMin, lang8), alert: { level: resp.alert.level, text: slaAlertText(resp.alert, lang8) }, queue: resp.queue.slice(0, 8).map((q) => ({ id: q.id, waitingMin: q.waitingMin, state: q.state })) } : undefined,
+    };
+  } catch {
+    /* the stability card is optional — the screen works without it */
   }
 
   return data;

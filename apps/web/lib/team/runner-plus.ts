@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { applyHealth, cleanHealth, recordResult, summarizeHealth, modelKey, type HealthRow, type HealthState } from "./model-health-core";
 import { classifyFailure, isStuck, nextRetry, teamHealth, type TeamHealth } from "./reliability-core";
+import { reasonCode } from "./tool-failure-core";
 
 /**
  * The digital team — server side of the upgrade: model health (circuit breaker) with a best-effort copy in the
@@ -156,7 +157,7 @@ export async function loadTeamHealth(orgId: string, settings: { enabled: boolean
   return {
     verdict: teamHealth({ enabled: settings.enabled, emergencyStop: settings.emergency_stop, stuck: stuck ?? 0, failedLast24h: rows.length, openCircuits: open, totalModels: models.length, lastTickAt: null, now }),
     models: models.slice(0, 8),
-    failures: rows.map((r) => ({ id: r.id, title: r.title.slice(0, 120), reason: classifyFailure(r.error).code, error: r.error?.slice(0, 120) ?? null, at: r.finished_at })),
+    failures: rows.map((r) => ({ id: r.id, title: r.title.slice(0, 120), reason: reasonCode(r.error), error: r.error?.slice(0, 120) ?? null, at: r.finished_at })),
     stuck: stuck ?? 0,
     failed24h: rows.length,
   };

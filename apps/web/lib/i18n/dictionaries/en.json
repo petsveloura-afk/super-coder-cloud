@@ -6531,7 +6531,9 @@
       "pending": "Pending",
       "in_progress": "Working",
       "draft": "Proposal",
-      "canceled": "Canceled"
+      "canceled": "Canceled",
+      "requires_connection": "Needs a connection",
+      "merged": "Merged"
     },
     "title": "My team",
     "subtitle": "Professional digital employees: they know the business, remember, work on their own and ask for approval when needed",
@@ -6997,7 +6999,18 @@
         "network": "Network problem (will retry)",
         "input": "Missing or invalid input",
         "tool": "A tool failed",
-        "unknown": "Unknown reason"
+        "unknown": "Unknown reason",
+        "tool_needs_connection": "Needs a connection",
+        "tool_missing_data": "Missing data",
+        "tool_temporary": "Temporary problem (will retry)",
+        "tool_bad_input": "Invalid input",
+        "tool_bug": "Unexpected error",
+        "no_key": "Provider without a key — skipped",
+        "wrong_kind": "Model does not fit this kind of work — skipped",
+        "resting": "Provider is resting — skipped for now",
+        "over_daily_quota": "Provider is over its daily quota — skipped",
+        "fail_streak": "Provider failed several times in a row — skipped for now",
+        "too_many_parallel": "Provider is busy right now — an idle one is preferred"
       }
     },
     "ops": {
@@ -7138,6 +7151,39 @@
         "title": "Morning brief and reports",
         "about": "Built from the business's real numbers, in the business language. Anomalies are found by thresholds in code.",
         "standup": "Daily stand-up"
+      }
+    },
+    "plus8": {
+      "title": "Stability and problem handling",
+      "about": "Tasks that need attention, with the reason and one next step. Nothing is deleted — only marked.",
+      "restart": "Restart",
+      "restarted": "The task is back in the queue",
+      "restartFailed": "It cannot be restarted right now",
+      "cancelOld": "Cancel old blocked",
+      "cancelOldDone": "{n} old blocked tasks canceled",
+      "merge": "Merge duplicates",
+      "mergeDone": "{n} duplicates merged (marked \"merged\", not deleted)",
+      "attention": {
+        "title": "Needs attention",
+        "empty": "No failed or blocked tasks."
+      },
+      "skipped": {
+        "title": "AI engines skipped right now",
+        "none": "All available engines are in use."
+      },
+      "queue": {
+        "title": "Waiting for a reply",
+        "empty": "No customers are waiting for a reply.",
+        "waiting": "waiting {n} min"
+      },
+      "sample": {
+        "title": "Enter the experiment sample",
+        "about": "Enter how many tried and how many succeeded in each version. The verdict is decided only after the minimum sample size.",
+        "trials": "Trials",
+        "successes": "Successes",
+        "save": "Add to the sample",
+        "errOver": "Successes cannot exceed trials",
+        "errNotRunning": "A sample can only be entered for a running experiment"
       }
     }
   }
