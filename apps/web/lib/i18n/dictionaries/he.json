@@ -6756,7 +6756,9 @@
       "experiments_propose": "הצעת ניסוי A/B",
       "board_view": "לוח העבודה המשותף",
       "board_post": "פרסום הערה בלוח הצוות",
-      "reports_latest": "הדוח האחרון (שבועי / חודשי)"
+      "reports_latest": "הדוח האחרון (שבועי / חודשי)",
+      "sop_lookup": "חיפוש נוהל עבודה",
+      "sop_propose": "הצעת שינוי בנוהל"
     },
     "goal": {
       "title": "מטרה לצוות",

@@ -6756,7 +6756,9 @@
       "experiments_propose": "Propose an A/B experiment",
       "board_view": "The shared team board",
       "board_post": "Post a note on the team board",
-      "reports_latest": "The latest weekly / monthly report"
+      "reports_latest": "The latest weekly / monthly report",
+      "sop_lookup": "Look up a work procedure",
+      "sop_propose": "Propose a procedure change"
     },
     "goal": {
       "title": "A goal for the team",
