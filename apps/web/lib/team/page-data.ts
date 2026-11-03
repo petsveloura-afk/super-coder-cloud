@@ -88,5 +88,29 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     /* the business facts card is optional — the screen works without it */
   }
 
+  try {
+    // upgrade 7 (stages C–J): goals + forecasts, experiments, decision records, the board, the latest reports (each part optional)
+    const { data: orgRow } = await a.from("organizations").select("locale").eq("id", org).maybeSingle();
+    const lang = (orgRow?.locale === "en" || orgRow?.locale === "ar" ? orgRow.locale : "he") as "he" | "en" | "ar";
+    const [g, e, d, b, rep, brief] = await Promise.all([
+      import("@/lib/team/goals").then((m) => m.evaluateGoals(org, lang)).catch(() => null),
+      import("@/lib/team/tools-plus7c").then((m) => m.loadExperiments(org)).catch(() => null),
+      import("@/lib/team/decisions").then((m) => m.loadDecisions(org, { limit: 20 })).catch(() => null),
+      import("@/lib/team/tools-plus7c").then((m) => m.loadBoard(org, lang)).catch(() => null),
+      import("@/lib/team/tools-plus7c").then((m) => m.latestReport(org, "week")).catch(() => null),
+      import("@/lib/team/tools-plus7c").then((m) => m.latestReport(org, "brief")).catch(() => null),
+    ]);
+    data.plus7 = {
+      goals: g?.available ? g.views.map((v) => ({ goal: v.goal, forecast: v.forecast })) : undefined,
+      experiments: e?.available ? e.rows : undefined,
+      decisions: d?.available ? d.rows.map((r) => ({ id: r.id, task_id: r.task_id, route: r.route, route_reasons: r.route_reasons, record: r.record, confidence: r.confidence, audit_verdict: r.audit_verdict, created_at: r.created_at })) : undefined,
+      standup: b?.standup.lines,
+      report: rep ? { title: rep.title, text: rep.text, period_start: rep.period_start } : undefined,
+      brief: brief ? { text: brief.text } : undefined,
+    };
+  } catch {
+    /* the upgrade-7 cards are optional — the screen works without them */
+  }
+
   return data;
 }

@@ -12,6 +12,7 @@ import { Presentation3D } from "./presentation-3d";
 import { TeamGrid, TeamTree } from "./views";
 import { MemberEditor, type EditorDraft } from "./member-editor";
 import { FactsPanel } from "./facts-panel";
+import { ExperimentsCard, GoalsCard, ReportsCard, WhyPanel } from "./plus7-panels";
 import { ActivityPanel, ApprovalsPanel, GoalsPanel, HireGallery, MeetingPanel, MemoryPanel, PlaybooksPanel, SettingsPanel } from "./panels";
 import type { TeamMemberView, TeamPageData } from "./types";
 
@@ -171,6 +172,13 @@ export function TeamScreen({ data }: { data: TeamPageData }) {
           )}
         </div>
       ) : null}
+      {tab === "goals" && data.plus7 ? (
+        <div className="mb-4 space-y-4">
+          {data.plus7.goals ? <GoalsCard data={data.plus7} canManage={data.canManage} locale={locale} onRefresh={refresh} /> : null}
+          <ReportsCard data={data.plus7} />
+          {data.plus7.experiments ? <ExperimentsCard data={data.plus7} canManage={data.canManage} locale={locale} onRefresh={refresh} /> : null}
+        </div>
+      ) : null}
       {tab === "goals" ? <GoalsPanel data={data} onRefresh={refresh} /> : null}
       {tab === "approvals" ? <ApprovalsPanel data={data} onRefresh={refresh} /> : null}
       {tab === "memory" && data.facts ? (
@@ -181,6 +189,11 @@ export function TeamScreen({ data }: { data: TeamPageData }) {
       {tab === "memory" ? <MemoryPanel data={data} onRefresh={refresh} /> : null}
       {tab === "playbooks" ? <PlaybooksPanel data={data} roles={ROLE_KEYS} onRefresh={refresh} /> : null}
       {tab === "meeting" ? <MeetingPanel data={data} /> : null}
+      {tab === "activity" && data.plus7?.decisions ? (
+        <div className="mb-4">
+          <WhyPanel data={data.plus7} canManage={data.canManage} locale={locale} onRefresh={refresh} />
+        </div>
+      ) : null}
       {tab === "activity" ? <ActivityPanel data={data} onRefresh={refresh} /> : null}
       {tab === "settings" ? <SettingsPanel data={data} onRefresh={refresh} /> : null}
 

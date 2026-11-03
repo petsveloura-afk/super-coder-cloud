@@ -157,6 +157,17 @@ export interface TeamPageData {
   templates?: { id: string; role: string; brief: string }[];
   /** upgrade 7: versioned business facts (absent when the migration was not run) */
   facts?: TeamFactsData;
+  /** upgrade 7 / stages C–J (each part absent when its migration was not run) */
+  plus7?: TeamPlus7Data;
+}
+
+export interface TeamPlus7Data {
+  goals?: { goal: import("@/lib/team/goals-core").Goal; forecast: import("@/lib/team/goals-core").Forecast }[];
+  experiments?: import("@/lib/team/experiments-core").Experiment[];
+  decisions?: { id: string; task_id: string; route: "fast" | "deep"; route_reasons: string[]; record: Omit<import("@/lib/team/decision-core").DecisionRecord, "id" | "hash" | "prev_hash" | "seq">; confidence: number; audit_verdict: string | null; created_at: string }[];
+  standup?: string[];
+  report?: { title: string; text: string; period_start: string };
+  brief?: { text: string };
 }
 
 export interface TeamFactsData {

@@ -258,6 +258,18 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
         const { runMarketTool } = await import("./market-intel");
         return runMarketTool(orgId, tool, args);
       }
+      case "goals.list":
+      case "goals.forecast":
+      case "goals.set":
+      case "experiments.list":
+      case "experiments.propose":
+      case "board.view":
+      case "board.post":
+      case "reports.latest": {
+        // upgrade 7 / stages C–H: goals, experiments, shared board, reports (every one fails soft when its migration was not run)
+        const { runPlus7cTool } = await import("./tools-plus7c");
+        return runPlus7cTool(orgId, tool, args, { lang: ctx.locale === "en" || ctx.locale === "ar" ? ctx.locale : "he" });
+      }
       case "facts.lookup":
       case "facts.history":
       case "facts.record": {

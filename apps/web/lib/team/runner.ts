@@ -8,6 +8,7 @@ import { initiatives, knownFacts, meetingFacts, memberStats, profilePrompt, type
 import { TOOL_MAP, validateArgs } from "./tools-core";
 import { withRoleExtras } from "./tools-plus-core";
 import { withRoleExtras7 } from "./tools-plus7-core";
+import { withRoleExtras7c } from "./tools-plus7c-core";
 import { automatedContactIds, runTeamTool } from "./tools";
 import { playbookPrompt } from "./playbooks";
 import { REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt } from "./doctrine";
@@ -184,7 +185,7 @@ interface MemberRow {
 const MEMBER_COLS = "id, role_key, name, tone, instructions, tools, autonomy, auto_actions, status, limits, reports_to, linked";
 
 function toEngine(m: MemberRow): EngineMember {
-  return { id: m.id, role: isRoleKey(m.role_key) ? m.role_key : "custom", name: m.name, tone: m.tone, instructions: m.instructions, tools: withRoleExtras7(m.role_key, withRoleExtras(m.role_key, m.tools)), autonomy: m.autonomy, auto_actions: m.auto_actions, status: m.status, limits: { max_steps: m.limits?.max_steps, max_credits: m.limits?.max_credits } };
+  return { id: m.id, role: isRoleKey(m.role_key) ? m.role_key : "custom", name: m.name, tone: m.tone, instructions: m.instructions, tools: withRoleExtras7c(m.role_key, withRoleExtras7(m.role_key, withRoleExtras(m.role_key, m.tools))), autonomy: m.autonomy, auto_actions: m.auto_actions, status: m.status, limits: { max_steps: m.limits?.max_steps, max_credits: m.limits?.max_credits } };
 }
 
 async function members(orgId: string): Promise<MemberRow[]> {
@@ -342,13 +343,19 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
       // a long memory list is narrowed to what shares terms with the task (hard rules always stay)
       const memories = allMemories.length > 150 ? candidatesFor(buildIndex(allMemories), `${claimed.title as string} ${(claimed.brief as string) ?? ""}`, 80) : allMemories;
       // upgrade 7: versioned business facts relevant to this task (empty when none / migration not run)
-      const factsBlock = await import("./business-facts").then((m) => m.factsPromptFor(orgId, `${claimed.title as string} ${(claimed.brief as string) ?? ""}`)).catch(() => "");
+      const goalsBlock = member.role === "manager" || member.role === "analyst" ? await import("./goals").then((m) => m.goalsPromptFor(orgId, lang)).catch(() => "") : "";
+      const factsBlock0 = await import("./business-facts").then((m) => m.factsPromptFor(orgId, `${claimed.title as string} ${(claimed.brief as string) ?? ""}`)).catch(() => "");
+      const factsBlock = [factsBlock0, goalsBlock].filter(Boolean).join("\n\n");
       return { profile: factsBlock ? `${profilePrompt(profile)}\n\n${factsBlock}` : profilePrompt(profile), known: knownFacts(profile), memories, playbookExtra: (extra?.extra as string) ?? "", reviewer: reviewerRow && reviewerRow.id !== member.id ? toEngine(reviewerRow) : null, reviewerExtra: (reviewerExtra as { extra?: string } | null)?.extra ?? "" };
     },
   };
   const task: EngineTask = { id: taskId, title: claimed.title as string, brief: (claimed.brief as string) ?? "", depth: claimed.depth as number, steps_used: claimed.steps_used as number, credits_used: claimed.credits_used as number, review_rounds: claimed.review_rounds as number, chain: await chainOf(orgId, (claimed.parent_id as string | null) ?? null), answer: ((claimed.result as Record<string, unknown>)?.answer as string | undefined) ?? null };
   const engineSettings: EngineSettings = { enabled: settings.enabled, emergency_stop: settings.emergency_stop, max_depth: settings.max_depth, max_steps: settings.max_steps, daily_credit_cap: settings.daily_credit_cap, day_credits: await dayCredits(orgId) };
-  const out = await runEmployeeTask(deps, member, task, engineSettings).catch((e: Error) => ({ status: "failed", report: "", output: null, question: null, credits: 0, steps: 0, approvals: [], handoffs: [], error: e.message.slice(0, 300), plan: null }) as Outcome);
+  // upgrade 7 (stages D + E): understanding + decision layer around the unchanged work cycle (fails soft)
+  const { layerDeps, foldHeld } = await import("./runner-plus7");
+  const layer = await layerDeps(orgId, deps, member, task);
+  const out0 = await runEmployeeTask(layer.deps, member, task, engineSettings).catch((e: Error) => ({ status: "failed", report: "", output: null, question: null, credits: 0, steps: 0, approvals: [], handoffs: [], error: e.message.slice(0, 300), plan: null }) as Outcome);
+  const out = foldHeld(out0, layer.held());
   // routing transparency: which engine was chosen and which one answered (a fallback is visible in the log)
   const fallbacks = routes.filter((r) => r.chosen !== "router" && r.chosen !== r.used);
   if (fallbacks.length) await log("system", `Model fallback used ${fallbacks.length}× (${fallbacks.map((f) => `${f.kind}: ${f.chosen} → ${f.used}`).join("; ")}).`, { routes: fallbacks });
@@ -659,6 +666,8 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
       result.blocked++;
     }
     await maintainTeam(orgId);
+    // upgrade 7: goals snapshot + alert, morning brief, weekly / monthly report (once a day per business, idempotent)
+    await import("./runner-plus7").then((m) => m.dailyPlus7(orgId, tz)).catch(() => undefined);
     if (Date.now() - started < budgetMs - 20_000) {
       // upgrade 3: morning / weekly digest + daily memory upkeep (idempotent; never blocks the work below)
       try {

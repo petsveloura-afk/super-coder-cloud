@@ -6746,7 +6746,15 @@
       "market_record": "Record a competitor finding",
       "facts_lookup": "Look up business facts",
       "facts_history": "History of a fact",
-      "facts_record": "Record a business fact"
+      "facts_record": "Record a business fact",
+      "goals_list": "Business goals and their forecast",
+      "goals_forecast": "Forecast of one goal",
+      "goals_set": "Propose a goal (waits for the owner)",
+      "experiments_list": "Recommendations and A/B experiments",
+      "experiments_propose": "Propose an A/B experiment",
+      "board_view": "The shared team board",
+      "board_post": "Post a note on the team board",
+      "reports_latest": "The latest weekly / monthly report"
     },
     "goal": {
       "title": "A goal for the team",
@@ -7069,6 +7077,67 @@
       },
       "err": {
         "migration": "Saving facts has not been enabled on the system yet. Contact the system administrator."
+      }
+    },
+    "plus7": {
+      "goalAlert": "Goal at risk: {title}",
+      "err": {
+        "migration": "This feature is not switched on yet: run the new migration in Supabase."
+      },
+      "goals": {
+        "title": "Business goals",
+        "about": "A goal has a metric, a baseline and a date. Progress is measured automatically from the CRM, and the forecast is an honest range, not a promise.",
+        "empty": "No goals yet. Add the first one, for example 30 new leads by the end of the month.",
+        "name": "Goal name",
+        "metric": "Metric",
+        "target": "Target",
+        "due": "Due date",
+        "save": "Add goal",
+        "proposed": "Suggested by an employee, waiting for you",
+        "paused": "Paused",
+        "pause": "Pause",
+        "activate": "Activate",
+        "daysLeft": "{n} days left"
+      },
+      "metrics": {
+        "leads_new": "New leads",
+        "deals_won": "Deals won",
+        "revenue_won": "Value of deals won",
+        "conversations": "Conversations",
+        "reviews_avg": "Average rating",
+        "reply_minutes": "Agent reply time (minutes)",
+        "custom": "Manual metric"
+      },
+      "exp": {
+        "title": "Recommendations and A/B experiments",
+        "about": "Every experiment has one deciding metric and an owner. A result is declared only after the minimum sample size; until then the honest answer is “not enough data”.",
+        "empty": "No experiments yet. Employees will propose one when there is a reason.",
+        "start": "Start the experiment",
+        "stop": "Stop the experiment",
+        "status": {
+          "proposed": "Proposed",
+          "running": "Running",
+          "concluded": "Concluded",
+          "stopped": "Stopped"
+        }
+      },
+      "why": {
+        "title": "Why I did this",
+        "about": "The employee's decision record: what was understood, what was decided, why, how sure, and what would change the decision. No raw chain of thought is shown.",
+        "empty": "No stored decisions yet.",
+        "deep": "Deep path",
+        "fast": "Fast path",
+        "routeWhy": "Why the deep path",
+        "calibrated": "the model said {n}%",
+        "correction": "What should have been done instead? (optional)",
+        "good": "Good decision",
+        "bad": "Wrong decision",
+        "thanks": "Saved. The lesson waits for your approval in the Memory screen."
+      },
+      "reports": {
+        "title": "Morning brief and reports",
+        "about": "Built from the business's real numbers, in the business language. Anomalies are found by thresholds in code.",
+        "standup": "Daily stand-up"
       }
     }
   }
