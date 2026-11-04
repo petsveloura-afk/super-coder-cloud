@@ -10,3 +10,14 @@
 6. `components/ai-team/health-panel.tsx` + מילוני he/en/ar – במקום `fallback_used` / `ai.failed` מוצגת סיבה בעברית.
 7. `lib/team/tool-failure-core.ts` – שגיאות של מנועי AI (עמוס, תשובה ריקה) מסווגות "תקלה זמנית" שנוסית שוב לבד, ולא "שגיאה לא צפויה" או "חסר נתון".
 8. בדיקות חדשות: `tests/unit/wave62-reliability.test.ts`.
+
+## טלגרם אישי (חיבור API / סשן משתמש)
+- `services/wa-bridge/src/telegram-user.mjs`:
+  - **Watchdog** כל 45 שניות: חיבור שנפל, או "מת בשקט" (בדיקת ping כל 3 דקות), נבנה מחדש אוטומטית עם לקוח חדש + השלמת הודעות שהוחמצו (`catchUp`).
+  - **כשל רשת בעלייה** כבר לא נחשב ניתוק: הסשן נשמר, הסטטוס "reconnecting" והחיבור נבנה מחדש. QR מוצג רק אם טלגרם עצמו אומר שהסשן בוטל, ואז נשלח גם `logged_out` ל-web.
+  - **שליחה** מנסה לשקם חיבור (עד כ-12 שניות) לפני שהיא נכשלת.
+  - **העברת הודעת לקוח ל-web**: עד 6 ניסיונות עם המתנה גדלה (כולל 5xx/429), במקום 3.
+  - לקוח ישן נסגר לפני יצירת חדש (בלי כפילויות).
+- `services/wa-bridge/src/server.mjs`: מפעיל את ה-watchdog; `/health` מציג כמה סשנים מחוברים.
+- `apps/web/lib/channels/tg-user.ts`: "reconnecting" מוצג כ"מתחבר"; שליחה שנכשלה בגלל חיבור שנפל מנוסה שוב ולא נחשבת כשל סופי.
+- בדיקות: `services/wa-bridge/tests/wave62-telegram.test.mjs`.

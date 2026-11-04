@@ -39,7 +39,9 @@ export async function tgUserStatus(accountId: string): Promise<TgUserStatus> {
   if (r.status === 404) return { status: "unknown" };
   if (r.status === 503) return { status: "not_configured" };
   if (!r.ok) return { status: "error", error: String(r.data.error ?? `bridge_${r.status}`) };
-  return r.data as unknown as TgUserStatus;
+  // wave 62: the bridge is rebuilding a dropped connection by itself — the screen shows "starting", never a QR or an error
+  const st = r.data as unknown as { status: string } & Omit<TgUserStatus, "status">;
+  return (st.status === "reconnecting" ? { ...st, status: "starting" } : st) as TgUserStatus;
 }
 
 export async function tgUserPassword(accountId: string, password: string): Promise<TgUserStatus> {
@@ -54,6 +56,6 @@ export async function tgUserLogout(accountId: string): Promise<void> {
 
 export async function tgUserSend(acc: LoadedAccount, externalId: string, text: string): Promise<ProviderResult> {
   const r = await bridgeCall(`/tg/sessions/${acc.id}/send`, { method: "POST", body: { to: externalId.replace(/[^\d]/g, ""), text } });
-  if (!r.ok) return { ok: false, status: r.status, error: String(r.data.error ?? `bridge_${r.status}`), permanent: r.status === 404 || r.status === 409 };
+  if (!r.ok) return { ok: false, status: r.status, error: String(r.data.error ?? `bridge_${r.status}`), permanent: r.status === 400 };
   return { ok: true, externalId: (r.data.id as string | undefined) ?? undefined };
 }

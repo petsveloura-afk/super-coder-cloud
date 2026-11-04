@@ -45,7 +45,7 @@ export function createServer({ manager, secret, appUrl, telegram = null }) {
     };
     try {
       const url = new URL(req.url ?? "/", "http://bridge");
-      if (req.method === "GET" && url.pathname === "/health") return send(200, { ok: true, sessions: manager.sessions.size, telegram: Boolean(telegram?.configured()), voice_realtime: Boolean(appUrl) }); // wave 56: + live calls
+      if (req.method === "GET" && url.pathname === "/health") return send(200, { ok: true, sessions: manager.sessions.size, telegram: Boolean(telegram?.configured()), telegram_sessions: telegram?.summary?.() ?? null, voice_realtime: Boolean(appUrl) }); // wave 56: + live calls
       if (!authorized(req.headers.authorization, secret)) return send(401, { error: "unauthorized" });
       // personal Telegram accounts: /tg/sessions/{id}[/start|send|logout|password]
       const tg = url.pathname.match(/^\/tg\/sessions\/([^/]+)(?:\/(start|send|logout|password|voice))?$/); // wave 22: + voice
@@ -172,6 +172,7 @@ async function main() {
     });
     const n = await telegram.restoreAll();
     console.log(`telegram user sessions restored: ${n}`);
+    telegram.startWatchdog(); // wave 62: dropped / silently dead Telegram connections are rebuilt automatically
   }
 
   const port = Number(process.env.PORT ?? 8080);

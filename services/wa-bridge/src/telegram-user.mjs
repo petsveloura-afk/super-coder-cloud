@@ -104,8 +104,11 @@ export class TelegramUserManager {
    * @param {{apiId:number, apiHash:string}|null} o.api
    * @param {object} o.lib  { TelegramClient, StringSession, NewMessage, Api, bigInt }
    */
-  constructor({ dataDir, secret, api, lib, fetchImpl = fetch, logger = console, ownerDelayMs = 1500 }) {
+  constructor({ dataDir, secret, api, lib, fetchImpl = fetch, logger = console, ownerDelayMs = 1500, authRetryMs = 2500, postRetryMs = 1000 }) {
     this.ownerDelayMs = ownerDelayMs;
+    this.authRetryMs = authRetryMs; // wave 62: pause between authorization re-checks at start-up
+    this.postRetryMs = postRetryMs; // wave 62: base back-off for delivering a message to the web app
+    this.watchdogTimer = null;
     this.dataDir = dataDir;
     this.secret = secret;
     this.api = api;
@@ -126,7 +129,7 @@ export class TelegramUserManager {
   status(id) {
     const s = this.sessions.get(id);
     if (!s) return null;
-    return { status: s.status, qr: s.status === "qr" ? s.qr : null, phone: s.phone, name: s.name, username: s.username, hint: s.status === "password" ? s.hint : null, error: s.error };
+    return { status: s.status, qr: s.status === "qr" ? s.qr : null, phone: s.phone, name: s.name, username: s.username, hint: s.status === "password" ? s.hint : null, error: s.error, last_event_at: s.lastEventAt ?? null, reconnects: s.reconnects ?? 0 };
   }
 
   async readFileSafe(p) {
@@ -170,10 +173,45 @@ export class TelegramUserManager {
       s.peers = {};
     }
     this.sessions.set(id, s);
-    const client = new TelegramClient(new StringSession(saved), this.api.apiId, this.api.apiHash, { connectionRetries: 5 });
+    // wave 62: a previous client of this account is closed first — never two live clients (duplicate answers / dead handlers)
+    if (s.client) {
+      const old = s.client;
+      s.client = null;
+      await old.disconnect?.().catch?.(() => {});
+      await old.destroy?.().catch?.(() => {});
+    }
+    const client = new TelegramClient(new StringSession(saved), this.api.apiId, this.api.apiHash, { connectionRetries: 10, retryDelay: 2000, autoReconnect: true });
     s.client = client;
-    await client.connect();
-    const authorized = saved ? await client.checkAuthorization().catch(() => false) : false;
+    try {
+      await client.connect();
+    } catch (e) {
+      // a saved session must survive a network hiccup: keep it and let the watchdog reconnect
+      if (!saved) throw e;
+      s.status = "reconnecting";
+      s.error = e?.message ?? "connect_failed";
+      this.log.error?.(`telegram user ${id}: connect failed, will retry`, s.error);
+      return s;
+    }
+    let authorized = saved ? await client.checkAuthorization().catch(() => false) : false;
+    if (saved && !authorized) {
+      // wave 62: "not authorized" can be a short network problem — re-check a few times, then ask Telegram itself
+      for (let i = 0; i < 3 && !authorized; i++) {
+        await wait(this.authRetryMs);
+        authorized = await client.checkAuthorization().catch(() => false);
+      }
+      if (!authorized) {
+        const kind = await this.probeAuth(client);
+        if (kind === "ok") authorized = true;
+        else if (kind === "network") {
+          s.status = "reconnecting";
+          s.error = "network";
+          return s; // the session file is kept; the watchdog tries again — never a QR for a healthy account
+        } else {
+          s.error = "logged_out";
+          this.post(id, { type: "status", status: "logged_out" }).catch(() => {});
+        }
+      }
+    }
     if (authorized) {
       await this.onLoggedIn(id);
       return s;
@@ -216,12 +254,15 @@ export class TelegramUserManager {
     await writeFile(path.join(this.dir(id), "session.txt"), s.client.session.save(), "utf8");
     const me = await s.client.getMe().catch(() => null);
     s.status = "connected";
+    s.connectedAt = Date.now();
+    s.lastPing = Date.now();
     s.qr = null;
     s.error = null;
     s.phone = me?.phone ? String(me.phone) : null;
     s.name = [me?.firstName, me?.lastName].filter(Boolean).join(" ") || null;
     s.username = me?.username ?? null;
     s.client.addEventHandler(async (event) => {
+      s.lastEventAt = Date.now();
       const ev = await toTelegramUserEvent(event);
       if (!ev) return;
       if (ev.accessHash) {
@@ -259,7 +300,8 @@ export class TelegramUserManager {
   async send(id, to, text) {
     const s = this.sessions.get(id);
     if (!s || s.stopped) throw Object.assign(new Error("not_found"), { code: 404 });
-    if (s.status !== "connected") throw Object.assign(new Error("not_connected"), { code: 409 });
+    if (s.status !== "connected") await this.heal(id); // wave 62: one quick reconnect before giving up
+    if (s.status !== "connected") throw Object.assign(new Error("not_connected"), { code: 503 });
     const uid = String(to ?? "").replace(/[^\d]/g, "");
     if (!/^\d{3,20}$/.test(uid)) throw Object.assign(new Error("invalid_recipient"), { code: 400 });
     const body = String(text ?? "").slice(0, 4000);
@@ -281,7 +323,8 @@ export class TelegramUserManager {
   async sendVoice(id, to, audioB64, mime) {
     const s = this.sessions.get(id);
     if (!s || s.stopped) throw Object.assign(new Error("not_found"), { code: 404 });
-    if (s.status !== "connected") throw Object.assign(new Error("not_connected"), { code: 409 });
+    if (s.status !== "connected") await this.heal(id);
+    if (s.status !== "connected") throw Object.assign(new Error("not_connected"), { code: 503 });
     const uid = String(to ?? "").replace(/[^\d]/g, "");
     if (!/^\d{3,20}$/.test(uid)) throw Object.assign(new Error("invalid_recipient"), { code: 400 });
     const v = decodeVoice(audioB64, mime);
@@ -324,15 +367,117 @@ export class TelegramUserManager {
     const s = this.sessions.get(id);
     if (!s?.callback) return;
     const body = JSON.stringify(payload);
-    for (let attempt = 0; attempt < 3; attempt++) {
+    // wave 62: a message from a customer must reach the web app — network errors, 5xx and 429 are retried with a growing pause
+    for (let attempt = 0; attempt < 6; attempt++) {
       try {
-        const res = await this.fetch(s.callback, { method: "POST", headers: { "Content-Type": "application/json", ...sign(this.secret, body) }, body, signal: AbortSignal.timeout(15_000) });
-        if (res.ok || (res.status >= 400 && res.status < 500)) return;
+        const res = await this.fetch(s.callback, { method: "POST", headers: { "Content-Type": "application/json", ...sign(this.secret, body) }, body, signal: AbortSignal.timeout(20_000) });
+        if (res.ok) return;
+        if (res.status >= 400 && res.status < 500 && res.status !== 429 && res.status !== 408) {
+          this.log.error?.(`telegram user ${id}: web app refused the callback (HTTP ${res.status})`);
+          return;
+        }
       } catch {
         /* retry */
       }
-      await wait(1000 * (attempt + 1));
+      await wait(this.postRetryMs * 2 ** attempt);
     }
+    this.log.error?.(`telegram user ${id}: could not deliver a ${payload?.type ?? "event"} to the web app`);
+  }
+
+  /** Telegram itself tells whether the saved session is valid: "ok" | "revoked" (really logged out) | "network" */
+  async probeAuth(client) {
+    try {
+      await client.getMe();
+      return "ok";
+    } catch (e) {
+      const m = String(e?.errorMessage ?? e?.message ?? "");
+      if (/AUTH_KEY_UNREGISTERED|AUTH_KEY_INVALID|SESSION_REVOKED|SESSION_EXPIRED|USER_DEACTIVATED|AUTH_KEY_DUPLICATED/i.test(m)) return "revoked";
+      return "network";
+    }
+  }
+
+  /** a cheap round-trip to Telegram (updates.getState) — proves the connection is really alive */
+  async ping(s) {
+    try {
+      const Req = this.lib.Api?.updates?.GetState;
+      const call = Req ? s.client.invoke(new Req()) : s.client.getMe();
+      await Promise.race([call, new Promise((_, rej) => setTimeout(() => rej(new Error("ping_timeout")), 20_000).unref?.())]);
+      s.lastPing = Date.now();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** closes the old client, opens a new one for the same saved session and catches up on what was missed */
+  async reconnect(id, why = "watchdog") {
+    const s = this.sessions.get(id);
+    if (!s || s.stopped || s.reconnecting) return;
+    s.reconnecting = true;
+    try {
+      this.log.warn?.(`telegram user ${id}: reconnecting (${why})`);
+      s.reconnects = (s.reconnects ?? 0) + 1;
+      await this.connect(id, s.callback);
+      if (s.status === "connected") {
+        s.error = null;
+        s.failedChecks = 0;
+        await s.client?.catchUp?.().catch?.(() => {});
+      }
+    } catch (e) {
+      s.status = "reconnecting";
+      s.error = e?.message ?? "reconnect_failed";
+    } finally {
+      s.reconnecting = false;
+    }
+  }
+
+  /** used before a send: reconnect once, wait at most ~12 seconds */
+  async heal(id) {
+    const s = this.sessions.get(id);
+    if (!s || s.stopped) return;
+    if (s.reconnecting) {
+      const until = Date.now() + 12_000;
+      while (s.reconnecting && Date.now() < until) await wait(250);
+      return;
+    }
+    await Promise.race([this.reconnect(id, "send"), wait(12_000)]);
+  }
+
+  /** every account is checked regularly: a dropped or silently dead connection is rebuilt without anybody touching it */
+  async checkAll({ pingEveryMs = 180_000 } = {}) {
+    for (const [id, s] of this.sessions) {
+      if (s.stopped || s.reconnecting) continue;
+      if (s.status === "reconnecting") {
+        await this.reconnect(id, "retry");
+        continue;
+      }
+      if (s.status !== "connected") continue;
+      let dead = !s.client || s.client.connected === false;
+      if (!dead && Date.now() - (s.lastPing ?? 0) >= pingEveryMs) dead = !(await this.ping(s));
+      if (dead) {
+        s.failedChecks = (s.failedChecks ?? 0) + 1;
+        await this.reconnect(id, "connection lost");
+      }
+    }
+  }
+
+  startWatchdog({ intervalMs = 45_000, pingEveryMs = 180_000 } = {}) {
+    if (this.watchdogTimer) return;
+    this.watchdogTimer = setInterval(() => {
+      this.checkAll({ pingEveryMs }).catch((e) => this.log.error?.("telegram watchdog failed", e?.message));
+    }, intervalMs);
+    this.watchdogTimer.unref?.();
+  }
+
+  stopWatchdog() {
+    if (this.watchdogTimer) clearInterval(this.watchdogTimer);
+    this.watchdogTimer = null;
+  }
+
+  summary() {
+    let connected = 0;
+    for (const s of this.sessions.values()) if (s.status === "connected") connected++;
+    return { sessions: this.sessions.size, connected };
   }
 
   async restoreAll() {
@@ -348,8 +493,13 @@ export class TelegramUserManager {
       try {
         await this.connect(id, JSON.parse(meta).callback);
         n++;
-      } catch {
-        /* skip broken session */
+      } catch (e) {
+        // wave 62: never dropped — the session stays in the list as "reconnecting" and the watchdog keeps trying
+        const cur = this.sessions.get(id);
+        if (cur) {
+          cur.status = "reconnecting";
+          cur.error = e?.message ?? "restore_failed";
+        }
       }
     }
     return n;
