@@ -478,6 +478,19 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
       if (openerPick) openerLine = `\n\n${openerInstruction(openerPick.text)}`;
     }
   }
+  // wave 63 — social intelligence: mood trend, sensitive moments, time (Shabbat / holidays / night), knowledge gaps.
+  // Silent: on any problem the prompt is exactly what it was before.
+  let socialSection = "";
+  let socialFlags = { noSelling: false, noEmoji: false };
+  try {
+    const { socialBrief } = await import("./social-intel-core");
+    const { similarity } = await import("./intelligence");
+    const sb = socialBrief({ history, text: lastIn, facts: factsText({ instructions: agent.instructions as string, profile: profile as Record<string, unknown> }), tz: sched?.tz, lang: replyLocale, similarity });
+    if (sb.text) socialSection = `\n\n${sb.text}`;
+    socialFlags = { noSelling: sb.noSelling, noEmoji: sb.noEmoji };
+  } catch {
+    /* never blocks the reply */
+  }
   // wave 7 — business profile, goal, sales method and tools (lead capture, buttons, share-phone)
   const system = `${baseInstructions}\n\n${salesAgentInstructions({
     profile: (agent.profile as AgentProfile | null) ?? null,
@@ -485,7 +498,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     channel: ch,
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
     locale,
-  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}\n\n${actionsSection}\n\n${salesSection}${openerLine}`;
+  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}\n\n${actionsSection}\n\n${salesSection}${socialSection}${openerLine}`;
   void typingIndicator(orgId, ch, conv.external_id as string); // speed upgrade: never waited for (the typing loop already runs)
   // wave 16: help-center answers (knowledge base) for this question
   let kb = "";
@@ -581,7 +594,15 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     const previous = history.filter((m) => m.role === "assistant").map((m) => m.content);
     const first = parseAgentTools(answer);
     const check = checkReply({ reply: first.text, facts, previousAssistant: previous, allowEmpty: first.handoff, customerText: lastIn });
-    if (!check.ok) {
+    // wave 63: extra checks (invented discount / warranty / response time, robotic wording, wrong language, emoji or selling to an upset customer)
+    let extraIssues: import("./reply-quality-core").QualityIssue[] = [];
+    try {
+      const { qualityIssues } = await import("./reply-quality-core");
+      extraIssues = qualityIssues({ reply: first.text, customerText: lastIn, facts, mood: analysis.mood, customerLang: analysis.lang, careful: socialFlags.noEmoji });
+    } catch {
+      /* the original check still runs */
+    }
+    if (!check.ok || extraIssues.length) {
       // speed upgrade: the correction gets a time budget (AI_SELF_CHECK_MS, default 7s); after it the
       // checked first answer is used (invented prices are still removed below)
       const fixed = await withSoftDeadline(
@@ -592,7 +613,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
           provider: agent.provider as "openai" | "anthropic" | "gemini",
           model: agent.model as string,
           system,
-          messages: [...history, { role: "assistant", content: answer.trim() || "(no answer)" }, { role: "user", content: correctionPrompt(check) }],
+          messages: [...history, { role: "assistant", content: answer.trim() || "(no answer)" }, { role: "user", content: await (async () => { try { const { combinedCorrectionPrompt } = await import("./reply-quality-core"); return combinedCorrectionPrompt(correctionPrompt(check), extraIssues, analysis.lang ?? replyLocale); } catch { return correctionPrompt(check); } })() }],
           temperature: Math.min(0.5, Number(agent.temperature ?? 0.4) + 0.1),
           maxTokens: ch === "email" ? 1200 : 600,
         }),
@@ -604,7 +625,14 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
       if (fixed.ok) {
         const fixedMarkers = parseActionMarkers(fixed.text);
         const again = checkReply({ reply: parseAgentTools(fixedMarkers.text).text, facts, previousAssistant: previous, allowEmpty: parseAgentTools(fixedMarkers.text).handoff, customerText: lastIn });
-        if (again.ok || again.issues.length < check.issues.length) {
+        let extraAfter = extraIssues;
+        try {
+          const { qualityIssues } = await import("./reply-quality-core");
+          extraAfter = qualityIssues({ reply: parseAgentTools(fixedMarkers.text).text, customerText: lastIn, facts, mood: analysis.mood, customerLang: analysis.lang, careful: socialFlags.noEmoji });
+        } catch {
+          /* keep the old comparison */
+        }
+        if ((!check.ok && (again.ok || again.issues.length < check.issues.length)) || (check.ok && again.ok && extraAfter.length < extraIssues.length)) {
           answer = fixedMarkers.text;
           if (fixedMarkers.actions.length) actionMarkers = fixedMarkers;
         }
@@ -616,6 +644,17 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   }
   const tools = parseAgentTools(answer);
   if (unsupportedLeft.length) tools.text = dropUnsupportedSentences(tools.text, unsupportedLeft);
+  // wave 63: last line of defence for a discount percentage the business never gave
+  try {
+    const { inventedPercents } = await import("./reply-quality-core");
+    const badPct = inventedPercents(tools.text, factsText({ instructions: agent.instructions as string, profile: profile as Record<string, unknown> }), lastIn);
+    if (badPct.length) {
+      const cleaned = dropUnsupportedSentences(tools.text, badPct);
+      if (cleaned.trim()) tools.text = cleaned;
+    }
+  } catch {
+    /* the reply goes out as it was */
+  }
   // wave 57: a control line the parsers did not recognise ("[[FOLLOW-UP …]]", "[[TASK - …]]") is never shown to the customer
   {
     const { stripStrayMarkers } = await import("./autopilot-heal");
@@ -746,6 +785,10 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
         return [] as string[];
       });
   }
+  // wave 63: what the conversation showed (objections, preferences, interests) becomes customer memory — best effort
+  void import("./customer-insight")
+    .then((m) => m.rememberFromConversation({ orgId, contactId: lead?.contact_id ?? ((conv.contact_id as string | null) ?? null), conversationId: conv.id as string, history }))
+    .catch(() => undefined);
   // wave 55 — move the funnel state forward from what really happened in this turn (CRM synced)
   try {
     const { nextSalesState } = await import("./sales-state-core");
@@ -842,7 +885,11 @@ export async function forwardAfterAutopilot(conversationId: string, res: Autopil
     }
     if (res.replied && res.text) await forwardToTeam(orgId, "messages", { ...base, agentText: res.text });
     if (res.leadData && (res.leadData.name || res.leadData.phone || res.leadData.email)) await forwardToTeam(orgId, "leads", { ...base, lead: res.leadData });
-    if (res.handoff) await forwardToTeam(orgId, "handoff", { ...base, reason: res.reason ?? null });
+    if (res.handoff) {
+      // wave 63: the person who takes over gets a ready summary (silent: without it the update looks as before)
+      const summary = await import("./handoff-summary").then((m) => m.loadHandoffSummary(conversationId, "he", res.reason ?? null)).catch(() => null);
+      await forwardToTeam(orgId, "handoff", { ...base, reason: res.reason ?? null, ...(summary ? { summary } : {}) });
+    }
     // wave 16: urgent phone call to the on-duty team member — hot lead / angry customer / asked for a person
     if (res.handoff) {
       const { data: hot } = await admin.from("conversations").select("lead_score").eq("id", conversationId).maybeSingle();

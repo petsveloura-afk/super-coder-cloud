@@ -19,6 +19,8 @@ export interface NotifyPayload {
   agentName?: string | null;
   lead?: { name?: string; phone?: string; email?: string; need?: string; budget?: string; score?: string; summary?: string } | null;
   reason?: string | null;
+  /** wave 63: ready summary for the person who takes over (handoff only) */
+  summary?: string | null;
   link?: string | null;
 }
 
@@ -60,6 +62,7 @@ export function notifyText(event: NotifyEvent, p: NotifyPayload, opts: { short?:
     lines.push(`🙋 נדרש נציג · ${p.orgName}${ch}`);
     lines.push(`👤 ${who}${p.reason ? ` · ${clip(p.reason, 80)}` : ""}`);
     if (p.customerText) lines.push(`💬 ${clip(p.customerText, max)}`);
+    if (p.summary && !opts.short) lines.push(`📋 ${clip(p.summary, 900)}`);
   } else {
     lines.push(`📊 ${p.orgName}`);
     if (p.agentText) lines.push(clip(p.agentText, max));

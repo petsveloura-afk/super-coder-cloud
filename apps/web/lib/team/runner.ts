@@ -673,7 +673,10 @@ async function runInitiative(orgId: string, tz: string) {
   const a = db();
   const day = new Date().toLocaleDateString("en-CA", { timeZone: tz || "Asia/Jerusalem" });
   const all = (await members(orgId)).filter((m) => m.status === "active");
-  const proposals = initiatives(await signals(orgId, tz), day);
+  const sig = await signals(orgId, tz);
+  // wave 63: + the business radar (hot leads, lead surge, money in dormant deals / overdue debts); topics the initiatives already cover are not created twice
+  const radar = await import("./business-radar").then((m) => m.radarInitiatives(orgId, tz, day, sig)).catch(() => []);
+  const proposals = [...initiatives(sig, day), ...radar];
   for (const p of proposals) {
     const key = `init-${p.key.split(":")[0]}-${day.replace(/-/g, "")}`.slice(0, 40);
     const { count } = await a.from("team_tasks").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("plan_key", key);
