@@ -18,6 +18,9 @@ export interface ToolFailure {
 
 export function classifyToolFailure(error: string | null | undefined): ToolFailure {
   const e = (error ?? "").toLowerCase();
+  // the AI engines themselves (busy, resting, empty answer) are a temporary problem that heals by itself — never "missing data" or "bug"
+  if (/ai_not_configured|ai\.notconfigured/.test(e)) return { kind: "missing_connection", code: "tool_needs_connection", needsConnection: true, retryable: false };
+  if (/ai_all_|ai_failed|ai\.failed|ai_busy|ai\.busy|empty_answer|empty answer|all engines|ai\.self_check|ai\.empty_retry/.test(e)) return { kind: "temporary", code: "tool_temporary", needsConnection: false, retryable: true };
   if (/not_connected|no_connection|not connected|channel_not|no_channel|integration|oauth|token (expired|invalid)|not_sent_guard_or_channel|permission|forbidden|unauthori[sz]ed|\b40[13]\b|missing_scope|no_pipeline_access|needs_connection/.test(e)) return { kind: "missing_connection", code: "tool_needs_connection", needsConnection: true, retryable: false };
   if (/not_found|no_pipeline|no_data|no_contact|nothing_to_change|empty|no_site|no_posts|missing_data|no_employee_with_role/.test(e)) return { kind: "missing_data", code: "tool_missing_data", needsConnection: false, retryable: false };
   if (/timeout|network|fetch failed|econn|etimedout|temporar|rate|429|5\d\d|busy|overload|deadlock|slot_taken/.test(e)) return { kind: "temporary", code: "tool_temporary", needsConnection: false, retryable: true };

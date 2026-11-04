@@ -3,6 +3,7 @@
 import { Activity, CircleAlert, CircleCheck, CircleX } from "lucide-react";
 import { useI18n } from "@/lib/i18n/client";
 import { Badge, Card, Ltr } from "@/components/ui/primitives";
+import { humanModelErrorKey } from "@/lib/team/model-health-core";
 import type { TeamHealthData } from "./types";
 
 /**
@@ -38,7 +39,7 @@ export function HealthPanel({ health }: { health: TeamHealthData }) {
                 <Ltr className="font-mono">{m.key}</Ltr>
                 <Badge tone={m.circuit === "closed" ? "success" : m.circuit === "open" ? "danger" : "warning"}>{t(`aiTeam.health.circuit.${m.circuit}`)}</Badge>
                 {m.circuit === "open" ? <span className="text-muted">{Math.max(1, Math.round(m.openForMs / 60_000))} {t("aiTeam.health.minutes")}</span> : null}
-                {m.lastError ? <Ltr className="truncate text-muted">{m.lastError}</Ltr> : null}
+                {m.lastError && m.circuit !== "closed" ? <span className="truncate text-muted">{t(`aiTeam.health.err.${humanModelErrorKey(m.lastError)}`)}</span> : null}
               </li>
             ))}
           </ul>

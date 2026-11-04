@@ -16,6 +16,11 @@ export const maxDuration = 60;
  */
 let running = false;
 let lastSchedules = 0;
+// the AI team and the AI agents run in their own lane so a long team run never delays a customer's answer
+let teamLaneRunning = false;
+let lastWatchdog = 0;
+let lastTeam = 0;
+let lastAgents = 0;
 
 export async function POST(request: NextRequest) {
   const raw = await request.text();
@@ -36,9 +41,40 @@ export async function POST(request: NextRequest) {
         lastSchedules = Date.now();
         await import("@/lib/conversations/scheduler").then((m) => m.runDueSchedules(10_000)).catch(() => null);
       }
+      // stuck chats (no answer for minutes) are retried and then handed to a person — every minute, not only when GitHub wakes up
+      if (Date.now() - lastWatchdog > 55_000) {
+        lastWatchdog = Date.now();
+        await import("@/lib/ai/watchdog").then((m) => m.runStuckWatchdog(12_000)).catch((e) => console.error("tick: watchdog failed", (e as Error).message));
+      }
     } finally {
       running = false;
     }
   });
+  // AI team clock + AI agents: GitHub's schedule alone left them asleep for long stretches, so the heartbeat drives them too
+  // (same database lock as the cron routes — a heartbeat run and a cron run never overlap)
+  if (!teamLaneRunning) {
+    teamLaneRunning = true;
+    after(async () => {
+      try {
+        const { runLockedJob } = await import("@/lib/ops/job-runs");
+        if (Date.now() - lastTeam > 55_000) {
+          lastTeam = Date.now();
+          await runLockedJob("team", async () => {
+            const { teamTick } = await import("@/lib/team/runner");
+            return teamTick(30_000);
+          }).catch((e) => console.error("tick: team clock failed", (e as Error).message));
+        }
+        if (Date.now() - lastAgents > 115_000) {
+          lastAgents = Date.now();
+          await runLockedJob("agents", async () => {
+            const { runAgentsCron } = await import("@/lib/agents/run");
+            return runAgentsCron(25_000);
+          }).catch((e) => console.error("tick: agents failed", (e as Error).message));
+        }
+      } finally {
+        teamLaneRunning = false;
+      }
+    });
+  }
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }

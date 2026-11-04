@@ -198,8 +198,15 @@ async function main() {
   // optional heartbeat: faster e-mail reading + automation jobs
   const cron = process.env.CRON_SECRET ?? "";
   if (appUrl && cron) {
+    let beats = 0;
     const tick = async () => {
-      for (const p of ["/api/channels/email/poll", "/api/jobs/dispatch", "/api/ai/followups"]) {
+      beats++;
+      // the AI team clock and the AI agents run every 2nd / 3rd minute here too (they hold a database lock, so a
+      // GitHub run and this one never overlap) — the schedule of GitHub alone can be hours late
+      const paths = ["/api/channels/email/poll", "/api/jobs/dispatch", "/api/ai/followups"];
+      if (beats % 2 === 0) paths.push("/api/cron/team");
+      if (beats % 3 === 0) paths.push("/api/cron/agents");
+      for (const p of paths) {
         try {
           await fetch(`${appUrl}${p}`, { method: "POST", headers: { Authorization: `Bearer ${cron}` }, signal: AbortSignal.timeout(55_000) });
         } catch {

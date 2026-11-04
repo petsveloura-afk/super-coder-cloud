@@ -6990,6 +6990,15 @@
         "open": "Skipped for now",
         "half_open": "Being tested"
       },
+      "err": {
+        "rate": "Busy or rate-limited — retried automatically",
+        "quota": "Quota used up — switching to another engine",
+        "model": "Model unavailable right now — switching to another engine",
+        "auth": "Invalid or blocked key",
+        "server": "Temporary provider problem",
+        "empty": "Empty answer received",
+        "unknown": "Temporary problem"
+      },
       "minutes": "min",
       "failures": "Latest failures",
       "noFailures": "No failures in the last 24 hours.",

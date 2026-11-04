@@ -62,11 +62,18 @@ export function recordResult(state: HealthState, key: string, ok: boolean, now: 
 
 export type CircuitState = "closed" | "open" | "half_open";
 
+/** a probe window nobody used for this long is over: the model shows as healthy again instead of "checking" forever */
+export const HALF_OPEN_STALE_MS = 20 * 60_000;
+
 export function circuitOf(state: HealthState, key: string, now: number): CircuitState {
   const e = state[key];
   if (!e || e.openUntil === 0) return "closed";
-  return e.openUntil > now ? "open" : "half_open";
+  if (e.openUntil > now) return "open";
+  return now - e.openUntil > HALF_OPEN_STALE_MS ? "closed" : "half_open";
 }
+
+/** old versions wrote the routing note "fallback_used" as if it were a failure of the first engine — never a real error */
+export const LEGACY_NOT_AN_ERROR = /^(fallback_used|fallback|ai\.fallback_used)$/i;
 
 /**
  * Reorders a route: healthy models first (original order kept), then half-open probes, then open ones LAST — so when
@@ -107,7 +114,23 @@ export function cleanHealth(raw: unknown): HealthState {
     if (!/^[a-z]{2,20}\/[A-Za-z0-9._:/@-]{2,100}$/.test(k) || !v || typeof v !== "object") continue;
     const e = v as Record<string, unknown>;
     const n = (x: unknown) => (typeof x === "number" && Number.isFinite(x) && x >= 0 ? x : 0);
-    out[k] = { fails: n(e.fails), trips: n(e.trips), openUntil: n(e.openUntil), lastError: typeof e.lastError === "string" ? e.lastError.slice(0, 160) : null, lastFailAt: n(e.lastFailAt), lastOkAt: n(e.lastOkAt), total: n(e.total), failed: n(e.failed) };
+    const entry: HealthEntry = { fails: n(e.fails), trips: n(e.trips), openUntil: n(e.openUntil), lastError: typeof e.lastError === "string" ? e.lastError.slice(0, 160) : null, lastFailAt: n(e.lastFailAt), lastOkAt: n(e.lastOkAt), total: n(e.total), failed: n(e.failed) };
+    // a state written by the old bookkeeping bug: not a failure — the model is simply healthy
+    if (entry.lastError && LEGACY_NOT_AN_ERROR.test(entry.lastError)) Object.assign(entry, { lastError: null, fails: 0, trips: 0, openUntil: 0 });
+    out[k] = entry;
   }
   return out;
+}
+
+/** the i18n key (aiTeam.health.err.*) that explains a raw engine error to a person — no codes like "fallback_used" on screen */
+export function humanModelErrorKey(error: string | null | undefined): string {
+  const e = String(error ?? "");
+  if (!e || LEGACY_NOT_AN_ERROR.test(e)) return "unknown";
+  if (/empty/i.test(e)) return "empty";
+  if (/quota|daily|per ?day|no free quota|resource_exhausted/i.test(e)) return "quota";
+  if (/429|rate|busy|overload|limit/i.test(e)) return "rate";
+  if (/404|not found|not available|does not exist|not supported|model_not_found|no endpoints/i.test(e)) return "model";
+  if (/401|403|api key|unauthor|permission|invalid key/i.test(e)) return "auth";
+  if (/5\d\d|timeout|aborted|fetch failed|econn|server/i.test(e)) return "server";
+  return "unknown";
 }

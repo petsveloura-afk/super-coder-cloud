@@ -527,6 +527,20 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
         if (quiet.replied) return quiet;
       }
     }
+    // the customer is owed a real AI answer, not a template: a few quiet retries (the typing indicator keeps running)
+    // come BEFORE any "on it" message, and the template is only sent when the engines stay unavailable for ~25 seconds
+    {
+      const quietUntil = Date.now() + 25_000;
+      let wait = (out as { retryInMs?: number | null }).retryInMs ?? null;
+      for (let q = 0; q < 3 && Date.now() < quietUntil; q++) {
+        const pause = Math.min(Math.max(typeof wait === "number" ? wait : 5_000, 3_000), 10_000);
+        if (Date.now() + pause > quietUntil + 2_000) break;
+        await sleep(pause);
+        const quietAgain = await handleInboundWithAI({ conversationId: conv.id as string, retry: true, quietRetry: true });
+        if (quietAgain.replied || quietAgain.reason === "already_answered" || quietAgain.reason === "human_mode" || quietAgain.reason?.startsWith("guard:")) return quietAgain;
+        wait = null;
+      }
+    }
     await admin.from("conversations").update({ ai_note: "ai_busy", ai_note_at: new Date().toISOString() }).eq("id", conv.id).then(() => undefined, () => undefined);
     // wave 9: at most ONE "on it" message per conversation every 15 minutes
     const { data: recentHold } = await admin
