@@ -151,7 +151,9 @@ export async function orderForTick<T extends { id: string; assignee_id?: string 
     if (service.size) list = [...list.filter((t) => t.assignee_id && service.has(t.assignee_id)), ...list.filter((t) => !(t.assignee_id && service.has(t.assignee_id)))];
     if (prioritize) {
       try {
-        const p = prioritize(list);
+        // wave 64: the priority hook orders WITHIN each group, so the waiting-customers queue still comes first
+        const isService = (t: T) => !!(t.assignee_id && service.has(t.assignee_id));
+        const p = service.size ? [...prioritize(list.filter(isService)), ...prioritize(list.filter((t) => !isService(t)))] : prioritize(list);
         if (Array.isArray(p) && p.length === list.length) list = p;
       } catch {
         /* the priority hook never blocks the clock */

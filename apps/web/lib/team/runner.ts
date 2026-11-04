@@ -762,7 +762,12 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
     const { data: org } = await a.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
     const tz = (org?.timezone as string) || "Asia/Jerusalem";
     await resumeHeldTasks(orgId).catch(() => 0);
-    const { data: tasks } = await a.from("team_tasks").select("id, status, depends_on, priority").eq("organization_id", orgId).in("status", ["pending", "done", "failed", "canceled", "in_progress", "awaiting_approval", "awaiting_input", "blocked"]).gte("updated_at", new Date(Date.now() - 30 * 86_400_000).toISOString()).order("priority").limit(500);
+    // wave 64: the tick also reads title / age / due date / origin / owner so the queue can be ordered by real importance;
+    // if that read fails for any reason, the original narrow read below runs exactly as before
+    const tickSince = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const tickStatuses = ["pending", "done", "failed", "canceled", "in_progress", "awaiting_approval", "awaiting_input", "blocked"];
+    const wide = await a.from("team_tasks").select("id, status, depends_on, priority, title, created_at, due_at, origin, depth, assignee_id").eq("organization_id", orgId).in("status", tickStatuses).gte("updated_at", tickSince).order("priority").limit(500);
+    const tasks: unknown[] | null = wide.error ? ((await a.from("team_tasks").select("id, status, depends_on, priority").eq("organization_id", orgId).in("status", tickStatuses).gte("updated_at", tickSince).order("priority").limit(500)).data as unknown[] | null) : (wide.data as unknown[] | null);
     const { ready, blocked } = readyTasks((tasks ?? []) as { id: string; status: string; depends_on: string[] }[]);
     for (const b of blocked) {
       await a.from("team_tasks").update({ status: "blocked", error: "dependency_failed", updated_at: new Date().toISOString() }).eq("id", b.id).eq("status", "pending");
@@ -793,7 +798,7 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
         /* optional */
       }
     }
-    const toRun = plus8 ? await plus8.orderForTick(orgId, ready as ((typeof ready)[number] & { assignee_id?: string | null })[], 3, (xs) => prioritizeTasks(xs)) : ready.slice(0, 3);
+    const toRun = plus8 ? await plus8.orderForTick(orgId, ready as ((typeof ready)[number] & { assignee_id?: string | null })[], 3, (xs) => prioritizeTasks(xs, { board: (tasks ?? []) as { id: string; status: string; depends_on: string[] }[] })) : ready.slice(0, 3);
     for (const t of toRun) {
       if (Date.now() - started > budgetMs - 15_000) break;
       const r = await runTask(orgId, t.id, { interactive: false, actorUser: null });

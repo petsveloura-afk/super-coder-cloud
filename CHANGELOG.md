@@ -1,5 +1,15 @@
 # Changelog
 
+## גל 64 — Wave 64: a smarter AI team (queue order, role fit, briefing, inbound guard, harmony) — 2026-11-04
+
+- **Queue order (`team-intel-core.ts`, `plus8b-hooks.ts → prioritizeTasks`):** the stub that returned the tasks unchanged is now a real, stable ordering: owner priority, overdue / due-soon, age (no starvation), owner-asked and colleague-waiting work, customers waiting, and what unblocks other tasks. The waiting-customers queue still comes first (the order is applied inside each group in `runner-plus8.ts → orderForTick`).
+- **Briefing before every task (`team-intel.ts`, `plus8b-hooks.ts → preTask`):** time awareness (Shabbat / holiday only for customer sends), role boundary, colleagues' open work (no duplicates), urgency, bulk-send rule, the role's definition of "done", and a live roster for manager / team lead / coordinator. It only adds context; it never blocks.
+- **Roster assessment:** each employee is judged in its own role (load, 30-day success, approvals); fewer than 3 finished tasks = "new", never "bad".
+- **Inbound guard (`plus8b-hooks.ts → guardInbound`):** hidden characters, fake `<<<` markers and control tags are neutralised and instruction-like text is labelled; normal text is returned unchanged.
+- **Harmony (`plus8b-hooks.ts → dailyTick`):** pending tasks nobody owns (they used to stop with `no_assignee`) go to the fitting role; unstarted work moves off an overloaded employee to a free colleague with the same role. Never the owner's own assignments; at most 3 changes, at most every 20 minutes per business; each change is logged.
+- **`runner.ts`:** the tick also reads title / dates / origin / owner; on any error the original narrow read runs unchanged.
+- **Tests:** `tests/unit/wave64-team-intel.test.ts` (31 tests). No existing test was changed. No migrations, no new environment variables.
+
 ## שדרוג 8, שלב ב (ב3–ב7) — Upgrade 8, stage B (B3–B7): job descriptions and department meetings added (B5–B6; B7 follows) — 2026-11-05
 
 - **B5 — job descriptions and the employee card (`job-profile-core.ts`, `employee-card.tsx`, `org-actions.ts`):** every employee has a job description in he / en / ar (responsibilities, authority, what is forbidden, the procedures that are theirs), derived from the role and the department; the owner may adapt the wording per employee (`team_job_profiles`, migration `20261105000012`). **Text only:** it grants no tool and changes no approval rule; the universal prohibitions (no customer contact / money / irreversible action without the owner, no invented facts, no leaking keys or payment details) are in every profile and an owner override can only ADD to the forbidden list. The card shows the department, the profile, the real success rate and average time from the employee's own finished tasks (with a "small sample" label under 5), open tasks, load and procedures. The change shows at once and is undone with a message if the server refuses.
