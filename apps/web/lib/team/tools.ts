@@ -29,9 +29,31 @@ export async function automatedContactIds(orgId: string, ids: (string | null)[])
   const list = [...new Set(ids.filter((x): x is string => Boolean(x)))].slice(0, 300);
   const out = new Set<string>();
   if (!list.length) return out;
-  const { data } = await createAdminClient().from("contacts").select("id, first_name, last_name, email, company_name").eq("organization_id", orgId).in("id", list);
-  for (const c of (data ?? []) as { id: string; first_name: string | null; last_name: string | null; email: string | null; company_name: string | null }[]) {
+  const { data } = await createAdminClient().from("contacts").select("id, first_name, last_name, email, company_name, phone").eq("organization_id", orgId).in("id", list);
+  const rows = (data ?? []) as { id: string; first_name: string | null; last_name: string | null; email: string | null; company_name: string | null; phone?: string | null }[];
+  for (const c of rows) {
     if (isAutomatedSender({ email: c.email, name: `${c.first_name ?? ""} ${c.last_name ?? ""}`, company: c.company_name })) out.add(c.id);
+  }
+  // wave 67: the Telegram service account and one-time login / verification code messages are robots too (fails silent → exactly the set above)
+  try {
+    const extra = await import("./automated-extra-core");
+    for (const c of rows) {
+      if (!out.has(c.id) && extra.isTelegramServiceContact({ name: `${c.first_name ?? ""} ${c.last_name ?? ""}`, phone: c.phone ?? null, company: c.company_name })) out.add(c.id);
+    }
+    const rest = list.filter((id) => !out.has(id)).slice(0, 100);
+    if (rest.length) {
+      const adm = createAdminClient();
+      const { data: convs } = await adm.from("conversations").select("id, contact_id").eq("organization_id", orgId).in("contact_id", rest).limit(300);
+      const convRows = (convs ?? []) as { id: string; contact_id: string | null }[];
+      if (convRows.length) {
+        const { data: msgs } = await adm.from("messages").select("conversation_id, body, created_at").eq("organization_id", orgId).eq("direction", "in").in("conversation_id", convRows.map((c) => c.id)).order("created_at", { ascending: false }).limit(600);
+        const lastInbound = new Map<string, string>();
+        for (const m of (msgs ?? []) as { conversation_id: string; body: string | null }[]) if (!lastInbound.has(m.conversation_id)) lastInbound.set(m.conversation_id, m.body ?? "");
+        for (const id of extra.contactsWithOnlyCodeMessages(convRows, lastInbound)) out.add(id);
+      }
+    }
+  } catch {
+    /* optional extra detection — the result stays what it was */
   }
   return out;
 }

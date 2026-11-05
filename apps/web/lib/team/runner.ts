@@ -270,6 +270,18 @@ async function memoriesFor(orgId: string, memberId: string | null): Promise<Memo
 export async function writeMemories(orgId: string, memberId: string | null, items: { layer: "episodic" | "semantic"; kind: MemoryItem["kind"]; content: string; subject?: string | null; confidence: number; status: "active" | "proposed" }[]) {
   if (!items.length) return;
   const existing = await memoriesFor(orgId, memberId);
+  // wave 67: a gate in front of the write — empty text, "0 actions" results and exact repeats are not saved as active memory,
+  // assumptions are saved as "proposed". Adds nothing; any error → the memories are written exactly as they were passed in.
+  try {
+    const proposed = await db().from("team_memory").select("layer, kind, content, status").eq("organization_id", orgId).eq("status", "proposed").limit(200).then((r) => (r.data ?? []) as { layer: string; kind: string; content: string; status: string }[], () => []);
+    const { safeGateMemoryWrites } = await import("./memory-clean-core");
+    const gated = safeGateMemoryWrites(items, [...existing, ...proposed]);
+    if (gated.notes.length) await logActivity(orgId, null, memberId, "learn", `Memory gate: ${gated.notes.join(" ")}`, { gate: gated.notes }, true).catch(() => undefined);
+    items = gated.items;
+  } catch {
+    /* the gate is optional — nothing changes */
+  }
+  if (!items.length) return;
   for (const it of items) {
     const old = it.status === "active" ? supersededBy({ subject: it.subject ?? null, member_id: memberId, layer: it.layer }, existing) : [];
     const { data } = await db().from("team_memory").insert({ organization_id: orgId, member_id: memberId, layer: it.layer, kind: it.kind, subject: it.subject ?? null, content: it.content.slice(0, 2000), confidence: it.confidence, source: it.kind === "outcome" ? "agent" : "feedback", status: it.status, supersedes: old[0] ?? null, expires_at: it.layer === "episodic" ? new Date(Date.now() + 120 * 86_400_000).toISOString() : null }).select("id").single();

@@ -72,6 +72,10 @@ export interface MemoryView {
   confidence: number;
   status: string;
   created_at: string;
+  /** wave 67: how many identical rows were merged into this one (absent = 1) */
+  count?: number;
+  /** wave 67: the stored text before display translation (what an edit starts from) */
+  raw?: string;
 }
 
 export interface ActivityView {

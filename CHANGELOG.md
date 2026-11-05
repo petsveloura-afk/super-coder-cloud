@@ -1,5 +1,14 @@
 # Changelog
 
+## גל 67 — Wave 67: clean team memory (display translation, merged duplicates, robots out of the queue, write gate) — 2026-11-05
+
+- **Already there, not touched:** the automated-sender detection (`isAutomatedSender`, `isAutomatedSenderPlus`) and its use in the waiting-customers queue / `inbox.unanswered`, the title and log translation (`title-i18n-core.ts`), memory supersede by subject, the `proposed` status (the team reads only `active`).
+- **Display (`memory-clean-core.ts`, `page-data.ts`, `panels.tsx`, `types.ts`):** the memory tab shows the sentences the team writes itself in he / ar, identical rows merged into the newest one with ×N, empty / placeholder / expired rows hidden. The database is not changed; an edit starts from the stored text (`raw`).
+- **Queue (`automated-extra-core.ts`, `tools.ts → automatedContactIds`):** the Telegram service account (name or phone) and contacts whose every conversation ends with a one-time login / verification code message are treated as robots, so they leave "waiting customers" and `inbox.unanswered`. Fails silent → exactly the old set. A question or a long text is never a code.
+- **Write gate (`runner.ts → writeMemories`):** empty text, outcomes with 0 actions done and exact repeats are not saved as active memory; the "Assumptions: …" tail of an outcome is saved as a separate `proposed` item. The decision is written to the existing activity log (phase `learn`). Any error → the memories are written exactly as before. Nothing is deleted.
+- **Cause found:** task outcomes are written with `subject: null`, so the supersede-by-subject rule never applied and repeated tasks piled up identical rows; the gate stops new exact repeats (old rows stay, hidden by the display merge).
+- **Tests:** `tests/unit/wave67-memory-clean.test.ts` (40 tests). No existing test was changed. No migrations, no new environment variables, no dictionary keys.
+
 ## גל 66 — Wave 66: AI stability (provider health window, model hint by kind of work, live-before-background) — 2026-11-05
 
 - **Already there, not touched:** the router's per-key/model rests (`capRest`, `ai_provider_rests`), the circuit breaker (`model-health-core`), `guardRoute` / daily quotas (`stability-core`), the team's task-kind routing (`routing-core`), the interactive / background lanes and the paid engines (Anthropic, OpenAI) that already come last and only when a key is set. **No paid-fallback engine was added: it already exists.**

@@ -556,11 +556,14 @@ export function MemoryPanel({ data, onRefresh }: { data: TeamPageData; onRefresh
                 </Button>
               </div>
             ) : (
-              <p>{m.content}</p>
+              <p>
+                {m.content}
+                {m.count && m.count > 1 ? <span className="ms-1.5 text-[11.5px] text-subtle">×{m.count}</span> : null}
+              </p>
             )}
             {data.canManage ? (
               <div className="mt-1.5 flex flex-wrap gap-1">
-                <Button size="sm" variant="ghost" onClick={() => setEdit({ id: m.id, content: m.content })}>{t("common.edit")}</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEdit({ id: m.id, content: m.raw ?? m.content })}>{t("common.edit")}</Button>
                 {m.status !== "revoked" ? <Button size="sm" variant="ghost" onClick={() => op("revoke", { id: m.id })}>{t("aiTeam.mem.revoke")}</Button> : null}
                 <Button size="sm" variant="ghost" onClick={() => op("delete", { id: m.id })}>{t("common.delete")}</Button>
               </div>

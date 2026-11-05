@@ -122,6 +122,14 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     data.tasks = data.tasks.map((x) => ({ ...x, title: localizeTitle(x.title, lang8) }));
     data.activity = data.activity.map((x) => ({ ...x, summary: localizeLog(x.summary, lang8) }));
     data.members = data.members.map((m) => ({ ...m, working_on: m.working_on ? localizeTitle(m.working_on, lang8) : m.working_on }));
+    // wave 67: the memory tab in the business language, duplicates merged (×N), empty rows hidden — display only, the database is not changed
+    try {
+      const mc = await import("@/lib/team/memory-clean-core");
+      data.memory = mc.safeMemoryView(data.memory, lang8, { now, localize: (s) => localizeTitle(s, lang8) });
+      data.activity = data.activity.map((x) => ({ ...x, summary: mc.localizeGateSummary(x.summary, lang8) }));
+    } catch {
+      /* display clean-up is optional */
+    }
     const [skipped, { data: bad }, resp] = await Promise.all([
       opts.platformAdmin || opts.canManage ? p8.loadSkippedProviders(lang8) : Promise.resolve([]),
       a.from("team_tasks").select("id, title, status, error, updated_at").eq("organization_id", org).in("status", ["failed", "blocked", "requires_connection"]).gte("updated_at", new Date(now - 30 * 86_400_000).toISOString()).order("updated_at", { ascending: false }).limit(40),
