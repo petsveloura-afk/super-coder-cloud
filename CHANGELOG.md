@@ -1,5 +1,9 @@
 # Changelog
 
+## Fix: dialogs opened off-center (found by the CI browser tests) — 2026-11-06
+
+- The new dialog / menu open animation (2026-11-05 polish) animated the CSS `translate` property and kept its end value. Tailwind v4 centers dialogs with that same property, so every dialog lost its centering and its lower half (including the save button) was pushed below the screen — the E2E journeys that create a contact, a product, an agent, an automation… timed out. Reproduced locally (dialog box at y = 360 on a 720 px screen, "element is outside of the viewport"), fixed: the animations now only fade and zoom (`opacity` + `scale`), never touch `translate`, and keep nothing after they end (`backwards`). Verified: the same dialog is centered and the contact is created; a unit test guards it.
+
 ## AI video for posts (paid by credits), a copy coach for posts, campaign playbooks — 2026-11-06
 
 - **AI video from the post (new, optional, paid by credits):** a "סרטון AI" button in the post editor makes a short clip from what the post says. A video director (free text call) turns the post into one professional shot — the business's real subject (same 20-industry detection as the image director), a camera move per style (cinematic / lifestyle / product / luxury / energetic / calm / 3D), 9:16 / 1:1 / 16:9, 5–8 s, and strict "no text / logos / warped hands" rules. Engines (each optional, tried in order, the next one if one refuses): your own GPU server (ComfyUI with Wan 2.2 / LTX / Mochi behind a tiny wrapper — `VIDEO_SELFHOST_URL`), Replicate (`REPLICATE_API_TOKEN`, default Wan 2.2 fast), fal (`FAL_KEY`, default LTX-Video), Google Gemini Omni Flash / Veo (paid tier only, `AI_GEMINI_VIDEO=on`). Nothing is turned on until a key is added; without one the panel says so.

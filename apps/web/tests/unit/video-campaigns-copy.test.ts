@@ -210,3 +210,16 @@ describe("AI video — the still camera line never leaks into the motion prompt"
     expect(p).toContain("Lighting:");
   });
 });
+
+describe("polish — dialogs stay centered (found in CI E2E)", () => {
+  it("open animations never touch `translate` (Tailwind v4 centers dialogs with it) and keep nothing after they end", () => {
+    const css = read("app/globals.css");
+    for (const k of ["dlg-in", "ov-in", "pop-in"]) {
+      const kf = css.match(new RegExp(`@keyframes ${k} \\{[^\\n]*\\}`))?.[0] ?? "";
+      expect(kf, k).not.toBe("");
+      expect(kf, k).not.toContain("translate");
+      expect(css).toMatch(new RegExp(`animation: ${k} [^;]*backwards;`));
+    }
+    expect(read("components/ui/dialog.tsx")).toContain("sm:-translate-y-1/2");
+  });
+});

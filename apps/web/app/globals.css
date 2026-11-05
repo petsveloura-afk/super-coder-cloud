@@ -914,18 +914,19 @@ main[data-shell] [aria-busy="true"] { cursor: progress; }
 }
 
 /* ======================================================================== polish (additive): dialogs, buttons, menus
- * Dialogs and sheets open with a short rise + fade (individual translate / scale compose with the centering transform),
+ * Dialogs and sheets open with a short fade + zoom. Tailwind v4 centers dialogs with the `translate` property, so these
+ * animations never touch `translate` and keep nothing after they end (fill-mode backwards): the element's own position wins.
  * primary buttons lift a pixel on hover, secondary buttons tint toward the brand, menus and popovers fade in. */
 @media (prefers-reduced-motion: no-preference) {
-  [role="dialog"][data-state="open"].fixed { animation: dlg-in 0.24s cubic-bezier(0.2, 0.7, 0.1, 1) both; }
-  .fixed.inset-0[data-state="open"]:not([role="dialog"]) { animation: ov-in 0.2s ease both; }
+  [role="dialog"][data-state="open"].fixed { animation: dlg-in 0.22s cubic-bezier(0.2, 0.7, 0.1, 1) backwards; }
+  .fixed.inset-0[data-state="open"]:not([role="dialog"]) { animation: ov-in 0.2s ease backwards; }
   .btn-brand:hover:not(:disabled) { translate: 0 -1px; }
   .btn-press { transition-property: color, background-color, border-color, filter, transform, box-shadow, translate; }
-  [role="menu"][data-state="open"], [data-radix-popper-content-wrapper] > [data-state="open"] { animation: pop-in 0.16s cubic-bezier(0.2, 0.7, 0.1, 1) both; }
+  [role="menu"][data-state="open"], [data-radix-popper-content-wrapper] > [data-state="open"] { animation: pop-in 0.16s cubic-bezier(0.2, 0.7, 0.1, 1) backwards; }
 }
-@keyframes dlg-in { from { opacity: 0; translate: 0 16px; scale: 0.985; } to { opacity: 1; translate: 0 0; scale: 1; } }
-@keyframes ov-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes pop-in { from { opacity: 0; scale: 0.97; translate: 0 -4px; } to { opacity: 1; scale: 1; translate: 0 0; } }
+@keyframes dlg-in { from { opacity: 0; scale: 0.97; } }
+@keyframes ov-in { from { opacity: 0; } }
+@keyframes pop-in { from { opacity: 0; scale: 0.97; } }
 /* secondary / outline buttons answer the pointer with a hint of the brand colour */
 main[data-shell] button.border-line:hover:not(:disabled),
 main[data-shell] a.border-line:hover { border-color: color-mix(in oklab, var(--accent) 35%, var(--border)); }
