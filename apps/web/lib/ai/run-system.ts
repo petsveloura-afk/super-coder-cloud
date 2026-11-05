@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_MODELS, pickProvider, routerExtrasConfigured, type AIMessage, type AIProviderName } from "./providers";
 import { generateRouted, hedgePlan, RouterError } from "./router";
 import { hedgeDelayMs, hedged } from "./speed-core";
+import { hintForFeature } from "./task-hint-core";
 import type { AIOutcome } from "./run";
 
 /**
@@ -56,6 +57,8 @@ export async function runAISystem(input: {
       maxCalls: 12,
       // wave 55: team agents / insights / summaries use the background lane (live chats keep the fast engines)
       lane: (["autopilot", "voice", "kb", "vision", "transcribe"].includes(input.feature) ? "interactive" : "background") as "interactive" | "background",
+      // wave 66: kind-of-work hint for the MODEL inside a provider; a team routeProvider/routeModel (explicit choice) always wins
+      hint: input.routeProvider ? null : hintForFeature(input.feature),
     };
     // speed upgrade — live conversations (chat, phone, help-center answers): when the main engine is
     // slow, a second configured engine starts in parallel after AI_HEDGE_MS (default 6s); first answer wins

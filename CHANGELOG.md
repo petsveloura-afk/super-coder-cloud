@@ -1,5 +1,14 @@
 # Changelog
 
+## גל 66 — Wave 66: AI stability (provider health window, model hint by kind of work, live-before-background) — 2026-11-05
+
+- **Already there, not touched:** the router's per-key/model rests (`capRest`, `ai_provider_rests`), the circuit breaker (`model-health-core`), `guardRoute` / daily quotas (`stability-core`), the team's task-kind routing (`routing-core`), the interactive / background lanes and the paid engines (Anthropic, OpenAI) that already come last and only when a key is set. **No paid-fallback engine was added: it already exists.**
+- **Provider health window (`provider-health-core.ts`, `provider-health.ts`):** success and response time of each provider over the last 15 minutes, in this server's memory (no table). It only RE-RANKS the candidates: healthy and neutral first, shaky next, degraded (under 50% with at least 3 calls) last, original order kept inside each tier. It never removes an engine (that stays with the existing rests), a provider with fewer than 3 calls is neutral, and paid providers keep the positions they had.
+- **Model hint (`task-hint-core.ts`):** short work (`contact_summary`, `segment`, `transcribe`, `brief`) asks for the faster model of each provider first, heavy work (`insights`, `forecast`, `sales_manager`, `site_builder`) for the stronger one. Only the model order INSIDE a provider changes; never the provider, never the preferred provider, and a team `routeProvider` / `routeModel` switches the hint off.
+- **Live before background (`lane-gate-core.ts`, `lane-gate.ts`):** a live request registers and goes on at once; a background request steps aside for at most 3 seconds while live requests run, then goes on anyway (in this instance only; a lease that is never released expires after 35 seconds).
+- **`router.ts`, `run-system.ts`, `run.ts`:** additions only (a `hint` input field, three fail-silent helpers, one `lane` enter / release, one health note after each attempt, one `hint:` line per caller). Any error → the order that exists today.
+- **Tests:** `tests/unit/wave66-ai-stability.test.ts` (36 tests). No existing test was changed. No migrations, no new environment variables, no UI text.
+
 ## גל 65 — Wave 65: team resilience (busy engines, repeated queue task, honest goal status) — 2026-11-05
 
 - **Adaptive tick (`runner.ts`, `team-intel-core.ts → tickBudget`):** when several "engines busy" failures happened in the last 30 minutes the team clock starts 2, then 1, task per tick instead of 3, so a burst does not trip the providers' per-minute limits again. Any error → the usual 3.

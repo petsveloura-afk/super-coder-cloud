@@ -130,6 +130,39 @@ export class RouterError extends Error {
   }
 }
 
+/* ------------------------------------------------------------------ wave 66 (additive): provider health window + lane priority.
+ * Every helper is fail-silent: any error means "no change" and the router behaves exactly as before. */
+
+/** re-orders the candidates IN PLACE by the model hint and the last-15-minutes provider health (same items, never fewer) */
+async function tuneInPlace(cands: RouteCandidate[], preferred?: string | null, hint?: "fast" | "strong" | null): Promise<void> {
+  try {
+    const m = await import("./provider-health");
+    const out = m.tuneCandidates(cands, { preferred, hint });
+    if (out !== cands && out.length === cands.length) cands.splice(0, cands.length, ...out);
+  } catch {
+    /* keep the current order */
+  }
+}
+
+/** remembers how the last attempt went (success + response time) for the health window */
+function noteHealth(a: RouteAttempt | undefined): void {
+  if (!a) return;
+  void import("./provider-health").then(
+    (m) => m.noteAttempt({ provider: a.provider, ok: a.ok, ms: a.ms }),
+    () => undefined,
+  );
+}
+
+/** live requests register and go on at once; background requests step aside for at most a few seconds while live ones run */
+async function laneEnter(lane: "interactive" | "background"): Promise<() => void> {
+  try {
+    const m = await import("./lane-gate");
+    return await m.laneEnter(lane);
+  } catch {
+    return () => undefined;
+  }
+}
+
 /**
  * Routed generation. Throws RouterError (busy=true when every candidate is resting or
  * rate-limited — the caller shows a short "on it" message and retries later).
@@ -150,12 +183,17 @@ export async function generateRouted(input: {
   skipProviders?: string[];
   /** wave 55: background work walks the engines in the other direction (live chats keep the fast ones) */
   lane?: "interactive" | "background";
+  /** wave 66: kind-of-work hint for the choice of MODEL inside a provider (never the provider itself); null / missing = today's order */
+  hint?: "fast" | "strong" | null;
 }): Promise<RoutedResult & { attempts: RouteAttempt[] }> {
   const cands = laneOrder(
     buildCandidates({ preferred: input.preferred, model: input.model, env: process.env }).filter((c) => !(input.skipProviders ?? []).includes(c.provider)),
     input.lane ?? "interactive",
   );
   if (!cands.length) throw new RouterError("ai_not_configured", [], null, false);
+  // wave 66: background work may step aside (max 3s) for live requests; then the model hint + provider health re-rank the candidates
+  const lease = await laneEnter(input.lane ?? "interactive");
+  await tuneInPlace(cands, input.preferred, input.hint);
   const rests = await loadRests();
   const started = Date.now();
   // at least 8s: enough to fail over from a limited engine to the next one
@@ -180,17 +218,21 @@ export async function generateRouted(input: {
       const r = await callOne(c, { system: input.system, messages: input.messages, temperature: input.temperature ?? 0.4, maxTokens: input.maxTokens ?? 600, json: input.json }, Math.min(25_000, left));
       if (!r.text) {
         attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, reason: "empty answer" });
+        noteHealth(attempts[attempts.length - 1]);
         failedBy.set(c.provider, (failedBy.get(c.provider) ?? 0) + 1);
         onlyBusy = false;
         continue;
       }
       attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: true, ms: Date.now() - t0 });
+      noteHealth(attempts[attempts.length - 1]);
       clearRestsOf(c);
+      lease();
       return { ...r, provider: c.provider, attempts };
     } catch (e) {
       const msg = (e as Error).message ?? String(e);
       const cl = classifyError(msg);
       attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, reason: cl.reason });
+      noteHealth(attempts[attempts.length - 1]);
       console.error("ai router: candidate failed", c.provider, c.model, c.keyId, cl.kind, msg.slice(0, 240));
       if (cl.kind === "model") triedModelGone.add(`${c.provider}|${c.model}`);
       failedBy.set(c.provider, (failedBy.get(c.provider) ?? 0) + 1);
@@ -212,20 +254,25 @@ export async function generateRouted(input: {
         const r = await callOne(c, { system: input.system, messages: input.messages, temperature: input.temperature ?? 0.4, maxTokens: input.maxTokens ?? 600, json: input.json }, Math.max(4000, Math.min(20_000, left)));
         if (!r.text) {
           attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, reason: "empty answer (probe)" });
+          noteHealth(attempts[attempts.length - 1]);
           continue;
         }
         attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: true, ms: Date.now() - t0 });
+        noteHealth(attempts[attempts.length - 1]);
         clearRestsOf(c);
+        lease();
         return { ...r, provider: c.provider, attempts };
       } catch (e) {
         const msg = (e as Error).message ?? String(e);
         const cl = classifyError(msg);
         attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, reason: `${cl.reason} (probe)` });
+        noteHealth(attempts[attempts.length - 1]);
         if (cl.kind !== "rate" && cl.kind !== "daily" && cl.kind !== "server") onlyBusy = false;
         await rest(restKey(c, cl.scope), capRest(cl, process.env), `${cl.kind}: ${cl.reason}`);
       }
     }
   }
+  lease();
   const retryIn = soonestReady(cands, await loadRests());
   throw new RouterError(attempts.length ? `ai_all_failed:${attempts.map((a) => `${a.provider}/${a.model}:${a.reason}`).join(",").slice(0, 400)}` : "ai_all_resting", attempts, retryIn, onlyBusy || !attempts.length);
 }

@@ -3,6 +3,7 @@ import { limitErrorKey } from "@scc/shared/billing";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_MODELS, pickProvider, routerExtrasConfigured, type AIMessage, type AIProviderName } from "./providers";
 import { generateRouted, RouterError } from "./router";
+import { hintForFeature } from "./task-hint-core";
 
 export type AIFeature =
   | "contact_summary"
@@ -74,6 +75,8 @@ export async function runAI(input: {
       budgetMs: input.budgetMs ?? (input.feature === "site_builder" ? 55_000 : 30_000),
       // wave 55: more engines in the chain → more of them may be tried within the same time budget
       maxCalls: 12,
+      // wave 66: kind-of-work hint for the MODEL inside a provider (the chosen provider keeps its place)
+      hint: hintForFeature(input.feature),
     });
     await supabase.rpc("finalize_ai_usage", {
       p_usage_id: usageId,
