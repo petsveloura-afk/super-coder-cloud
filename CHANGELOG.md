@@ -1,5 +1,15 @@
 # Changelog
 
+## גל 69 — Wave 69: quality measurement (fixed scenarios, 👍/👎 on agent replies, resolution metrics) — 2026-11-05
+
+- **Already there, not touched:** `reply-quality-core.ts` (`qualityIssues`, correction prompts), `intelligence.ts` (`checkReply`), the team evals (`evals.ts`, `evals-plus7.ts`, `tests/unit/team-evals.test.ts`), the audit log (`audit_logs`).
+- **47 fixed scenarios (`lib/ai/quality-scenarios.ts`):** real-looking situations in Hebrew, English and Arabic (invented discount / warranty / response time, wrong language, emoji or selling to an upset customer, robotic wording, answer length, clean answers) run through the real checks with NO AI call; each states the exact set of issues expected.
+- **👍/👎 on the agent's replies (`reply-feedback-core.ts`, `inbox/feedback-actions.ts`, `components/inbox/reply-feedback.tsx`):** two small buttons under each reply the agent wrote (people who can reply in the inbox). Stored in the existing `audit_logs` (action `ai.reply_feedback`, one row per tap, the latest per person per message counts). No new table, no migration.
+- **Resolution metrics (`resolution-core.ts`, `resolution.ts`, `components/analytics/quality-section.tsx`):** on the analytics screen: tickets closed without a person, tickets where the customer asked the same thing again, and the 👍/👎 totals. From existing conversations and messages; no percentage under 5 agent tickets; any failure = no card.
+- **Texts:** new block `aiQuality.*` (12 keys) in he / en / ar.
+- **Tests:** `tests/unit/wave69-quality.test.ts`.
+- **Safety:** additions only; the inbox message query and every existing line are unchanged (diff: 0 lines removed).
+
 ## גל 68 — Wave 68: transparency (one clear failure reason, today's health card) — 2026-11-05
 
 - **Already there, not touched:** `classifyFailure` / `classifyToolFailure` / `explainToolFailure` / `reasonCode`, the failure reasons on the team health screen (`aiTeam.health.reason.*`), the team health card (`HealthPanel`: verdict, skipped models, latest failures), the provider health window of wave 66 (`healthRows`).

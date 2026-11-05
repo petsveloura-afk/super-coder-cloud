@@ -7251,5 +7251,23 @@
         "split": "By department"
       }
     }
+  },
+  "aiQuality": {
+    "feedback": {
+      "label": "Rate the agent's reply",
+      "up": "Good reply",
+      "down": "Not a good reply",
+      "saved": "Rating saved"
+    },
+    "card": {
+      "title": "Agent quality",
+      "window": "Last {days} days",
+      "closedAlone": "Tickets closed without a person",
+      "repeat": "Tickets where the customer asked the same thing again",
+      "ofConvs": "Out of {n} tickets the agent answered",
+      "rating": "Ratings of the agent's replies",
+      "ratingLine": "{up} good, {down} not good",
+      "notEnough": "Not enough tickets yet to measure"
+    }
   }
 }

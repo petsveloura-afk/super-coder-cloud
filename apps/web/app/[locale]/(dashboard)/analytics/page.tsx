@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 import { stageLabel } from "@/lib/labels";
 import { ScreenPulse } from "@/components/ui/screen-pulse";
+import { QualitySection } from "@/components/analytics/quality-section";
 import { analyticsPulse } from "@/lib/insights/screens-core";
 import { cn } from "@/lib/utils";
 
@@ -235,6 +236,7 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
           </>
         }
       />
+      <QualitySection orgId={ctx.org.id} locale={locale} days={days} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="analytics-kpis">
         {kpis.map((k) => (

@@ -1,4 +1,5 @@
 import { VoiceBubble } from "@/components/inbox/voice-bubble";
+import { ReplyFeedback } from "@/components/inbox/reply-feedback";
 import Link from "next/link";
 import { SalesStateBar } from "@/components/inbox/sales-state-bar";
 import { isSalesState, type SalesState } from "@/lib/ai/sales-state-core";
@@ -333,6 +334,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                       <p className="whitespace-pre-wrap break-words" dir="auto">
                         {(m.body as string) || (m.media ? "📎" : "")}
                       </p>
+                      {out && m.ai_agent_id && ctx.can("inbox.reply") ? <ReplyFeedback messageId={m.id as string} /> : null}
                       {typeof (m.meta as { transcript?: string } | null)?.transcript === "string" && (m.meta as { transcript: string }).transcript !== m.body ? (
                         <p className="mt-1 rounded-lg bg-surface/60 px-2 py-1 text-[12.5px] text-muted" dir="auto" data-testid="voice-transcript">
                           🎙️ {(m.meta as { transcript: string }).transcript}
