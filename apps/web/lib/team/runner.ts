@@ -21,6 +21,7 @@ import { isQuietHour, findDuplicateTask } from "./ops-core";
 import { redactSensitive, needsDoubleApproval } from "./safety-plus-core";
 import { buildIndex, candidatesFor, clientSubject } from "./memory-plus-core";
 import { guardInbound, guardOutbound, prioritizeTasks, preTask, dailyTick } from "./plus8b-hooks";
+import { tickBudget } from "./team-intel-core";
 
 /**
  * The digital team — server runner. Connects the pure engine to the database, the existing AI router (with
@@ -559,7 +560,7 @@ async function refreshGoal(orgId: string, goalId: string) {
   const failed = rows.filter((r) => r.status === "failed" || r.status === "blocked" || r.status === "requires_connection");
   const report = rows.map((r) => `${r.status === "done" ? "✅" : "⚠️"} ${r.title}: ${(r.result?.report ?? r.status).slice(0, 300)}`).join("\n");
   const synthesis = await synthesizeGoal(orgId, goal.assignee_id as string | null, goal.title as string, rows).catch(() => null);
-  await a.from("team_tasks").update({ status: failed.length === rows.length ? "failed" : "done", result: { ...((goal.result as Record<string, unknown>) ?? {}), report, ...(synthesis ? { summary: synthesis } : {}), done: rows.length - failed.length, failed: failed.length }, finished_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", goalId);
+  await a.from("team_tasks").update({ status: failed.length === rows.length ? "failed" : "done", result: { ...((goal.result as Record<string, unknown>) ?? {}), report, ...(synthesis ? { summary: synthesis } : {}), done: rows.length - failed.length, failed: failed.length, outcome: failed.length === 0 ? "complete" : failed.length === rows.length ? "failed" : "partial" }, finished_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", goalId);
   await logActivity(orgId, goalId, goal.assignee_id as string, "learn", `Goal finished: ${rows.length - failed.length}/${rows.length} tasks done.`, { failed: failed.length });
 }
 
@@ -798,7 +799,16 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
         /* optional */
       }
     }
-    const toRun = plus8 ? await plus8.orderForTick(orgId, ready as ((typeof ready)[number] & { assignee_id?: string | null })[], 3, (xs) => prioritizeTasks(xs, { board: (tasks ?? []) as { id: string; status: string; depends_on: string[] }[] })) : ready.slice(0, 3);
+    // wave 65: when the AI engines are visibly busy (several "busy" failures in the last 30 minutes) start fewer tasks per tick,
+    // so a burst of 3 at once does not trip the providers' per-minute limits again. Any error → the usual 3.
+    let perTick = 3;
+    try {
+      const { data: recent } = await a.from("team_tasks").select("error").eq("organization_id", orgId).in("status", ["failed", "blocked"]).gte("updated_at", new Date(Date.now() - 30 * 60_000).toISOString()).limit(30);
+      perTick = tickBudget(((recent ?? []) as { error: string | null }[]).map((x) => x.error), 3);
+    } catch {
+      perTick = 3;
+    }
+    const toRun = plus8 ? await plus8.orderForTick(orgId, ready as ((typeof ready)[number] & { assignee_id?: string | null })[], perTick, (xs) => prioritizeTasks(xs, { board: (tasks ?? []) as { id: string; status: string; depends_on: string[] }[] })) : ready.slice(0, perTick);
     for (const t of toRun) {
       if (Date.now() - started > budgetMs - 15_000) break;
       const r = await runTask(orgId, t.id, { interactive: false, actorUser: null });

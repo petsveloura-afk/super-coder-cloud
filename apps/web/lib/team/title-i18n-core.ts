@@ -19,6 +19,7 @@ const PHRASES: Record<string, Pair> = {
   "follow up with leads": { he: "מעקב אחרי לידים", ar: "متابعة العملاء المحتملين" },
   "reply to customers": { he: "מענה ללקוחות", ar: "الرد على العملاء" },
   "review campaign results": { he: "בדיקת תוצאות הקמפיין", ar: "مراجعة نتائج الحملة" },
+  "leads dropped sharply — find out why": { he: "ירידה חדה בלידים — לברר למה", ar: "انخفاض حاد في العملاء المحتملين — معرفة السبب" },
 };
 
 /** word lexicon for titles made of known words only */
@@ -29,10 +30,24 @@ const WORDS: Record<string, Pair> = {
 const norm = (s: string) => s.trim().replace(/[.!:;\s]+$/g, "").replace(/\s+/g, " ").toLowerCase();
 
 /** a display title in the business's language (unchanged when already in it, or when not recognized) */
+/** wave 64+: the daily initiative titles that carry a number (they are created by the insight rules in English) */
+const TITLE_RULES: { re: RegExp; he: (m: RegExpMatchArray) => string; ar: (m: RegExpMatchArray) => string }[] = [
+  { re: /^Reach (\d+) new lead\(s\) that got no reply$/i, he: (m) => `לפנות ל-${m[1]} לידים חדשים שלא קיבלו מענה`, ar: (m) => `التواصل مع ${m[1]} عملاء محتملين جدد لم يتلقوا ردًا` },
+  { re: /^Answer (\d+) negative review\(s\)$/i, he: (m) => `לענות על ${m[1]} ביקורות שליליות`, ar: (m) => `الرد على ${m[1]} مراجعات سلبية` },
+  { re: /^(\d+) conversation\(s\) waiting for an answer$/i, he: (m) => `${m[1]} שיחות שממתינות למענה`, ar: (m) => `${m[1]} محادثات بانتظار الرد` },
+  { re: /^Revive (\d+) stuck deal\(s\)$/i, he: (m) => `להחיות ${m[1]} עסקאות תקועות`, ar: (m) => `إحياء ${m[1]} صفقات متعثرة` },
+  { re: /^(\d+) overdue invoice\(s\)$/i, he: (m) => `${m[1]} חשבוניות באיחור`, ar: (m) => `${m[1]} فواتير متأخرة` },
+  { re: /^No post for (\d+) days$/i, he: (m) => `אין פוסט כבר ${m[1]} ימים`, ar: (m) => `لا يوجد منشور منذ ${m[1]} أيام` },
+];
+
 export function localizeTitle(title: string, lang: Lang): string {
   if (lang === "en" || !title || hasLocal(title) || !hasLatin(title)) return title;
   const p = PHRASES[norm(title)];
   if (p) return p[lang];
+  for (const r of TITLE_RULES) {
+    const m = title.trim().match(r.re);
+    if (m) return r[lang](m);
+  }
   const words = norm(title).replace(/[&,]/g, " ").split(" ").filter(Boolean);
   if (words.length && words.length <= 6 && words.every((w) => w in WORDS)) {
     const t = words.map((w) => WORDS[w]![lang]).filter(Boolean).join(" ");

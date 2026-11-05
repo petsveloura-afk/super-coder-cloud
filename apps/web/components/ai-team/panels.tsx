@@ -237,7 +237,7 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
                   <div className="flex items-center gap-2">
                     {m ? <AgentAvatar spec={m.avatar} state={g.status === "in_progress" ? "working" : g.status === "done" ? "success" : "idle"} size={30} /> : null}
                     <span className="min-w-0 flex-1 font-semibold">{g.title}</span>
-                    <Badge tone={g.status === "in_progress" ? "accent" : "neutral"}>{t(`aiTeam.status.${g.status}`)}</Badge>
+                    <Badge tone={g.status === "in_progress" ? "accent" : "neutral"}>{g.status === "done" && kids.length > 0 && done < kids.length ? t("aiTeam.goal.partial") : t(`aiTeam.status.${g.status}`)}</Badge>
                   </div>
                   {kids.length ? (
                     <div className="mt-2">

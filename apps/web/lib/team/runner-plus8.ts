@@ -8,6 +8,7 @@ import { findExisting, planMerge, type WorkItem } from "./dedupe-core";
 import { buildQueue, responseStats, slaAlert, type QueueItem } from "./response-queue-core";
 import { canRestart, restartPatch, revivable, staleBlocked } from "./restart-core";
 import { localizeTitle, titleInstruction } from "./title-i18n-core";
+import { hasOpenWaitingTask, queueCooldown } from "./team-intel-core";
 
 /**
  * Upgrade 8 / stage A, server side — connects the pure stability logic to the database and the AI call. Every function is
@@ -355,6 +356,12 @@ export async function ensureQueueTask(orgId: string, lang: Lang, targetMin: numb
     const key = `queue-${new Date().toISOString().slice(0, 13).replace(/[-T]/g, "")}`.slice(0, 40);
     const { count } = await a.from("team_tasks").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("plan_key", key);
     if (count) return false;
+    // wave 65: if the daily initiative (or an earlier queue task) on the same customers is still open, do not open a second one
+    const { data: openQ } = await a.from("team_tasks").select("title").eq("organization_id", orgId).in("status", ["pending", "in_progress", "awaiting_approval", "awaiting_input"]).limit(80);
+    if (hasOpenWaitingTask(((openQ ?? []) as { title: string | null }[]).map((x) => x.title))) return false;
+    // wave 65: when the earlier waiting-customers tasks FAILED (engines busy), wait before creating another one (30 / 90 / 180 min)
+    const { data: failedQ } = await a.from("team_tasks").select("updated_at").eq("organization_id", orgId).like("plan_key", "queue-%").eq("status", "failed").gte("updated_at", new Date(Date.now() - 3 * 3_600_000).toISOString()).limit(10);
+    if (queueCooldown(((failedQ ?? []) as { updated_at: string }[]).map((x) => x.updated_at), Date.now()).skip) return false;
     const top = view.queue.slice(0, 5);
     const brief = (lang === "he" ? "לקוחות שממתינים למענה (הוותיקים והחשובים ראשונים):" : lang === "ar" ? "عملاء بانتظار الرد (الأقدم والأهم أولًا):" : "Customers waiting for a reply (oldest and most valuable first):") + "\n" + top.map((q, i) => `${i + 1}. ${q.contactId ? `contact ${q.contactId}` : `conversation ${q.id}`} — ${q.waitingMin} min`).join("\n");
     const title = lang === "he" ? "מענה ללקוחות שממתינים" : lang === "ar" ? "الرد على العملاء المنتظرين" : "Reply to waiting customers";

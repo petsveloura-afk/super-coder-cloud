@@ -13,6 +13,7 @@
  * Nothing in this file reads a database, a clock (unless `now` is passed) or a network.
  */
 import { jaccard, tokens } from "./memory-plus-core";
+import { classifyFailure } from "./reliability-core";
 import type { RoleKey } from "./roles";
 
 export type Lang = "he" | "en" | "ar";
@@ -303,6 +304,8 @@ export interface BriefingInput {
   peers?: PeerTask[];
   roster?: MemberFacts[];
   queueAhead?: number;
+  /** the error text of the previous attempt of this same task, when it was retried */
+  lastError?: string | null;
 }
 
 const CUSTOMER_OUT = /(שלח|שלוח|שליחה|שליחת|להשיב|לענות|מענה ללקוח|הודעה ללקוח|תזכורת ללקוח|תזכורת תשלום|וואטסאפ|send|reply|respond|message to|payment reminder|whatsapp|email the customer|أرسل|رد على)/i;
@@ -345,6 +348,10 @@ export function taskBriefing(i: BriefingInput): string {
     else if (t.holidayTomorrow) parts.push("TIME: a holiday begins tomorrow evening. If the message needs a reply or action from the customer, say so and schedule it before the holiday.");
     else if (t.night) parts.push("TIME: it is night for the customer. A reminder or offer should wait for the morning; a reply to a customer who just wrote may go out.");
   }
+
+  // 1b. a retried task: never act twice on the same customer
+  const retry = retryNote(i.lastError);
+  if (retry) parts.push(retry);
 
   // 2. role boundary
   const mis = roleMismatch(i.role, text);
@@ -502,4 +509,41 @@ export function planMoves(members: MemberRow[], open: OpenTaskRow[], now: number
     bump(target.id, 1);
   }
   return moves.slice(0, max);
+}
+
+/* ============================================================================================ 7. resilience (wave 65) */
+
+/** "the engines are busy" — how many tasks one tick may start (a burst of 3 at once is what trips the providers' per-minute limits) */
+export function tickBudget(recentErrors: (string | null | undefined)[], base = 3): number {
+  const busy = recentErrors.filter((e) => classifyFailure(e).kind === "ai_busy").length;
+  if (busy >= 3) return 1;
+  if (busy === 2) return Math.min(base, 2);
+  return base;
+}
+
+const QUEUE_COOLDOWN_MIN = [0, 30, 90, 180];
+/**
+ * The waiting-customers task is created again whenever customers still wait. If the previous ones FAILED, creating another one
+ * every hour only burns engine calls. After 1 / 2 / 3+ failures within 3 hours it waits 30 / 90 / 180 minutes since the last failure.
+ */
+export function queueCooldown(failedUpdatedAt: string[], now: number): { skip: boolean; waitMs: number } {
+  const recent = failedUpdatedAt.map((x) => Date.parse(x)).filter((t) => !Number.isNaN(t) && now - t <= 3 * 3_600_000).sort((a, b) => b - a);
+  if (!recent.length) return { skip: false, waitMs: 0 };
+  const wait = (QUEUE_COOLDOWN_MIN[Math.min(recent.length, 3)] ?? 180) * 60_000;
+  const left = recent[0]! + wait - now;
+  return left > 0 ? { skip: true, waitMs: left } : { skip: false, waitMs: 0 };
+}
+
+/** the note a retried task gets: the earlier attempt may already have sent or created something */
+export function retryNote(lastError: string | null | undefined): string {
+  if (!lastError || !lastError.trim()) return "";
+  const k = classifyFailure(lastError).kind;
+  if (k !== "ai_busy" && k !== "network" && k !== "ai_unreadable") return "";
+  return "RETRY: your previous attempt stopped because of temporary trouble (engines busy, network or an unreadable answer), not because the task was wrong. Before you act, check this task's log, the contact's latest messages and what already waits for approval, so nothing is sent or created twice. Then continue from where it stopped.";
+}
+
+/** an open task (the daily initiative or an earlier queue task) already works on the customers who wait — a second one only doubles the cost */
+const WAITING_TITLE = /(waiting for (an answer|a reply)|reply to waiting customers|מענה ללקוחות שממתינים|שממתינות למענה|שממתינים למענה|بانتظار الرد|الرد على العملاء المنتظرين)/i;
+export function hasOpenWaitingTask(openTitles: (string | null | undefined)[]): boolean {
+  return openTitles.some((t) => !!t && WAITING_TITLE.test(t));
 }

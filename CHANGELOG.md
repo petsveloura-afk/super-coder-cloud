@@ -1,5 +1,15 @@
 # Changelog
 
+## גל 65 — Wave 65: team resilience (busy engines, repeated queue task, honest goal status) — 2026-11-05
+
+- **Adaptive tick (`runner.ts`, `team-intel-core.ts → tickBudget`):** when several "engines busy" failures happened in the last 30 minutes the team clock starts 2, then 1, task per tick instead of 3, so a burst does not trip the providers' per-minute limits again. Any error → the usual 3.
+- **Waiting-customers task (`runner-plus8.ts → ensureQueueTask`, `queueCooldown`):** after failed queue tasks it waits 30 / 90 / 180 minutes (1 / 2 / 3+ failures in 3 hours) before creating another, instead of a new failing task every hour.
+- **No double work (`hasOpenWaitingTask`):** the waiting-customers task is not created while the daily initiative or an earlier queue task on the same customers is still open.
+- **Retried tasks (`retryNote`, `team-intel.ts`):** a task retried after a temporary failure is told to check the log, the contact's latest messages and pending approvals first, so nothing is sent or created twice.
+- **Goals (`runner.ts → refreshGoal`, `panels.tsx`):** the goal result now carries `outcome` (complete / partial / failed) and the badge shows "Partly done" when some tasks failed (new key `aiTeam.goal.partial` in he / en / ar). The stored status is unchanged.
+- **Titles (`title-i18n-core.ts`):** the numbered daily-initiative titles ("Reach N new lead(s)…", "Answer N negative review(s)", "N conversation(s) waiting…", "Revive N stuck deal(s)", "N overdue invoice(s)", "No post for N days", "Leads dropped sharply…") are shown in Hebrew / Arabic. Display only; the database is not changed.
+- **Tests:** `tests/unit/wave65-team-resilience.test.ts` (12 tests). No migrations, no new environment variables.
+
 ## גל 64 — Wave 64: a smarter AI team (queue order, role fit, briefing, inbound guard, harmony) — 2026-11-04
 
 - **Queue order (`team-intel-core.ts`, `plus8b-hooks.ts → prioritizeTasks`):** the stub that returned the tasks unchanged is now a real, stable ordering: owner priority, overdue / due-soon, age (no starvation), owner-asked and colleague-waiting work, customers waiting, and what unblocks other tasks. The waiting-customers queue still comes first (the order is applied inside each group in `runner-plus8.ts → orderForTick`).

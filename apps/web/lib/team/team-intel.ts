@@ -17,12 +17,12 @@ export async function briefingFor(ctx: { orgId: string; taskId: string; memberRo
     const a = db();
     const wantsRoster = ctx.memberRole === "manager" || ctx.memberRole === "team_lead" || ctx.memberRole === "project_coordinator";
     const [taskRes, orgRes, memRes, openRes] = await Promise.all([
-      a.from("team_tasks").select("priority, origin, due_at, assignee_id").eq("organization_id", ctx.orgId).eq("id", ctx.taskId).maybeSingle(),
+      a.from("team_tasks").select("priority, origin, due_at, assignee_id, error").eq("organization_id", ctx.orgId).eq("id", ctx.taskId).maybeSingle(),
       a.from("organizations").select("timezone").eq("id", ctx.orgId).maybeSingle(),
       a.from("team_members").select("id, name, role_key, status").eq("organization_id", ctx.orgId).limit(100),
       a.from("team_tasks").select("id, title, assignee_id, status").eq("organization_id", ctx.orgId).in("status", OPEN_STATUSES).neq("id", ctx.taskId).limit(400),
     ]);
-    const task = (taskRes.data ?? null) as { priority: number | null; origin: string | null; due_at: string | null; assignee_id: string | null } | null;
+    const task = (taskRes.data ?? null) as { priority: number | null; origin: string | null; due_at: string | null; assignee_id: string | null; error?: string | null } | null;
     const members = (memRes.data ?? []) as { id: string; name: string; role_key: string; status: string }[];
     const open = (openRes.data ?? []) as { id: string; title: string; assignee_id: string | null; status: string }[];
     const byId = new Map(members.map((m) => [m.id, m]));
@@ -49,6 +49,7 @@ export async function briefingFor(ctx: { orgId: string; taskId: string; memberRo
       priority: task?.priority ?? null,
       origin: task?.origin ?? null,
       dueAt: task?.due_at ?? null,
+      lastError: task?.error ?? null,
       time,
       peers,
       roster,

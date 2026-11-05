@@ -6772,6 +6772,7 @@
       "estimate": "הערכה: כ-{n} קרדיטים",
       "progressTitle": "יעדים בביצוע וסיכומים",
       "summaryTitle": "סיכום ההנהלה",
+      "partial": "הושלם חלקית",
       "tasksDone": "{done} מתוך {total} משימות הושלמו",
       "suggestHint": "רעיונות ליעד (לחיצה ממלאת את התיבה):",
       "suggest": {

@@ -6772,6 +6772,7 @@
       "estimate": "تقدير: حوالي {n} رصيد",
       "progressTitle": "الأهداف قيد التنفيذ والملخصات",
       "summaryTitle": "ملخص الإدارة",
+      "partial": "مكتمل جزئيًا",
       "tasksDone": "اكتملت {done} من {total} مهام",
       "suggestHint": "أفكار للأهداف (اضغط لتعبئة الحقل):",
       "suggest": {

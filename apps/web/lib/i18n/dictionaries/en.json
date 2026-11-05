@@ -6772,6 +6772,7 @@
       "estimate": "Estimate: about {n} credits",
       "progressTitle": "Goals in progress and summaries",
       "summaryTitle": "Executive summary",
+      "partial": "Partly done",
       "tasksDone": "{done} of {total} tasks done",
       "suggestHint": "Goal ideas (click to fill the box):",
       "suggest": {
