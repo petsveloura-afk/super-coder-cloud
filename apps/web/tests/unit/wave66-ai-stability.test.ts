@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEGRADED_BELOW, HEALTH_WINDOW_MS, MAX_SAMPLES, MIN_SAMPLES, providerHealth, rankByHealth, recordSample, reorderWithin, summarizeWindow, type HealthWindow } from "@/lib/ai/provider-health-core";
 import { hintForFeature, hintOrder } from "@/lib/ai/task-hint-core";
@@ -322,7 +323,7 @@ describe("wave 66 — router integration (mocked network)", () => {
 });
 
 describe("wave 66 — wiring keeps today's lines", () => {
-  const read = (p: string) => require("node:fs").readFileSync(`${import.meta.dirname}/../../${p}`, "utf8") as string;
+  const read = (p: string): string => readFileSync(`${import.meta.dirname}/../../${p}`, "utf8");
   it("run-system keeps the explicit team choice and only adds the hint", () => {
     const s = read("lib/ai/run-system.ts");
     expect(s).toContain("preferred: input.routeProvider || input.provider || provider");

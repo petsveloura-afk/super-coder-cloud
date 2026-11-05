@@ -21,8 +21,7 @@ export function enterLive(state: LiveState, id: string, now: number, ttlMs = GAT
 
 export function leaveLive(state: LiveState, id: string): LiveState {
   if (!(id in state)) return state;
-  const { [id]: _gone, ...rest } = state;
-  return rest;
+  return Object.fromEntries(Object.entries(state).filter(([k]) => k !== id));
 }
 
 export function pruneLive(state: LiveState, now: number): LiveState {
