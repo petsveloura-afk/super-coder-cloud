@@ -11,7 +11,7 @@
 import { firstJsonObject as firstJsonObjectStrict } from "@/lib/operator/operator-core";
 import { firstJsonObjectTolerant } from "./json-repair-core";
 import type { AiResult, EngineDeps, EngineMember, EngineTask, ToolRun } from "./engine-core";
-import { DECISION_FORMAT_DEEP, DECISION_FORMAT_FAST, appendRecord, approvalNote, auditDecision, auditorPrompt, classifyRoute, combineAudit, parseAuditVerdict, parseDecision, type DecisionDraft, type DecisionRecord, type FinalAudit, type Route, type Sensitivity } from "./decision-core";
+import { DECISION_FORMAT_DEEP, DECISION_FORMAT_FAST, decisionLanguageLine, appendRecord, approvalNote, auditDecision, auditorPrompt, classifyRoute, combineAudit, parseAuditVerdict, parseDecision, type DecisionDraft, type DecisionRecord, type FinalAudit, type Route, type Sensitivity } from "./decision-core";
 import { askOrAssume, calibrate, errorCost, understand, understandingPrompt, type CalibrationBin, type Understanding } from "./understanding-core";
 
 export interface LayerOptions {
@@ -117,7 +117,7 @@ export function withDecisionLayer(deps: EngineDeps, o: LayerOptions): EngineDeps
       if (kind !== "plan") return deps.ai(kind, system, user, maxTokens);
       let add = "";
       try {
-        add = [preBlock, state.route === "deep" ? `${DECISION_FORMAT_DEEP}\nRisk reasons: ${state.routeReasons.join(", ")}` : DECISION_FORMAT_FAST].filter(Boolean).join("\n\n");
+        add = [preBlock, state.route === "deep" ? `${DECISION_FORMAT_DEEP}\nRisk reasons: ${state.routeReasons.join(", ")}` : DECISION_FORMAT_FAST, decisionLanguageLine(deps.lang)].filter(Boolean).join("\n\n");
       } catch {
         add = "";
       }

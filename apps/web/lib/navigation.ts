@@ -14,6 +14,16 @@ export interface NavItem {
   platformOnly?: boolean;
   /** Only shown when this feature flag is on for the business (new features stay invisible until enabled). */
   flag?: string;
+  /** display grouping inside the menu: "ai" items are shown together under "AI & agents" (the section itself is unchanged) */
+  group?: "ai";
+}
+
+/** the menu groups in display order: a group key is a section, or "ai" (the AI agents, shown between core and growth) */
+export type NavGroupKey = NavSection | "ai";
+export const NAV_GROUPS: NavGroupKey[] = ["core", "ai", "growth", "ops"];
+/** the items of one menu group (AI items leave the growth list and form their own group) */
+export function itemsOfGroup<T extends { section: NavSection; group?: "ai" }>(items: T[], g: NavGroupKey): T[] {
+  return g === "ai" ? items.filter((i) => i.group === "ai") : items.filter((i) => i.section === g && i.group !== "ai");
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -24,15 +34,15 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "tasks", label: "nav.tasks", section: "core", phase: null, permission: "tasks.read" },
   { key: "inbox", label: "nav.inbox", section: "core", phase: null, permission: "inbox.read" },
   { key: "automations", label: "nav.automations", section: "growth", phase: null, permission: "automations.manage" },
-  { key: "ai-agents", label: "nav.aiAgents", section: "growth", phase: null, permission: "ai.use" },
+  { key: "ai-agents", label: "nav.aiAgents", section: "growth", phase: null, permission: "ai.use", group: "ai" },
   // wave 19: the AI team (marketing, sales manager, daily brief, collections) + social (comments, posts, reviews)
-  { key: "agents", label: "nav.agents", section: "growth", phase: null, permission: "ai.use" },
+  { key: "agents", label: "nav.agents", section: "growth", phase: null, permission: "ai.use", group: "ai" },
   // wave 54: the AI Operator — say what should happen, approve, done
-  { key: "operator", label: "nav.operator", section: "growth", phase: null, permission: "ai.use" },
+  { key: "operator", label: "nav.operator", section: "growth", phase: null, permission: "ai.use", group: "ai" },
   // the digital team (behind the feature flag team_v1)
-  { key: "ai-team", label: "nav.aiTeam", section: "growth", phase: null, permission: "ai.use", flag: "team_v1" },
+  { key: "ai-team", label: "nav.aiTeam", section: "growth", phase: null, permission: "ai.use", flag: "team_v1", group: "ai" },
   // wave 57: the phone agent in one place (number, voice, transfer, test call, calls)
-  { key: "phone", label: "nav.phone", section: "growth", phase: null, permission: "ai.use" },
+  { key: "phone", label: "nav.phone", section: "growth", phase: null, permission: "ai.use", group: "ai" },
   { key: "social", label: "nav.social", section: "growth", phase: null, permission: "inbox.read" },
   { key: "campaigns", label: "nav.campaigns", section: "growth", phase: null, permission: "campaigns.manage" },
   { key: "websites", label: "nav.websites", section: "growth", phase: null, permission: "websites.manage" },

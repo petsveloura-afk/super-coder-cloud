@@ -106,8 +106,21 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
   ]);
   const nowMs = new Date().getTime();
   const allRows = (convs ?? []) as ConvRow[];
-  const list = flag === "waiting" ? allRows.filter((c) => waitingMinutes(c, nowMs) !== null) : allRows;
-  const waitingCount = allRows.filter((c) => waitingMinutes(c, nowMs) !== null).length;
+  // automatic e-mails (bounces, "noreply", service notifications) are not customers waiting for an answer — they no longer
+  // fill the "waiting" counter and do not show a red waiting time (the conversations themselves stay as they are)
+  const robotIds = new Set<string>();
+  try {
+    const emailRows = allRows.filter((c) => c.channel === "email");
+    if (emailRows.length) {
+      const { robotConversationIds } = await import("@/lib/inbox/robots");
+      for (const id of await robotConversationIds(supabase, ctx.org.id, emailRows)) robotIds.add(id);
+    }
+  } catch {
+    /* the waiting counter works as before */
+  }
+  const waitOf = (c: ConvRow) => (robotIds.has(c.id) ? null : waitingMinutes(c, nowMs));
+  const list = flag === "waiting" ? allRows.filter((c) => waitOf(c) !== null) : allRows;
+  const waitingCount = allRows.filter((c) => waitOf(c) !== null).length;
   const flagCount: Record<InboxFlag, number | null> = { waiting: flag === null || flag === "waiting" ? waitingCount : null, hot: cHot ?? null, human: cHuman ?? null };
   const memberName = new Map(members.map((m) => [m.id, m.label]));
 
@@ -220,7 +233,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
             <ul className="max-h-[70dvh] divide-y divide-line overflow-y-auto">
               {list.map((c) => {
                 const Icon = CHANNEL_ICON[c.channel] ?? MessageCircle;
-                const wait = waitingMinutes(c, nowMs);
+                const wait = waitOf(c);
                 const tone = slaTone(wait);
                 return (
                   <li key={c.id}>

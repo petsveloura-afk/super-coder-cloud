@@ -120,6 +120,8 @@ export interface DayHealthView {
   failed: number;
   reasons: { code: string; count: number }[];
   providers: { provider: string; calls: number; successPct: number | null; status: "healthy" | "neutral" | "shaky" | "degraded" }[];
+  /** false = the AI providers list is hidden (platform-admin detail); missing = shown */
+  showProviders?: boolean;
 }
 
 /** upgrade 2: the team health card (optional — absent when the data could not be loaded) */
@@ -130,6 +132,8 @@ export interface TeamHealthData {
   failures: { id: string; title: string; reason: string; error: string | null; at: string | null }[];
   stuck: number;
   failed24h: number;
+  /** false = the AI models list is not shown (it is for the platform admin); missing = shown (old behaviour) */
+  showModels?: boolean;
 }
 
 /** upgrade 3: operating rules + first-response time + work templates (all optional on the screen) */

@@ -41,7 +41,8 @@
     "guide": "User guide",
     "calculators": "Calculators",
     "health": "Mission Control",
-    "aiTeam": "My AI team"
+    "aiTeam": "My AI team",
+    "sectionAi": "AI & agents"
   },
   "common": {
     "save": "Save",
@@ -7309,6 +7310,12 @@
         "release": "You released the emergency stop",
         "tightened": "You moved employees back to \"asks me first\""
       }
+    },
+    "more": {
+      "goals": "Insights, targets and reports",
+      "memory": "Business facts and procedures",
+      "activity": "Decisions and oversight",
+      "settings": "Health and reliability"
     }
   },
   "aiQuality": {

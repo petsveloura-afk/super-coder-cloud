@@ -66,7 +66,8 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
   try {
     const { loadTeamHealth } = await import("@/lib/team/runner-plus");
     const h = await loadTeamHealth(org, settings);
-    data.health = { level: h.verdict.level, issues: h.verdict.issues, models: h.models, failures: h.failures, stuck: h.stuck, failed24h: h.failed24h };
+    // the list of AI engines / models is technical: shown to the platform admin only (business owners see the verdict and the failures)
+    data.health = { level: h.verdict.level, issues: h.verdict.issues, models: opts.platformAdmin ? h.models : [], failures: h.failures, stuck: h.stuck, failed24h: h.failed24h, showModels: opts.platformAdmin };
   } catch {
     /* the health card is optional — the screen works without it */
   }
@@ -75,7 +76,7 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     // wave 68: today's health for the owner (tasks that worked / failed and why, which AI provider is healthy)
     const { loadDayHealth } = await import("@/lib/team/day-health");
     const dh = await loadDayHealth(org);
-    if (dh) data.dayHealth = dh;
+    if (dh) data.dayHealth = { ...dh, showProviders: opts.platformAdmin };
   } catch {
     /* the card is optional */
   }
@@ -123,7 +124,8 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
       goals: g?.available ? g.views.map((v) => ({ goal: v.goal, forecast: v.forecast })) : undefined,
       experiments: e?.available ? e.rows : undefined,
       decisions: d?.available ? d.rows.map((r) => ({ id: r.id, task_id: r.task_id, route: r.route, route_reasons: r.route_reasons, record: r.record, confidence: r.confidence, audit_verdict: r.audit_verdict, created_at: r.created_at })) : undefined,
-      standup: b?.standup.lines,
+      // the stand-up lines carry stored task titles — shown in the business language (display only)
+      standup: b?.standup.lines ? await import("@/lib/team/title-i18n-core").then((m) => b.standup.lines.map((l: string) => l.replace(/^(.*?:\s)(.+)$/, (_x: string, head: string, title: string) => head + m.localizeTitle(title, lang)))).catch(() => b.standup.lines) : undefined,
       report: rep ? { title: rep.title, text: rep.text, period_start: rep.period_start } : undefined,
       brief: brief ? { text: brief.text } : undefined,
     };
@@ -138,7 +140,23 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     const lang8 = (orgRow8?.locale === "en" || orgRow8?.locale === "ar" ? orgRow8.locale : "he") as "he" | "en" | "ar";
     const [{ localizeTitle, localizeLog }, { explainToolFailure, reasonCode }, p8, { statsLine, slaAlertText }] = await Promise.all([import("@/lib/team/title-i18n-core"), import("@/lib/team/tool-failure-core"), import("@/lib/team/runner-plus8"), import("@/lib/team/response-queue-core")]);
     data.tasks = data.tasks.map((x) => ({ ...x, title: localizeTitle(x.title, lang8) }));
+    if (data.health) data.health = { ...data.health, failures: data.health.failures.map((f) => ({ ...f, title: localizeTitle(f.title, lang8) })) };
     data.activity = data.activity.map((x) => ({ ...x, summary: localizeLog(x.summary, lang8) }));
+    // tool lines ("goals.list: no goals recorded") — the tool's name from the dictionary and the result in the business language
+    try {
+      const { getT } = await import("@/lib/i18n/server");
+      const { t } = await getT(lang8);
+      const { localizeToolLine } = await import("@/lib/team/title-i18n-core");
+      const label = (k: string) => {
+        const key = `aiTeam.tools.${k.replace(".", "_")}`;
+        const v = t(key);
+        return v && v !== key ? v : null;
+      };
+      data.activity = data.activity.map((x) => ({ ...x, summary: localizeToolLine(x.summary, lang8, label) }));
+      if (data.ownerLog) data.ownerLog = data.ownerLog.map((e) => (e.text ? { ...e, text: localizeToolLine(localizeLog(e.text, lang8), lang8, label) } : e));
+    } catch {
+      /* display translation is optional */
+    }
     data.members = data.members.map((m) => ({ ...m, working_on: m.working_on ? localizeTitle(m.working_on, lang8) : m.working_on }));
     // wave 67: the memory tab in the business language, duplicates merged (×N), empty rows hidden — display only, the database is not changed
     try {
@@ -155,7 +173,8 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
       /* display translation is optional */
     }
     const [skipped, { data: bad }, resp] = await Promise.all([
-      opts.platformAdmin || opts.canManage ? p8.loadSkippedProviders(lang8) : Promise.resolve([]),
+      // "add a key in Vercel" is platform work — business owners never see it
+      opts.platformAdmin ? p8.loadSkippedProviders(lang8) : Promise.resolve([]),
       a.from("team_tasks").select("id, title, status, error, updated_at").eq("organization_id", org).in("status", ["failed", "blocked", "requires_connection"]).gte("updated_at", new Date(now - 30 * 86_400_000).toISOString()).order("updated_at", { ascending: false }).limit(40),
       p8.loadResponseQueue(org, data.ops?.sla.targetMin ?? 60),
     ]);

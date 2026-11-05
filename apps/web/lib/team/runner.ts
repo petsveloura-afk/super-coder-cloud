@@ -690,6 +690,10 @@ async function runInitiative(orgId: string, tz: string) {
   // wave 63: + the business radar (hot leads, lead surge, money in dormant deals / overdue debts); topics the initiatives already cover are not created twice
   const radar = await import("./business-radar").then((m) => m.radarInitiatives(orgId, tz, day, sig)).catch(() => []);
   const proposals = [...initiatives(sig, day), ...radar];
+  // the task titles are stored in the business's language (they were English: "Leads dropped sharply — find out why")
+  const { data: orgLang } = await a.from("organizations").select("locale").eq("id", orgId).maybeSingle();
+  const lang: "he" | "en" | "ar" = orgLang?.locale === "en" || orgLang?.locale === "ar" ? orgLang.locale : "he";
+  const { localizeTitle } = await import("./title-i18n-core");
   for (const p of proposals) {
     const key = `init-${p.key.split(":")[0]}-${day.replace(/-/g, "")}`.slice(0, 40);
     const { count } = await a.from("team_tasks").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("plan_key", key);
@@ -697,7 +701,7 @@ async function runInitiative(orgId: string, tz: string) {
     const m = all.find((x) => x.role_key === p.role);
     if (!m) continue;
     // "suggest only" employees propose (the owner starts it); the others start — customer actions still wait for approval
-    await a.from("team_tasks").insert({ organization_id: orgId, plan_key: key, title: p.title, brief: p.brief, assignee_id: m.id, priority: p.priority, status: m.autonomy === "suggest" ? "draft" : "pending", origin: "initiative" });
+    await a.from("team_tasks").insert({ organization_id: orgId, plan_key: key, title: localizeTitle(p.title, lang), brief: p.brief, assignee_id: m.id, priority: p.priority, status: m.autonomy === "suggest" ? "draft" : "pending", origin: "initiative" });
     await logActivity(orgId, null, m.id, "initiative", `${m.name} noticed: ${p.title}`, { key: p.key });
   }
 }

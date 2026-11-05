@@ -52,6 +52,8 @@ export async function noteModelResult(provider: string, model: string, ok: boole
 /* ------------------------------------------------------------------ recovery + retry */
 
 const MAX_ATTEMPTS = 4;
+/** temporary failures (busy engines, network, an unreadable answer) — about 3 hours of tries with growing pauses */
+const TEMP_MAX_ATTEMPTS = 10;
 
 /** tasks stuck "in progress" (server died mid-run) go back to the queue — and stop after too many tries */
 export async function recoverStuckTasks(orgId: string): Promise<number> {
@@ -73,11 +75,15 @@ export async function recoverStuckTasks(orgId: string): Promise<number> {
 export async function retryFailedTasks(orgId: string): Promise<number> {
   const a = db();
   const now = Date.now();
-  const { data } = await a.from("team_tasks").select("id, error, attempts, finished_at").eq("organization_id", orgId).eq("status", "failed").gte("finished_at", new Date(now - 6 * 3600_000).toISOString()).limit(20);
+  // busy AI engines / network: the task keeps trying for hours (up to TEMP_MAX_ATTEMPTS, the pause grows to 30 min) — before,
+  // four quick tries (~8 minutes) were the end and the task stayed "failed" although the engines came back soon after
+  const { data } = await a.from("team_tasks").select("id, error, attempts, finished_at").eq("organization_id", orgId).eq("status", "failed").gte("finished_at", new Date(now - 24 * 3600_000).toISOString()).limit(20);
   let n = 0;
   for (const t of (data ?? []) as { id: string; error: string | null; attempts: number | null; finished_at: string | null }[]) {
     const attempts = t.attempts ?? 0;
-    const d = nextRetry(t.error, attempts, t.finished_at ? Date.parse(t.finished_at) : now, MAX_ATTEMPTS, () => 0.5);
+    const kind = classifyFailure(t.error).kind;
+    const max = kind === "ai_busy" || kind === "network" || kind === "ai_unreadable" ? TEMP_MAX_ATTEMPTS : MAX_ATTEMPTS;
+    const d = nextRetry(t.error, attempts, t.finished_at ? Date.parse(t.finished_at) : now, max, () => 0.5);
     if (!d.retry || d.at === null || d.at > now) continue;
     const { data: done } = await a.from("team_tasks").update({ status: "pending", error: null, attempts: attempts + 1, finished_at: null, updated_at: new Date().toISOString() }).eq("organization_id", orgId).eq("id", t.id).eq("status", "failed").select("id");
     if (done?.length) n++;

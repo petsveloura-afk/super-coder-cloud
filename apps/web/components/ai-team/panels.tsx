@@ -798,11 +798,6 @@ export function SettingsPanel({ data, onRefresh }: { data: TeamPageData; onRefre
   };
   return (
     <div className="space-y-4" data-testid="settings-panel">
-      {data.health ? <HealthPanel health={data.health} /> : null}
-      {data.dayHealth ? <DayHealthCard day={data.dayHealth} /> : null}
-      <OwnerControlCard members={data.members} canManage={data.canManage} onRefresh={onRefresh} />
-      {data.ownerLog ? <OwnerLogCard entries={data.ownerLog} members={data.members} /> : null}
-      {data.ops ? <OpsPanel ops={data.ops} sla={data.sla} canManage={data.canManage} locale={locale} onRefresh={onRefresh} /> : null}
       <Card className={cn("p-5", s.emergency_stop && "border-danger/50 bg-danger/5")}>
         <div className="flex flex-wrap items-center gap-3">
           <AlertOctagon className={cn("h-8 w-8", s.emergency_stop ? "text-danger" : "text-muted")} />
@@ -863,6 +858,11 @@ export function SettingsPanel({ data, onRefresh }: { data: TeamPageData; onRefre
           <Button onClick={() => act(() => saveTeamSettingsAction({ locale, routing_pref: s.routing_pref, daily_credit_cap: s.daily_credit_cap, max_depth: s.max_depth, max_steps: s.max_steps, initiative: s.initiative }))}>{t("common.save")}</Button>
         </Card>
       ) : null}
+      <OwnerControlCard members={data.members} canManage={data.canManage} onRefresh={onRefresh} />
+      {data.ops ? <OpsPanel ops={data.ops} sla={data.sla} canManage={data.canManage} locale={locale} onRefresh={onRefresh} /> : null}
+      {data.health ? <HealthPanel health={data.health} /> : null}
+      {data.dayHealth ? <DayHealthCard day={data.dayHealth} /> : null}
+      {data.ownerLog ? <OwnerLogCard entries={data.ownerLog} members={data.members} /> : null}
       {data.platformAdmin ? (
         <Card className="space-y-3 border-dashed p-5">
           <h3 className="font-semibold">{t("aiTeam.admin.title")}</h3>

@@ -135,6 +135,15 @@ export const DECISION_FORMAT_DEEP = [
   "Prefer the reversible option when the options are close. Do not claim certainty you do not have.",
 ].join("\n");
 
+/**
+ * The owner reads the decision record and the plan in the app — in the business language. Models often wrote the JSON values
+ * in English for Hebrew / Arabic businesses ("to create three post drafts…"); this line asks for the right language explicitly.
+ */
+export function decisionLanguageLine(lang: string | null | undefined): string {
+  const name = lang === "en" ? "English" : lang === "ar" ? "Arabic" : "Hebrew";
+  return `LANGUAGE: write EVERY text value in your JSON ("understanding", "title", "brief", and all of "decision": understood / decided / why / would_change_mind / options / premortem) in ${name} — the owner reads them in the app. Keep JSON keys, tool keys and enum values (low / medium / high, true / false) in English.`;
+}
+
 /* ------------------------------------------------------------------------------------------------ the deterministic audit */
 
 export interface AuditResult {

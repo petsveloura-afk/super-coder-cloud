@@ -175,6 +175,8 @@ export async function handleInboundWithAI(input: { conversationId: string; messa
 
 async function handleInboundWithAICore(input: { conversationId: string; messageId?: string | null; debounceMs?: number; retry?: boolean; quietRetry?: boolean }): Promise<AutopilotResult> {
   const timing = new Timing();
+  // true when the agent just took back a conversation it had handed over and nobody from the team answered
+  let resumedUnattended = false;
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { replied: false, handoff: false, reason: "no_service_key" };
   const admin = createAdminClient();
   const { data: conv } = await admin
@@ -198,11 +200,35 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     const minutes = Number((ra?.profile as { resume_after_minutes?: number } | null)?.resume_after_minutes ?? DEFAULT_RESUME_MINUTES);
     // wave 57: a conversation that was paused only because of a TECHNICAL hiccup (an empty / broken AI
     // answer, a busy engine) — not by a person and not by a real handoff — comes straight back to the agent
-    const { data: noteRow } = await admin.from("conversations").select("ai_note").eq("id", conv.id).maybeSingle();
-    const { technicalPause } = await import("./autopilot-heal");
-    if (technicalPause((noteRow as { ai_note?: string | null } | null)?.ai_note ?? null)) {
+    const { data: noteRow } = await admin.from("conversations").select("ai_note, handoff_at, owner_takeover_at").eq("id", conv.id).maybeSingle();
+    const { technicalPauseExtended, unattendedResume } = await import("./autopilot-heal");
+    const nr = (noteRow ?? {}) as { ai_note?: string | null; handoff_at?: string | null; owner_takeover_at?: string | null };
+    // (also the watchdog's own hand-over after busy engines — "stuck_no_answer" is technical too)
+    if (technicalPauseExtended(nr.ai_note ?? null)) {
       await admin.from("conversations").update({ ai_mode: "auto", handoff_at: null, ai_note: null, ai_note_at: null }).eq("id", conv.id).eq("ai_mode", "human");
       conv.ai_mode = "auto";
+    }
+    // the AGENT handed the conversation over and nobody from the team answered for a while → the agent answers again
+    // (before: the customer's next messages got no reply at all until someone pressed "return to agent")
+    if (conv.ai_mode !== "auto" && nr.handoff_at && !nr.owner_takeover_at) {
+      const { data: teamReply } = await admin
+        .from("messages")
+        .select("id")
+        .eq("conversation_id", conv.id)
+        .eq("direction", "out")
+        .gt("created_at", nr.handoff_at)
+        .or("sent_by.not.is.null,meta->>owner.eq.true")
+        .limit(1)
+        .maybeSingle();
+      const unattendedMinutes = (ra?.profile as { unattended_resume_minutes?: number } | null)?.unattended_resume_minutes;
+      if (unattendedResume({ note: nr.ai_note, handoffAt: nr.handoff_at, ownerTakeoverAt: nr.owner_takeover_at, teamAnsweredSince: Boolean(teamReply), minutes: unattendedMinutes, now: Date.now() })) {
+        const { data: back } = await admin.from("conversations").update({ ai_mode: "auto", handoff_at: null, ai_note: "resumed_unattended", ai_note_at: new Date().toISOString() }).eq("id", conv.id).eq("ai_mode", "human").select("id");
+        if (back?.length) {
+          conv.ai_mode = "auto";
+          resumedUnattended = true;
+          await admin.rpc("emit_event", { p_org: conv.organization_id, p_type: "ai.resumed", p_entity_type: "conversation", p_entity_id: conv.id, p_payload: { conversation_id: conv.id, reason: "team_silent", note: nr.ai_note ?? null } }).then(() => undefined, () => undefined);
+        }
+      }
     }
     const { maybeResumeAgent } = await import("@/lib/channels/owner");
     if (conv.ai_mode !== "auto" && !(minutes > 0 && (await maybeResumeAgent(conv.id as string, minutes)))) return { replied: false, handoff: false, reason: "human_mode" };
@@ -270,7 +296,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   // message is already a real reply (not the short "on it" hold message)
   if (input.retry) {
     const { data: last } = await admin.from("messages").select("direction, meta").eq("conversation_id", input.conversationId).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (last && last.direction === "out" && (last.meta as { fallback?: boolean } | null)?.fallback !== true) return { replied: false, handoff: false, reason: "already_answered" };
+    if (last && last.direction === "out" && (last.meta as { fallback?: boolean } | null)?.fallback !== true && (last.meta as { escalation?: boolean } | null)?.escalation !== true) return { replied: false, handoff: false, reason: "already_answered" };
   }
 
   // debounce: answer only the latest of several quick messages
@@ -303,7 +329,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   ]);
   if (allowed === false) return { replied: false, handoff: false, reason: "rate_limited" };
   // "I'm checking…" holding replies are not part of the real conversation
-  const history = buildHistory(((rows ?? []) as (StoredMessage & { meta?: { fallback?: boolean } | null })[]).reverse().filter((m) => !(m.direction === "out" && m.meta?.fallback)));
+  const history = buildHistory(((rows ?? []) as (StoredMessage & { meta?: { fallback?: boolean; escalation?: boolean } | null })[]).reverse().filter((m) => !(m.direction === "out" && (m.meta?.fallback || m.meta?.escalation))));
   const lastIn = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
   if (!lastIn) return { replied: false, handoff: false, reason: "empty" };
   const locale = autopilotLocale(agent.language);
@@ -498,7 +524,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     channel: ch,
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
     locale,
-  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}\n\n${actionsSection}\n\n${salesSection}${socialSection}${openerLine}`;
+  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}\n\n${actionsSection}\n\n${salesSection}${socialSection}${openerLine}${resumedUnattended ? `\n\n${(await import("./autopilot-heal")).resumedNote(replyLocale)}` : ""}`;
   void typingIndicator(orgId, ch, conv.external_id as string); // speed upgrade: never waited for (the typing loop already runs)
   // wave 16: help-center answers (knowledge base) for this question
   let kb = "";

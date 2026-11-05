@@ -179,8 +179,9 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
           const { data: c } = await db.from("contacts").select("id").eq("organization_id", orgId).eq("id", contact).maybeSingle();
           if (!c) return { ok: false, summary: "", error: "contact_not_found" };
         }
-        const { error } = await db.from("tasks").insert({ organization_id: orgId, title: s(args.title).slice(0, 200), description: s(args.description).slice(0, 4000) || null, status: "open", due_at: s(args.due_iso) || null, contact_id: contact, assignee_id: ctx.actorUser, created_by: ctx.actorUser });
-        return error ? { ok: false, summary: "", error: error.message } : { ok: true, summary: `task created: ${s(args.title).slice(0, 120)}`, link: "/tasks" };
+        const { error } = await db.from("tasks").insert({ organization_id: orgId, title: s(args.title).slice(0, 200), description: s(args.description).slice(0, 4000) || null, status: "open", due_at: safeDueIso(s(args.due_iso)), contact_id: contact, assignee_id: ctx.actorUser, created_by: ctx.actorUser });
+        // a date the model wrote in words ("tomorrow", "יום ראשון") no longer fails the whole task — the task is created without a due date
+        return error ? { ok: false, summary: "", error: error.message } : { ok: true, summary: `task created: ${s(args.title).slice(0, 120)}${s(args.due_iso) && !safeDueIso(s(args.due_iso)) ? " (the due date was not a valid date — set it in Tasks)" : ""}`, link: "/tasks" };
       }
       case "deals.create": {
         const { data: pipe } = await db.from("pipelines").select("id, pipeline_stages(id, position)").eq("organization_id", orgId).order("created_at").limit(1).maybeSingle();
@@ -311,4 +312,13 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
   } catch (e) {
     return { ok: false, summary: "", error: (e as Error).message.slice(0, 300) };
   }
+}
+
+
+/** an ISO date / date-time the database accepts, or null (models sometimes write "tomorrow" or a date in words) */
+export function safeDueIso(v: string | null | undefined): string | null {
+  const t = (v ?? "").trim();
+  if (!t || !/^\d{4}-\d{2}-\d{2}/.test(t)) return null;
+  const ms = Date.parse(t);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 }

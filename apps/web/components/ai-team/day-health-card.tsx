@@ -36,6 +36,7 @@ export function DayHealthCard({ day }: { day: DayHealthView }) {
           </ul>
         </div>
       ) : null}
+      {day.showProviders === false ? null : (
       <div>
         <h4 className="mb-1 text-[12.5px] font-semibold">{t("aiTeam.dayHealth.providers")}</h4>
         {day.providers.length ? (
@@ -53,6 +54,7 @@ export function DayHealthCard({ day }: { day: DayHealthView }) {
         )}
         <p className="mt-1 text-[11.5px] text-subtle">{t("aiTeam.dayHealth.providersNote")}</p>
       </div>
+      )}
     </Card>
   );
 }

@@ -144,7 +144,8 @@ export function StabilityPanel({ data, locale, onRefresh }: { data: TeamPageData
 export function SkippedEnginesCard({ data }: { data: TeamPageData }) {
   const { t } = useI18n();
   const p = data.plus8;
-  if (!p) return null;
+  // engine keys are platform work — business owners never see this card
+  if (!p || !data.platformAdmin) return null;
   return (
     <Card className="space-y-2 p-5" data-testid="skipped-engines">
       <div>

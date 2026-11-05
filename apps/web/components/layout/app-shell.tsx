@@ -7,7 +7,7 @@ import * as DM from "@radix-ui/react-dropdown-menu";
 import { Bell, Check, ChevronDown, ChevronsLeft, ChevronsRight, LogOut, Menu, Plus, Search, ShieldCheck, UserRound } from "lucide-react";
 import type { Permission } from "@scc/shared/permissions";
 import { matchCommands } from "@/lib/command-actions";
-import { MOBILE_PRIMARY, NAV_ITEMS, type NavItem, type NavSection } from "@/lib/navigation";
+import { MOBILE_PRIMARY, NAV_GROUPS, NAV_ITEMS, itemsOfGroup, type NavGroupKey, type NavItem, type NavSection } from "@/lib/navigation";
 import { useI18n } from "@/lib/i18n/client";
 import { cn, initials } from "@/lib/utils";
 import { BrandLockup, BrandMark } from "./brand";
@@ -34,11 +34,15 @@ export interface ShellProps {
   children: ReactNode;
 }
 
+/** the menu groups with their headings (core, AI & agents, growth, operations) */
+const GROUPS: { key: NavGroupKey; label: "nav.sectionCore" | "nav.sectionGrowth" | "nav.sectionOps" | "nav.sectionAi" }[] = NAV_GROUPS.map((key) => ({ key, label: key === "core" ? "nav.sectionCore" : key === "growth" ? "nav.sectionGrowth" : key === "ops" ? "nav.sectionOps" : "nav.sectionAi" }));
 const SECTIONS: { key: NavSection; label: "nav.sectionCore" | "nav.sectionGrowth" | "nav.sectionOps" }[] = [
   { key: "core", label: "nav.sectionCore" },
   { key: "growth", label: "nav.sectionGrowth" },
   { key: "ops", label: "nav.sectionOps" },
 ];
+// (the section list is kept for reference; the menu renders GROUPS, which adds the AI group)
+void SECTIONS;
 
 /** feature flags that are on for the business (items with a `flag` stay hidden until it is on) */
 const FlagsContext = createContext<string[]>([]);
@@ -87,7 +91,7 @@ function NavList({ permissions, collapsed, onNavigate, isPlatformAdmin }: { perm
   const items = useVisibleItems(permissions, isPlatformAdmin);
   return (
     <nav className="space-y-5" aria-label={t("nav.menu")}>
-      {SECTIONS.map((s) => (
+      {GROUPS.filter((s) => itemsOfGroup(items, s.key).length).map((s) => (
         <div key={s.key}>
           {!collapsed ? (
             <div className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">{t(s.label)}</div>
@@ -95,8 +99,7 @@ function NavList({ permissions, collapsed, onNavigate, isPlatformAdmin }: { perm
             <div className="mx-auto mb-2 h-px w-6 bg-line" />
           )}
           <div className="space-y-0.5">
-            {items
-              .filter((i) => i.section === s.key)
+            {itemsOfGroup(items, s.key)
               .map((i) => (
                 <NavLink key={i.key} item={i} collapsed={collapsed} onNavigate={onNavigate} />
               ))}
@@ -114,8 +117,8 @@ function NavGrid({ permissions, onNavigate, isPlatformAdmin }: { permissions: Pe
   const items = useVisibleItems(permissions, isPlatformAdmin);
   return (
     <nav className="space-y-4" aria-label={t("nav.menu")} data-testid="nav-grid">
-      {SECTIONS.map((s) => {
-        const list = items.filter((i) => i.section === s.key);
+      {GROUPS.map((s) => {
+        const list = itemsOfGroup(items, s.key);
         if (!list.length) return null;
         return (
           <div key={s.key}>

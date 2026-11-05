@@ -30,6 +30,7 @@ export function HealthPanel({ health }: { health: TeamHealthData }) {
           ))}
         </ul>
       ) : null}
+      {health.showModels === false ? null : (
       <div>
         <h4 className="mb-1 text-[12.5px] font-semibold">{t("aiTeam.health.models")}</h4>
         {health.models.length ? (
@@ -47,6 +48,7 @@ export function HealthPanel({ health }: { health: TeamHealthData }) {
           <p className="text-[12.5px] text-muted">{t("aiTeam.health.noModels")}</p>
         )}
       </div>
+      )}
       <div>
         <h4 className="mb-1 text-[12.5px] font-semibold">{t("aiTeam.health.failures")}</h4>
         {health.failures.length ? (

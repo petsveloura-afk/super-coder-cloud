@@ -174,6 +174,15 @@ export function TeamScreen({ data }: { data: TeamPageData }) {
           )}
         </div>
       ) : null}
+      {/* each tab opens with its main work (give a goal, the approvals, the memory, the log, the settings);
+          the extra insight cards follow under one clear heading */}
+      {tab === "goals" ? <GoalsPanel data={data} onRefresh={refresh} /> : null}
+      {tab === "goals" && (data.plus7 || data.plus8 || data.orgId) ? <MoreHeading label={t("aiTeam.more.goals")} /> : null}
+      {tab === "goals" && data.plus8 ? (
+        <div className="mb-4">
+          <StabilityPanel data={data} locale={locale} onRefresh={refresh} />
+        </div>
+      ) : null}
       {tab === "goals" && data.plus7 ? (
         <div className="mb-4 space-y-4">
           {data.plus7.goals ? <GoalsCard data={data.plus7} canManage={data.canManage} locale={locale} onRefresh={refresh} /> : null}
@@ -182,37 +191,34 @@ export function TeamScreen({ data }: { data: TeamPageData }) {
           <SampleEntryCard data={data} locale={locale} onRefresh={refresh} />
         </div>
       ) : null}
-      {tab === "goals" && data.plus8 ? (
-        <div className="mb-4">
-          <StabilityPanel data={data} locale={locale} onRefresh={refresh} />
-        </div>
-      ) : null}
       {tab === "goals" && data.orgId ? <Plus8bPanels orgId={data.orgId} locale={locale} slot="goals" /> : null}
-      {tab === "goals" ? <GoalsPanel data={data} onRefresh={refresh} /> : null}
       {tab === "approvals" ? <ApprovalsPanel data={data} onRefresh={refresh} /> : null}
+      {tab === "memory" ? <MemoryPanel data={data} onRefresh={refresh} /> : null}
+      {tab === "memory" && (data.facts || data.orgId) ? <MoreHeading label={t("aiTeam.more.memory")} /> : null}
       {tab === "memory" && data.facts ? (
         <div className="mb-4">
           <FactsPanel facts={data.facts} canManage={data.canManage} locale={locale} now={data.now} onRefresh={refresh} />
         </div>
       ) : null}
       {tab === "memory" && data.orgId ? <Plus8bPanels orgId={data.orgId} locale={locale} slot="memory" /> : null}
-      {tab === "memory" ? <MemoryPanel data={data} onRefresh={refresh} /> : null}
       {tab === "playbooks" ? <PlaybooksPanel data={data} roles={ROLE_KEYS} onRefresh={refresh} /> : null}
       {tab === "meeting" ? <MeetingPanel data={data} /> : null}
+      {tab === "activity" ? <ActivityPanel data={data} onRefresh={refresh} /> : null}
+      {tab === "activity" && (data.plus7?.decisions || data.orgId) ? <MoreHeading label={t("aiTeam.more.activity")} /> : null}
       {tab === "activity" && data.plus7?.decisions ? (
         <div className="mb-4">
           <WhyPanel data={data.plus7} canManage={data.canManage} locale={locale} onRefresh={refresh} />
         </div>
       ) : null}
       {tab === "activity" && data.orgId ? <Plus8bPanels orgId={data.orgId} locale={locale} slot="activity" /> : null}
-      {tab === "activity" ? <ActivityPanel data={data} onRefresh={refresh} /> : null}
+      {tab === "settings" ? <SettingsPanel data={data} onRefresh={refresh} /> : null}
+      {tab === "settings" && (data.orgId || (data.plus8 && data.platformAdmin)) ? <MoreHeading label={t("aiTeam.more.settings")} /> : null}
       {tab === "settings" && data.orgId ? <Plus8bPanels orgId={data.orgId} locale={locale} slot="health" /> : null}
       {tab === "settings" && data.plus8 ? (
         <div className="mb-4">
           <SkippedEnginesCard data={data} />
         </div>
       ) : null}
-      {tab === "settings" ? <SettingsPanel data={data} onRefresh={refresh} /> : null}
 
       <Dialog open={hireOpen} onOpenChange={setHireOpen} title={t("aiTeam.hire.title")} description={t("aiTeam.hire.body")} className="sm:max-w-4xl">
         <HireGallery roles={ROLE_KEYS} onPick={hire} />
@@ -233,6 +239,16 @@ export function TeamScreen({ data }: { data: TeamPageData }) {
           roles={ROLE_KEYS}
         />
       ) : null}
+    </div>
+  );
+}
+
+/** a quiet section heading between a tab's main work and its extra cards */
+function MoreHeading({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-2" role="separator" aria-label={label}>
+      <span className="text-[12px] font-semibold uppercase tracking-wide text-subtle">{label}</span>
+      <span className="h-px flex-1 bg-line" aria-hidden />
     </div>
   );
 }
