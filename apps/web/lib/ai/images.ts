@@ -26,15 +26,30 @@ export interface GeneratedImage {
   model: string;
 }
 
+/** optional extras for a generation (all additive; without them the call is exactly what it was) */
+export interface ImageOptions {
+  /** "16:9", "1:1", "4:5", "9:16", "3:2", "4:3", "21:9" — sent as generationConfig.imageConfig.aspectRatio */
+  aspectRatio?: string | null;
+}
+
 /** Raw generation (no storage). Throws `image_<status>…` when every model/key failed. */
-export async function generateImage(prompt: string): Promise<GeneratedImage> {
+export async function generateImage(prompt: string, opts: ImageOptions = {}): Promise<GeneratedImage> {
   const keys = geminiKeys();
   if (!keys.length) throw new Error("image_not_configured");
   const base = (process.env.AI_GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
-  const body = JSON.stringify({
+  const aspect = opts.aspectRatio && /^\d{1,2}:\d{1,2}$/.test(opts.aspectRatio) ? opts.aspectRatio : null;
+  const plainBody = JSON.stringify({
     contents: [{ role: "user", parts: [{ text: prompt.slice(0, 1800) }] }],
     generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
   });
+  // the aspect ratio is asked for when given; a model that does not know the field is asked again without it (same key)
+  const aspectBody = aspect
+    ? JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt.slice(0, 1800) }] }],
+        generationConfig: { responseModalities: ["TEXT", "IMAGE"], imageConfig: { aspectRatio: aspect } },
+      })
+    : null;
+  let body = aspectBody ?? plainBody;
   const start = Math.floor(Math.random() * keys.length);
   let last = "image_failed";
   let calls = 0;
@@ -63,6 +78,11 @@ export async function generateImage(prompt: string): Promise<GeneratedImage> {
       }
       last = `image_${res.status}${json.error?.status ? `:${json.error.status}` : ""}${json.error?.message ? `:${json.error.message.slice(0, 160)}` : ""}`;
       console.error("gemini image failed", model, last);
+      if (res.status === 400 && body !== plainBody && /imageConfig|aspect|unknown|invalid json payload/i.test(json.error?.message ?? "")) {
+        body = plainBody; // this model does not take the aspect ratio — the same key again without it
+        k--;
+        continue;
+      }
       if (res.status === 404 || res.status === 400 || res.status === 403) break; // model not available for this key → next model
     }
     if (calls >= 6) break;
@@ -71,8 +91,8 @@ export async function generateImage(prompt: string): Promise<GeneratedImage> {
 }
 
 /** Generate + store in the public bucket; returns the public https URL. */
-export async function generateAndStoreImage(orgId: string, prompt: string): Promise<{ url: string; model: string }> {
-  const img = await generateImage(prompt);
+export async function generateAndStoreImage(orgId: string, prompt: string, opts: ImageOptions = {}): Promise<{ url: string; model: string }> {
+  const img = await generateImage(prompt, opts);
   const ext = img.mimeType.includes("jpeg") ? "jpg" : img.mimeType.includes("webp") ? "webp" : "png";
   const path = `${orgId}/${randomUUID()}.${ext}`;
   const admin = createAdminClient();

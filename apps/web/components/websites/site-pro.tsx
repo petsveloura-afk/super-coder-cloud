@@ -5,6 +5,7 @@ import { PublicForm } from "@/components/public/public-form";
 import { LEGAL_TITLES, legalText, parseLegal, type LegalKey } from "@/lib/site/legal";
 import { FONTS, fontsHref, onColor, resolveTheme } from "@/lib/site/templates";
 import { A11yMenu, CookieBanner, SiteMotion } from "./site-client";
+import { SiteEffects } from "./site-effects";
 import { SiteCountdown } from "./site-countdown";
 import type { FormsMap } from "./site-renderer";
 import "./site-pro.css";
@@ -17,7 +18,7 @@ import "./site-pro.css";
 export interface ProSiteData {
   name: string;
   slug: string;
-  theme: { template?: string; accent?: string; accent2?: string; mode?: "dark" | "light"; font?: string; radius?: string; animations?: boolean };
+  theme: { template?: string; accent?: string; accent2?: string; mode?: "dark" | "light"; font?: string; radius?: string; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant" };
   blocks: SiteBlock[];
   settings?: Record<string, unknown> | null;
   pages?: Record<string, string> | null;
@@ -704,7 +705,7 @@ export function ProSite({
   ) : null;
 
   return (
-    <div id={rootId} className="scs" dir={dir} lang={lang} style={style} data-tpl={th.tpl.key} data-mode={th.mode} data-radius={th.radius} data-cards={th.tpl.cards} data-bg={th.tpl.bg} data-motion={th.tpl.motion} data-anim={th.animations ? "on" : "off"} data-testid="pro-site">
+    <div id={rootId} className="scs" dir={dir} lang={lang} style={style} data-tpl={th.tpl.key} data-mode={th.mode} data-radius={th.radius} data-cards={th.tpl.cards} data-bg={th.tpl.bg} data-motion={th.tpl.motion} data-anim={th.animations ? "on" : "off"} data-fx={th.effects ?? "subtle"} data-div={th.dividers ?? "none"} data-testid="pro-site">
       {fonts ? <link rel="stylesheet" href={fonts} /> : null}
       <div className="bgfx" aria-hidden="true" />
       {banner}
@@ -823,6 +824,8 @@ export function ProSite({
       ) : null}
       {s.cookie_banner !== false ? <CookieBanner text={t("websites.site.cookieText")} accept={t("websites.site.cookieOk")} more={LEGAL_TITLES[lang === "en" ? "en" : lang === "ar" ? "ar" : "he"].cookies} href={link("cookies")} /> : null}
       <SiteMotion rootId={rootId} enabled={th.animations} />
+      {/* effects pack: scroll progress, counting numbers, spotlight cards, staggered reveals, back to top (client island) */}
+      {th.effects && th.effects !== "none" ? <SiteEffects rootId={rootId} level={th.effects} /> : null}
     </div>
   );
 }

@@ -30,7 +30,7 @@ export interface SiteValue {
   name: string;
   slug: string;
   status: "draft" | "published";
-  theme: { accent: string; mode: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean };
+  theme: { accent: string; mode: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant" };
   seo: { title: string; description: string };
   blocks: BlockValue[];
   // wave 13

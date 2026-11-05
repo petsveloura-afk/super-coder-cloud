@@ -45,7 +45,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
   const embeds = await siteEmbedOptions(ctx.org.id);
   const caps = await aiSiteCaps(ctx.org.id);
   const Back = locale === "en" ? ArrowLeft : ArrowRight;
-  const theme = (s.theme ?? {}) as { accent?: string; mode?: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean };
+  const theme = (s.theme ?? {}) as { accent?: string; mode?: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant" };
   // wave 13: domain panel data
   const { domainsConfigured } = await import("@/lib/site/domains");
   const { paypalSdkConfig } = await import("@/lib/billing/paypal");
@@ -117,6 +117,9 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             ...(theme.font ? { font: theme.font } : {}),
             ...(theme.radius ? { radius: theme.radius } : {}),
             ...(theme.animations === false ? { animations: false } : {}),
+            // the effects pack and section shapes the site already has (saving the editor keeps them)
+            ...(theme.effects === "none" || theme.effects === "subtle" || theme.effects === "rich" ? { effects: theme.effects } : {}),
+            ...(theme.dividers === "none" || theme.dividers === "wave" || theme.dividers === "curve" || theme.dividers === "slant" ? { dividers: theme.dividers } : {}),
           },
           settings: (s.settings ?? {}) as SiteSettings,
           pages: (s.pages ?? {}) as SitePages,

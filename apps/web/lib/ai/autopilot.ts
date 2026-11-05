@@ -709,6 +709,21 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
       const retryMarkers = parseActionMarkers(retry.text);
       const retryTools = parseAgentTools(retryMarkers.text);
       retryTools.text = stripStrayMarkers(retryTools.text);
+      // the quick retry passes the same price check as the first answer — an invented price never goes out this way either
+      {
+        const factsForRetry = factsText({ instructions: agent.instructions as string, profile: profile as Record<string, unknown> });
+        const rc = checkReply({ reply: retryTools.text, facts: factsForRetry, previousAssistant: history.filter((m) => m.role === "assistant").map((m) => m.content), allowEmpty: retryTools.handoff, customerText: lastIn });
+        if (rc.unsupported.length) {
+          retryTools.text = dropUnsupportedSentences(retryTools.text, rc.unsupported);
+          if (!retryTools.text.trim()) {
+            // nothing true is left to say: the honest "let me check with the team" — the team gets it; the agent returns if nobody answers
+            const safe = formatForChannel(guardrailHandoffText(locale, "check"), ch);
+            await sendToConversation(orgId, conv.id as string, safe, undefined, { aiAgentId: agent.id as string, meta: { system: "guardrail", blocked: "price", draft: retry.text.slice(0, 1500) } });
+            await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "guardrail_price" });
+            return { replied: true, handoff: true, reason: "guardrail_price", text: safe };
+          }
+        }
+      }
       if (retryTools.text || retryTools.handoff) {
         Object.assign(tools, retryTools);
         if (retryMarkers.actions.length) actionMarkers = retryMarkers;

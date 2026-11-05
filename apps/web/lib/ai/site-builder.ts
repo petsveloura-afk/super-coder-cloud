@@ -143,7 +143,12 @@ export async function buildSiteWithAI(input: {
     const { data: usageId } = await supabase.rpc("reserve_ai_credits", { p_org: input.orgId, p_feature: "image_gen", p_agent: input.agentId ?? null });
     if (usageId !== null && usageId !== undefined) {
       try {
-        const img = await generateAndStoreImage(input.orgId, `${site.imagePrompt}. Professional, high quality, modern, website hero photo, no text, no watermark.`);
+        // the image director: a full art-direction prompt for a wide hero (falls back to the site's own prompt)
+        const heroPrompt = await import("./image-director")
+          .then((m) => m.directImage({ request: `${site.imagePrompt}\n${input.brief.slice(0, 600)}`, purpose: "hero", business: site.name, brandColors: [site.theme?.accent, site.theme?.accent2].filter((c): c is string => typeof c === "string") }))
+          .then((d) => d.prompt)
+          .catch(() => `${site.imagePrompt}. Professional, high quality, modern, website hero photo, no text, no watermark.`);
+        const img = await generateAndStoreImage(input.orgId, heroPrompt, { aspectRatio: "16:9" });
         const hero = site.blocks.find((b) => b.type === "hero");
         if (hero && hero.type === "hero") hero.data.image_url = img.url;
         image = true;
@@ -158,7 +163,9 @@ export async function buildSiteWithAI(input: {
   // tool 3: free photos for every slot still empty (hero without AI image, about, gallery) — never blocks the site
   if (Date.now() - t0 < 70_000) {
     const { freeSiteImages } = await import("./site-tools");
-    const filled = await freeSiteImages(input.orgId, site as unknown as { name: string; blocks: { type: string; data: Record<string, unknown> }[] }, site.imagePrompt || input.brief, 18_000);
+    // photos that match the business (a Hebrew brief no longer becomes the search word "business")
+    const seed = await import("./image-director-core").then((m) => m.stockSeed(site.imagePrompt, input.brief)).catch(() => site.imagePrompt || input.brief);
+    const filled = await freeSiteImages(input.orgId, site as unknown as { name: string; blocks: { type: string; data: Record<string, unknown> }[] }, seed, 18_000);
     site.blocks = filled.site.blocks as unknown as typeof site.blocks;
     report.images = filled.placed + (image ? 1 : 0);
     if (!image && site.blocks.some((b) => b.type === "hero" && typeof (b.data as { image_url?: string }).image_url === "string" && Boolean((b.data as { image_url?: string }).image_url))) image = true;
@@ -191,7 +198,11 @@ export async function aiHeroImage(orgId: string, prompt: string): Promise<{ ok: 
   const { data: usageId, error: reserveError } = await supabase.rpc("reserve_ai_credits", { p_org: orgId, p_feature: "image_gen", p_agent: null });
   if (reserveError || usageId === null) return { ok: false, error: reserveError?.message?.includes("plan_limit") ? "ai.limitReached" : "ai.failed" };
   try {
-    const img = await generateAndStoreImage(orgId, `${prompt.slice(0, 800)}. Professional, high quality, modern, website hero photo, no text, no watermark.`);
+    const heroPrompt = await import("./image-director")
+      .then((m) => m.directImage({ request: prompt.slice(0, 800), purpose: "hero" }))
+      .then((d) => d.prompt)
+      .catch(() => `${prompt.slice(0, 800)}. Professional, high quality, modern, website hero photo, no text, no watermark.`);
+    const img = await generateAndStoreImage(orgId, heroPrompt, { aspectRatio: "16:9" });
     await supabase.rpc("finalize_ai_usage", { p_usage_id: usageId, p_provider: "gemini", p_model: img.model, p_input: 4000, p_output: 0, p_ok: true });
     return { ok: true, url: img.url };
   } catch (e) {

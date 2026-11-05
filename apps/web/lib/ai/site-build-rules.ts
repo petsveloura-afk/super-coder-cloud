@@ -195,7 +195,7 @@ export function siteBuildOverrides(d: BuildDirectives, mode: "landing" | "full")
 type B = { type: string; data: Record<string, unknown> };
 export interface PolishableSite {
   name: string;
-  theme: { accent: string; mode: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean };
+  theme: { accent: string; mode: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant" };
   seo: { title: string; description: string };
   blocks: SiteBlock[];
 }
@@ -302,6 +302,8 @@ export function polishBuiltSite<T extends PolishableSite>(input: T, d: BuildDire
   if (d.accent) site.theme.accent = d.accent;
   if (d.accent2) site.theme.accent2 = d.accent2;
   site.theme.animations = d.animations === false ? false : true;
+  // the effects pack: a new site looks designed — "rich" unless the owner asked for no animations or the model chose calmer
+  site.theme.effects = site.theme.animations === false ? "none" : site.theme.effects ?? (d.style === "corporate" || d.style === "minimal" || d.industry === "law" || d.industry === "clinic" ? "subtle" : "rich");
   if (!o.template && d.style) {
     const pick = STYLE_TEMPLATES[d.style].find((k) => o.templates.includes(k));
     if (pick) {

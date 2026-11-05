@@ -41,11 +41,12 @@ async function fallbackAndStore(orgId: string, prompt: string, platform: StudioP
   return { url: admin.storage.from("site-assets").getPublicUrl(path).data.publicUrl, model: "flux-fallback" };
 }
 
-async function produce(orgId: string, prompt: string, platform: StudioPlatform): Promise<{ url: string; model: string; provider: string }> {
+async function produce(orgId: string, prompt: string, platform: StudioPlatform, aspectRatio?: string | null): Promise<{ url: string; model: string; provider: string }> {
   let primaryError = "";
   if (imagesConfigured() && primaryAvailable(primaryCoolUntil, Date.now())) {
     try {
-      const r = await generateAndStoreImage(orgId, prompt);
+      // the frame the post needs (square for Instagram, wide for Facebook) unless the caller asked for another one
+      const r = await generateAndStoreImage(orgId, prompt, { aspectRatio: aspectRatio ?? (platform === "instagram" ? "1:1" : "16:9") });
       return { ...r, provider: "gemini" };
     } catch (e) {
       primaryError = (e as Error).message;
@@ -82,14 +83,14 @@ async function produce(orgId: string, prompt: string, platform: StudioPlatform):
   }
 }
 
-export async function generateMeteredImage(orgId: string, prompt: string, platform: StudioPlatform = "facebook"): Promise<MeteredImage> {
+export async function generateMeteredImage(orgId: string, prompt: string, platform: StudioPlatform = "facebook", opts: { aspectRatio?: string | null } = {}): Promise<MeteredImage> {
   const admin = createAdminClient();
   const { data: usageId, error: reserveError } = await admin.rpc("reserve_ai_credits_system", { p_org: orgId, p_feature: "image_gen", p_agent: null });
   if (reserveError || usageId === null || usageId === undefined) {
     return { ok: false, error: limitErrorKey(reserveError?.message) ?? "ai.failed" };
   }
   try {
-    const img = await produce(orgId, prompt, platform);
+    const img = await produce(orgId, prompt, platform, opts.aspectRatio);
     await admin.rpc("finalize_ai_usage_system", { p_usage_id: usageId, p_provider: img.provider, p_model: img.model, p_input: 0, p_output: 0, p_ok: true });
     return { ok: true, url: img.url, model: img.model };
   } catch (e) {
@@ -145,4 +146,32 @@ export async function sceneForImage(postText: string): Promise<string> {
     console.error("studio scene from post failed", (e as Error).message);
   }
   return topicForImage(seed);
+}
+
+
+/**
+ * The professional prompt for a post picture: the image director (art-direction brief → full prompt). When the
+ * director is unavailable the caller's own prompt is used unchanged — so this can only make a picture better.
+ */
+export async function directedPostPrompt(input: { request: string; platform: StudioPlatform; style?: string | null; business?: string | null; brandVoice?: string | null; orgId?: string | null }, fallbackPrompt: string): Promise<string> {
+  try {
+    const { directImage } = await import("@/lib/ai/image-director");
+    const colors = input.orgId ? await brandColors(input.orgId) : [];
+    const d = await directImage({ request: input.request, purpose: "post", platform: input.platform, style: (input.style as never) ?? "auto", business: input.business ?? null, brandVoice: input.brandVoice ?? null, brandColors: colors });
+    return d.prompt || fallbackPrompt;
+  } catch (e) {
+    console.error("directed post prompt failed", (e as Error).message);
+    return fallbackPrompt;
+  }
+}
+
+/** the brand colors the business already uses on its published website (accent + second accent), if any */
+export async function brandColors(orgId: string): Promise<string[]> {
+  try {
+    const { data } = await createAdminClient().from("sites").select("theme").eq("organization_id", orgId).order("updated_at", { ascending: false }).limit(1).maybeSingle();
+    const th = ((data as { theme?: { accent?: string; accent2?: string } } | null)?.theme ?? {}) as { accent?: string; accent2?: string };
+    return [th.accent, th.accent2].filter((c): c is string => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c));
+  } catch {
+    return [];
+  }
 }

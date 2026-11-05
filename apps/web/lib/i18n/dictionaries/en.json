@@ -3086,7 +3086,17 @@
       "radiusRound": "Round",
       "animations": "Animations and motion",
       "pickForAi": "Design template",
-      "aiChooses": "Let the AI pick a template for the business"
+      "aiChooses": "Let the AI pick a template for the business",
+      "effects": "Effects",
+      "effectsHint": "Gentle card motion, counting numbers, a progress bar. \"Rich\" adds a glow behind the hero, shining buttons and depth in images.",
+      "effectsNone": "None",
+      "effectsSubtle": "Subtle (recommended)",
+      "effectsRich": "Rich — extra impressive",
+      "dividers": "Between sections",
+      "dividersNone": "Straight",
+      "dividersWave": "Wave",
+      "dividersCurve": "Curve",
+      "dividersSlant": "Slant"
     },
     "business": {
       "title": "Business details",
@@ -3154,7 +3164,17 @@
         "comparison": "Comparison table",
         "countdown": "Countdown",
         "banner": "Announcement bar",
-        "polish": "Pro polish"
+        "polish": "Pro polish",
+        "wow": "Wow effects",
+        "waves": "Waves between sections",
+        "darkLux": "Dark & luxurious",
+        "colorful": "Colorful & happy",
+        "gallery": "Gallery",
+        "team": "Team",
+        "headline": "Stronger headline",
+        "mobile": "Mobile-first",
+        "elegantFont": "Elegant font",
+        "story": "Business story"
       },
       "quick": {
         "modern": "Make the site more modern and impressive: a stronger headline, sharper copy and a current design template that fits the business",
@@ -3176,7 +3196,17 @@
         "comparison": "Add an 'us vs. others' comparison table with 5-6 honest rows about general advantages, no competitor names and no invented numbers",
         "countdown": "Add an offer countdown section ONLY if the content has an end date; if not, do not add it and do not invent a date",
         "banner": "Add a slim announcement bar at the top ONLY if the content has a real offer or news",
-        "polish": "Do a full professional polish: sharp short headlines, concrete benefits, a clear call to action in every part, a logical section order and consistent language. Keep all existing content and details and do not delete sections"
+        "polish": "Do a full professional polish: sharp short headlines, concrete benefits, a clear call to action in every part, a logical section order and consistent language. Keep all existing content and details and do not delete sections",
+        "wow": "Make the site visually impressive: set \"effects\": \"rich\", choose \"dividers\" that fit the style, strengthen headlines and calls to action. Do not change facts.",
+        "waves": "Add soft transitions between sections: set \"dividers\": \"wave\". Do not change content.",
+        "darkLux": "Redesign with a dark, luxurious look: dark mode, gold/champagne colors, an elegant font, sharp corners and \"effects\": \"rich\". Do not change facts.",
+        "colorful": "Redesign with a bright, colorful, happy look: lively harmonious colors, round corners, \"dividers\": \"wave\" and \"effects\": \"rich\".",
+        "gallery": "Add a gallery section after the services with 6 items and short captions, for the owner to replace with their own photos.",
+        "team": "Add a team section with 3 people — names and roles as placeholders for the owner to replace, without inventing facts.",
+        "headline": "Rewrite the hero title and subtitle to focus on the outcome the customer gets — short and strong. Do not invent facts.",
+        "mobile": "Shorten all texts for easy reading on a phone: titles up to 6 words, short sentences, one paragraph per section.",
+        "elegantFont": "Switch to an elegant font (frank or noto-serif for headings) and match the corners to a refined look.",
+        "story": "Add or improve the About section: the business story, values and approach in 2-3 short, warm paragraphs, without inventing facts."
       },
       "stage0": "Reading your current site…",
       "stage1": "Planning the changes…",

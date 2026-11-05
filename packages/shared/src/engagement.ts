@@ -420,6 +420,11 @@ export const siteSchema = z.object({
       font: z.enum(SITE_FONTS).optional(),
       radius: z.enum(["sharp", "soft", "round"]).optional(),
       animations: z.boolean().optional(),
+      // effects pack (optional): card lift + glow, staggered reveals, counting numbers, scroll progress, image zoom;
+      // "rich" adds the hero aurora, spotlight cards, button shine and hero parallax. Missing = "subtle".
+      effects: z.enum(["none", "subtle", "rich"]).optional(),
+      // a soft shape between sections (missing = none)
+      dividers: z.enum(["none", "wave", "curve", "slant"]).optional(),
     })
     .default({ accent: "#3366E6", mode: "dark" }),
   seo: z.object({ title: shortText(70), description: shortText(160) }).default({ title: "", description: "" }),

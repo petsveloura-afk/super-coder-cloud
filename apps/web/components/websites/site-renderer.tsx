@@ -11,7 +11,7 @@ import { ProSite } from "./site-pro";
  */
 export interface RenderableSite {
   name: string;
-  theme: { accent?: string; mode?: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: string; animations?: boolean };
+  theme: { accent?: string; mode?: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: string; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant" };
   blocks: SiteBlock[];
   // wave 13 (optional)
   slug?: string;

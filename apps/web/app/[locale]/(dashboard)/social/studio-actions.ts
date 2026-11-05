@@ -48,10 +48,12 @@ export async function aiImageAction(input: { locale: string; topic: string; plat
     admin.from("organizations").select("name").eq("id", ctx.org.id).maybeSingle(),
     admin.from("social_settings").select("brand_voice").eq("organization_id", ctx.org.id).maybeSingle(),
   ]);
-  const { generateMeteredImage, topicForImage } = await import("@/lib/social/studio-image");
+  const { generateMeteredImage, topicForImage, directedPostPrompt } = await import("@/lib/social/studio-image");
   // image models understand English far better than Hebrew/Arabic: translate the topic first (free text call, no credit)
   const topicEn = await topicForImage(p.data.topic);
-  const prompt = buildImagePrompt({ topic: topicEn, platform: p.data.platform, brandVoice: (social?.brand_voice as string | null) ?? null, business: (org?.name as string | null) ?? null });
+  const basicPrompt = buildImagePrompt({ topic: topicEn, platform: p.data.platform, brandVoice: (social?.brand_voice as string | null) ?? null, business: (org?.name as string | null) ?? null });
+  // the image director: a full art-direction prompt (subject, setting, camera, light, palette, quality, no text) — falls back to the basic prompt
+  const prompt = await directedPostPrompt({ request: p.data.topic, platform: p.data.platform, business: (org?.name as string | null) ?? null, brandVoice: (social?.brand_voice as string | null) ?? null, orgId: ctx.org.id }, basicPrompt);
   const supabase = await createClient();
   const images: { url: string }[] = [];
   let partialError: string | undefined;
@@ -188,10 +190,12 @@ export async function aiImageProAction(input: { locale: string; topic?: string; 
     admin.from("organizations").select("name").eq("id", ctx.org.id).maybeSingle(),
     admin.from("social_settings").select("brand_voice").eq("organization_id", ctx.org.id).maybeSingle(),
   ]);
-  const { generateMeteredImage, topicForImage, sceneForImage } = await import("@/lib/social/studio-image");
+  const { generateMeteredImage, topicForImage, sceneForImage, directedPostPrompt } = await import("@/lib/social/studio-image");
   // the post wins: the picture must match what was actually written; the topic box refines it when both exist
   const scene = postText.length >= 2 ? await sceneForImage(topic.length >= 2 ? `${topic}\n\n${postText}` : postText) : await topicForImage(topic);
-  const prompt = buildSceneImagePrompt({ scene, platform: p.data.platform, style: p.data.style ?? "auto", brandVoice: (social?.brand_voice as string | null) ?? null, business: (org?.name as string | null) ?? null });
+  const scenePrompt = buildSceneImagePrompt({ scene, platform: p.data.platform, style: p.data.style ?? "auto", brandVoice: (social?.brand_voice as string | null) ?? null, business: (org?.name as string | null) ?? null });
+  // the image director refines the scene into a full art-direction prompt (the scene prompt stays the fallback)
+  const prompt = await directedPostPrompt({ request: `${scene}${topic.length >= 2 ? `\n(${topic})` : ""}`, platform: p.data.platform, style: p.data.style ?? "auto", business: (org?.name as string | null) ?? null, brandVoice: (social?.brand_voice as string | null) ?? null, orgId: ctx.org.id }, scenePrompt);
   const title = (topic || postToSceneSeed(postText) || postText).slice(0, 200);
   const supabase = await createClient();
   const images: { url: string }[] = [];

@@ -171,7 +171,10 @@ export async function makeSmartPost(orgId: string, opts: MakeOpts): Promise<{ ok
   if (media !== "none" && !videoUrl) {
     const { generateMeteredImage, sceneForImage } = await import("./studio-image");
     const scene = parts.scene && !/[֐-׿؀-ۿ]/.test(parts.scene) && media !== "video" ? parts.scene : await sceneForImage(body);
-    const prompt = buildSceneImagePrompt({ scene, platform: primary, style: (s.style === "auto" ? "photo" : s.style) as "photo", brandVoice: (social?.brand_voice as string | null) ?? null, business: org.name });
+    const scenePrompt = buildSceneImagePrompt({ scene, platform: primary, style: (s.style === "auto" ? "photo" : s.style) as "photo", brandVoice: (social?.brand_voice as string | null) ?? null, business: org.name });
+    // the image director turns the scene into a full art-direction prompt (the scene prompt stays the fallback)
+    const { directedPostPrompt } = await import("./studio-image");
+    const prompt = await directedPostPrompt({ request: scene, platform: primary, style: s.style === "auto" ? "auto" : (s.style as string), business: org.name, brandVoice: (social?.brand_voice as string | null) ?? null, orgId }, scenePrompt);
     const img = await generateMeteredImage(orgId, prompt, primary);
     if (img.ok) imageUrl = img.url;
     else mediaPending = "image";
@@ -268,7 +271,11 @@ export async function fillPendingMedia(budgetMs = 30_000): Promise<{ filled: num
       const { generateMeteredImage, sceneForImage } = await import("./studio-image");
       const { buildSceneImagePrompt } = await import("./studio-core");
       const { data: org } = await admin.from("organizations").select("name").eq("id", p.organization_id).maybeSingle();
-      const img = await generateMeteredImage(p.organization_id, buildSceneImagePrompt({ scene: await sceneForImage(p.body), platform, style: (s.style === "auto" ? "photo" : s.style) as "photo", business: (org?.name as string | null) ?? null }), platform);
+      const scene2 = await sceneForImage(p.body);
+      const scenePrompt2 = buildSceneImagePrompt({ scene: scene2, platform, style: (s.style === "auto" ? "photo" : s.style) as "photo", business: (org?.name as string | null) ?? null });
+      const { directedPostPrompt } = await import("./studio-image");
+      const prompt2 = await directedPostPrompt({ request: scene2, platform, style: s.style === "auto" ? "auto" : (s.style as string), business: (org?.name as string | null) ?? null, orgId: p.organization_id }, scenePrompt2);
+      const img = await generateMeteredImage(p.organization_id, prompt2, platform);
       if (img.ok) image = img.url;
     }
     if (image || video) {

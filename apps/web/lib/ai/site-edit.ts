@@ -23,7 +23,7 @@ export async function editSiteWithAI(input: { orgId: string; locale: Locale; ins
   const form = input.site.blocks.find((b) => b.type === "form");
   const booking = input.site.blocks.find((b) => b.type === "booking");
   const ctx = { formSlug: form?.type === "form" ? form.data.form_slug || null : null, bookingSlug: booking?.type === "booking" ? booking.data.booking_slug || null : null };
-  const current = { name: input.site.name, accent: input.site.theme.accent, mode: input.site.theme.mode, template: input.site.theme.template ?? ordered[0], accent2: input.site.theme.accent2, font: input.site.theme.font, radius: input.site.theme.radius, seo: input.site.seo, blocks: input.site.blocks };
+  const current = { name: input.site.name, accent: input.site.theme.accent, mode: input.site.theme.mode, template: input.site.theme.template ?? ordered[0], accent2: input.site.theme.accent2, font: input.site.theme.font, radius: input.site.theme.radius, effects: (input.site.theme as { effects?: string }).effects, dividers: (input.site.theme as { dividers?: string }).dividers, animations: (input.site.theme as { animations?: boolean }).animations, seo: input.site.seo, blocks: input.site.blocks };
   const system = [
     "You are editing an EXISTING website. Apply the owner's instruction and return the COMPLETE updated website JSON (same shape as below).",
     "Keep everything the instruction does not mention: section order, texts, image_url values, links, form_slug / booking_slug, contact details. Never invent phone numbers, emails, prices, reviews or client names.",
@@ -71,5 +71,18 @@ export async function editSiteWithAI(input: { orgId: string; locale: Locale; ins
   });
   // wave 34: contact details / images the model forgot come back (matched by section type, not by position)
   restoreKept(input.site.blocks as unknown as { type: string; data: Record<string, unknown> }[], site.blocks as unknown as { type: string; data: Record<string, unknown> }[], input.instruction);
+  // a gallery / about / hero the edit added without pictures gets matching free photos (never replaces a picture that exists)
+  try {
+    const needs = site.blocks.some((b) => (b.type === "gallery" && !((b.data as { items?: unknown[] }).items ?? []).length) || ((b.type === "about" || b.type === "hero") && !(b.data as { image_url?: string }).image_url));
+    if (needs) {
+      const { freeSiteImages } = await import("./site-tools");
+      const { stockSeed } = await import("./image-director-core");
+      const seed = stockSeed(null, `${input.site.name} ${input.instruction} ${JSON.stringify(input.site.blocks).slice(0, 1500)}`);
+      const filled = await freeSiteImages(input.orgId, site as unknown as { name: string; blocks: { type: string; data: Record<string, unknown> }[] }, seed, 12_000);
+      site.blocks = filled.site.blocks as unknown as typeof site.blocks;
+    }
+  } catch (e) {
+    console.error("ai site edit photos failed", (e as Error).message);
+  }
   return { ok: true, site: { name: site.name, theme: { ...input.site.theme, ...site.theme }, seo: site.seo, blocks: site.blocks } };
 }

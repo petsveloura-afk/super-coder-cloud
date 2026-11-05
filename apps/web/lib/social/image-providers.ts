@@ -45,7 +45,8 @@ async function cloudflare(prompt: string): Promise<RawImage> {
     const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(acc.accountId)}/ai/run/${model}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${acc.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: prompt.slice(0, 2000), steps: 6 }),
+      // 8 = the most FLUX.1-schnell takes on Workers AI (sharper detail than 6); CF_IMAGE_STEPS can lower it
+      body: JSON.stringify({ prompt: prompt.slice(0, 2000), steps: Math.max(1, Math.min(8, Number(process.env.CF_IMAGE_STEPS) || 8)) }),
       signal: AbortSignal.timeout(40_000),
       cache: "no-store",
     }).catch((e: Error) => ({ ok: false, status: 0, text: async () => e.message }) as unknown as Response);

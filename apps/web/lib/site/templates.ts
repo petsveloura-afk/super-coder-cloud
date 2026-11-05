@@ -266,9 +266,12 @@ export interface ResolvedTheme {
   radius: SiteTemplate["radius"];
   animations: boolean;
   palette: SiteTemplate["palette"];
+  /** effects pack level (missing in the theme = "subtle"; no animations = "none") */
+  effects?: "none" | "subtle" | "rich";
+  dividers?: "none" | "wave" | "curve" | "slant";
 }
 
-export function resolveTheme(theme: { template?: string; accent?: string; accent2?: string; mode?: "dark" | "light"; font?: string; radius?: string; animations?: boolean } | null | undefined): ResolvedTheme {
+export function resolveTheme(theme: { template?: string; accent?: string; accent2?: string; mode?: "dark" | "light"; font?: string; radius?: string; animations?: boolean; effects?: string; dividers?: string } | null | undefined): ResolvedTheme {
   const tpl = templateByKey(theme?.template);
   const accent = hex(theme?.accent ?? "") ? theme!.accent! : tpl.accent;
   const accent2 = hex(theme?.accent2 ?? "") ? theme!.accent2! : tpl.accent2;
@@ -282,5 +285,8 @@ export function resolveTheme(theme: { template?: string; accent?: string; accent
         : { bg: "#ffffff", fg: "#0f172a", muted: "#475569", card: "#f5f7fb", line: "#e2e8f0", soft: "#eef2f8" };
   const font = theme?.font && theme.font in FONTS ? (theme.font as FontKey) : null;
   const radius = theme?.radius === "sharp" || theme?.radius === "soft" || theme?.radius === "round" ? theme.radius : tpl.radius;
-  return { tpl, accent, accent2, mode, display: font ?? tpl.display, body: font ?? tpl.body, radius, animations: theme?.animations !== false && tpl.motion !== "none", palette };
+  const animations = theme?.animations !== false && tpl.motion !== "none";
+  const effects = !animations ? "none" : theme?.effects === "none" || theme?.effects === "rich" || theme?.effects === "subtle" ? theme.effects : "subtle";
+  const dividers = theme?.dividers === "wave" || theme?.dividers === "curve" || theme?.dividers === "slant" ? theme.dividers : "none";
+  return { tpl, accent, accent2, mode, display: font ?? tpl.display, body: font ?? tpl.body, radius, animations, palette, effects, dividers };
 }

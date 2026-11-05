@@ -127,6 +127,14 @@ export async function voiceTurn(input: { orgId: string; callId: string; conversa
   const messages = turns.map((t) => ({ role: t.role === "caller" ? ("user" as const) : ("assistant" as const), content: t.text }));
   if (!messages.length) messages.push({ role: "user", content: "(the call just started — greet the caller briefly and ask how you can help)" });
   const out = await runAISystem({ orgId: input.orgId, feature: "voice", agentId: (agent?.id as string | undefined) ?? null, system, messages, temperature: 0.4, maxTokens: 220, patienceMs: 9000 });
+  // a busy moment no longer hangs up on the caller: the first time the agent asks them to repeat (the engines often
+  // answer on the next turn); only a second failure in a row ends the call with the call-back promise
+  const hold = input.locale === "en" ? "Sorry, I missed that for a second — could you say it again?" : input.locale === "ar" ? "عذراً، لم ألتقط ذلك للحظة — هل يمكنك أن تعيد؟" : "סליחה, לא קלטתי לרגע — אפשר לחזור על זה?";
+  const lastAgent = [...turns].reverse().find((t) => t.role === "agent")?.text ?? "";
+  if (!out.ok && lastAgent !== hold && input.callerText) {
+    await addTurn(input.callId, input.conversationId, input.orgId, { role: "agent", text: hold, at: new Date().toISOString() });
+    return { say: hold, end: false, transfer: false };
+  }
   const say = out.ok ? speakable(out.text.replace(/\[\[[^\]]*\]\]/g, ""), 500) : input.locale === "en" ? "Sorry, one moment please — a person from the team will call you back shortly." : input.locale === "ar" ? "عذراً — سيعاود أحد أفراد الفريق الاتصال بك قريباً." : "סליחה, נציג מהצוות יחזור אליך בהקדם.";
   await addTurn(input.callId, input.conversationId, input.orgId, { role: "agent", text: say, at: new Date().toISOString() });
   return { say, end: !out.ok, transfer: false };

@@ -342,3 +342,53 @@
 /* polish: calmer motion for people who ask for it, smoother anchors under the sticky header */
 html:has(.scs) { scroll-padding-top: 5rem; }
 @media (prefers-reduced-motion: reduce) { .scs .trust-i, .scs .cd-c { transition: none; } .scs .trust-i:hover { transform: none; } }
+
+/* ======================================================================== effects pack (additive)
+ * data-fx="subtle" (default when animations are on) | "rich" | "none"; data-div = shape between sections.
+ * Everything below only adds polish on top of the template; reduce-motion and the "still" accessibility mode turn motion off. */
+.scs .fx-progress { position: fixed; top: 0; inset-inline: 0; height: 3px; z-index: 70; pointer-events: none; transform: scaleX(var(--p, 0)); transform-origin: 0 50%; background: linear-gradient(90deg, var(--a), var(--a2)); }
+.scs[dir="rtl"] .fx-progress { transform-origin: 100% 50%; }
+.scs .fx-top { position: fixed; bottom: 1.2rem; inset-inline-end: 1.2rem; z-index: 40; display: grid; place-items: center; width: 2.9rem; height: 2.9rem; border-radius: 99px; border: 1px solid var(--line); background: color-mix(in srgb, var(--card) 88%, transparent); color: var(--fg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 12px 28px -14px rgba(0, 0, 0, 0.5); cursor: pointer; opacity: 0; transform: translateY(14px) scale(0.9); pointer-events: none; transition: opacity 0.3s ease, transform 0.3s ease, border-color 0.2s ease; }
+.scs .fx-top.on { opacity: 1; transform: none; pointer-events: auto; }
+.scs .fx-top:hover { border-color: var(--a); color: var(--a); }
+.scs .fx-top:focus-visible { outline: 3px solid var(--a); outline-offset: 3px; }
+.scs .stat b { font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* cards lift and glow; images breathe on hover */
+  .scs:is([data-fx="subtle"], [data-fx="rich"]):not(.a11y-still) .card { transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.1, 1), box-shadow 0.45s ease, border-color 0.45s ease, opacity 0.8s ease; }
+  .scs:is([data-fx="subtle"], [data-fx="rich"]):not(.a11y-still):not([data-cards="brutal"]):not([data-cards="line"]) .card:hover { transform: translateY(-6px); border-color: color-mix(in srgb, var(--a) 45%, var(--line)); box-shadow: 0 26px 60px -28px color-mix(in srgb, var(--a) 55%, #000); }
+  .scs:is([data-fx="subtle"], [data-fx="rich"])[data-cards="brutal"]:not(.a11y-still) .card:hover { transform: translate(-2px, -2px); }
+  .scs:is([data-fx="subtle"], [data-fx="rich"]):not(.a11y-still) :is(.gallery figure, .about-img, .hero-art, .member .ph) img { transition: transform 1.2s cubic-bezier(0.2, 0.7, 0.1, 1), filter 0.6s ease; }
+  .scs:is([data-fx="subtle"], [data-fx="rich"]):not(.a11y-still) :is(.gallery figure, .about-img, .hero-art, .member .ph):hover img { transform: scale(1.05); }
+  /* (cards in a row appear one after the other: the effects island delays each reveal by its place in the row) */
+  .scs:is([data-fx="subtle"], [data-fx="rich"]):not(.a11y-still) .btn-a:active { transform: translateY(0) scale(0.98); }
+
+  /* rich: aurora light behind the hero, button shine, pointer spotlight on cards, hero parallax, floating WhatsApp pulse */
+  .scs[data-fx="rich"] .hero:not([data-hero="cover"]) { isolation: isolate; overflow: hidden; }
+  .scs[data-fx="rich"] .hero:not([data-hero="cover"])::before { content: ""; position: absolute; inset: -25% -10%; z-index: -1; pointer-events: none; background: radial-gradient(40% 50% at 20% 25%, color-mix(in srgb, var(--a) 55%, transparent), transparent 70%), radial-gradient(35% 45% at 80% 30%, color-mix(in srgb, var(--a2) 50%, transparent), transparent 70%), radial-gradient(45% 40% at 55% 85%, color-mix(in srgb, var(--a) 30%, transparent), transparent 70%); filter: blur(60px); opacity: 0.38; animation: scs-aurora 22s ease-in-out infinite alternate; }
+  .scs[data-fx="rich"][data-mode="light"] .hero:not([data-hero="cover"])::before { opacity: 0.24; }
+  .scs[data-fx="rich"]:not(.a11y-still) .btn-a { position: relative; overflow: hidden; isolation: isolate; }
+  .scs[data-fx="rich"]:not(.a11y-still) .btn-a::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.38) 50%, transparent 70%); transform: translateX(-120%); transition: transform 0.8s ease; }
+  .scs[data-fx="rich"]:not(.a11y-still) .btn-a:hover::after { transform: translateX(120%); }
+  .scs[data-fx="rich"]:not(.a11y-still):not([data-cards="line"]) .card { background-image: radial-gradient(420px circle at var(--mx, -999px) var(--my, -999px), color-mix(in srgb, var(--a) 13%, transparent), transparent 42%); }
+  .scs[data-fx="rich"]:not(.a11y-still) .float-wa::before { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.55); animation: scs-pulse 2.6s ease-out infinite; }
+  @supports (animation-timeline: view()) {
+    .scs[data-fx="rich"]:not(.a11y-still) .hero[data-hero="cover"] .cover-img img { animation: scs-parallax linear both; animation-timeline: view(); animation-range: exit 0% exit 100%; }
+    .scs[data-fx="rich"]:not(.a11y-still) :is(.hero-wide, .about-img) img { animation: scs-drift-img linear both; animation-timeline: view(); animation-range: cover 0% cover 100%; }
+  }
+}
+@keyframes scs-aurora { 0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); } 50% { transform: translate3d(4%, -3%, 0) rotate(8deg) scale(1.06); } 100% { transform: translate3d(-4%, 3%, 0) rotate(-6deg) scale(0.98); } }
+@keyframes scs-pulse { 0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.5); } 70% { box-shadow: 0 0 0 16px rgba(37, 211, 102, 0); } 100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); } }
+@keyframes scs-parallax { from { transform: translateY(0) scale(1.06); } to { transform: translateY(12%) scale(1.06); } }
+@keyframes scs-drift-img { from { transform: scale(1.1) translateY(-3%); } to { transform: scale(1.1) translateY(3%); } }
+
+/* shapes between sections: the section after the first gets a soft top edge in its own background */
+.scs[data-div="wave"] .sec + .sec::before,
+.scs[data-div="curve"] .sec + .sec::before,
+.scs[data-div="slant"] .sec + .sec::before { content: ""; position: absolute; inset-inline: 0; top: -1px; height: clamp(18px, 3vw, 42px); pointer-events: none; background: color-mix(in srgb, var(--a) 7%, var(--bg)); opacity: 0.9; }
+.scs[data-div="wave"] .sec + .sec::before { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 40' preserveAspectRatio='none'%3E%3Cpath d='M0 0h1200v14c-100 18-200 26-300 18S700 6 600 10 400 34 300 32 100 14 0 20z'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 40' preserveAspectRatio='none'%3E%3Cpath d='M0 0h1200v14c-100 18-200 26-300 18S700 6 600 10 400 34 300 32 100 14 0 20z'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; }
+.scs[data-div="curve"] .sec + .sec::before { -webkit-mask: radial-gradient(70% 100% at 50% 0, #000 98%, transparent 100%); mask: radial-gradient(70% 100% at 50% 0, #000 98%, transparent 100%); }
+.scs[data-div="slant"] .sec + .sec::before { -webkit-clip-path: polygon(0 0, 100% 0, 100% 15%, 0 100%); clip-path: polygon(0 0, 100% 0, 100% 15%, 0 100%); }
+.scs.a11y-still .fx-progress { display: none; }
+@media print { .scs .fx-progress, .scs .fx-top { display: none !important; } }

@@ -20,6 +20,10 @@ export interface DesignTheme {
   font?: string;
   radius?: "sharp" | "soft" | "round";
   animations?: boolean;
+  /** effects pack: none / subtle (default) / rich */
+  effects?: "none" | "subtle" | "rich";
+  /** shape between sections */
+  dividers?: "none" | "wave" | "curve" | "slant";
 }
 
 function Mini({ tpl, active }: { tpl: SiteTemplate; active: boolean }) {
@@ -172,6 +176,21 @@ export function DesignPanel({ theme, onChange, proAllowed }: { theme: DesignThem
           <input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={theme.animations !== false} onChange={(e) => onChange({ ...theme, animations: e.target.checked })} data-testid="ds-animations" />
           {t("websites.design.animations")}
         </label>
+        <Field label={t("websites.design.effects")} htmlFor="ds-effects" hint={t("websites.design.effectsHint")}>
+          <Select id="ds-effects" value={theme.animations === false ? "none" : (theme.effects ?? "subtle")} disabled={theme.animations === false} onChange={(e) => onChange({ ...theme, effects: e.target.value as DesignTheme["effects"] })} data-testid="ds-effects">
+            <option value="none">{t("websites.design.effectsNone")}</option>
+            <option value="subtle">{t("websites.design.effectsSubtle")}</option>
+            <option value="rich">{t("websites.design.effectsRich")}</option>
+          </Select>
+        </Field>
+        <Field label={t("websites.design.dividers")} htmlFor="ds-dividers">
+          <Select id="ds-dividers" value={theme.dividers ?? "none"} onChange={(e) => onChange({ ...theme, dividers: e.target.value as DesignTheme["dividers"] })} data-testid="ds-dividers">
+            <option value="none">{t("websites.design.dividersNone")}</option>
+            <option value="wave">{t("websites.design.dividersWave")}</option>
+            <option value="curve">{t("websites.design.dividersCurve")}</option>
+            <option value="slant">{t("websites.design.dividersSlant")}</option>
+          </Select>
+        </Field>
       </Card>
     </div>
   );

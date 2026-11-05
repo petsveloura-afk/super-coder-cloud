@@ -55,7 +55,7 @@ const INTENT_PATTERNS: [Intent, RegExp][] = [
   ["hours", /שעות\s*(?:פעילות|פתיחה|עבודה)|עד\s*מתי\s*(?:פתוח|פתוחים)|פתוחים|\b(?:opening hours|open (?:now|today|until)|what time do you)\b|ساعات\s*(?:العمل|الدوام)|متى\s*تفتح/i],
   ["location", /איפה\s*(?:אתם|נמצאים|המקום)|כתובת|איך\s*מגיעים|\b(?:where are you|address|location|directions)\b|عنوان|أين\s*(?:تقعون|موقعكم)/i],
   ["legal", /אתבע|אתבעו|אגיש\s*(?:נגדכם\s*)?תביעה|תביעה\s*(?:נגד|משפטית)|(?:אפנה|לפנות|פונה|מפנה)\s*(?:ל|אל\s*)(?:עורך\s*דין|עו"ד|משטרה|הגנת\s*הצרכן|רשות)|אתלונן\s*(?:במשטרה|ב|ל)|\b(?:i(?:'ll| will| am going to)? sue|sue you|take legal action|my lawyer will|call(?:ing)? my lawyer|contact(?:ing)? my lawyer|report you to|going to the police|file a (?:lawsuit|complaint))\b|سأقاضي|سأرفع\s*دعوى|سأتصل\s*بالمحامي|سأبلغ\s*الشرطة/i],
-  ["unsubscribe", /הסירו\s*אותי|תפסיקו\s*לשלוח|הסרה\s*מהרשימה|\b(?:stop (?:messaging|texting|sending)|remove me|opt.?out|leave me alone)\b|توقفوا\s*عن|احذفوني/i],
+  ["unsubscribe", /הסירו\s*אותי|(?:^|\s)(?:תסיר|תסירו|הסר|להסיר)\s+אותי|תפסיקו\s*לשלוח|תפסיק\s*לשלוח|הוציאו\s+אותי\s+מה?רשימה|הסרה\s*מהרשימה|\b(?:stop (?:messaging|texting|sending)|remove me|opt.?out|leave me alone)\b|توقفوا\s*عن|احذفوني/i],
 ];
 
 const ANGRY_RE = /זבל|נוכלים|נוכל|רמאים|רמאות|הונאה|שערורייה|בושה|מגעיל|מתחרפן|נמאס\s*לי|לא\s*עונים\s*לי|עוד\s*פעם\s*ועוד\s*פעם|\b(?:scam|scammers?|fraud|ridiculous|disgusting|pathetic|useless|garbage|rip.?off|fed up|stupid bot|idiots?)\b|نصابين|احتيال|مقرف|زبالة/i;

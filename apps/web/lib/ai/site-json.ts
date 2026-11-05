@@ -182,7 +182,7 @@ function coerceBlock(raw: unknown, ctx: SiteContext): SiteBlock | null {
 /** wave 13: template + second colour + font + corners chosen by the model (validated) */
 const AI_TEMPLATES = ["classic", "minimal", "fresh", "aurora", "luxe", "bold", "corporate", "pastel", "neon", "nature", "editorial", "midnight", "sunset", "ocean", "clinic", "noir", "terracotta", "studio"] as const;
 const AI_FONTS = ["rubik", "heebo", "assistant", "frank", "inter", "playfair", "secular", "varela", "suez", "karantina", "noto-serif"] as const;
-function aiThemeExtras(r: Record<string, unknown>, allowed?: readonly string[]): { template?: (typeof AI_TEMPLATES)[number]; accent2?: string; font?: (typeof AI_FONTS)[number]; radius?: "sharp" | "soft" | "round"; animations?: boolean } {
+function aiThemeExtras(r: Record<string, unknown>, allowed?: readonly string[]): { template?: (typeof AI_TEMPLATES)[number]; accent2?: string; font?: (typeof AI_FONTS)[number]; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant" } {
   const out: ReturnType<typeof aiThemeExtras> = {};
   const tpl = String(r.template ?? "");
   if ((AI_TEMPLATES as readonly string[]).includes(tpl)) out.template = (allowed && !allowed.includes(tpl) ? (allowed[0] ?? "classic") : tpl) as (typeof AI_TEMPLATES)[number];
@@ -191,12 +191,15 @@ function aiThemeExtras(r: Record<string, unknown>, allowed?: readonly string[]):
   if ((AI_FONTS as readonly string[]).includes(String(r.font ?? ""))) out.font = String(r.font) as (typeof AI_FONTS)[number];
   if (r.radius === "sharp" || r.radius === "soft" || r.radius === "round") out.radius = r.radius;
   if (typeof r.animations === "boolean") out.animations = r.animations;
+  // effects pack + section shapes (optional; anything else is ignored)
+  if (r.effects === "none" || r.effects === "subtle" || r.effects === "rich") out.effects = r.effects;
+  if (r.dividers === "none" || r.dividers === "wave" || r.dividers === "curve" || r.dividers === "slant") out.dividers = r.dividers;
   return out;
 }
 
 export interface NormalizedSite {
   name: string;
-  theme: { accent: string; mode: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean };
+  theme: { accent: string; mode: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant" };
   seo: { title: string; description: string };
   blocks: SiteBlock[];
   imagePrompt: string;
@@ -251,6 +254,7 @@ export function siteJsonInstructionsPro(mode: SiteMode, locale: "he" | "ar" | "e
     "EXTRA TOP-LEVEL FIELDS (add them to the same JSON object):",
     `"template": one of ${JSON.stringify(templates)} — the design that best fits the business (e.g. luxe for real estate / fine dining, fresh for clinics & beauty, corporate for law / accounting, bold for shops & events, aurora for tech, nature for natural products, pastel for kids & bakeries, neon for nightlife & fitness, minimal for consultants, editorial for blogs & architects, midnight for SaaS & fintech, sunset for restaurants & cafes, ocean for travel & marine, clinic for doctors & therapists, noir for photographers & fashion, terracotta for boutiques & ceramics, studio for agencies & freelancers).`,
     `"accent2": "#RRGGBB" a second brand colour that harmonises with accent; "font": one of ["rubik","heebo","assistant","frank","secular","varela","suez","noto-serif"] (Hebrew-friendly) or omit; "radius": "sharp"|"soft"|"round".`,
+    `"effects": "rich" (impressive motion: glow behind the hero, shining buttons, image depth — best for most businesses, shops, beauty, food, tech, events) | "subtle" (calm motion — law, finance, medical) | "none"; "dividers": "wave" | "curve" | "slant" | "none" (a soft shape between sections — wave/curve for warm, playful or beauty brands, slant for bold/tech, none for corporate).`,
     "EXTRA BLOCK TYPES you may use (in addition to the ones above):",
     `{"type":"about","data":{"title","body"}} (the story, values, experience — 2-4 short paragraphs)`,
     `{"type":"stats","data":{"title","items":[{"value","label"}] (3-4 items)}} ONLY with numbers the customer gave (years, clients, projects); otherwise skip`,
@@ -258,6 +262,9 @@ export function siteJsonInstructionsPro(mode: SiteMode, locale: "he" | "ar" | "e
     `{"type":"testimonials","data":{"title","items":[{"name","role","quote","rating":"5"}]}} ONLY quotes the customer actually gave — never invent reviews; otherwise skip this block`,
     `{"type":"pricing","data":{"title","items":[{"name","price","period","features":"one per line","highlight":"yes"|"" ,"cta_label","cta_href":"#contact"}]}} ONLY with prices the customer gave`,
     `{"type":"logos","data":{"title","items":[{"name"}]}} ONLY real client / partner names the customer gave`,
+    `{"type":"gallery","data":{"title","items":[]}} (a photo gallery — leave items EMPTY: the platform fills it with real photos that match the business; the owner replaces them with their own)`,
+    `{"type":"team","data":{"title","items":[{"name","role"}]}} ONLY real names the customer gave (or clearly marked placeholders when the owner asked for a team section)`,
+    `{"type":"video","data":{"title","url","text"}} ONLY with a real YouTube / Vimeo link the customer gave`,
     "MORE BLOCK TYPES (wave 37 — use when they fit; never invent facts):",
     `{"type":"banner","data":{"text","label","href":"#contact"}} (one slim announcement strip at the very top — only for a real offer/news the customer gave)`,
     `{"type":"trust","data":{"title","items":[{"title","text"}] (3-6 items)}} (guarantees / why trust us: licence, warranty, response time, free quote — only what is true or generic like "clear pricing")`,
