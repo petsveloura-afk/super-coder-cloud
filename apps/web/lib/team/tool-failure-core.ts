@@ -3,6 +3,7 @@
  * "Missing connection" is NOT a failure: the task is shown as "needs a connection" with the way forward.
  */
 import { classifyFailure } from "./reliability-core";
+import { looksTemporaryFailure } from "./failure-wording-core";
 
 export type Lang = "he" | "en" | "ar";
 export type ToolFailureKind = "missing_connection" | "missing_data" | "temporary" | "bad_input" | "bug";
@@ -25,6 +26,8 @@ export function classifyToolFailure(error: string | null | undefined): ToolFailu
   if (/not_found|no_pipeline|no_data|no_contact|nothing_to_change|empty|no_site|no_posts|missing_data|no_employee_with_role/.test(e)) return { kind: "missing_data", code: "tool_missing_data", needsConnection: false, retryable: false };
   if (/timeout|network|fetch failed|econn|etimedout|temporar|rate|429|5\d\d|busy|overload|deadlock|slot_taken/.test(e)) return { kind: "temporary", code: "tool_temporary", needsConnection: false, retryable: true };
   if (/invalid|bad_|too_short|validation|required|malformed|bad_channel|bad_time|unknown_tool|not_a_customer/.test(e)) return { kind: "bad_input", code: "tool_bad_input", needsConnection: false, retryable: false };
+  // wave 68: AI-layer wordings that heal by themselves are a temporary problem, not an "unexpected error"
+  if (looksTemporaryFailure(e)) return { kind: "temporary", code: "tool_temporary", needsConnection: false, retryable: true };
   return { kind: "bug", code: "tool_bug", needsConnection: false, retryable: true };
 }
 

@@ -72,6 +72,15 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
   }
 
   try {
+    // wave 68: today's health for the owner (tasks that worked / failed and why, which AI provider is healthy)
+    const { loadDayHealth } = await import("@/lib/team/day-health");
+    const dh = await loadDayHealth(org);
+    if (dh) data.dayHealth = dh;
+  } catch {
+    /* the card is optional */
+  }
+
+  try {
     const ops = await import("@/lib/team/runner-ops");
     const { WORK_TEMPLATES } = await import("@/lib/team/ops-core");
     data.ops = await ops.loadOps(org);

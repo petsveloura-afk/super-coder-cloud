@@ -6968,6 +6968,24 @@
       "adminTitle": "This business isn't on a plan that includes the team yet",
       "adminBody": "The digital team is available on Pro and up, or with a 7-day free trial (once per business). To test it here: start the trial above, or move this business to a matching plan."
     },
+    "dayHealth": {
+      "title": "Today's health",
+      "window": "In the last 24 hours",
+      "done": "Tasks that worked",
+      "failed": "Tasks that failed",
+      "reasons": "Why they failed",
+      "providers": "AI provider status",
+      "providersNote": "Measured over the last 15 minutes on this server",
+      "noProviders": "Not enough data about the providers yet",
+      "quiet": "No tasks finished in the last 24 hours",
+      "calls": "calls",
+      "status": {
+        "healthy": "Healthy",
+        "neutral": "Not enough data",
+        "shaky": "Shaky",
+        "degraded": "Degraded"
+      }
+    },
     "health": {
       "title": "Team health",
       "level": {
@@ -7007,7 +7025,7 @@
         "policy": "Blocked by permissions or a stop",
         "budget": "Reached the step or credit limit",
         "ai_unreadable": "The AI returned an unreadable answer",
-        "ai_busy": "AI engines are busy (will retry)",
+        "ai_busy": "AI engines are busy (will retry in a few minutes)",
         "network": "Network problem (will retry)",
         "input": "Missing or invalid input",
         "tool": "A tool failed",
@@ -7016,7 +7034,7 @@
         "tool_missing_data": "Missing data",
         "tool_temporary": "Temporary problem (will retry)",
         "tool_bad_input": "Invalid input",
-        "tool_bug": "Unexpected error",
+        "tool_bug": "Unexpected error — logged, you can restart the task",
         "no_key": "Provider without a key — skipped",
         "wrong_kind": "Model does not fit this kind of work — skipped",
         "resting": "Provider is resting — skipped for now",

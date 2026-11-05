@@ -1,5 +1,14 @@
 # Changelog
 
+## גל 68 — Wave 68: transparency (one clear failure reason, today's health card) — 2026-11-05
+
+- **Already there, not touched:** `classifyFailure` / `classifyToolFailure` / `explainToolFailure` / `reasonCode`, the failure reasons on the team health screen (`aiTeam.health.reason.*`), the team health card (`HealthPanel`: verdict, skipped models, latest failures), the provider health window of wave 66 (`healthRows`).
+- **Fewer "unexpected errors" (`failure-wording-core.ts`, `tool-failure-core.ts`):** AI-layer wordings that heal by themselves (rate limited, resource exhausted, unreadable plan, "AI engines busy" in Hebrew, …) used to fall through to the generic `tool_bug` bucket; one extra line before that bucket now classifies them as a temporary problem. Every earlier answer is unchanged.
+- **One reason + one action (`failure-reason-core.ts → ownerFailure`):** a sentence in the business language ("מנועי ה-AI עמוסים, ינסה שוב בעוד כמה דקות") and one action, never a technical code, for AI busy / unreadable, network, budget, policy, connection, missing data, input and the real-bug case. Pure and available; the screens still use the extended classifier and texts.
+- **Texts:** `aiTeam.health.reason.ai_busy` and `tool_bug` extended in he / en / ar (the old words stay, the way forward is added).
+- **Today's health card (`day-health-core.ts`, `day-health.ts`, `day-health-card.tsx`, settings tab, after the health card):** tasks that worked and failed in the last 24 hours, why they failed (existing reason codes) and the state of each AI provider (this server's 15-minute window). Read-only; the loader and the page wiring fail silent (card simply absent). New block `aiTeam.dayHealth.*` in he / en / ar.
+- **Tests:** `tests/unit/wave68-transparency.test.ts` (24 tests). No existing test was changed. No migrations, no new environment variables.
+
 ## גל 67 — Wave 67: clean team memory (display translation, merged duplicates, robots out of the queue, write gate) — 2026-11-05
 
 - **Already there, not touched:** the automated-sender detection (`isAutomatedSender`, `isAutomatedSenderPlus`) and its use in the waiting-customers queue / `inbox.unanswered`, the title and log translation (`title-i18n-core.ts`), memory supersede by subject, the `proposed` status (the team reads only `active`).

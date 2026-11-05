@@ -111,6 +111,15 @@ export interface TeamSettingsView {
   initiative: boolean;
 }
 
+/** wave 68: today's health for the owner */
+export interface DayHealthView {
+  windowHours: number;
+  done: number;
+  failed: number;
+  reasons: { code: string; count: number }[];
+  providers: { provider: string; calls: number; successPct: number | null; status: "healthy" | "neutral" | "shaky" | "degraded" }[];
+}
+
 /** upgrade 2: the team health card (optional — absent when the data could not be loaded) */
 export interface TeamHealthData {
   level: "ok" | "degraded" | "down";
@@ -158,6 +167,8 @@ export interface TeamPageData {
   toolCatalog: { key: string; kind: string; sensitivity: string; about: string }[];
   dayCredits: number;
   health?: TeamHealthData;
+  /** wave 68: today's health card (absent when it could not be loaded) */
+  dayHealth?: DayHealthView;
   ops?: TeamOpsData;
   sla?: TeamSlaData;
   templates?: { id: string; role: string; brief: string }[];

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { AgentAvatar } from "./avatar";
 import { HealthPanel } from "./health-panel";
+import { DayHealthCard } from "./day-health-card";
 import { OpsPanel } from "./ops-panel";
 import type { ActivityView, ApprovalView, MemoryView, StatsView, TeamMemberView, TeamPageData, TeamTaskView } from "./types";
 import { PLAYBOOKS } from "@/lib/team/playbooks";
@@ -797,6 +798,7 @@ export function SettingsPanel({ data, onRefresh }: { data: TeamPageData; onRefre
   return (
     <div className="space-y-4" data-testid="settings-panel">
       {data.health ? <HealthPanel health={data.health} /> : null}
+      {data.dayHealth ? <DayHealthCard day={data.dayHealth} /> : null}
       {data.ops ? <OpsPanel ops={data.ops} sla={data.sla} canManage={data.canManage} locale={locale} onRefresh={onRefresh} /> : null}
       <Card className={cn("p-5", s.emergency_stop && "border-danger/50 bg-danger/5")}>
         <div className="flex flex-wrap items-center gap-3">
