@@ -1,5 +1,15 @@
 # Changelog
 
+## גל 70 — Wave 70: control for the business owner (who works alone, a team log in plain words, one safe "take control back" action) — 2026-11-05
+
+- **Already there, not touched:** the three autonomy levels per employee (`suggest` / `approve` / `auto` + `auto_actions`), `policy-core.ts → decide`, the emergency stop, the operations card (quiet hours, recipient cap), the technical activity timeline, the approvals tab and the audit lines the actions write into `team_activity`. **Per-tool "never" rules were not added: removing a tool from an employee already blocks it (`tool_not_allowed`).**
+- **Who works alone (`owner-control-core.ts → autonomyView`, `components/ai-team/owner-control-card.tsx`):** per employee, in business words: what is done alone, what waits for the owner, what is only looked at, and how much of the "alone" part touches customers, money or cannot be undone. It asks the real `decide()` for every tool, so it can never disagree with the engine. Settings tab, after today's health card. Needs no new data (reads the members already on the screen).
+- **One safe action (`ai-team/control-actions.ts → tightenAutonomyAction`):** moves employees on `auto` back to `approve` and clears their allowed customer / money actions, for one employee or for the whole team. It only ever goes towards MORE caution (it never touches `suggest` / `approve`), needs `ai.manage`, is scoped to the business and is written to the append-only team log. More freedom is still given only in the employee editor.
+- **Team log in the owner's words (`owner-control-core.ts → ownerLog`, `owner-log.ts`, `OwnerLogCard`):** the last 7 days of `team_activity` as short lines: done, waiting for you, decided, stopped and why (reason code → plain sentence), what you changed. Technical phases (understand, plan, self-check, …) are left out. Filters (everything / waiting for you / stopped or failed), a per-employee tally and day groups. Old English lines are translated for display with the existing `localizeLog` (own try block, database unchanged). The loader reads only a few JSON fields of the existing rows and fails silent (card absent).
+- **Texts:** new blocks `aiTeam.control.*` and `aiTeam.ownerLog.*` in he / en / ar.
+- **Tests:** `tests/unit/wave70-owner-control.test.ts` (31 tests). No existing test was changed. No migrations, no new environment variables.
+- **Safety:** additions only (diff: 0 lines removed in every edited file).
+
 ## גל 69 — Wave 69: quality measurement (fixed scenarios, 👍/👎 on agent replies, resolution metrics) — 2026-11-05
 
 - **Already there, not touched:** `reply-quality-core.ts` (`qualityIssues`, correction prompts), `intelligence.ts` (`checkReply`), the team evals (`evals.ts`, `evals-plus7.ts`, `tests/unit/team-evals.test.ts`), the audit log (`audit_logs`).

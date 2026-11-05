@@ -1,4 +1,6 @@
 /** Shapes the AI team screen receives from the server page (plain JSON, no secrets). */
+import type { OwnerLogEntry } from "@/lib/team/owner-control-core";
+
 export type MemberStatus = "active" | "paused";
 export type LiveState = "idle" | "working" | "waiting" | "success" | "error" | "paused";
 
@@ -169,6 +171,8 @@ export interface TeamPageData {
   health?: TeamHealthData;
   /** wave 68: today's health card (absent when it could not be loaded) */
   dayHealth?: DayHealthView;
+  /** wave 70: the team log in the owner's words (absent when it could not be loaded) */
+  ownerLog?: OwnerLogEntry[];
   ops?: TeamOpsData;
   sla?: TeamSlaData;
   templates?: { id: string; role: string; brief: string }[];

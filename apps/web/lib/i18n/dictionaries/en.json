@@ -7250,6 +7250,65 @@
         "none": "None",
         "split": "By department"
       }
+    },
+    "control": {
+      "title": "Who works alone and who asks you first",
+      "intro": "A plain view of what each employee does without asking and what waits for your approval. You can take control back with one tap.",
+      "risky": "{n} employees can act on customers, money or things that cannot be undone without asking you",
+      "allAsk": "Everyone asks you before anything customers see",
+      "level": {
+        "careful": "Only suggests",
+        "balanced": "Asks before important things",
+        "independent": "Works alone, even with customers"
+      },
+      "paused": "Paused",
+      "askFirst": "Ask me first again",
+      "counts": "Does alone: {alone} · Asks you: {asks} · Only looks: {looks}",
+      "aloneRisky": "Alone with customers: {customer} · Money: {money} · Cannot be undone: {irreversible}",
+      "allAskFirst": "Make everyone ask me first",
+      "confirm": "Move {n} employees back to \"asks me first\"?",
+      "yes": "Yes, move them",
+      "note": "The buttons here only give control back to you. To give an employee more freedom, edit them in the team tab.",
+      "nothingToTighten": "Nobody works alone, nothing to change",
+      "tightened": "The employees are asking you again before anything important"
+    },
+    "ownerLog": {
+      "title": "Team log",
+      "window": "Last 7 days",
+      "filter": {
+        "all": "Everything",
+        "waited": "Waiting for you",
+        "problems": "Stopped or failed"
+      },
+      "tally": "Did {did} · Waited for you {waited} · Stopped {stopped}",
+      "empty": "Nothing to show yet",
+      "you": "You",
+      "waitedGeneric": "Waiting for your approval",
+      "kind": {
+        "did": "Done",
+        "waited": "Waiting for you",
+        "decided": "You decided",
+        "blocked": "Stopped",
+        "problem": "Did not work",
+        "initiative": "Initiative",
+        "changed": "You changed"
+      },
+      "why": {
+        "emergency_stop": "Stopped because the emergency stop is on",
+        "team_off": "Stopped because the team is off",
+        "member_paused": "Stopped because the employee is paused",
+        "tool_not_allowed": "Stopped because it is outside this employee's job",
+        "needs_screen": "Stopped because it needs you at the screen",
+        "unknown_tool": "Stopped because the action is not known",
+        "other": "Stopped and not done"
+      },
+      "change": {
+        "autonomy": "You changed how independent {name} is",
+        "settings": "You changed the team settings",
+        "stop": "You turned the emergency stop on",
+        "release": "You released the emergency stop",
+        "tightened": "You moved employees back to \"asks me first\""
+      }
     }
   },
   "aiQuality": {

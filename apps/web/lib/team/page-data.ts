@@ -81,6 +81,15 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
   }
 
   try {
+    // wave 70: the team log in the owner's words (the card is optional)
+    const { loadOwnerLog } = await import("@/lib/team/owner-log");
+    const ol = await loadOwnerLog(org);
+    if (ol) data.ownerLog = ol;
+  } catch {
+    /* the card is optional */
+  }
+
+  try {
     const ops = await import("@/lib/team/runner-ops");
     const { WORK_TEMPLATES } = await import("@/lib/team/ops-core");
     data.ops = await ops.loadOps(org);
@@ -138,6 +147,12 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
       data.activity = data.activity.map((x) => ({ ...x, summary: mc.localizeGateSummary(x.summary, lang8) }));
     } catch {
       /* display clean-up is optional */
+    }
+    // wave 70: the owner's team log in the business language (display only)
+    try {
+      if (data.ownerLog) data.ownerLog = data.ownerLog.map((e) => (e.text ? { ...e, text: localizeLog(e.text, lang8) } : e));
+    } catch {
+      /* display translation is optional */
     }
     const [skipped, { data: bad }, resp] = await Promise.all([
       opts.platformAdmin || opts.canManage ? p8.loadSkippedProviders(lang8) : Promise.resolve([]),
