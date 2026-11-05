@@ -12,6 +12,7 @@ import { ConfirmActionButton } from "@/components/ui/form-dialog";
 import { aiSegmentAction, launchCampaignAction, previewAudienceAction, saveCampaignAction } from "@/app/[locale]/(dashboard)/campaigns/actions";
 import { cn } from "@/lib/utils";
 import { AudiencePresets, MessageStudio, ReadinessPanel, SendTimeChips } from "./campaign-studio";
+import { PlaceholderWarning } from "./campaign-placeholders";
 
 export interface CampaignValue {
   name: string;
@@ -287,6 +288,7 @@ export function CampaignEditor({ id, initial, tags, channelsReady }: { id?: stri
         </Field>
       </Card>
 
+      <PlaceholderWarning subject={v.channel === "email" ? v.subject : ""} body={v.body} />
       <ReadinessPanel channel={v.channel} channelConnected={Boolean(channelsReady[v.channel])} name={v.name} subject={v.subject} body={v.body} audienceCount={count} scheduledAt={v.scheduled_at ?? null} hasTemplate={Boolean(v.wa_template?.name)} dirty={Boolean(id && dirty)} />
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

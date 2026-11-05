@@ -277,6 +277,7 @@ export async function aiFullPostAction(input: { locale: string; topic: string; t
         `4) Hashtags on the last line: ${isIg ? "5-10 relevant, mix of popular and niche, in the post language and English" : "1-3 relevant"}.`,
         "Use 2-4 fitting emojis, never more. Natural, human, native-level language — never robotic, never generic filler.",
         "NEVER invent prices, discounts, dates, names, addresses or facts that are not in the business information.",
+        "Write like a copywriter of a top brand: specific and sensory, benefit-first (what the reader gets), one emotion per post, active verbs, short sentences. No clichés (\"we are happy to announce\", \"don't miss out\", \"the best in town\"), no walls of text, no repeated words.",
       ].join("\n"),
       [
         "Also art-direct ONE image for the post: \"scene\" = a concrete English description of a photograph that matches the post (subject, setting, mood, colors, lighting; max 45 words; no text, letters, logos, prices or numbers in the image).",
@@ -303,9 +304,11 @@ export async function aiFullPostAction(input: { locale: string; topic: string; t
   // image step — failures here never lose the text
   const { data: imgAllowed } = await admin.rpc("public_rate_limit", { p_bucket: `socialimg:${ctx.org.id}`, p_limit: 6, p_window_seconds: 60 });
   if (imgAllowed === false) return { ok: true, data: { ...result, imageError: "ai.busy" } };
-  const { generateMeteredImage, sceneForImage } = await import("@/lib/social/studio-image");
+  const { generateMeteredImage, sceneForImage, directedPostPrompt } = await import("@/lib/social/studio-image");
   const scene = parts.scene && !/[\u0590-\u05FF\u0600-\u06FF]/.test(parts.scene) ? parts.scene : await sceneForImage(parts.post);
-  const prompt = buildSceneImagePrompt({ scene, platform: p.data.platform, style: p.data.style ?? "photo", brandVoice: (social?.brand_voice as string | null) ?? null, business: (org?.name as string | null) ?? null });
+  const scenePrompt = buildSceneImagePrompt({ scene, platform: p.data.platform, style: p.data.style ?? "photo", brandVoice: (social?.brand_voice as string | null) ?? null, business: (org?.name as string | null) ?? null });
+  // the image director turns the post's scene into a full art-direction prompt (the scene prompt stays the fallback)
+  const prompt = await directedPostPrompt({ request: `${scene}\n(${p.data.topic})`, platform: p.data.platform, style: p.data.style ?? "photo", business: (org?.name as string | null) ?? null, brandVoice: (social?.brand_voice as string | null) ?? null, orgId: ctx.org.id }, scenePrompt);
   const img = await generateMeteredImage(ctx.org.id, prompt, p.data.platform);
   if (!img.ok) return { ok: true, data: { ...result, scene, imageError: img.error } };
   const row = normalizeAsset({ url: img.url, title: parts.headline ?? p.data.topic, prompt });

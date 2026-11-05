@@ -20,6 +20,8 @@ async function handle(request: NextRequest) {
   const t0 = Date.now();
   const { publishDuePosts } = await import("@/lib/social/publish");
   const result = await publishDuePosts(45_000).catch((e) => ({ error: (e as Error).message }));
+  // AI video for posts: clips still being made at the engines are checked and stored (a few seconds at most)
+  const aiVideo = await import("@/lib/social/video-jobs").then((m) => m.advancePendingVideoJobs(Math.max(3_000, Math.min(12_000, 50_000 - (Date.now() - t0))))).catch((e) => ({ error: (e as Error).message }));
   // wave 41: customers' Facebook / Instagram comments and messages that Meta's webhook did not deliver
   // (runs only in the time that is left; never delays or blocks the posts above)
   const left = 56_000 - (Date.now() - t0);
@@ -35,7 +37,7 @@ async function handle(request: NextRequest) {
       return { checked: false, error: (e as Error).message };
     }
   })();
-  return NextResponse.json({ ok: true, socialPosts: result, metaSync, metaWebhook }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, socialPosts: result, aiVideo, metaSync, metaWebhook }, { headers: { "Cache-Control": "no-store" } });
 }
 
 // spec A4: every run is recorded in job_runs and never overlaps itself

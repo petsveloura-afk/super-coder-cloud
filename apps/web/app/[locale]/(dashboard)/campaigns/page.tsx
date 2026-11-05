@@ -7,6 +7,8 @@ import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateTime, formatNumber, formatPercent } from "@/lib/format";
 import { campaignRates, isStatusFilter, summarizeCampaigns, CAMPAIGN_STATUS_FILTERS } from "@/lib/campaigns/metrics";
+import { CAMPAIGN_SORTS, sortCampaigns, sortCampaignsKey, type CampaignSortRow } from "@/lib/campaigns/list-core";
+import { PLAYBOOKS } from "@/lib/campaigns/templates";
 import { cn } from "@/lib/utils";
 import { CAMPAIGN_CHANNELS } from "@scc/shared/engagement";
 import { CampaignOverview } from "@/components/campaigns/campaign-overview";
@@ -21,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 
 const TONE: Record<string, "neutral" | "accent" | "success" | "danger" | "gold"> = { draft: "neutral", scheduled: "gold", sending: "accent", sent: "success", canceled: "danger" };
 
-export default async function CampaignsPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams?: Promise<{ status?: string; channel?: string; q?: string }> }) {
+export default async function CampaignsPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams?: Promise<{ status?: string; channel?: string; q?: string; sort?: string }> }) {
   const locale = await resolveLocale(params);
   const ctx = await getOrgContext(locale);
   const { t } = await getT(locale);
@@ -40,14 +42,17 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
   const statusF = isStatusFilter(sp.status) ? sp.status : "all";
   const channelF = typeof sp.channel === "string" && sp.channel ? sp.channel : "all";
   const q = (sp.q ?? "").trim().toLowerCase().slice(0, 80);
-  const rows = all.filter((c) => (statusF === "all" || c.status === statusF) && (channelF === "all" || c.channel === channelF) && (!q || String(c.name).toLowerCase().includes(q)));
+  const filtered = all.filter((c) => (statusF === "all" || c.status === statusF) && (channelF === "all" || c.channel === channelF) && (!q || String(c.name).toLowerCase().includes(q)));
+  // sorting (newest first stays the default)
+  const sortF = sortCampaignsKey(sp.sort);
+  const rows = sortCampaigns(filtered as CampaignSortRow[], sortF) as typeof filtered;
   const sum = summarizeCampaigns(all.map((c) => ({ status: c.status as string, channel: c.channel as string, stats: c.stats as never })));
   // wave 40: every platform is offered in the filter (not only the ones already used), with a per-channel count
   const channelList = [...new Set<string>([...CAMPAIGN_CHANNELS, ...all.map((c) => c.channel as string)])];
   const channelCount = (ch: string) => all.filter((c) => c.channel === ch).length;
   const href = (over: Record<string, string>) => {
     const u = new URLSearchParams();
-    const cur: Record<string, string> = { status: statusF, channel: channelF, q, ...over };
+    const cur: Record<string, string> = { status: statusF, channel: channelF, q, sort: sortF === "newest" ? "" : sortF, ...over };
     for (const [k, v] of Object.entries(cur)) if (v && v !== "all") u.set(k, v);
     const qs = u.toString();
     return `/${locale}/campaigns${qs ? `?${qs}` : ""}`;
@@ -63,6 +68,15 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
       {ctx.can("ai.use") ? <CampaignAgent compact /> : null}
       {/* wave 53 — smart tips (the KPI cards below already show the numbers) */}
       <ScreenPulse screen="campaigns" pulse={campaignsPulse(sum)} locale={locale} t={t} />
+      {/* ready playbooks: start a professional campaign in one click */}
+      <div className="mb-4 flex flex-wrap items-center gap-1.5" data-testid="campaign-playbook-strip">
+        <span className="me-1 text-[12.5px] font-semibold text-muted">{t("campaigns.playbooks.quick")}</span>
+        {PLAYBOOKS.map((p) => (
+          <Link key={p.id} href={`/${locale}/campaigns/new?playbook=${p.id}`} className="rounded-full border border-line px-3 py-1 text-[12.5px] font-medium text-muted transition hover:border-accent hover:bg-accent-soft hover:text-accent">
+            {t(`campaigns.playbooks.items.${p.id}`)}
+          </Link>
+        ))}
+      </div>
       {all.length > 0 ? (
         <>
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="campaign-kpis">
@@ -104,6 +118,13 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
                 {channelList.map((c) => (
                   <option key={c} value={c}>
                     {t(`campaigns.channels.${c}`)} ({channelCount(c)})
+                  </option>
+                ))}
+              </select>
+              <select name="sort" defaultValue={sortF} aria-label={t("campaigns.sort.label")} className="h-9 rounded-xl border border-line bg-surface px-3 text-[13px]" data-testid="campaign-sort">
+                {CAMPAIGN_SORTS.map((k) => (
+                  <option key={k} value={k}>
+                    {t(`campaigns.sort.${k}`)}
                   </option>
                 ))}
               </select>

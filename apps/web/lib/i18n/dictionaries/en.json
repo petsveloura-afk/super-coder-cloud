@@ -2564,7 +2564,40 @@
       "insights": "Insights",
       "allGood": "All good. Nothing needs attention right now."
     },
-    "metaHint": "Facebook Messenger and Instagram Direct only reach people who already messaged your page or account. Outside Meta's 24-hour window some messages may be rejected, and those show as failed in the report."
+    "metaHint": "Facebook Messenger and Instagram Direct only reach people who already messaged your page or account. Outside Meta's 24-hour window some messages may be rejected, and those show as failed in the report.",
+    "playbooks": {
+      "title": "Start from a professional playbook",
+      "hint": "A written message, the right channel and a ready audience — all editable",
+      "quick": "Ready campaign:",
+      "blank": "Blank campaign",
+      "blankHint": "Start from scratch",
+      "fillTitle": "{count} details still to fill before sending:",
+      "when": {
+        "morning": "Morning",
+        "noon": "Noon",
+        "evening": "Evening"
+      },
+      "items": {
+        "welcome": "Welcome",
+        "winback": "Win back",
+        "flash": "Flash sale",
+        "holiday": "Holiday + offer",
+        "event": "Event invite",
+        "review": "Review request",
+        "reactivate": "Re-engage leads",
+        "launch": "New launch",
+        "reminder": "Reminder",
+        "vip": "VIP offer"
+      }
+    },
+    "sort": {
+      "label": "Sort",
+      "newest": "Newest first",
+      "oldest": "Oldest first",
+      "name": "By name",
+      "recipients": "Most recipients",
+      "delivery": "Best delivery"
+    }
   },
   "inbox": {
     "ai": {
@@ -5297,7 +5330,9 @@
       "v_reel": "Reel script",
       "v_telegram": "Telegram",
       "v_whatsapp": "WhatsApp status",
-      "v_linkedin": "LinkedIn"
+      "v_linkedin": "LinkedIn",
+      "aiVideo": "AI video",
+      "quality": "Copy quality"
     },
     "drawer": {
       "title": "Your post is ready",
@@ -5310,6 +5345,106 @@
       "stageText": "Writing the text…",
       "stageMedia": "Creating the image or video…",
       "stageSave": "Saving and opening the editor…"
+    },
+    "video": {
+      "title": "AI video from the post",
+      "hint": "A short professional clip made exactly from what the post says — commercial-grade camera, motion and light.",
+      "price": "{n} credits per clip",
+      "fromPost": "The clip follows the post text. Optionally refine what you want to see",
+      "placeholder": "Describe what happens in the clip — e.g. a stylist coloring caramel hair, slow push-in",
+      "aspect": "Format",
+      "style": "Style",
+      "length": "Length",
+      "seconds": "{n} seconds",
+      "create": "Create video",
+      "starting": "Starting…",
+      "refund": "A clip that fails costs nothing — credits are returned.",
+      "making": "Making the clip… (usually 1–3 minutes, you can close the page)",
+      "ready": "Your video is ready 🎬",
+      "started": "We started making your video — it will appear here when ready",
+      "use": "Attach to post",
+      "attached": "Video attached to the post",
+      "check": "Check",
+      "needText": "Write the post or a description for the clip first",
+      "notConfigured": "AI video is not enabled on the platform yet. The platform admin can enable it by adding a video engine key.",
+      "aspects": {
+        "9x16": "Vertical 9:16 (Reels / Stories)",
+        "1x1": "Square 1:1 (feed)",
+        "16x9": "Wide 16:9"
+      },
+      "styles": {
+        "auto": "Automatic (from the post)",
+        "cinematic": "Cinematic",
+        "lifestyle": "Lifestyle",
+        "product": "Product",
+        "luxury": "Luxury",
+        "energetic": "Energetic",
+        "calm": "Calm",
+        "3d": "3D"
+      },
+      "err": {
+        "credits": "Not enough credits for a video — buy a pack on the billing page",
+        "notConfigured": "AI video is not enabled yet",
+        "safety": "The video engine declined this content — try different wording",
+        "busy": "The video engine is busy — try again in a minute (you were not charged)",
+        "timeout": "The clip did not arrive in time — credits returned",
+        "failed": "Video generation failed — credits returned",
+        "tooMany": "3 clips are already being made — wait for one to finish"
+      }
+    },
+    "quality": {
+      "score": "Score {n} of 100",
+      "hint": "A live score based on what works on social — fixed in one click.",
+      "rewrite": "Professional rewrite:",
+      "rewritten": "Post rewritten — you can undo",
+      "alreadyTidy": "The text is already tidy",
+      "tidy": "Tidy up (no word changes)",
+      "undo": "Undo — bring back the previous text",
+      "grade": {
+        "great": "Strong post 💪",
+        "good": "Good — a little more polish",
+        "weak": "Could be much better"
+      },
+      "ok": {
+        "hook": "A first line that stops the scroll",
+        "length": "Good length",
+        "lines": "Short, readable lines",
+        "cta": "Has a call to action",
+        "hashtags": "Hashtags in the right amount",
+        "emojis": "Emojis in moderation",
+        "question": "Asks a question that invites comments",
+        "noCaps": "No shouting in capitals",
+        "noLinksIg": "No link that does not work on Instagram",
+        "value": "Clear value for the reader"
+      },
+      "tip": {
+        "hook": "Make the first line 9–12 words with a question, number or promise",
+        "length": "Length is not ideal — not too short, not a wall of text",
+        "lines": "Split into short lines — one idea per line",
+        "cta": "Add a call to action: \"message us\", \"book now\", \"comment\"",
+        "hashtags": "Instagram 3–15 hashtags, Facebook up to 4",
+        "emojis": "Add 1–4 fitting emojis (no more than 6)",
+        "question": "A question to the audience drives comments and reach",
+        "noCaps": "Fewer capital letters — it reads like shouting",
+        "noLinksIg": "Links in captions are not clickable on Instagram — use \"link in bio\"",
+        "value": "Give value: a tip, news, an offer or a reason to stop"
+      },
+      "fw": {
+        "hook": "Strong hook",
+        "aida": "AIDA",
+        "pas": "Problem–solution",
+        "story": "Story",
+        "short": "Short & sharp",
+        "list": "List"
+      },
+      "fwHint": {
+        "hook": "A scroll-stopping first line + short lines + call to action",
+        "aida": "Attention → Interest → Desire → Action",
+        "pas": "Problem → Agitate → your Solution",
+        "story": "A human micro-story with a soft ending",
+        "short": "Up to 3 lines + call to action",
+        "list": "A scannable list with an emoji per line"
+      }
     }
   },
   "market": {

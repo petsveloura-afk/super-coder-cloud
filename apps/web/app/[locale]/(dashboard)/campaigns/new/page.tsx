@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
-import { CampaignEditor } from "@/components/campaigns/campaign-editor";
+import { NewCampaignWorkspace } from "@/components/campaigns/campaign-playbooks";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return { title: t("campaigns.new") };
 }
 
-export default async function NewCampaignPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function NewCampaignPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams?: Promise<{ playbook?: string }> }) {
   const locale = await resolveLocale(params);
   const ctx = await getOrgContext(locale);
   const { t } = await getT(locale);
@@ -35,7 +35,8 @@ export default async function NewCampaignPage({ params }: { params: Promise<{ lo
       </Link>
       <PageHeader title={t("campaigns.new")} description={t("campaigns.newHint")} />
       {ctx.can("ai.use") ? <CampaignAgent /> : null}
-      <CampaignEditor initial={{ name: "", channel: "email", subject: "", body: "", audience: {} }} tags={(tags ?? []).map((x) => x.name as string)} channelsReady={ready} />
+      {/* playbooks: one click fills the editor (the blank editor is still the default) */}
+      <NewCampaignWorkspace tags={(tags ?? []).map((x) => x.name as string)} channelsReady={ready} initialPlaybook={((await searchParams) ?? {}).playbook ?? null} />
     </>
   );
 }

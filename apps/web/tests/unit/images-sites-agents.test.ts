@@ -73,7 +73,7 @@ describe("image director — professional prompts", () => {
     expect(img).toContain("imageConfig: { aspectRatio: aspect }");
     expect(img).toContain("body = plainBody;");
     const studio = read("app/[locale]/(dashboard)/social/studio-actions.ts");
-    expect(studio.match(/directedPostPrompt\(/g)?.length).toBe(2);
+    expect(studio.match(/directedPostPrompt\(/g)?.length).toBe(3);
     expect(read("lib/social/brain.ts").match(/directedPostPrompt\(/g)?.length).toBe(2);
     const sb = read("lib/ai/site-builder.ts");
     expect(sb).toContain('purpose: "hero"');
