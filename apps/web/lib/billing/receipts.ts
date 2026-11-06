@@ -31,8 +31,14 @@ export function businessDetails() {
   };
 }
 
-export async function recordPayment(p: PaymentInput): Promise<{ id: string; receipt_number: number; new: boolean } | null> {
+export async function recordPayment(p0: PaymentInput): Promise<{ id: string; receipt_number: number; new: boolean } | null> {
   const admin = createAdminClient();
+  // billing integrity (additive): one payment = one receipt. A PayPal subscription payment reaches us twice (the
+  // PAYMENT.SALE.COMPLETED event with the sale id, and the subscription sync with "<subscription>:<time>") — the second one
+  // returns the first receipt instead of a new number. The billing interval is filled from the subscription when missing.
+  const p = await completePayment(p0).catch(() => p0);
+  const twin = await findTwinPayment(p).catch(() => null);
+  if (twin) return { ...twin, new: false };
   const { data, error } = await admin.rpc("record_billing_payment", {
     p_org: p.orgId,
     p_provider: p.provider,
@@ -55,6 +61,44 @@ export async function recordPayment(p: PaymentInput): Promise<{ id: string; rece
   return r;
 }
 
+/** the interval (and period end) of the business's subscription when the event did not carry it */
+async function completePayment(p: PaymentInput): Promise<PaymentInput> {
+  if (p.interval || !p.plan) return p;
+  const admin = createAdminClient();
+  const { data } = await admin.from("subscriptions").select("plan_key, billing_interval, current_period_end").eq("organization_id", p.orgId).maybeSingle();
+  if (!data || data.plan_key !== p.plan) return p;
+  const interval = data.billing_interval === "month" || data.billing_interval === "year" ? (data.billing_interval as "month" | "year") : null;
+  return { ...p, interval, periodEnd: p.periodEnd ?? ((data.current_period_end as string | null) ?? null) };
+}
+
+/** the same subscription payment already recorded under the other id (same subscription + amount within 3 days) */
+async function findTwinPayment(p: PaymentInput): Promise<{ id: string; receipt_number: number } | null> {
+  const sub = typeof p.meta?.subscription === "string" ? p.meta.subscription : null;
+  if (p.provider !== "paypal" || !sub) return null;
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("billing_payments")
+    .select("id, receipt_number, external_id, amount")
+    .eq("organization_id", p.orgId)
+    .eq("provider", "paypal")
+    .eq("meta->>subscription", sub)
+    .gte("paid_at", new Date(Date.now() - 3 * 86_400_000).toISOString())
+    .order("paid_at", { ascending: false })
+    .limit(5);
+  const hit = ((data ?? []) as { id: string; receipt_number: number; external_id: string; amount: number }[]).find((r) => r.external_id !== p.externalId.slice(0, 200) && Math.abs(Number(r.amount) - p.amount) < 0.01);
+  return hit ? { id: hit.id, receipt_number: Number(hit.receipt_number) } : null;
+}
+
+/** what the receipt is for: a plan, an AI credit pack or a domain (pure — also used by the printable receipt) */
+export function receiptItemHe(p: { plan?: string | null; interval?: string | null; meta?: Record<string, unknown> | null }): string {
+  const credits = Number((p.meta ?? {}).credits);
+  if ((p.meta ?? {}).credit_pack) return `חבילת קרדיטים ל-AI${Number.isFinite(credits) && credits > 0 ? ` · ${credits.toLocaleString("he-IL")} קרדיטים` : ""}`;
+  const domain = (p.meta ?? {}).domain;
+  if (typeof domain === "string" && domain) return `דומיין · ${domain}`;
+  const plan = p.plan ? p.plan.charAt(0).toUpperCase() + p.plan.slice(1) : "";
+  return `${plan}${p.interval ? ` · ${p.interval === "year" ? "שנתי" : "חודשי"}` : ""}` || "—";
+}
+
 async function emailReceipt(p: PaymentInput, r: { id: string; receipt_number: number }) {
   if (!emailConfigured()) return;
   const admin = createAdminClient();
@@ -74,7 +118,7 @@ async function emailReceipt(p: PaymentInput, r: { id: string; receipt_number: nu
   const rows = [
     ["מספר קבלה", `#${r.receipt_number}`],
     ["תאריך", new Date().toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })],
-    ["מסלול", `${plan}${p.interval ? ` · ${p.interval === "year" ? "שנתי" : "חודשי"}` : ""}`],
+    ["פריט", receiptItemHe({ plan: p.plan, interval: p.interval, meta: p.meta ?? null }) || plan],
     ["סכום", amount],
     ["אמצעי תשלום", { paypal: "PayPal / כרטיס אשראי", lemonsqueezy: "כרטיס אשראי (Lemon Squeezy)", nowpayments: "מטבע דיגיטלי", stripe: "כרטיס אשראי (Stripe)", manual: "ידני" }[p.provider]],
   ];

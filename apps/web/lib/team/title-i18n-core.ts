@@ -121,6 +121,11 @@ const RULES_MORE: Rule[] = [
   { re: /^Memory upkeep started\.?$/i, he: () => "תחזוקת הזיכרון התחילה.", ar: () => "بدأت صيانة الذاكرة." },
   { re: /^Memory upkeep: (\d+) merged, (\d+) conflicts settled, (\d+) faded \(kept, marked expired\)\.?$/i, he: (m) => `תחזוקת זיכרון: ${m[1]} אוחדו, ${m[2]} סתירות נפתרו, ${m[3]} סומנו כפגי תוקף (נשמרו).`, ar: (m) => `صيانة الذاكرة: دُمجت ${m[1]}، حُسمت ${m[2]} تعارضات، ${m[3]} انتهت صلاحيتها (محفوظة).` },
   { re: /^The AI did not answer \(all engines busy\) — the task will be retried\.?$/i, he: () => "מנועי ה-AI לא ענו (כולם עמוסים) — המשימה תנוסה שוב לבד.", ar: () => "لم تُجب محركات الذكاء الاصطناعي (كلها مشغولة) — ستُعاد المحاولة تلقائيًا." },
+  // resilience upgrade (additive): lines that stayed in English
+  { re: /^The first answer was unreadable — the second attempt worked\.?$/i, he: () => "התשובה הראשונה לא הייתה קריאה — הניסיון השני הצליח.", ar: () => "الإجابة الأولى لم تكن مقروءة — المحاولة الثانية نجحت." },
+  { re: /^The first answer was unreadable and the second attempt failed too\.?$/i, he: () => "התשובה הראשונה לא הייתה קריאה וגם הניסיון השני נכשל — ננסה שוב בקרוב.", ar: () => "الإجابة الأولى لم تكن مقروءة وفشلت المحاولة الثانية أيضًا — سنحاول مجددًا قريبًا." },
+  { re: /^Could not write the output \(AI busy\)\.?$/i, he: () => "לא הצלחתי לכתוב את התוצר (מנועי ה-AI עמוסים) — ננסה שוב לבד.", ar: () => "تعذّرت كتابة الناتج (محركات الذكاء الاصطناعي مشغولة) — ستُعاد المحاولة تلقائيًا." },
+  { re: /^goal: (.+)$/i, he: (m) => `מטרה: ${m[1]}`, ar: (m) => `الهدف: ${m[1]}` },
   { re: /^([^:]{1,60}): (approve|revise)(.*)$/i, he: (m) => `${m[1]}: ${m[2]!.toLowerCase() === "approve" ? "אישר/ה" : "ביקש/ה תיקון"}${m[3] ?? ""}`, ar: (m) => `${m[1]}: ${m[2]!.toLowerCase() === "approve" ? "وافق" : "طلب تصحيحًا"}${m[3] ?? ""}` },
 ];
 

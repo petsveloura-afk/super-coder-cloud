@@ -264,5 +264,9 @@ export async function processDomainPayment(paypalOrderId: string): Promise<Domai
   }
   await admin.from("domain_orders").update({ status: "active", registrar_order_id: registrarOrder, contact: null, error: siteStatus === "active" ? null : "dns_pending", updated_at: new Date().toISOString() }).eq("id", row.id);
   await admin.from("audit_logs").insert({ organization_id: base.orgId, actor_id: row.created_by, action: "domain.purchased", entity_type: "site", entity_id: base.siteId, metadata: { domain: base.domain, price: Number(row.price), cost: Number(row.cost) } });
+  // billing integrity (additive): a domain purchase gets a numbered receipt like every other payment (once — same capture id)
+  await import("@/lib/billing/receipts")
+    .then((m) => m.recordPayment({ orgId: base.orgId, provider: "paypal", externalId: `paypal:${order.capture!.id}`, plan: null, interval: null, amount: order.capture!.amount, currency: order.capture!.currency, meta: { domain: base.domain, domain_order: row.id } }))
+    .catch(() => null);
   return { handled: true, status: "active", ...base };
 }

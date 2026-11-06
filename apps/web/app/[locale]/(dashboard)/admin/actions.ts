@@ -73,3 +73,28 @@ export async function resetAiRestsAction(locale: string): Promise<ActionState> {
   await clearRests();
   return { ok: true, message: "admin.aiHealth.resetDone" };
 }
+
+/* ------------------------------------------------------------------ billing integrity (additive) */
+
+/** Platform admin: run the billing integrity sweep now (payers get access back, ended plans end). */
+export async function billingIntegrityAction(locale: string): Promise<ActionState<{ restored: number; manual_expired: number; past_due_expired: number; period_ended: number }>> {
+  const ctx = await getOrgContext(locale === "en" || locale === "ar" ? locale : "he");
+  if (!ctx.isPlatformAdmin) return { error: "errors.forbidden" };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_billing_integrity_sweep");
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}/admin`);
+  const d = (data ?? {}) as { restored?: number; manual_expired?: number; past_due_expired?: number; period_ended?: number };
+  return { ok: true, data: { restored: d.restored ?? 0, manual_expired: d.manual_expired ?? 0, past_due_expired: d.past_due_expired ?? 0, period_ended: d.period_ended ?? 0 } };
+}
+
+/** Platform admin: the full billing file of one business (payments + receipts, packs, usage, plan history). */
+export async function billingFileAction(locale: string, orgId: string): Promise<ActionState<{ file: Record<string, unknown> }>> {
+  const ctx = await getOrgContext(locale === "en" || locale === "ar" ? locale : "he");
+  if (!ctx.isPlatformAdmin) return { error: "errors.forbidden" };
+  if (!uuidSchema.safeParse(orgId).success) return { error: "validation.invalidOption" };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("platform_billing_file", { p_org: orgId });
+  if (error) return { error: dbErrorKey(error) };
+  return { ok: true, data: { file: (data ?? {}) as Record<string, unknown> } };
+}

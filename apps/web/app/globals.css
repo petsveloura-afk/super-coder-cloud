@@ -997,3 +997,29 @@ main[data-shell] :is(a, button, [role="tab"], summary):focus-visible { outline: 
   .btn-brand::after { display: none !important; }
 }
 }
+
+/* site agent loader (additive) — the "building your site" scene. transform / opacity only, layered, no motion when reduced */
+@layer components {
+  @media (prefers-reduced-motion: no-preference) {
+    .sal-backdrop { animation: sal-fade 0.25s ease-out backwards; }
+    .sal-card { animation: sal-card-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1.15) backwards; }
+    .sal-orbit { animation: sal-spin 6s linear infinite; }
+    .sal-orbit-item { animation: sal-spin-rev 6s linear infinite; }
+    .sal-bob { display: inline-block; animation: sal-bob 1.6s ease-in-out infinite; }
+    .sal-pop { display: inline-block; animation: sal-pop 0.6s cubic-bezier(0.2, 0.8, 0.2, 1.4) backwards; }
+    .sal-shake { display: inline-block; animation: sal-shake 0.5s ease-in-out 2; }
+    .sal-burst { animation: sal-burst 0.9s ease-out forwards; }
+    .sal-block { animation: sal-build 2.4s ease-in-out infinite backwards; transform-origin: center; }
+    .sal-glow { animation: sal-glow 2.4s ease-in-out infinite; }
+  }
+  @keyframes sal-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes sal-card-in { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+  @keyframes sal-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes sal-spin-rev { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+  @keyframes sal-bob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-8px) rotate(4deg); } }
+  @keyframes sal-pop { from { opacity: 0; transform: scale(0.3); } to { opacity: 1; transform: scale(1); } }
+  @keyframes sal-shake { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); } }
+  @keyframes sal-burst { from { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(0.6); } to { opacity: 0; transform: rotate(var(--a)) translateY(-78px) scale(1.2); } }
+  @keyframes sal-build { 0% { opacity: 0.15; transform: scaleX(0.35); } 35%, 80% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0.15; transform: scaleX(1); } }
+  @keyframes sal-glow { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+}

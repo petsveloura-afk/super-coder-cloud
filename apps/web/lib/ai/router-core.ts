@@ -8,12 +8,14 @@
  * (remembered across requests), and moves on immediately to the next provider.
  */
 
-export type RouteProvider = "gemini" | "groq" | "cerebras" | "openrouter" | "mistral" | "anthropic" | "openai" | "cloudflare" | "github" | "sambanova" | "nvidia" | "huggingface";
+export type RouteProvider = "gemini" | "groq" | "cerebras" | "openrouter" | "mistral" | "anthropic" | "openai" | "cloudflare" | "github" | "sambanova" | "nvidia" | "huggingface" | "together" | "cohere" | "zhipu" | "custom";
 // wave 55: five more free engines (Cloudflare Workers AI, GitHub Models, SambaNova, NVIDIA NIM, Hugging Face)
 // join the failover chain — each is used only when its key is set
 // wave 57: the original engines keep their places at the front (exactly as before wave 55) — the new free
 // engines are extra capacity right after them, before the paid ones
-export const ROUTE_PROVIDERS: RouteProvider[] = ["groq", "cerebras", "gemini", "openrouter", "mistral", "cloudflare", "github", "sambanova", "nvidia", "huggingface", "anthropic", "openai"];
+// resilience upgrade (additive): three more free engines (Together free models, Cohere trial, Zhipu GLM Flash) and any number of
+// "custom" OpenAI-compatible engines from AI_EXTRA_ENGINES — all after the existing free engines, before the paid ones
+export const ROUTE_PROVIDERS: RouteProvider[] = ["groq", "cerebras", "gemini", "openrouter", "mistral", "cloudflare", "github", "sambanova", "nvidia", "huggingface", "together", "cohere", "zhipu", "custom", "anthropic", "openai"];
 /** Paid engines: always last in the background lane (free capacity first). */
 export const PAID_PROVIDERS: RouteProvider[] = ["anthropic", "openai"];
 
@@ -30,9 +32,9 @@ type Env = Record<string, string | undefined>;
 
 const clean = (k: string | undefined) => (k ?? "").trim().replace(/^["']|["']$/g, "");
 
-/** KEY, KEY_2 … KEY_10 and KEYS (comma-separated), cleaned and de-duplicated. */
+/** KEY, KEY_2 … KEY_30 and KEYS (comma-separated), cleaned and de-duplicated (resilience upgrade: up to 30 numbered keys, was 10). */
 export function keysFor(env: Env, base: string, minLen = 20): string[] {
-  const raw = [env[base], ...Array.from({ length: 9 }, (_, i) => env[`${base}_${i + 2}`]), ...(env[`${base}S`] ?? "").split(",")];
+  const raw = [env[base], ...Array.from({ length: 29 }, (_, i) => env[`${base}_${i + 2}`]), ...(env[`${base}S`] ?? "").split(",")];
   return [...new Set(raw.map(clean).filter((k) => k.length >= minLen))];
 }
 
@@ -70,6 +72,14 @@ export function modelsFor(provider: RouteProvider, env: Env): string[] {
       return list(env.AI_NVIDIA_MODELS, ["meta/llama-3.3-70b-instruct", "openai/gpt-oss-120b"]);
     case "huggingface":
       return list(env.AI_HUGGINGFACE_MODELS, ["openai/gpt-oss-120b", "meta-llama/Llama-3.3-70B-Instruct"]);
+    case "together":
+      return list(env.AI_TOGETHER_MODELS, ["meta-llama/Llama-3.3-70B-Instruct-Turbo-Free", "openai/gpt-oss-120b"]);
+    case "cohere":
+      return list(env.AI_COHERE_MODELS, ["command-a-03-2025", "command-r-plus-08-2024"]);
+    case "zhipu":
+      return list(env.AI_ZHIPU_MODELS, ["glm-4.5-flash", "glm-4-flash-250414"]);
+    case "custom":
+      return [...new Set(extraEngines(env).flatMap((e) => e.models))];
   }
 }
 
@@ -82,10 +92,37 @@ const BASES: Record<string, [string, string]> = {
   sambanova: ["AI_SAMBANOVA_BASE_URL", "https://api.sambanova.ai/v1"],
   nvidia: ["AI_NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1"],
   huggingface: ["AI_HUGGINGFACE_BASE_URL", "https://router.huggingface.co/v1"],
+  together: ["AI_TOGETHER_BASE_URL", "https://api.together.xyz/v1"],
+  cohere: ["AI_COHERE_BASE_URL", "https://api.cohere.ai/compatibility/v1"],
+  zhipu: ["AI_ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4"],
 };
 
+/**
+ * resilience upgrade — any OpenAI-compatible engine without code: AI_EXTRA_ENGINES="name|baseUrl|model1;model2|ENV_NAME_OF_THE_KEY, …".
+ * The key itself stays in its own variable (ENV_NAME, ENV_NAME_2 … ENV_NAME_30, ENV_NAMES — the same rules as every engine).
+ */
+export interface ExtraEngine {
+  name: string;
+  baseUrl: string;
+  models: string[];
+  keys: string[];
+}
+
+export function extraEngines(env: Env): ExtraEngine[] {
+  const out: ExtraEngine[] = [];
+  for (const raw of (env.AI_EXTRA_ENGINES ?? "").split(",").map((x) => x.trim()).filter(Boolean)) {
+    const [name, baseUrl, models, keyEnv] = raw.split("|").map((x) => (x ?? "").trim());
+    if (!name || !/^[a-z0-9-]{2,30}$/i.test(name) || !baseUrl || !/^https:\/\//.test(baseUrl) || !models || !keyEnv || !/^[A-Z0-9_]{3,60}$/.test(keyEnv)) continue;
+    const ms = models.split(";").map((m) => m.trim()).filter(Boolean).slice(0, 6);
+    const keys = keysFor(env, keyEnv, 8);
+    if (!ms.length || !keys.length) continue;
+    out.push({ name: name.toLowerCase(), baseUrl: baseUrl.replace(/\/$/, ""), models: ms, keys });
+  }
+  return out.slice(0, 12);
+}
+
 /** Engines whose OpenAI-compatible API may reject response_format=json_object (the prompt asks for JSON anyway). */
-export const NO_JSON_MODE: RouteProvider[] = ["cloudflare", "huggingface", "sambanova"];
+export const NO_JSON_MODE: RouteProvider[] = ["cloudflare", "huggingface", "sambanova", "together", "cohere", "custom"];
 
 /**
  * Cloudflare Workers AI accounts as "accountId:token" keys: CLOUDFLARE_AI_ACCOUNTS="id:token,…" plus the
@@ -146,6 +183,14 @@ export function providerKeys(provider: RouteProvider, env: Env): string[] {
       return keysFor(env, "NVIDIA_API_KEY");
     case "huggingface":
       return keysFor(env, "HF_TOKEN");
+    case "together":
+      return keysFor(env, "TOGETHER_API_KEY");
+    case "cohere":
+      return keysFor(env, "COHERE_API_KEY");
+    case "zhipu":
+      return keysFor(env, "ZHIPU_API_KEY");
+    case "custom":
+      return [...new Set(extraEngines(env).flatMap((e) => e.keys))];
   }
 }
 
@@ -168,6 +213,17 @@ export function buildCandidates(input: { preferred?: string | null; model?: stri
   const providers = pref ? [pref, ...order.filter((p) => p !== pref)] : order;
   const out: RouteCandidate[] = [];
   for (const provider of providers) {
+    if (provider === "custom") {
+      // resilience upgrade: every custom engine, model by model, keys rotated from a random start (same rule as the built-in engines)
+      for (const e of extraEngines(env)) {
+        const st = Math.floor(rnd() * e.keys.length);
+        for (const model of e.models) for (let i = 0; i < e.keys.length; i++) {
+          const key = e.keys[(st + i) % e.keys.length]!;
+          out.push({ provider, model, key, keyId: keyId(`custom-${e.name}`, key), baseUrl: e.baseUrl });
+        }
+      }
+      continue;
+    }
     const keys = providerKeys(provider, env);
     if (!keys.length) continue;
     let models = modelsFor(provider, env);

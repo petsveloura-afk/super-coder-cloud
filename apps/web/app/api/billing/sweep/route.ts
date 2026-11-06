@@ -41,7 +41,30 @@ async function handle(request: NextRequest) {
       reminded++;
     }
   }
-  return NextResponse.json({ ok: true, due: due.length, reminded });
+  // billing integrity (additive, never fails the sweep): payers always keep access, ended plans really end, and PayPal
+  // subscriptions whose period passed without a renewal event are re-read from PayPal (the truth) instead of guessed
+  const integrity = await admin.rpc("billing_integrity_sweep").then((r) => (r.error ? null : r.data), () => null);
+  let resynced = 0;
+  try {
+    const { paypalConfigured, syncPayPalSubscription } = await import("@/lib/billing/paypal");
+    if (paypalConfigured()) {
+      const { data: stale } = await admin
+        .from("subscriptions")
+        .select("provider_subscription_id")
+        .eq("provider", "paypal")
+        .in("status", ["active", "past_due"])
+        .like("provider_subscription_id", "I-%")
+        .lt("current_period_end", new Date(Date.now() - 86_400_000).toISOString())
+        .limit(20);
+      for (const s of (stale ?? []) as { provider_subscription_id: string }[]) {
+        const r = await syncPayPalSubscription(s.provider_subscription_id).catch(() => ({ ok: false }));
+        if (r.ok) resynced++;
+      }
+    }
+  } catch {
+    /* PayPal unreachable — the next sweep tries again */
+  }
+  return NextResponse.json({ ok: true, due: due.length, reminded, integrity, resynced });
 }
 
 // spec A4: every run is recorded in job_runs and never overlaps itself

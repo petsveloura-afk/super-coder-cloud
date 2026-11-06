@@ -102,7 +102,7 @@ export function withDecisionLayer(deps: EngineDeps, o: LayerOptions): EngineDeps
       const log: DecisionRecord[] = [];
       const rec = appendRecord(log, draft, { id: o.newId?.() ?? `${o.task.id}:${Date.now()}`, task_id: o.task.id, member_id: o.member.id, route: state.route, route_reasons: state.routeReasons, confidence: calibrated, audit: state.audit, now: o.now?.() ?? Date.now() })[0]!;
       state.record = rec;
-      await deps.log("plan", `Decision (${state.route}${state.routeReasons.length ? `: ${state.routeReasons.join(", ")}` : ""}) — ${draft.decided.slice(0, 160)} · confidence ${Math.round(calibrated * 100)}%${state.audit ? ` · audit: ${state.audit.verdict}` : ""}`, { route: state.route, reasons: state.routeReasons, audit: state.audit }, state.audit?.verdict !== "revise");
+      await deps.log("plan", `Decision (${state.route}${state.routeReasons.length ? `: ${state.routeReasons.join(", ")}` : ""}) — ${(draft.decided || draft.understood || o.task.title || "").slice(0, 160)} · confidence ${Math.round(calibrated * 100)}%${state.audit ? ` · audit: ${state.audit.verdict}` : ""}`, { route: state.route, reasons: state.routeReasons, audit: state.audit }, state.audit?.verdict !== "revise");
       if (o.persist) await o.persist(rec).catch(() => undefined);
     } catch {
       /* the layer never breaks the cycle */

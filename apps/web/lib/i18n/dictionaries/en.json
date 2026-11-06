@@ -661,7 +661,9 @@
       "payNow": "Pay now",
       "trouble": "Can't pay here? Pay on PayPal's secure page",
       "byPaying": "Want another plan?",
-      "changePlan": "Back to plans"
+      "changePlan": "Back to plans",
+      "itemCredits": "AI credit pack · {n} credits",
+      "itemDomain": "Domain · {domain}"
     },
     "customPrice": "Your special price",
     "advisor": {
@@ -3701,6 +3703,18 @@
         "warm": "Soft corners, waves and a warm gradient for the story",
         "tech": "Slide entrances, gradients and a neon glow"
       }
+    },
+    "agentLoader": {
+      "titleBuild": "The agent is building your site",
+      "titleEdit": "The agent is upgrading your site",
+      "doneBuild": "Your site is ready! 🎉",
+      "doneEdit": "Your changes are ready! ✨",
+      "showing": "Showing the site…",
+      "errorTitle": "Something went wrong",
+      "errorBody": "We couldn't finish this time. Nothing was deleted — you can try again.",
+      "retry": "Try again",
+      "close": "Close",
+      "hint": "You can close this window — the agent keeps working in the background."
     }
   },
   "admin": {
@@ -3896,6 +3910,58 @@
       "voiceSection": "Voice & phone — the agent speaks and answers calls",
       "moreSection": "Phone notifications and default voice",
       "makeVapid": "Create notification keys"
+    },
+    "billingHealth": {
+      "title": "Billing integrity and client files",
+      "subtitle": "Payers get exactly their plan, non-payers never keep a paid plan. Every business has a full file: payments and receipts, credit packs, monthly usage and plan history. The check also runs by itself every day.",
+      "total": "{n} businesses",
+      "paying": "{n} paying",
+      "issues": "{n} need attention",
+      "search": "Search business or email",
+      "showAll": "Show all",
+      "showIssues": "Issues only",
+      "fix": "Check and fix now",
+      "fixed": "Done: {restored} plans given back to payers · {ended} ended plans closed",
+      "allGood": "All good: every payer has their plan and no paid plan runs without payment.",
+      "plan": "Active plan",
+      "subscription": "Subscription",
+      "paid": "Paid to date",
+      "credits": "Credits this month",
+      "flags": "Status",
+      "until": "until {date}",
+      "receipts": "{n} receipts",
+      "ok": "OK",
+      "file": "Client file",
+      "fileTitle": "Client file · {name}",
+      "noSubscription": "No subscription (free plan)",
+      "creditsLine": "This month: {used} of {limit} credits · pack balance: {packs}",
+      "payments": "Payments and receipts",
+      "noPayments": "No payments yet",
+      "receipt": "Receipt",
+      "packs": "Credit packs",
+      "usage": "AI usage by month",
+      "history": "Plan history",
+      "status": {
+        "active": "Active",
+        "trialing": "Trial",
+        "past_due": "Payment failed",
+        "canceled": "Canceled",
+        "incomplete": "Incomplete",
+        "unpaid": "Unpaid"
+      },
+      "flag": {
+        "paid_no_access": "Paying, no access",
+        "access_no_payment": "Plan without payment",
+        "past_due": "Payment failed",
+        "period_passed": "Period passed",
+        "no_receipts": "No receipts",
+        "over_limit": "Over limit"
+      },
+      "action": {
+        "plan_changed": "Plan changed",
+        "plan_restored": "Plan restored to payer",
+        "payment": "Payment received"
+      }
     }
   },
   "chat": {

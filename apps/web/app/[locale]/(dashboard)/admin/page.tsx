@@ -9,6 +9,7 @@ import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatNumber } from "@/lib/format";
 import { AdminPayments } from "@/components/admin/admin-payments";
+import { AdminBillingHealth } from "@/components/admin/admin-billing-health";
 import { AiHealth } from "@/components/admin/ai-health";
 import { AdminDomains } from "@/components/admin/admin-domains";
 import { AdminOverrides } from "@/components/admin/admin-growth";
@@ -78,6 +79,8 @@ export default async function AdminPage({ params, searchParams }: { params: Prom
       <AiHealth configured={Object.fromEntries(ROUTE_PROVIDERS.map((p) => [p, providerKeys(p, process.env).length]))} />
       <SpeedCard locale={locale} />
       <AdminPayments locale={locale} />
+      {/* billing integrity (additive): payers always get their plan + a client file per business */}
+      <AdminBillingHealth locale={locale} />
       <AdminDomains locale={locale} />
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map(([k, n, Icon]) => (

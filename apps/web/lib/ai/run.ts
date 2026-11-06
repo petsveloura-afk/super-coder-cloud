@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_MODELS, pickProvider, routerExtrasConfigured, type AIMessage, type AIProviderName } from "./providers";
 import { generateRouted, RouterError } from "./router";
 import { hintForFeature } from "./task-hint-core";
+import { busyWaitMs, secondPassBudget } from "./busy-wait-core";
 
 export type AIFeature =
   | "contact_summary"
@@ -64,7 +65,8 @@ export async function runAI(input: {
   const model = input.provider === provider && input.model ? input.model : DEFAULT_MODELS[provider];
   try {
     // AI router: the chosen provider first, then every other configured provider — fast failover, no retry storms
-    const result = await generateRouted({
+    const callStarted = Date.now();
+    const routedArgs = {
       preferred: input.provider ?? provider,
       model,
       system: input.system,
@@ -77,6 +79,15 @@ export async function runAI(input: {
       maxCalls: 12,
       // wave 66: kind-of-work hint for the MODEL inside a provider (the chosen provider keeps its place)
       hint: hintForFeature(input.feature),
+    };
+    const result = await generateRouted(routedArgs).catch(async (e: unknown) => {
+      // resilience upgrade (additive): every engine resting for only a moment → wait that long (a few seconds at most) and make ONE more pass
+      if (!(e instanceof RouterError)) throw e;
+      const elapsed = Date.now() - callStarted;
+      const wait = busyWaitMs({ retryInMs: e.retryInMs, lane: "interactive", elapsedMs: elapsed, busy: e.busy }, process.env);
+      if (!wait) throw e;
+      await new Promise((r) => setTimeout(r, wait));
+      return generateRouted({ ...routedArgs, budgetMs: secondPassBudget(elapsed, wait, process.env) });
     });
     await supabase.rpc("finalize_ai_usage", {
       p_usage_id: usageId,

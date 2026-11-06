@@ -10,6 +10,7 @@ import { aiEditSiteAction } from "@/app/[locale]/(dashboard)/websites/actions";
 import type { SiteValue } from "./site-builder";
 import { diffSites, type SiteDiff } from "@/lib/site/diff";
 import { cn } from "@/lib/utils";
+import { SiteAgentLoader, type AgentPhase } from "./site-agent-loader";
 
 /**
  * Wave 13 — "tell the agent what to change": the AI rewrites texts, adds sections,
@@ -93,6 +94,10 @@ export function AiEditPanel({
   const recentRaw = useSyncExternalStore(subscribeHistory, rawHistory, () => "[]");
   const recent = useMemo(() => parseHistory(recentRaw), [recentRaw]);
   const [empty, setEmpty] = useState(false);
+  // the animated "upgrading your site" scene (additive): working → done (the edited site shows in the editor) / error
+  const [phase, setPhase] = useState<AgentPhase>("idle");
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [lastInstruction, setLastInstruction] = useState("");
   // wave 34: the newest editor state — an answer that arrives after the owner kept typing must never silently overwrite that work
   const latest = useRef(value);
   useEffect(() => {
@@ -138,8 +143,15 @@ export function AiEditPanel({
     setText("");
     writeHistory([instruction.trim(), ...parseHistory(rawHistory()).filter((x) => x !== instruction.trim())].slice(0, 5));
     toast.success(t("websites.aiEdit.applied"));
+    // the scene celebrates for a moment, then the edited site shows in the editor exactly as before
+    setPhase("done");
+    window.setTimeout(() => setPhase((p) => (p === "done" ? "idle" : p)), 1300);
   };
-  const run = (instruction: string) =>
+  const run = (instruction: string) => {
+    // set outside the transition — updates inside an async transition only render when it ends
+    setLastInstruction(instruction);
+    setAgentError(null);
+    setPhase("working");
     start(async () => {
       const base = value;
       setConflict(null);
@@ -148,13 +160,21 @@ export function AiEditPanel({
         r = await aiEditSiteAction({ locale, instruction, site: base, allowProTemplates: proTemplates });
       } catch {
         // wave 34: a dropped connection / platform time-out must never crash the editor — nothing was changed
+        setAgentError(t("websites.aiEdit.failed"));
+        setPhase("error");
         return void toast.error(t("websites.aiEdit.failed"));
       }
-      if (r.error || !r.data) return void toast.error(t(r.error ?? "common.error"));
+      if (r.error || !r.data) {
+        setAgentError(t(r.error ?? "common.error"));
+        setPhase("error");
+        return void toast.error(t(r.error ?? "common.error"));
+      }
+
       const next = { ...base, ...(r.data.site as unknown as Partial<SiteValue>), slug: base.slug, status: base.status } as SiteValue;
       const d = diffSites(base, next);
       // wave 33: an answer identical to the current site is reported — never a silent "success"
       if (d.empty) {
+        setPhase("idle");
         setEmpty(true);
         setDiff(null);
         return void toast.info(t("websites.aiEdit.nothing"));
@@ -162,11 +182,13 @@ export function AiEditPanel({
       // wave 34: the owner edited while the agent was working — ask before replacing that work
       if (JSON.stringify(latest.current) !== JSON.stringify(base)) {
         setDiff(null);
+        setPhase("idle");
         setConflict({ next, d, instruction });
         return;
       }
       finish(next, d, instruction, base);
     });
+  };
   return (
     <Card className="overflow-hidden border-accent/30" data-testid="ai-edit-panel">
       <div className="flex items-center gap-3 border-b border-line bg-accent-soft/40 px-4 py-3">
@@ -335,6 +357,7 @@ export function AiEditPanel({
           </div>
         ) : null}
       </div>
+      <SiteAgentLoader phase={phase} mode="edit" stages={([0, 1, 2, 3] as const).map((k) => t(`websites.aiEdit.stage${k}`))} error={agentError} onClose={() => setPhase("idle")} onRetry={lastInstruction ? () => run(lastInstruction) : undefined} />
     </Card>
   );
 }

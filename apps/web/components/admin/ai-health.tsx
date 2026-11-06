@@ -21,6 +21,11 @@ const NAMES: Record<string, string> = {
   sambanova: "SambaNova",
   nvidia: "NVIDIA NIM",
   huggingface: "Hugging Face",
+  // resilience upgrade
+  together: "Together AI",
+  cohere: "Cohere",
+  zhipu: "Zhipu GLM",
+  custom: "Custom engines (AI_EXTRA_ENGINES)",
 };
 
 /**

@@ -1,5 +1,31 @@
 # Changelog
 
+## AI resilience, billing integrity, site agent loader
+
+- **AI engines — no more "all busy" stalls**
+  - Three more free engines in the failover chain: Together, Cohere and Zhipu GLM Flash.
+  - Any OpenAI-compatible engine can be added without code through `AI_EXTRA_ENGINES`.
+  - Every engine accepts up to 30 keys (was 10).
+  - When every engine rests for only a few seconds, the call now waits exactly that long and makes one more pass. This applies to both user calls and background (team) calls. Before, the work failed and waited for the next clock tick.
+  - Team log lines that stayed in English are now shown in Hebrew and Arabic.
+  - An empty decision line now shows what the employee understood.
+- **Billing integrity**
+  - A daily sweep, plus a button in the admin screen:
+    - restores the plan to a business that pays but lost access;
+    - ends hand-granted plans on their end date;
+    - ends failed payments 7 days after the period ended;
+    - ends cancelled-at-period-end subscriptions whose end event never arrived.
+  - PayPal subscriptions whose period passed are re-read from PayPal.
+  - One payment produces one receipt. A PayPal subscription payment that arrives twice keeps its first receipt number.
+  - Receipts name what was bought: a plan, a credit pack or a domain.
+  - Domain purchases now get receipts.
+  - The admin screen has a client file per business: subscription, payments with receipt links, packs, monthly AI usage and plan history.
+- **Site agent loader**
+  - An animated scene runs while the agent builds or edits a site: a robot with orbiting tools, a page assembling itself, the current stage and a progress bar.
+  - When the agent finishes, the scene celebrates and the site is shown as before.
+  - On failure, the scene says so and offers to try again.
+  - The scene can be closed at any time.
+
 ## Design 2.0: a page-builder for websites (section design, ready-made styles), an agency-level ad studio, a livelier platform — 2026-11-06
 
 - **Websites — section design (like a page builder's section inspector):** every section can have its own background (clean / soft / brand colour / gradient / dark band with its own readable palette), entrance (fade / rise / zoom / slide / blur-to-sharp / 3D flip), spacing (compact / roomy), heading alignment and device visibility (phones only / computers only). Stored as an optional `style` on each section (lenient: an unknown value is dropped, never fails the site); sections without it are unchanged.

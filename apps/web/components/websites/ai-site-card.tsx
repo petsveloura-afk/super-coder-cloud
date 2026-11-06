@@ -10,6 +10,7 @@ import { ALL_TEMPLATES } from "@/lib/site/templates";
 import { SECTION_KEYS, STYLE_KEYS, type SectionKey, type StyleKey } from "@/lib/ai/site-build-rules";
 import { cn } from "@/lib/utils";
 import { buildSiteWithAIAction } from "@/app/[locale]/(dashboard)/websites/actions";
+import { SiteAgentLoader, type AgentPhase } from "./site-agent-loader";
 
 /** what the site agent is doing right now — its tools in order (shown while it builds, ~every 7 seconds) */
 const BUILD_STAGES = ["facts", "copy", "design", "quality", "images", "save"] as const;
@@ -47,6 +48,32 @@ export function AiSiteCard({ caps }: { caps: { full: boolean; images: boolean; p
   const prefs = [style ? `Style: ${style}` : "", must.length ? `Must include: ${must.join(", ")}` : "", mode ? `Mode: ${mode}` : "", `Animations: ${anim ? "yes" : "no"}`].filter(Boolean).join("\n");
   const chip = (on: boolean) => cn("min-h-10 rounded-full border px-3.5 text-[13px] transition", on ? "border-accent bg-accent-soft font-medium text-accent" : "border-line text-muted hover:border-accent");
   const [pending, start] = useTransition();
+  // the animated "building your site" scene (additive): working → done (then the preview opens) / error (try again)
+  const [phase, setPhase] = useState<AgentPhase>("idle");
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const build = () => {
+    // set outside the transition — updates inside an async transition only render when it ends
+    setAgentError(null);
+    setPhase("working");
+    start(async () => {
+      let r: Awaited<ReturnType<typeof buildSiteWithAIAction>>;
+      try {
+        r = await buildSiteWithAIAction({ locale, brief: `${brief.trim().slice(0, 2700)}\n\nPreferences:\n${prefs}`, full, template: template || undefined });
+      } catch {
+        setAgentError(t("websites.agentLoader.errorBody"));
+        setPhase("error");
+        return;
+      }
+      if (r.error || !r.data) {
+        setAgentError(t(r.error ?? "common.error"));
+        setPhase("error");
+        return void toast.error(t(r.error ?? "common.error"));
+      }
+      setPhase("done");
+      toast.success(t(r.message ?? "ai.siteBuilt", r.messageParams));
+      router.push(`/${locale}/websites/${r.data.id}/preview`);
+    });
+  };
   return (
     <Card className="shine-border mb-4 overflow-hidden border-accent/30" data-testid="ai-site-card">
       <div className="hero-mesh flex items-center gap-3 border-b border-line px-5 py-3">
@@ -121,20 +148,14 @@ export function AiSiteCard({ caps }: { caps: { full: boolean; images: boolean; p
           <Button
             loading={pending}
             disabled={brief.trim().length < 10}
-            onClick={() =>
-              start(async () => {
-                const r = await buildSiteWithAIAction({ locale, brief: `${brief.trim().slice(0, 2700)}\n\nPreferences:\n${prefs}`, full, template: template || undefined });
-                if (r.error || !r.data) return void toast.error(t(r.error ?? "common.error"));
-                toast.success(t(r.message ?? "ai.siteBuilt", r.messageParams));
-                router.push(`/${locale}/websites/${r.data.id}/preview`);
-              })
-            }
+            onClick={build}
           >
             <Sparkles className="h-4 w-4" /> {t(pending ? "websites.aiBuilding" : "websites.aiBuild")}
           </Button>
         </div>
         {pending ? <BuildStages /> : null}
       </div>
+      <SiteAgentLoader phase={phase} mode="build" stages={BUILD_STAGES.map((k) => t(`websites.buildStages.${k}`))} error={agentError} onClose={() => setPhase("idle")} onRetry={build} />
     </Card>
   );
 }

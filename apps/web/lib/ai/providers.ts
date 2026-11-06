@@ -59,7 +59,9 @@ export function providerConfigured(p: AIProviderName): boolean {
 /** Any key of the extra free providers the AI router can use (Groq, Cerebras, OpenRouter, Mistral). */
 export function routerExtrasConfigured(env: Record<string, string | undefined> = process.env): boolean {
   return (
-    ["GROQ_API_KEY", "CEREBRAS_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY", "GITHUB_MODELS_TOKEN", "SAMBANOVA_API_KEY", "NVIDIA_API_KEY", "HF_TOKEN"].some((b) => Boolean(env[b] || env[`${b}S`] || env[`${b}_2`])) ||
+    ["GROQ_API_KEY", "CEREBRAS_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY", "GITHUB_MODELS_TOKEN", "SAMBANOVA_API_KEY", "NVIDIA_API_KEY", "HF_TOKEN", "TOGETHER_API_KEY", "COHERE_API_KEY", "ZHIPU_API_KEY"].some((b) => Boolean(env[b] || env[`${b}S`] || env[`${b}_2`])) ||
+    // resilience upgrade: custom OpenAI-compatible engines (AI_EXTRA_ENGINES)
+    Boolean(env.AI_EXTRA_ENGINES) ||
     // wave 55: Cloudflare Workers AI (text) with the same account keys as the image engine
     Boolean(env.CLOUDFLARE_AI_ACCOUNTS || (env.CLOUDFLARE_ACCOUNT_ID && (env.CLOUDFLARE_AI_TOKEN || env.CLOUDFLARE_API_TOKEN)))
   );

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { uuidSchema } from "@scc/shared/validators";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 import { businessDetails } from "@/lib/billing/receipts";
 import { PrintButton } from "@/components/billing/print-button";
 
@@ -30,11 +30,18 @@ export default async function ReceiptPage({ params }: { params: Params }) {
   if (!r) notFound();
   const { data: org } = await supabase.from("organizations").select("name").eq("id", r.organization_id).maybeSingle();
   const b = businessDetails();
+  const meta = (r.meta ?? {}) as { credit_pack?: string; credits?: number; domain?: string };
+  const itemLabel = () => {
+    if (meta.credit_pack) return t("billing.pay.itemCredits", { n: formatNumber(locale, Number(meta.credits) || 0) });
+    if (typeof meta.domain === "string" && meta.domain) return t("billing.pay.itemDomain", { domain: meta.domain });
+    return `${r.plan_key ? t(`billing.plans.${r.plan_key}.name`) : "—"}${r.billing_interval ? ` · ${t(r.billing_interval === "year" ? "billing.yearly" : "billing.monthly")}` : ""}`;
+  };
   const rows: [string, string][] = [
     [t("billing.pay.receiptNo"), `#${r.receipt_number}`],
     [t("billing.pay.date"), formatDate(locale, r.paid_at as string)],
     [t("billing.pay.customer"), [org?.name, r.payer_name, r.payer_email].filter(Boolean).join(" · ") || "—"],
-    [t("billing.pay.item"), `${r.plan_key ? t(`billing.plans.${r.plan_key}.name`) : "—"}${r.billing_interval ? ` · ${t(r.billing_interval === "year" ? "billing.yearly" : "billing.monthly")}` : ""}`],
+    // billing integrity: a credit pack / domain receipt names what was bought (before it showed "—")
+    [t("billing.pay.item"), itemLabel()],
     [t("billing.pay.method"), t(`billing.pay.providers.${r.provider}`)],
     ...(r.period_end ? ([[t("billing.pay.validUntil"), formatDate(locale, r.period_end as string)]] as [string, string][]) : []),
   ];

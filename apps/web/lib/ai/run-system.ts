@@ -5,6 +5,7 @@ import { DEFAULT_MODELS, pickProvider, routerExtrasConfigured, type AIMessage, t
 import { generateRouted, hedgePlan, RouterError } from "./router";
 import { hedgeDelayMs, hedged } from "./speed-core";
 import { hintForFeature } from "./task-hint-core";
+import { busyWaitMs, secondPassBudget } from "./busy-wait-core";
 import type { AIOutcome } from "./run";
 
 /**
@@ -64,14 +65,26 @@ export async function runAISystem(input: {
     // slow, a second configured engine starts in parallel after AI_HEDGE_MS (default 6s); first answer wins
     const hedgeMs = ["autopilot", "voice", "kb"].includes(input.feature) ? hedgeDelayMs(process.env) : 0;
     const plan = hedgeMs > 0 ? await hedgePlan(routedArgs.preferred, model).catch(() => null) : null;
-    const result = plan
-      ? await hedged(
-          () => generateRouted(routedArgs),
-          () => generateRouted({ ...routedArgs, preferred: plan.second, model: null, skipProviders: [plan.first] }),
-          hedgeMs,
-          () => console.info("ai hedge: second engine started", plan.first, "→", plan.second),
-        )
-      : await generateRouted(routedArgs);
+    const callStarted = Date.now();
+    const result = await (async () =>
+      plan
+        ? await hedged(
+            () => generateRouted(routedArgs),
+            () => generateRouted({ ...routedArgs, preferred: plan.second, model: null, skipProviders: [plan.first] }),
+            hedgeMs,
+            () => console.info("ai hedge: second engine started", plan.first, "→", plan.second),
+          )
+        : await generateRouted(routedArgs))().catch(async (e: unknown) => {
+      // resilience upgrade (additive): every engine resting for only a few seconds → wait exactly that long and make ONE more pass
+      // (before, the work failed at once and waited minutes for the next clock tick). Anything else is re-thrown unchanged.
+      if (!(e instanceof RouterError)) throw e;
+      const elapsed = Date.now() - callStarted;
+      const wait = busyWaitMs({ retryInMs: e.retryInMs, lane: routedArgs.lane, elapsedMs: elapsed, busy: e.busy }, process.env);
+      if (!wait) throw e;
+      console.info("ai busy — waiting before one more pass", wait, "ms", routedArgs.lane);
+      await new Promise((r) => setTimeout(r, wait));
+      return generateRouted({ ...routedArgs, budgetMs: secondPassBudget(elapsed, wait, process.env) });
+    });
     await admin.rpc("finalize_ai_usage_system", {
       p_usage_id: usageId,
       p_provider: result.provider,
