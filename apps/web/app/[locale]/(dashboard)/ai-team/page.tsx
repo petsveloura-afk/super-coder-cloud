@@ -1,3 +1,4 @@
+import { AgentsHarmony } from "@/components/agents/agents-harmony";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { Network } from "lucide-react";
@@ -64,6 +65,8 @@ export default async function AiTeamPage({ params }: { params: Promise<{ locale:
     <>
       <PageHeader title={t("aiTeam.title")} description={t("aiTeam.subtitle")} />
       <TrialNote locale={locale} access={access} />
+      {/* agent coordination (additive): the same board on my team — every agent of the business in one picture */}
+      <AgentsHarmony locale={locale} orgId={ctx.org.id} />
       <TeamScreen data={data} />
     </>
   );

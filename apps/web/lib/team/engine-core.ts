@@ -195,6 +195,15 @@ const REPORT_TEXT: Record<"he" | "en" | "ar", { done: (n: number) => string; not
 const LANG = { he: "Hebrew", en: "English", ar: "Arabic" } as const;
 
 /** the employee's system prompt: identity + playbook + safety + business + memory + tools */
+/** agent coordination (additive): the employee works next to the smart team, the conversation agent and the operator — never against them */
+export const COORDINATION_RULES = [
+  "WORKING WITH THE OTHER AGENTS: this business also runs a conversation agent (answers customers live), a smart team (collections, re-engagement, review requests, abandoned carts, a sales manager) and an operator.",
+  "- Before you message a customer or open a follow-up, read the customer's brief: when it says \"handled now by other agents\", do NOT repeat that work — report it and move on.",
+  "- A customer in a live conversation is answered by the conversation agent; you never answer in parallel to it.",
+  "- When a tool answers \"not sent — … already handles this customer\", that is SUCCESS of the coordination, not a failure: do not retry.",
+  "- The owner's confirmed business facts are shared by every agent; never state anything that contradicts them.",
+].join("\n");
+
 export function employeeSystem(m: EngineMember, ctx: TeamContext, lang: "he" | "en" | "ar", task: string): string {
   const mem = recall(ctx.memories.filter((x) => !isClientSubject(x.subject)), task, m.id, 12);
   return [
@@ -206,6 +215,7 @@ export function employeeSystem(m: EngineMember, ctx: TeamContext, lang: "he" | "
     isDiagnosticTask(task) ? DIAGNOSTIC_METHOD : "",
     m.instructions ? `The owner's own instructions for you:\n${m.instructions.slice(0, 6000)}` : "",
     SAFETY_RULES,
+    COORDINATION_RULES,
     ctx.profile ? `THE BUSINESS (live profile from the platform):\n${ctx.profile}` : "",
     memoryPrompt(mem),
     toolsPrompt(m.tools),

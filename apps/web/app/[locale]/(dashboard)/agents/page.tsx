@@ -4,6 +4,7 @@ import { Bot } from "lucide-react";
 import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { AgentsHub, type AgentView } from "@/components/agents/agents-hub";
 import { AgentsBrain } from "@/components/agents/agents-brain";
+import { AgentsHarmony } from "@/components/agents/agents-harmony";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -77,6 +78,8 @@ export default async function AgentsPage({ params }: { params: Promise<{ locale:
       </Card>
       {teamAccess.allowed ? <TrialNote locale={locale} access={teamAccess} /> : <div className="mb-4"><FeatureLock locale={locale} feature="ai_team" plan="pro" access={teamAccess} canTrial={canTrial} /></div>}
       <AgentsBrain agents={views} canManage={ctx.can("ai.manage")} />
+      {/* agent coordination (additive): who handles which customer now + overlaps avoided, shared by every agent */}
+      <AgentsHarmony locale={locale} orgId={ctx.org.id} />
       <AgentsHub agents={views} canManage={ctx.can("ai.manage")} />
       {plusAccess.allowed ? <div className="mt-4"><TrialNote locale={locale} access={plusAccess} /></div> : <div className="mt-4"><FeatureLock locale={locale} feature="ai_team_plus" plan="business" access={plusAccess} canTrial={canTrial} /></div>}
       <PlusAgents agents={plusViews} canManage={ctx.can("ai.manage")} />

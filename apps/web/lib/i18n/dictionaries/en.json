@@ -5058,6 +5058,30 @@
         "tunePosts": "Three posts a week keeps the page active without overloading it.",
         "reviewFirst": "Review the first posts before auto-publishing. Switch auto-publish off for now."
       }
+    },
+    "harmony": {
+      "title": "Agent coordination",
+      "subtitle": "All the business's agents work as one team: before an agent reaches a customer or opens a follow-up, it checks that no other agent is handling that customer for the same purpose right now. So a customer never gets a double message, and no agent undoes another's work.",
+      "score": "Harmony score",
+      "active": "Customers being handled now",
+      "prevented": "Overlaps avoided this week",
+      "shared": "What they all share",
+      "sharedBody": "One set of confirmed business facts, one conversation guard (consent, quiet hours, caps) and one coordination board.",
+      "nowTitle": "Who handles what right now",
+      "none": "No customer is being handled proactively by an agent right now — everyone is free.",
+      "until": "until {date}",
+      "avoided": "{n} overlaps avoided",
+      "systems": {
+        "conversation": "Conversation agent",
+        "smart": "Smart team",
+        "team": "My team",
+        "operator": "Operator"
+      },
+      "lanes": {
+        "outreach": "Outreach",
+        "money": "Collections",
+        "task": "Follow-up task"
+      }
     }
   },
   "social": {

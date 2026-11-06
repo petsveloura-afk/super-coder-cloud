@@ -82,10 +82,12 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
           db.from("messages").select("direction, body, created_at, conversations!inner(contact_id)").eq("organization_id", orgId).eq("conversations.contact_id", id).order("created_at", { ascending: false }).limit(6),
         ]);
         if (!c) return { ok: false, summary: "", error: "contact_not_found" };
+        // agent coordination: the employee sees which other agent already handles this customer (so it never repeats their work)
+        const handled = await import("@/lib/coordination/claims").then((m) => m.claimsOn(orgId, "contact", id)).then(async (rows) => (await import("@/lib/coordination/core")).claimsBriefLine(rows)).catch(() => "");
         const last = ((msgs ?? []) as { direction: string; body: string | null }[]).reverse().map((m) => `${m.direction === "in" ? "customer" : "business"}: ${(m.body ?? "").slice(0, 140)}`).join(" | ");
         return {
           ok: true,
-          summary: `${c.first_name} ${c.last_name ?? ""} · ${c.status}${c.company_name ? ` · ${c.company_name}` : ""} · memories: ${((mem ?? []) as { fact: string }[]).map((m) => m.fact).join("; ") || "—"} · open deals: ${((deals ?? []) as { title: string; value: number }[]).map((d) => `${d.title} (${d.value})`).join(", ") || "—"} · open tasks: ${((tasks ?? []) as { title: string }[]).map((t) => t.title).join(", ") || "—"} · last messages: ${last || "—"}`,
+          summary: `${c.first_name} ${c.last_name ?? ""} · ${c.status}${c.company_name ? ` · ${c.company_name}` : ""} · memories: ${((mem ?? []) as { fact: string }[]).map((m) => m.fact).join("; ") || "—"} · open deals: ${((deals ?? []) as { title: string; value: number }[]).map((d) => `${d.title} (${d.value})`).join(", ") || "—"} · open tasks: ${((tasks ?? []) as { title: string }[]).map((t) => t.title).join(", ") || "—"} · last messages: ${last || "—"}${handled ? ` · ${handled}` : ""}`,
           link: `/crm/${id}`,
         };
       }
@@ -258,7 +260,14 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
         const { data: c } = await db.from("contacts").select("id").eq("organization_id", orgId).eq("id", s(args.contact_id)).maybeSingle();
         if (!c) return { ok: false, summary: "", error: "contact_not_found" };
         const { messageContact } = await import("@/lib/agents/run");
-        const sent = await messageContact(orgId, c.id as string, s(args.text).slice(0, 4000), tool === "collections.send_reminder" ? "reminder" : "automation", { team: true });
+        // agent coordination: a person who asked for this now (interactive) always goes through; otherwise the employee steps aside when
+        // another agent already reaches this customer for the same purpose
+        const sent = await messageContact(orgId, c.id as string, s(args.text).slice(0, 4000), tool === "collections.send_reminder" ? "reminder" : "automation", { team: true, force: ctx.interactive === true });
+        if (!sent && !ctx.interactive) {
+          const { claimsOn } = await import("@/lib/coordination/claims");
+          const held = (await claimsOn(orgId, "contact", c.id as string)).find((r) => r.owner !== "team:employee" && r.lane === (tool === "collections.send_reminder" ? "money" : "outreach"));
+          if (held) return { ok: true, summary: `not sent — ${held.owner} already handles this customer (${held.lane}) until ${held.until.slice(0, 16)}; no double message`, link: `/crm/${c.id}` };
+        }
         return sent ? { ok: true, summary: "message sent to the customer", link: `/crm/${c.id}` } : { ok: false, summary: "", error: "not_sent_guard_or_channel" };
       }
       case "calendar.book": {

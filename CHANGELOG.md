@@ -1,5 +1,19 @@
 # Changelog
 
+## Agent coordination — every agent works as one team
+
+- **Shared claims board (`agent_claims`)**: before any agent proactively reaches a customer, it claims that customer for the purpose — outreach (24h), collections (20h) or a follow-up task (20h). The agents are the smart team (collections, re-engagement, review requests, abandoned carts, sales manager) and the digital-team employees.
+  - Another agent with the same purpose steps aside, so the customer never gets a double message and no agent undoes another's work. The overlap it avoided is counted.
+  - A person's explicit action always goes through.
+  - When nothing was actually sent, the claim is released.
+  - If the migration has not run yet, agents work exactly as before (fail-open).
+- **Shared brain**:
+  - The smart team now reads the same owner-confirmed business facts as the digital team.
+  - Digital-team employees see in a customer's brief which agent already handles that customer.
+  - They also see what the smart team did in the last 24 hours, and they follow written coordination rules.
+- **Smarter sales manager**: when no deal is stuck, it scans for hot leads in open conversations that have no follow-up, and opens one claimed task per lead. Before, it ran and "found nothing to do".
+- **Coordination board** on the smart team page and on My team: a harmony score, the customers being handled right now and by which agent, overlaps avoided this week, and what every agent shares.
+
 ## AI resilience, billing integrity, site agent loader
 
 - **AI engines — no more "all busy" stalls**

@@ -402,7 +402,18 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
       // upgrade 8 / stage B: the matching company procedure (its own block; empty when none fits)
       const orgBlock = await import("./runner-org8").then((m) => m.orgContextFor(orgId, member, `${claimed.title as string} ${(claimed.brief as string) ?? ""}`, lang)).catch(() => "");
       const factsBlock0 = await import("./business-facts").then((m) => m.factsPromptFor(orgId, `${claimed.title as string} ${(claimed.brief as string) ?? ""}`)).catch(() => "");
-      const factsBlock = [factsBlock0, goalsBlock, extraCtx, orgBlock].filter(Boolean).join("\n\n");
+      // agent coordination (additive): what the smart team did in the last 24 hours, so the employee builds on it and never repeats it
+      const smartBlock = await Promise.resolve(
+        a
+        .from("agent_runs")
+        .select("agent, summary, created_at")
+        .eq("organization_id", orgId)
+        .gte("created_at", new Date(Date.now() - 86_400_000).toISOString())
+        .order("created_at", { ascending: false })
+        .limit(8)
+        .then(({ data }) => import("@/lib/coordination/team-core").then((m) => m.smartTeamBlock((data ?? []) as { agent: string; summary: string; created_at: string }[])), () => ""),
+      ).catch(() => "");
+      const factsBlock = [factsBlock0, goalsBlock, extraCtx, orgBlock, smartBlock].filter(Boolean).join("\n\n");
       return { profile: factsBlock ? `${profilePrompt(profile)}\n\n${factsBlock}` : profilePrompt(profile), known: knownFacts(profile), memories, playbookExtra: (extra?.extra as string) ?? "", reviewer: reviewerRow && reviewerRow.id !== member.id ? toEngine(reviewerRow) : null, reviewerExtra: (reviewerExtra as { extra?: string } | null)?.extra ?? "" };
     },
   };

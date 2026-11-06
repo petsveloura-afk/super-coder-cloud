@@ -48,7 +48,11 @@ export async function notifyOwners(orgId: string, titleKey: string, params: Reco
   if (rows.length) await admin.from("notifications").insert(rows);
 }
 
-export async function ai(org: Org, feature: "marketing" | "sales_manager" | "brief" | "collections", system: string, user: string, maxTokens = 700): Promise<string | null> {
+export async function ai(org: Org, feature: "marketing" | "sales_manager" | "brief" | "collections", system0: string, user: string, maxTokens = 700): Promise<string | null> {
+  // shared brain (additive): the smart team reads the same owner-confirmed business facts as the digital team, so every agent works
+  // from ONE truth (prices, hours, policies) and no agent contradicts another. Empty when there are none / unavailable.
+  const facts = await import("@/lib/team/business-facts").then((m) => m.factsPromptFor(org.id, `${system0.slice(0, 400)} ${user.slice(0, 600)}`)).catch(() => "");
+  const system = facts ? `${system0}\n\n${facts}\nThese confirmed facts are shared by every agent of the business — never contradict them.` : system0;
   const out = await runAISystem({
     orgId: org.id,
     feature,
@@ -172,6 +176,15 @@ export async function runSalesManager(orgId: string, config: Record<string, unkn
   const { data } = await admin.rpc("stuck_deals", { p_org: orgId, p_days: days, p_limit: 30 });
   const deals = (data ?? []) as { id: string; title: string; value: number; stage_name: string | null; owner_id: string | null; contact_id: string | null; days_quiet: number }[];
   if (!deals.length) {
+    // smarter sales manager (additive): no stuck deal → it looks for money left on the table — hot leads in an open conversation
+    // that have no follow-up task yet — and opens ONE task per lead for the owner (claimed, so no other agent doubles it)
+    const scan = await opportunityScan(org, maxTasks).catch(() => ({ created: 0, names: [] as string[] }));
+    if (scan.created) {
+      const msg = org.locale === "en" ? `No deal went quiet. Found ${scan.created} hot lead(s) without a follow-up and opened a task for each: ${scan.names.join(", ")}.` : org.locale === "ar" ? `لا صفقات متوقفة. وُجد ${scan.created} عملاء ساخنون بلا متابعة وفُتحت مهمة لكل منهم: ${scan.names.join("، ")}.` : `אין עסקאות תקועות. נמצאו ${scan.created} לידים חמים בלי מעקב, ונפתחה משימה לכל אחד: ${scan.names.join(", ")}.`;
+      await logRun(orgId, "sales_manager", msg, { checked: 0, hot_leads: scan.created }, scan.created);
+      await notifyOwners(orgId, "agents.salesNotification", { count: String(scan.created) }, "/tasks");
+      return { actions: scan.created };
+    }
     await logRun(orgId, "sales_manager", org.locale === "en" ? "No deal went quiet — the pipeline is moving." : org.locale === "ar" ? "لا توجد صفقات متوقفة." : "אין עסקאות תקועות — הצינור זז.", { checked: 0 }, 0);
     return { actions: 0 };
   }
@@ -190,10 +203,13 @@ export async function runSalesManager(orgId: string, config: Record<string, unkn
     steps = {};
   }
   let created = 0;
+  const { claimEntity } = await import("@/lib/coordination/claims");
   for (const d of deals.slice(0, maxTasks)) {
     await admin.rpc("agent_emit", { p_org: orgId, p_type: "deal.stuck", p_entity_type: "deal", p_entity_id: d.id, p_payload: { title: d.title, value: d.value, quiet_days: d.days_quiet } }).then(() => undefined, () => undefined);
     const { data: open } = await admin.from("tasks").select("id").eq("organization_id", orgId).eq("deal_id", d.id).eq("status", "open").limit(1).maybeSingle();
     if (open) continue;
+    // agent coordination (additive): one follow-up per deal per day across every agent
+    if (!(await claimEntity({ orgId, entityType: "deal", entityId: d.id, lane: "task", owner: "smart:sales_manager", minutes: 20 * 60, note: d.title })).granted) continue;
     const step = steps[d.id] ?? (org.locale === "en" ? "Call and agree on the next step" : org.locale === "ar" ? "اتصل واتفق على الخطوة التالية" : "להתקשר ולסגור את הצעד הבא");
     const { error } = await admin.from("tasks").insert({
       organization_id: orgId,
@@ -218,8 +234,55 @@ export async function runSalesManager(orgId: string, config: Record<string, unkn
   return { actions: created };
 }
 
+/** hot leads (open conversation, scored "hot", active in the last 14 days) without an open task → one task each (claimed) */
+async function opportunityScan(org: Org, max: number): Promise<{ created: number; names: string[] }> {
+  const admin = createAdminClient();
+  const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
+  const { data: convs } = await admin.from("conversations").select("contact_id, summary, channel").eq("organization_id", org.id).eq("status", "open").eq("lead_score", "hot").not("contact_id", "is", null).gte("last_message_at", since).order("last_message_at", { ascending: false }).limit(40);
+  const byContact = new Map<string, { summary: string | null; channel: string }>();
+  for (const c of (convs ?? []) as { contact_id: string; summary: string | null; channel: string }[]) if (!byContact.has(c.contact_id)) byContact.set(c.contact_id, { summary: c.summary, channel: c.channel });
+  const ids = [...byContact.keys()];
+  if (!ids.length) return { created: 0, names: [] };
+  const [{ data: openTasks }, { data: people }] = await Promise.all([
+    admin.from("tasks").select("contact_id").eq("organization_id", org.id).eq("status", "open").in("contact_id", ids).limit(500),
+    admin.from("contacts").select("id, first_name, last_name, owner_id").eq("organization_id", org.id).in("id", ids),
+  ]);
+  const busy = new Set(((openTasks ?? []) as { contact_id: string }[]).map((t) => t.contact_id));
+  const { claimEntity } = await import("@/lib/coordination/claims");
+  const { hotLeadTask } = await import("@/lib/coordination/sales-core");
+  let created = 0;
+  const names: string[] = [];
+  for (const p of (people ?? []) as { id: string; first_name: string | null; last_name: string | null; owner_id: string | null }[]) {
+    if (created >= max || busy.has(p.id)) continue;
+    const name = [p.first_name, p.last_name].filter(Boolean).join(" ") || "—";
+    if (!(await claimEntity({ orgId: org.id, entityType: "contact", entityId: p.id, lane: "task", owner: "smart:sales_manager", minutes: 20 * 60, note: name })).granted) continue;
+    const t = hotLeadTask(org.locale, { name, summary: byContact.get(p.id)?.summary ?? null, channel: byContact.get(p.id)?.channel ?? "" });
+    const { error } = await admin.from("tasks").insert({ organization_id: org.id, contact_id: p.id, assignee_id: p.owner_id, title: t.title, description: t.description, due_at: new Date(Date.now() + 4 * 3_600_000).toISOString(), remind_at: new Date(Date.now() + 3_600_000).toISOString() });
+    if (!error) {
+      created++;
+      names.push(name);
+    }
+  }
+  return { created, names };
+}
+
 /* ------------------------------------------------------------------ collections (+ abandoned carts) */
-export async function messageContact(orgId: string, contactId: string, text: string, kind: "reminder" | "automation", meta: Record<string, unknown>): Promise<boolean> {
+export async function messageContact(orgId: string, contactId: string, text: string, kind: "reminder" | "automation", meta0: Record<string, unknown>): Promise<boolean> {
+  // agent coordination (additive): one agent per customer per purpose at a time — the smart team, my team and the operator all
+  // claim the customer here first; a different agent that already reaches this customer for the same purpose wins, this one steps
+  // aside (counted on the coordination board). A person's explicit action (force) always goes through. Fail-open when unavailable.
+  const { force, ...meta } = meta0;
+  const { claimForMessage } = await import("@/lib/coordination/core");
+  const { claimEntity, releaseEntity } = await import("@/lib/coordination/claims");
+  const want = claimForMessage(kind, meta);
+  const claim = await claimEntity({ orgId, entityType: "contact", entityId: contactId, lane: want.lane, owner: want.owner, minutes: want.minutes, note: text.split("\n")[0]!.slice(0, 120), force: force === true });
+  if (!claim.granted) return false;
+  const sent = await messageContactInner(orgId, contactId, text, kind, meta);
+  if (!sent) await releaseEntity({ orgId, entityType: "contact", entityId: contactId, lane: want.lane, owner: want.owner });
+  return sent;
+}
+
+async function messageContactInner(orgId: string, contactId: string, text: string, kind: "reminder" | "automation", meta: Record<string, unknown>): Promise<boolean> {
   const admin = createAdminClient();
   const { checkGuard, checkContact } = await import("@/lib/conversations/guard");
   const { sendToConversation, sendToContact } = await import("@/lib/channels/send-message");
