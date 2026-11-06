@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { siteEmbedOptions, sitePublicBase } from "@/lib/websites";
 import { aiSiteCaps } from "@/lib/ai/site-builder";
 import { formatNumber } from "@/lib/format";
+import { SITE_BUTTONS, SITE_ENTRANCES, SITE_HEADERS, SITE_HOVERS, cleanSectionStyle } from "@/lib/site/section-style";
 
 /** wave 34: the agent / AI site actions run from this page — a full-site answer can take well over the platform default */
 export const maxDuration = 60;
@@ -45,7 +46,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
   const embeds = await siteEmbedOptions(ctx.org.id);
   const caps = await aiSiteCaps(ctx.org.id);
   const Back = locale === "en" ? ArrowLeft : ArrowRight;
-  const theme = (s.theme ?? {}) as { accent?: string; mode?: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant" };
+  const theme = (s.theme ?? {}) as { accent?: string; mode?: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant"; buttons?: string; hover?: string; entrance?: string; header?: string };
   // wave 13: domain panel data
   const { domainsConfigured } = await import("@/lib/site/domains");
   const { paypalSdkConfig } = await import("@/lib/billing/paypal");
@@ -120,11 +121,20 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             // the effects pack and section shapes the site already has (saving the editor keeps them)
             ...(theme.effects === "none" || theme.effects === "subtle" || theme.effects === "rich" ? { effects: theme.effects } : {}),
             ...(theme.dividers === "none" || theme.dividers === "wave" || theme.dividers === "curve" || theme.dividers === "slant" ? { dividers: theme.dividers } : {}),
+            // site-wide design (kept on load so a save never drops it)
+            ...(SITE_BUTTONS.includes(theme.buttons as never) ? { buttons: theme.buttons as (typeof SITE_BUTTONS)[number] } : {}),
+            ...(SITE_HOVERS.includes(theme.hover as never) ? { hover: theme.hover as (typeof SITE_HOVERS)[number] } : {}),
+            ...(SITE_ENTRANCES.includes(theme.entrance as never) ? { entrance: theme.entrance as (typeof SITE_ENTRANCES)[number] } : {}),
+            ...(SITE_HEADERS.includes(theme.header as never) ? { header: theme.header as (typeof SITE_HEADERS)[number] } : {}),
           },
           settings: (s.settings ?? {}) as SiteSettings,
           pages: (s.pages ?? {}) as SitePages,
           seo: { title: seo.title ?? "", description: seo.description ?? "" },
-          blocks: ((s.blocks ?? []) as { type: SiteBlockType; data: BlockValue["data"] }[]).map((b) => ({ type: b.type, data: b.data ?? {} })),
+          // each section keeps its own design (style) on load
+          blocks: ((s.blocks ?? []) as { type: SiteBlockType; data: BlockValue["data"]; style?: unknown }[]).map((b) => {
+            const st = cleanSectionStyle(b.style);
+            return st ? { type: b.type, data: b.data ?? {}, style: st } : { type: b.type, data: b.data ?? {} };
+          }),
         }}
       />
       <div className="mt-4">

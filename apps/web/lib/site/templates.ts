@@ -269,9 +269,17 @@ export interface ResolvedTheme {
   /** effects pack level (missing in the theme = "subtle"; no animations = "none") */
   effects?: "none" | "subtle" | "rich";
   dividers?: "none" | "wave" | "curve" | "slant";
+  /** site-wide design (missing = the template's own look) */
+  buttons?: "solid" | "gradient" | "outline" | "glass" | "pill";
+  hover?: "lift" | "glow" | "tilt" | "none";
+  /** how sections enter (overrides the template's motion; "blur" / "flip" are new) */
+  entrance?: "rise" | "fade" | "scale" | "slide" | "blur" | "flip";
+  header?: "glass" | "solid" | "minimal";
 }
 
-export function resolveTheme(theme: { template?: string; accent?: string; accent2?: string; mode?: "dark" | "light"; font?: string; radius?: string; animations?: boolean; effects?: string; dividers?: string } | null | undefined): ResolvedTheme {
+const pick = <T extends string>(v: unknown, vals: readonly T[]): T | undefined => (typeof v === "string" && (vals as readonly string[]).includes(v) ? (v as T) : undefined);
+
+export function resolveTheme(theme: { template?: string; accent?: string; accent2?: string; mode?: "dark" | "light"; font?: string; radius?: string; animations?: boolean; effects?: string; dividers?: string; buttons?: string; hover?: string; entrance?: string; header?: string } | null | undefined): ResolvedTheme {
   const tpl = templateByKey(theme?.template);
   const accent = hex(theme?.accent ?? "") ? theme!.accent! : tpl.accent;
   const accent2 = hex(theme?.accent2 ?? "") ? theme!.accent2! : tpl.accent2;
@@ -288,5 +296,11 @@ export function resolveTheme(theme: { template?: string; accent?: string; accent
   const animations = theme?.animations !== false && tpl.motion !== "none";
   const effects = !animations ? "none" : theme?.effects === "none" || theme?.effects === "rich" || theme?.effects === "subtle" ? theme.effects : "subtle";
   const dividers = theme?.dividers === "wave" || theme?.dividers === "curve" || theme?.dividers === "slant" ? theme.dividers : "none";
-  return { tpl, accent, accent2, mode, display: font ?? tpl.display, body: font ?? tpl.body, radius, animations, palette, effects, dividers };
+  const design = {
+    buttons: pick(theme?.buttons, ["solid", "gradient", "outline", "glass", "pill"] as const),
+    hover: pick(theme?.hover, ["lift", "glow", "tilt", "none"] as const),
+    entrance: pick(theme?.entrance, ["rise", "fade", "scale", "slide", "blur", "flip"] as const),
+    header: pick(theme?.header, ["glass", "solid", "minimal"] as const),
+  };
+  return { tpl, accent, accent2, mode, display: font ?? tpl.display, body: font ?? tpl.body, radius, animations, palette, effects, dividers, ...design };
 }

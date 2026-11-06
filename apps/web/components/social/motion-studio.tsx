@@ -320,7 +320,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, w: number, h: number, i
   ctx.restore();
 }
 
-function putBlob(url: string, blob: Blob, type: string, onProgress: (n: number) => void): Promise<void> {
+export function putBlob(url: string, blob: Blob, type: string, onProgress: (n: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);

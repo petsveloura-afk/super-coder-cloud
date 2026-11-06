@@ -16,7 +16,15 @@ import { cn } from "@/lib/utils";
  * restyles the site or switches the template. The result lands in the editor (not
  * saved) so the business reviews it and saves / publishes; one-click undo.
  */
-const QUICK = ["modern", "testimonials", "pricing", "shorter", "luxury", "stats", "steps", "english", "faq", "seo", "cta", "trust", "arabic", "hebrew", "trustBadges", "timeline", "comparison", "countdown", "banner", "polish", "wow", "waves", "darkLux", "colorful", "gallery", "team", "headline", "mobile", "elegantFont", "story"] as const;
+export const QUICK = ["modern", "testimonials", "pricing", "shorter", "luxury", "stats", "steps", "english", "faq", "seo", "cta", "trust", "arabic", "hebrew", "trustBadges", "timeline", "comparison", "countdown", "banner", "polish", "wow", "waves", "darkLux", "colorful", "gallery", "team", "headline", "mobile", "elegantFont", "story", "rhythm", "standOut", "cinematic", "glassButtons", "calmMotion", "designerPass"] as const;
+
+/** the one-click edits grouped (design first) — 36 chips in one pile were hard to scan */
+const QUICK_GROUPS: Record<"design" | "sections" | "content" | "language", readonly (typeof QUICK)[number][]> = {
+  design: ["designerPass", "modern", "rhythm", "standOut", "cinematic", "glassButtons", "calmMotion", "wow", "waves", "darkLux", "colorful", "luxury", "elegantFont", "mobile", "polish"],
+  sections: ["testimonials", "pricing", "stats", "steps", "faq", "cta", "trust", "trustBadges", "timeline", "comparison", "countdown", "banner", "gallery", "team", "story"],
+  content: ["headline", "shorter", "seo"],
+  language: ["hebrew", "english", "arabic"],
+};
 
 /** wave 33: the last instructions, remembered in this browser (a convenience — works without storage) */
 const HISTORY_KEY = "scc-ai-edit-history";
@@ -77,6 +85,7 @@ export function AiEditPanel({
 }) {
   const { t, locale } = useI18n();
   const [text, setText] = useState("");
+  const [group, setGroup] = useState<keyof typeof QUICK_GROUPS>("design");
   const [prev, setPrev] = useState<SiteValue | null>(null);
   const [pending, start] = useTransition();
   const [diff, setDiff] = useState<SiteDiff | null>(null);
@@ -170,8 +179,15 @@ export function AiEditPanel({
         </div>
       </div>
       <div className="space-y-3 p-4">
+        <div className="flex flex-wrap gap-1" role="tablist" aria-label={t("websites.aiEdit.groups.label")}>
+          {(Object.keys(QUICK_GROUPS) as (keyof typeof QUICK_GROUPS)[]).map((g) => (
+            <button key={g} type="button" role="tab" aria-selected={group === g} onClick={() => setGroup(g)} className={cn("rounded-lg px-2.5 py-1 text-[12px] font-medium transition", group === g ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-hover hover:text-fg")} data-quick-group={g}>
+              {t(`websites.aiEdit.groups.${g}`)}
+            </button>
+          ))}
+        </div>
         <div className="flex flex-wrap gap-1.5">
-          {QUICK.map((q) => (
+          {QUICK_GROUPS[group].map((q) => (
             <button key={q} type="button" disabled={pending} onClick={() => run(t(`websites.aiEdit.quick.${q}`))} className="rounded-full border border-line px-3 py-1 text-[12.5px] hover:border-accent hover:text-accent disabled:opacity-50" data-quick={q}>
               {t(`websites.aiEdit.quickLabel.${q}`)}
             </button>

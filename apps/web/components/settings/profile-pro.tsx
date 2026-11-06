@@ -104,9 +104,11 @@ export function ProfileProCard(props: { name: string; email: string; role: strin
 
   return (
     <div className="space-y-5 p-5" data-testid="profile-pro">
+      {/* a soft brand cover behind the profile header (decorative) */}
+      <div className="profile-cover -mx-5 -mt-5 mb-[-3.25rem] h-24" aria-hidden />
       {/* identity */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative">
+      <div className="relative flex flex-wrap items-end gap-4">
+        <div className="avatar-ring relative">
           {avatar ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={avatar} alt={props.name || props.email} className="h-20 w-20 rounded-full object-cover ring-2 ring-accent/30" referrerPolicy="no-referrer" />

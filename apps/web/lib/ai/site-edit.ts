@@ -23,11 +23,12 @@ export async function editSiteWithAI(input: { orgId: string; locale: Locale; ins
   const form = input.site.blocks.find((b) => b.type === "form");
   const booking = input.site.blocks.find((b) => b.type === "booking");
   const ctx = { formSlug: form?.type === "form" ? form.data.form_slug || null : null, bookingSlug: booking?.type === "booking" ? booking.data.booking_slug || null : null };
-  const current = { name: input.site.name, accent: input.site.theme.accent, mode: input.site.theme.mode, template: input.site.theme.template ?? ordered[0], accent2: input.site.theme.accent2, font: input.site.theme.font, radius: input.site.theme.radius, effects: (input.site.theme as { effects?: string }).effects, dividers: (input.site.theme as { dividers?: string }).dividers, animations: (input.site.theme as { animations?: boolean }).animations, seo: input.site.seo, blocks: input.site.blocks };
+  const current = { name: input.site.name, accent: input.site.theme.accent, mode: input.site.theme.mode, template: input.site.theme.template ?? ordered[0], accent2: input.site.theme.accent2, font: input.site.theme.font, radius: input.site.theme.radius, effects: (input.site.theme as { effects?: string }).effects, dividers: (input.site.theme as { dividers?: string }).dividers, animations: (input.site.theme as { animations?: boolean }).animations, buttons: (input.site.theme as { buttons?: string }).buttons, hover: (input.site.theme as { hover?: string }).hover, entrance: (input.site.theme as { entrance?: string }).entrance, header: (input.site.theme as { header?: string }).header, seo: input.site.seo, blocks: input.site.blocks };
   const system = [
     "You are editing an EXISTING website. Apply the owner's instruction and return the COMPLETE updated website JSON (same shape as below).",
     "Keep everything the instruction does not mention: section order, texts, image_url values, links, form_slug / booking_slug, contact details. Never invent phone numbers, emails, prices, reviews or client names.",
     "If asked to change the language, translate every visible text. If asked to change the style, you may change template / accent / accent2 / font / radius / mode.",
+    "Design requests ('more modern', 'more dynamic', 'like Wix', 'more elegant', 'alternate the backgrounds', 'make the testimonials stand out'…) are done with the site-wide design (buttons / hover / entrance / header / effects / dividers) and each block's \"style\" (bg / anim / pad / align) — keep every block's existing \"style\" unless the instruction is about design.",
     "",
     siteJsonInstructionsPro("full", input.locale, ctx, ordered),
     "",
@@ -71,6 +72,15 @@ export async function editSiteWithAI(input: { orgId: string; locale: Locale; ins
   });
   // wave 34: contact details / images the model forgot come back (matched by section type, not by position)
   restoreKept(input.site.blocks as unknown as { type: string; data: Record<string, unknown> }[], site.blocks as unknown as { type: string; data: Record<string, unknown> }[], input.instruction);
+  // section design the model left out is kept (matched by position + type); then no two heavy bands in a row
+  try {
+    const { balanceRhythm, cleanSectionStyle } = await import("@/lib/site/section-style");
+    const prevStyles = input.site.blocks.map((b) => ({ type: b.type, style: cleanSectionStyle((b as { style?: unknown }).style) }));
+    const withStyles = (site.blocks as unknown as { type: string; style?: ReturnType<typeof cleanSectionStyle> }[]).map((b, i) => (!b.style && prevStyles[i]?.type === b.type && prevStyles[i]?.style ? { ...b, style: prevStyles[i]!.style } : b));
+    site.blocks = balanceRhythm(withStyles as { style?: import("@scc/shared/engagement").BlockStyle | null }[]) as unknown as typeof site.blocks;
+  } catch (e) {
+    console.error("ai site edit styles failed", (e as Error).message);
+  }
   // a gallery / about / hero the edit added without pictures gets matching free photos (never replaces a picture that exists)
   try {
     const needs = site.blocks.some((b) => (b.type === "gallery" && !((b.data as { items?: unknown[] }).items ?? []).length) || ((b.type === "about" || b.type === "hero") && !(b.data as { image_url?: string }).image_url));

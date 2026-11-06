@@ -920,7 +920,8 @@ main[data-shell] [aria-busy="true"] { cursor: progress; }
 @media (prefers-reduced-motion: no-preference) {
   [role="dialog"][data-state="open"].fixed { animation: dlg-in 0.22s cubic-bezier(0.2, 0.7, 0.1, 1) backwards; }
   .fixed.inset-0[data-state="open"]:not([role="dialog"]) { animation: ov-in 0.2s ease backwards; }
-  .btn-brand:hover:not(:disabled) { translate: 0 -1px; }
+  /* layered, so a Tailwind translate utility on the same button (centering) always wins */
+  @layer components { .btn-brand:hover:not(:disabled) { translate: 0 -1px; } }
   .btn-press { transition-property: color, background-color, border-color, filter, transform, box-shadow, translate; }
   [role="menu"][data-state="open"], [data-radix-popper-content-wrapper] > [data-state="open"] { animation: pop-in 0.16s cubic-bezier(0.2, 0.7, 0.1, 1) backwards; }
 }
@@ -936,4 +937,63 @@ main[data-shell] h3.font-bold { letter-spacing: -0.005em; }
 @media (prefers-reduced-motion: no-preference) and (hover: hover) {
   nav a.group svg { transition: translate 0.18s ease, color 0.18s ease; }
   nav a.group:hover svg { translate: calc(var(--dir-sign, 1) * 1px) 0; }
+}
+
+/* ======================================================================== design 2.0 (additive, CSS only)
+ * Cards rise in one after the other, primary buttons get a light sweep, cards / tables / tabs answer the pointer, the
+ * profile gets a brand cover and a living ring, empty states float. Rules learned the hard way: animations only use
+ * opacity / transform (never `translate`, which Tailwind v4 uses to center dialogs) and keep nothing after they end
+ * (fill-mode backwards); everything is off for "reduce motion" and on print. No JavaScript, no layout shift. */
+/* inside the components layer: a Tailwind utility on the same element (absolute, fixed, transition-…) always wins */
+@layer components {
+@media (prefers-reduced-motion: no-preference) {
+  main[data-shell] .card-premium { animation: d2-card-in 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+  main[data-shell] :is(.grid, .space-y-3, .space-y-4, .space-y-5) > .card-premium:nth-child(2) { animation-delay: 45ms; }
+  main[data-shell] :is(.grid, .space-y-3, .space-y-4, .space-y-5) > .card-premium:nth-child(3) { animation-delay: 90ms; }
+  main[data-shell] :is(.grid, .space-y-3, .space-y-4, .space-y-5) > .card-premium:nth-child(4) { animation-delay: 135ms; }
+  main[data-shell] :is(.grid, .space-y-3, .space-y-4, .space-y-5) > .card-premium:nth-child(5) { animation-delay: 180ms; }
+  main[data-shell] :is(.grid, .space-y-3, .space-y-4, .space-y-5) > .card-premium:nth-child(n + 6) { animation-delay: 220ms; }
+
+  /* primary buttons: a soft light sweeps across on hover */
+  .btn-brand { position: relative; isolation: isolate; overflow: hidden; }
+  .btn-brand::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.28) 50%, transparent 70%); transform: translateX(-130%); transition: transform 0.7s ease; }
+  .btn-brand:hover:not(:disabled)::after { transform: translateX(130%); }
+
+  /* empty states: the icon floats gently */
+  .empty-icon { animation: d2-float 4.5s ease-in-out infinite; }
+
+  /* the profile picture: a slowly turning brand ring */
+  /* only a thin ring (the middle is masked out), so a see-through avatar background never shows the colours */
+  .avatar-ring::before { content: ""; position: absolute; inset: -5px; border-radius: 9999px; background: conic-gradient(from 0deg, var(--accent), #00d9c5, #c9a66b, var(--accent)); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px)); animation: d2-spin 9s linear infinite; z-index: 0; opacity: 0.9; pointer-events: none; }
+  .avatar-ring > :first-child { position: relative; z-index: 1; }
+}
+@keyframes d2-card-in { from { opacity: 0; transform: translateY(8px) scale(0.995); } }
+@keyframes d2-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes d2-spin { to { transform: rotate(1turn); } }
+
+/* cards answer the pointer with a hairline of the brand colour (no movement — calm and cheap) */
+main[data-shell] .card-premium { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+@media (hover: hover) {
+  main[data-shell] .card-premium:hover { border-color: color-mix(in oklab, var(--accent) 22%, var(--border)); }
+  /* table rows: a soft highlight under the pointer */
+  main[data-shell] table tbody tr { transition: background-color 0.15s ease; }
+  main[data-shell] table tbody tr:hover { background-color: color-mix(in oklab, var(--accent) 5%, transparent); }
+}
+
+/* the profile cover: a soft brand mesh */
+.profile-cover {
+  background:
+    radial-gradient(60% 120% at 85% 0%, color-mix(in oklab, var(--accent) 38%, transparent), transparent 70%),
+    radial-gradient(50% 120% at 10% 100%, rgb(0 217 197 / 0.22), transparent 70%),
+    linear-gradient(135deg, color-mix(in oklab, var(--accent) 12%, var(--surface)), var(--surface));
+  border-bottom: 1px solid var(--border);
+}
+
+/* keyboard focus: one clear, brand-coloured ring everywhere */
+main[data-shell] :is(a, button, [role="tab"], summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 10px; }
+
+@media print {
+  main[data-shell] .card-premium, .empty-icon, .avatar-ring::before { animation: none !important; }
+  .btn-brand::after { display: none !important; }
+}
 }

@@ -1,4 +1,5 @@
 import { SITE_BLOCK_TYPES, siteBlockSchema, siteSchema, type SiteBlock } from "@scc/shared/engagement";
+import { SITE_BUTTONS, SITE_ENTRANCES, SITE_HEADERS, SITE_HOVERS, cleanSectionStyle } from "@/lib/site/section-style";
 
 /**
  * Turning a model's JSON into a site the builder accepts — pure and unit-tested.
@@ -176,13 +177,16 @@ function coerceBlock(raw: unknown, ctx: SiteContext): SiteBlock | null {
       return null;
   }
   const parsed = siteBlockSchema.safeParse({ type, data });
-  return parsed.success ? parsed.data : null;
+  if (!parsed.success) return null;
+  // the section's own design (entrance / background / spacing / alignment / devices), when the model set one
+  const st = cleanSectionStyle((raw as { style?: unknown }).style);
+  return st ? ({ ...parsed.data, style: st } as unknown as SiteBlock) : parsed.data;
 }
 
 /** wave 13: template + second colour + font + corners chosen by the model (validated) */
 const AI_TEMPLATES = ["classic", "minimal", "fresh", "aurora", "luxe", "bold", "corporate", "pastel", "neon", "nature", "editorial", "midnight", "sunset", "ocean", "clinic", "noir", "terracotta", "studio"] as const;
 const AI_FONTS = ["rubik", "heebo", "assistant", "frank", "inter", "playfair", "secular", "varela", "suez", "karantina", "noto-serif"] as const;
-function aiThemeExtras(r: Record<string, unknown>, allowed?: readonly string[]): { template?: (typeof AI_TEMPLATES)[number]; accent2?: string; font?: (typeof AI_FONTS)[number]; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant" } {
+function aiThemeExtras(r: Record<string, unknown>, allowed?: readonly string[]): { template?: (typeof AI_TEMPLATES)[number]; accent2?: string; font?: (typeof AI_FONTS)[number]; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant"; buttons?: (typeof SITE_BUTTONS)[number]; hover?: (typeof SITE_HOVERS)[number]; entrance?: (typeof SITE_ENTRANCES)[number]; header?: (typeof SITE_HEADERS)[number] } {
   const out: ReturnType<typeof aiThemeExtras> = {};
   const tpl = String(r.template ?? "");
   if ((AI_TEMPLATES as readonly string[]).includes(tpl)) out.template = (allowed && !allowed.includes(tpl) ? (allowed[0] ?? "classic") : tpl) as (typeof AI_TEMPLATES)[number];
@@ -194,12 +198,17 @@ function aiThemeExtras(r: Record<string, unknown>, allowed?: readonly string[]):
   // effects pack + section shapes (optional; anything else is ignored)
   if (r.effects === "none" || r.effects === "subtle" || r.effects === "rich") out.effects = r.effects;
   if (r.dividers === "none" || r.dividers === "wave" || r.dividers === "curve" || r.dividers === "slant") out.dividers = r.dividers;
+  // site-wide design (optional)
+  if ((SITE_BUTTONS as readonly unknown[]).includes(r.buttons)) out.buttons = r.buttons as (typeof SITE_BUTTONS)[number];
+  if ((SITE_HOVERS as readonly unknown[]).includes(r.hover)) out.hover = r.hover as (typeof SITE_HOVERS)[number];
+  if ((SITE_ENTRANCES as readonly unknown[]).includes(r.entrance)) out.entrance = r.entrance as (typeof SITE_ENTRANCES)[number];
+  if ((SITE_HEADERS as readonly unknown[]).includes(r.header)) out.header = r.header as (typeof SITE_HEADERS)[number];
   return out;
 }
 
 export interface NormalizedSite {
   name: string;
-  theme: { accent: string; mode: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant" };
+  theme: { accent: string; mode: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant"; buttons?: string; hover?: string; entrance?: string; header?: string };
   seo: { title: string; description: string };
   blocks: SiteBlock[];
   imagePrompt: string;
@@ -255,6 +264,8 @@ export function siteJsonInstructionsPro(mode: SiteMode, locale: "he" | "ar" | "e
     `"template": one of ${JSON.stringify(templates)} — the design that best fits the business (e.g. luxe for real estate / fine dining, fresh for clinics & beauty, corporate for law / accounting, bold for shops & events, aurora for tech, nature for natural products, pastel for kids & bakeries, neon for nightlife & fitness, minimal for consultants, editorial for blogs & architects, midnight for SaaS & fintech, sunset for restaurants & cafes, ocean for travel & marine, clinic for doctors & therapists, noir for photographers & fashion, terracotta for boutiques & ceramics, studio for agencies & freelancers).`,
     `"accent2": "#RRGGBB" a second brand colour that harmonises with accent; "font": one of ["rubik","heebo","assistant","frank","secular","varela","suez","noto-serif"] (Hebrew-friendly) or omit; "radius": "sharp"|"soft"|"round".`,
     `"effects": "rich" (impressive motion: glow behind the hero, shining buttons, image depth — best for most businesses, shops, beauty, food, tech, events) | "subtle" (calm motion — law, finance, medical) | "none"; "dividers": "wave" | "curve" | "slant" | "none" (a soft shape between sections — wave/curve for warm, playful or beauty brands, slant for bold/tech, none for corporate).`,
+    `Site-wide design (optional, pick what fits the brand): "buttons": "solid"|"gradient"|"outline"|"glass"|"pill"; "hover": "lift"|"glow"|"tilt"|"none" (how cards react); "entrance": "rise"|"fade"|"scale"|"slide"|"blur"|"flip" (how sections appear); "header": "glass"|"solid"|"minimal".`,
+    `Every block MAY carry "style" (a professional rhythm, like a designer would): {"bg": "plain"|"tint"|"accent"|"gradient"|"dark", "anim": "fade"|"rise"|"zoom"|"slide"|"blur"|"flip"|"none", "pad": "compact"|"roomy", "align": "start"|"center"}. Alternate backgrounds (plain ↔ tint), give ONE or two key sections (stats / testimonials / cta) a "dark" or "gradient" band, never two dark sections in a row, and keep the hero without bg.`,
     "EXTRA BLOCK TYPES you may use (in addition to the ones above):",
     `{"type":"about","data":{"title","body"}} (the story, values, experience — 2-4 short paragraphs)`,
     `{"type":"stats","data":{"title","items":[{"value","label"}] (3-4 items)}} ONLY with numbers the customer gave (years, clients, projects); otherwise skip`,

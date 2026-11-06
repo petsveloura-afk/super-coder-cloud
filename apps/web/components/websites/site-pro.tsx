@@ -1,9 +1,10 @@
-import type { CSSProperties, ReactNode } from "react";
+import { cloneElement, isValidElement, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Award, CalendarDays, Check, Clock, Gem, Heart, Leaf, Mail, MapPin, MessageCircle, Phone, Rocket, ShieldCheck, Smile, Sparkles, Star, ThumbsUp, Zap } from "lucide-react";
 import type { SiteBlock } from "@scc/shared/engagement";
 import { PublicForm } from "@/components/public/public-form";
 import { LEGAL_TITLES, legalText, parseLegal, type LegalKey } from "@/lib/site/legal";
 import { FONTS, fontsHref, onColor, resolveTheme } from "@/lib/site/templates";
+import { sectionStyleAttrs } from "@/lib/site/section-style";
 import { A11yMenu, CookieBanner, SiteMotion } from "./site-client";
 import { SiteEffects } from "./site-effects";
 import { SiteCountdown } from "./site-countdown";
@@ -18,10 +19,20 @@ import "./site-pro.css";
 export interface ProSiteData {
   name: string;
   slug: string;
-  theme: { template?: string; accent?: string; accent2?: string; mode?: "dark" | "light"; font?: string; radius?: string; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant" };
+  theme: { template?: string; accent?: string; accent2?: string; mode?: "dark" | "light"; font?: string; radius?: string; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant"; buttons?: string; hover?: string; entrance?: string; header?: string };
   blocks: SiteBlock[];
   settings?: Record<string, unknown> | null;
   pages?: Record<string, string> | null;
+}
+
+/**
+ * Section design (the editor's per-section inspector): data attributes on the section element; site-pro.css does the
+ * rest. A section without a style is returned untouched.
+ */
+function withSectionStyle(el: ReactNode, b: SiteBlock): ReactNode {
+  const st = sectionStyleAttrs((b as { style?: Record<string, unknown> }).style);
+  if (!st || !isValidElement(el)) return el;
+  return cloneElement(el as ReactElement<Record<string, unknown>>, st);
 }
 
 const ICONS = [Sparkles, ShieldCheck, Clock, Star, Heart, Zap, Award, Smile, Leaf, Gem, Rocket, ThumbsUp];
@@ -705,7 +716,7 @@ export function ProSite({
   ) : null;
 
   return (
-    <div id={rootId} className="scs" dir={dir} lang={lang} style={style} data-tpl={th.tpl.key} data-mode={th.mode} data-radius={th.radius} data-cards={th.tpl.cards} data-bg={th.tpl.bg} data-motion={th.tpl.motion} data-anim={th.animations ? "on" : "off"} data-fx={th.effects ?? "subtle"} data-div={th.dividers ?? "none"} data-testid="pro-site">
+    <div id={rootId} className="scs" dir={dir} lang={lang} style={style} data-tpl={th.tpl.key} data-mode={th.mode} data-radius={th.radius} data-cards={th.tpl.cards} data-bg={th.tpl.bg} data-motion={th.entrance ?? th.tpl.motion} data-anim={th.animations ? "on" : "off"} data-fx={th.effects ?? "subtle"} data-div={th.dividers ?? "none"} data-btn={th.buttons} data-hover={th.hover} data-hdr={th.header} data-testid="pro-site">
       {fonts ? <link rel="stylesheet" href={fonts} /> : null}
       <div className="bgfx" aria-hidden="true" />
       {banner}
@@ -739,7 +750,7 @@ export function ProSite({
           ) : null}
         </div>
       </header>
-      <main id="main">{legal ? legalPage : <div id="top">{site.blocks.map(renderBlock)}</div>}</main>
+      <main id="main">{legal ? legalPage : <div id="top">{site.blocks.map((b, i) => withSectionStyle(renderBlock(b, i), b))}</div>}</main>
       <footer className="ftr">
         <div className="wrap">
           <div className="ftr-grid">

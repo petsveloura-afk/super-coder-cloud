@@ -406,6 +406,32 @@ export const sitePagesSchema = z
   .default({});
 export type SiteBlock = z.infer<typeof siteBlockSchema>;
 
+/**
+ * Section design (optional, per section — like a page builder's section inspector). Every value is lenient: an unknown
+ * value is dropped (the section keeps the template's look) instead of failing the whole site.
+ *   anim   how the section enters (missing / "auto" = the site's entrance)
+ *   bg     background: plain, tint (soft), accent (soft brand wash), gradient, dark band
+ *   pad    spacing: compact / roomy
+ *   align  headings: start / center
+ *   hide   hide on phones or on computers
+ */
+export const SECTION_ANIMS = ["auto", "none", "fade", "rise", "zoom", "slide", "blur", "flip"] as const;
+export const SECTION_BGS = ["auto", "plain", "tint", "accent", "gradient", "dark"] as const;
+const lenient = <T extends readonly [string, ...string[]]>(vals: T) => z.enum(vals).optional().catch(undefined);
+export const blockStyleSchema = z
+  .object({
+    anim: lenient(SECTION_ANIMS),
+    bg: lenient(SECTION_BGS),
+    pad: lenient(["auto", "compact", "roomy"] as const),
+    align: lenient(["auto", "start", "center"] as const),
+    hide: lenient(["none", "mobile", "desktop"] as const),
+  })
+  .partial();
+export type BlockStyle = z.infer<typeof blockStyleSchema>;
+/** a section + its optional design (the site keeps working without it) */
+export const siteBlockStyledSchema = z.intersection(siteBlockSchema, z.object({ style: blockStyleSchema.optional().catch(undefined) }));
+export type SiteBlockStyled = z.infer<typeof siteBlockStyledSchema>;
+
 export const siteSchema = z.object({
   name: z.string().trim().min(1, { message: "validation.required" }).max(120),
   slug,
@@ -425,10 +451,16 @@ export const siteSchema = z.object({
       effects: z.enum(["none", "subtle", "rich"]).optional(),
       // a soft shape between sections (missing = none)
       dividers: z.enum(["none", "wave", "curve", "slant"]).optional(),
+      // site-wide design (optional; missing = the template's own look). Lenient: unknown values are dropped.
+      buttons: z.enum(["solid", "gradient", "outline", "glass", "pill"]).optional().catch(undefined),
+      hover: z.enum(["lift", "glow", "tilt", "none"]).optional().catch(undefined),
+      entrance: z.enum(["rise", "fade", "scale", "slide", "blur", "flip"]).optional().catch(undefined),
+      header: z.enum(["glass", "solid", "minimal"]).optional().catch(undefined),
     })
     .default({ accent: "#3366E6", mode: "dark" }),
   seo: z.object({ title: shortText(70), description: shortText(160) }).default({ title: "", description: "" }),
-  blocks: z.array(siteBlockSchema).min(1, { message: "websites.needBlock" }).max(40, { message: "validation.tooMany" }),
+  // each section may carry its own design (`style`); sections without it are unchanged
+  blocks: z.array(siteBlockStyledSchema).min(1, { message: "websites.needBlock" }).max(40, { message: "validation.tooMany" }),
   // wave 13 (optional — older clients keep working)
   settings: siteSettingsSchema.optional(),
   pages: sitePagesSchema.optional(),

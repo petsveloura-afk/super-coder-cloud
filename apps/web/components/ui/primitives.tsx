@@ -172,7 +172,7 @@ export function EmptyState({ icon, title, body, action }: { icon?: ReactNode; ti
   return (
     <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
       {icon ? (
-        <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-line bg-elevated text-accent">{icon}</div>
+        <div className="empty-icon mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-line bg-elevated text-accent shadow-[0_10px_30px_-14px_var(--brand)]">{icon}</div>
       ) : null}
       <h3 className="text-base font-semibold text-fg">{title}</h3>
       {body ? <p className="mt-1 max-w-sm text-sm text-muted">{body}</p> : null}

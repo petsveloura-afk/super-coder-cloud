@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncE
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Briefcase, ChevronsDownUp, ChevronsUpDown, ChevronDown, Copy, ExternalLink, Eye, Globe, Maximize2, ShieldAlert, GripVertical, ImageIcon, LayoutTemplate, ListTree, PanelRightClose, Plus, Redo2, Save, Trash2, Undo2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { SITE_BLOCK_TYPES, type SiteBlockType } from "@scc/shared/engagement";
+import { SITE_BLOCK_TYPES, type BlockStyle, type SiteBlockType } from "@scc/shared/engagement";
+import { SectionDesign } from "./section-design";
+import { StylePacks } from "./style-packs";
 import { StarterKits } from "./starter-kits";
 import { kitBlocks, type StarterKit } from "@/lib/site/starter-kits";
 import { FREE_TEMPLATES } from "@/lib/site/templates";
@@ -25,12 +27,14 @@ type Item = Record<string, string>;
 export interface BlockValue {
   type: SiteBlockType;
   data: Record<string, string | Item[]>;
+  /** section design (optional — the section inspector) */
+  style?: BlockStyle;
 }
 export interface SiteValue {
   name: string;
   slug: string;
   status: "draft" | "published";
-  theme: { accent: string; mode: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant" };
+  theme: { accent: string; mode: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant"; buttons?: "solid" | "gradient" | "outline" | "glass" | "pill"; hover?: "lift" | "glow" | "tilt" | "none"; entrance?: "rise" | "fade" | "scale" | "slide" | "blur" | "flip"; header?: "glass" | "solid" | "minimal" };
   seo: { title: string; description: string };
   blocks: BlockValue[];
   // wave 13
@@ -550,6 +554,8 @@ export function SiteBuilder({
           </button>
         ))}
       </div>
+      {/* one-click site styles (design + section rhythm), then the fine controls */}
+      {tab === "design" ? <StylePacks value={v} onApply={(nv) => setV(nv)} /> : null}
       {tab === "design" ? <DesignPanel theme={v.theme} onChange={(theme) => set({ theme })} proAllowed={proTemplates} /> : null}
       {tab === "business" ? (
         <BusinessPanel
@@ -658,6 +664,8 @@ export function SiteBuilder({
                 </div>
                 {collapsed.includes(i) ? null : (
                 <>
+                {/* section inspector: entrance, background, spacing, alignment, devices */}
+                <SectionDesign index={i} value={b.style} onChange={(st) => setV((x) => ({ ...x, blocks: x.blocks.map((bb, j) => (j === i ? { ...bb, style: st } : bb)) }))} />
                 <div className="grid gap-3 sm:grid-cols-2">
                   {spec.fields.map((f) => {
                     const fid = `bl-${i}-${f.key}`;

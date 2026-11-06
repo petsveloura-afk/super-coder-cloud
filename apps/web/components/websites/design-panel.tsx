@@ -5,6 +5,7 @@ import { SITE_FONTS } from "@scc/shared/engagement";
 import { useI18n } from "@/lib/i18n/client";
 import { Card, Field, Input, Select } from "@/components/ui/primitives";
 import { FONTS, ALL_TEMPLATES, fontsHref, type SiteTemplate } from "@/lib/site/templates";
+import { SITE_BUTTONS, SITE_ENTRANCES, SITE_HEADERS, SITE_HOVERS } from "@/lib/site/section-style";
 import { cn } from "@/lib/utils";
 
 /**
@@ -24,6 +25,11 @@ export interface DesignTheme {
   effects?: "none" | "subtle" | "rich";
   /** shape between sections */
   dividers?: "none" | "wave" | "curve" | "slant";
+  /** site-wide design (missing = the template's own look) */
+  buttons?: "solid" | "gradient" | "outline" | "glass" | "pill";
+  hover?: "lift" | "glow" | "tilt" | "none";
+  entrance?: "rise" | "fade" | "scale" | "slide" | "blur" | "flip";
+  header?: "glass" | "solid" | "minimal";
 }
 
 function Mini({ tpl, active }: { tpl: SiteTemplate; active: boolean }) {
@@ -191,6 +197,26 @@ export function DesignPanel({ theme, onChange, proAllowed }: { theme: DesignThem
             <option value="slant">{t("websites.design.dividersSlant")}</option>
           </Select>
         </Field>
+        {/* site-wide design: buttons, how cards react, how sections enter, the header (empty = the template's own) */}
+        {(
+          [
+            ["buttons", SITE_BUTTONS],
+            ["hover", SITE_HOVERS],
+            ["entrance", SITE_ENTRANCES],
+            ["header", SITE_HEADERS],
+          ] as const
+        ).map(([k, list]) => (
+          <Field key={k} label={t(`websites.design.${k}`)} htmlFor={`ds-${k}`}>
+            <Select id={`ds-${k}`} value={theme[k] ?? ""} onChange={(e) => onChange({ ...theme, [k]: e.target.value || undefined })} data-testid={`ds-${k}`}>
+              <option value="">{t("websites.design.fromTemplate")}</option>
+              {list.map((x) => (
+                <option key={x} value={x}>
+                  {t(`websites.design.${k}Opt.${x}`)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ))}
       </Card>
     </div>
   );

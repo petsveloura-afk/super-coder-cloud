@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { Bookmark, Camera, Clapperboard, Copy, Film, Gauge, Hash, Heart, MessageCircle, MessagesSquare, Send, Share2, Smartphone, Wand2 } from "lucide-react";
+import { Bookmark, Camera, Clapperboard, Copy, Film, Gauge, Megaphone, Hash, Heart, MessageCircle, MessagesSquare, Send, Share2, Smartphone, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Button } from "@/components/ui/primitives";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { isVideoUrl } from "@/lib/social/post-core";
 import { MotionStudio } from "@/components/social/motion-studio";
 import { AiVideoPanel } from "@/components/social/ai-video-panel";
+import { AdCreativeStudio } from "@/components/social/ad-creative-studio";
 import { PostQualityPanel } from "@/components/social/post-quality-panel";
 import { hashtagsAction, repurposeAction } from "@/app/[locale]/(dashboard)/social/brain-actions";
 
@@ -84,12 +85,12 @@ const VERSION_KEYS = ["instagram", "facebook", "story", "reel", "telegram", "wha
 
 export function PostPower(props: { body: string; setBody: (v: string) => void; image: string; setImage: (v: string) => void; video: string; setVideo: (v: string) => void; fb: boolean; ig: boolean; brand?: string }) {
   const { t, locale } = useI18n();
-  const [open, setOpen] = useState<null | "preview" | "motion" | "versions" | "aivideo" | "quality">(null);
+  const [open, setOpen] = useState<null | "preview" | "motion" | "versions" | "aivideo" | "quality" | "ad">(null);
   const [platform, setPlatform] = useState<"facebook" | "instagram">(props.ig && !props.fb ? "instagram" : props.ig ? "instagram" : "facebook");
   const [versions, setVersions] = useState<Record<string, string> | null>(null);
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
-  const toggle = (k: "preview" | "motion" | "versions" | "aivideo" | "quality") => setOpen((x) => (x === k ? null : k));
+  const toggle = (k: "preview" | "motion" | "versions" | "aivideo" | "quality" | "ad") => setOpen((x) => (x === k ? null : k));
   const makeVersions = () =>
     start(async () => {
       setBusy("v");
@@ -122,6 +123,9 @@ export function PostPower(props: { body: string; setBody: (v: string) => void; i
         <button type="button" onClick={() => toggle("motion")} aria-expanded={open === "motion"} className={cn(tool, open === "motion" ? "border-accent bg-accent-soft text-accent" : "border-line hover:bg-surface-hover")} data-testid="open-motion">
           <Clapperboard className="h-4 w-4" /> {t("social.power.motion")}
         </button>
+        <button type="button" onClick={() => toggle("ad")} aria-expanded={open === "ad"} className={cn(tool, open === "ad" ? "border-accent bg-accent-soft text-accent" : "border-line hover:bg-surface-hover")} data-testid="open-ad-studio">
+          <Megaphone className="h-4 w-4" /> {t("social.power.ad")}
+        </button>
         <button type="button" onClick={() => toggle("aivideo")} aria-expanded={open === "aivideo"} className={cn(tool, open === "aivideo" ? "border-accent bg-accent-soft text-accent" : "border-line hover:bg-surface-hover")} data-testid="open-ai-video">
           <Film className="h-4 w-4" /> {t("social.power.aiVideo")}
         </button>
@@ -148,6 +152,7 @@ export function PostPower(props: { body: string; setBody: (v: string) => void; i
         </div>
       ) : null}
       {open === "motion" ? <MotionStudio image={props.image} body={props.body} brand={props.brand} ig={props.ig} onVideo={props.setVideo} onImage={props.setImage} /> : null}
+      {open === "ad" ? <AdCreativeStudio body={props.body} image={props.image} ig={props.ig} onImage={props.setImage} /> : null}
       {open === "aivideo" ? <AiVideoPanel body={props.body} ig={props.ig} onVideo={props.setVideo} /> : null}
       {open === "quality" ? <PostQualityPanel body={props.body} setBody={props.setBody} ig={props.ig} /> : null}
       {open === "versions" && versions ? (

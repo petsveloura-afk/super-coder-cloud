@@ -1,4 +1,5 @@
 import type { SiteBlock } from "@scc/shared/engagement";
+import { applyStylePack, balanceRhythm, cleanSectionStyle, packFor, packTheme } from "@/lib/site/section-style";
 
 /**
  * Wave 36 — a smarter site builder (pure, unit-tested).
@@ -312,6 +313,22 @@ export function polishBuiltSite<T extends PolishableSite>(input: T, d: BuildDire
     }
     const r = STYLE_RADIUS[d.style];
     if (r && !site.theme.radius) site.theme.radius = r;
+  }
+
+  // 5b) a designed site from the first minute: when the model gave no section design, a professional rhythm of section
+  //     backgrounds / entrances that fits the template (and the site-wide buttons / hover / entrance / header it left
+  //     empty); never two heavy bands in a row. With animations off only the backgrounds are set.
+  {
+    const typed = blocks as unknown as { type: string; style?: import("@scc/shared/engagement").BlockStyle | null }[];
+    if (!typed.some((b) => cleanSectionStyle(b.style))) {
+      const pack = packFor(site.theme.template as string | undefined, d.style ?? null, d.industry ?? null);
+      const styled = applyStylePack({ theme: {}, blocks: typed }, pack).blocks.map((b) => (site.theme.animations === false && b.style ? { ...b, style: cleanSectionStyle({ ...b.style, anim: undefined }) ?? undefined } : b));
+      blocks = balanceRhythm(styled) as unknown as B[];
+      const th = site.theme as Record<string, unknown>;
+      const pt = packTheme(pack);
+      for (const k of ["buttons", "hover", "entrance", "header"] as const) if (!th[k]) th[k] = pt[k];
+      applied.push(`design:${pack}`);
+    } else blocks = balanceRhythm(typed) as unknown as B[];
   }
 
   // 6) search-engine texts that fit

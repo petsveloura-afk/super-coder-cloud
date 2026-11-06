@@ -3137,7 +3137,38 @@
       "dividersNone": "Straight",
       "dividersWave": "Wave",
       "dividersCurve": "Curve",
-      "dividersSlant": "Slant"
+      "dividersSlant": "Slant",
+      "buttons": "Button style",
+      "hover": "Card hover",
+      "entrance": "Section entrance",
+      "header": "Header",
+      "fromTemplate": "From the template",
+      "buttonsOpt": {
+        "solid": "Solid",
+        "gradient": "Gradient",
+        "outline": "Outline",
+        "glass": "Glass",
+        "pill": "Rounded pill"
+      },
+      "hoverOpt": {
+        "lift": "Lift",
+        "glow": "Glow",
+        "tilt": "3D tilt",
+        "none": "None"
+      },
+      "entranceOpt": {
+        "rise": "Rise",
+        "fade": "Fade in",
+        "scale": "Scale",
+        "slide": "Slide",
+        "blur": "Blur to sharp",
+        "flip": "3D flip"
+      },
+      "headerOpt": {
+        "glass": "Glass",
+        "solid": "Solid",
+        "minimal": "Transparent (appears on scroll)"
+      }
     },
     "business": {
       "title": "Business details",
@@ -3215,7 +3246,13 @@
         "headline": "Stronger headline",
         "mobile": "Mobile-first",
         "elegantFont": "Elegant font",
-        "story": "Business story"
+        "story": "Business story",
+        "rhythm": "🎚️ Design rhythm",
+        "standOut": "⭐ Make sections stand out",
+        "cinematic": "🎬 Cinematic look",
+        "glassButtons": "🫧 Glass buttons",
+        "calmMotion": "🍃 Calm motion",
+        "designerPass": "🎨 Designer pass"
       },
       "quick": {
         "modern": "Make the site more modern and impressive: a stronger headline, sharper copy and a current design template that fits the business",
@@ -3247,7 +3284,13 @@
         "headline": "Rewrite the hero title and subtitle to focus on the outcome the customer gets — short and strong. Do not invent facts.",
         "mobile": "Shorten all texts for easy reading on a phone: titles up to 6 words, short sentences, one paragraph per section.",
         "elegantFont": "Switch to an elegant font (frank or noto-serif for headings) and match the corners to a refined look.",
-        "story": "Add or improve the About section: the business story, values and approach in 2-3 short, warm paragraphs, without inventing facts."
+        "story": "Add or improve the About section: the business story, values and approach in 2-3 short, warm paragraphs, without inventing facts.",
+        "rhythm": "Give the site a professional design rhythm: alternate section backgrounds (plain ↔ tint), one or two key sections in a dark or gradient band, and varied section entrances — without changing the content.",
+        "standOut": "Make the testimonials, numbers and call to action stand out: a dark or gradient band, a zoom entrance and generous spacing — without changing texts.",
+        "cinematic": "Make the site cinematic: blur entrances, a dramatic hero entrance, glass buttons, a glow on card hover and rich effects — without changing texts.",
+        "glassButtons": "Change every button to a modern glass style and add a glow on card hover.",
+        "calmMotion": "Make the motion calm and gentle: fade entrances, no tilts and no heavy effects — right for a serious business.",
+        "designerPass": "Go over the site like a senior web designer: pick a site-wide design that fits the business (buttons, hover, entrances, header), give every section a fitting background, entrance and spacing, never two dark bands in a row, and change no text."
       },
       "stage0": "Reading your current site…",
       "stage1": "Planning the changes…",
@@ -3268,7 +3311,14 @@
       "changed": "{n} updated",
       "removed": "{n} removed",
       "design": "Design",
-      "fillIn": "New sections without real data were added with sample text. Replace it with your own details before publishing."
+      "fillIn": "New sections without real data were added with sample text. Replace it with your own details before publishing.",
+      "groups": {
+        "label": "Kinds of edits",
+        "design": "Design",
+        "sections": "Sections",
+        "content": "Content",
+        "language": "Language"
+      }
     },
     "site": {
       "skip": "Skip to content",
@@ -3582,6 +3632,75 @@
       "quality": "Checking quality and improving (SEO, calls to action, trust)",
       "images": "Adding professional photos",
       "save": "Saving a draft ready to preview"
+    },
+    "sectionDesign": {
+      "title": "Section design",
+      "hint": "Background, entrance, spacing and devices",
+      "custom": "This section has its own design",
+      "bg": "Background",
+      "anim": "Entrance",
+      "pad": "Spacing",
+      "align": "Heading alignment",
+      "hide": "Show on",
+      "reset": "Back to the site design",
+      "bgs": {
+        "auto": "Site default",
+        "plain": "Clean",
+        "tint": "Soft",
+        "accent": "Brand colour",
+        "gradient": "Gradient",
+        "dark": "Dark band"
+      },
+      "anims": {
+        "auto": "Site default",
+        "none": "None",
+        "fade": "Fade in",
+        "rise": "Rise",
+        "zoom": "Zoom",
+        "slide": "Slide",
+        "blur": "Blur to sharp",
+        "flip": "3D flip"
+      },
+      "pads": {
+        "auto": "Normal",
+        "compact": "Compact",
+        "roomy": "Roomy"
+      },
+      "aligns": {
+        "auto": "Site default",
+        "start": "Start",
+        "center": "Center"
+      },
+      "hides": {
+        "none": "All devices",
+        "mobile": "Computers only",
+        "desktop": "Phones only"
+      }
+    },
+    "stylePacks": {
+      "title": "Ready-made styles",
+      "hint": "A complete professional look in one click — content and colours are kept, and you can undo",
+      "applied": "The \"{name}\" style was applied — undo with Ctrl+Z",
+      "items": {
+        "elegant": "Elegant",
+        "bold": "Bold",
+        "minimal": "Minimal",
+        "playful": "Playful",
+        "corporate": "Corporate",
+        "cinematic": "Cinematic",
+        "warm": "Warm & inviting",
+        "tech": "Tech"
+      },
+      "desc": {
+        "elegant": "Serif font, outline buttons, a soft glow and a dark band for testimonials",
+        "bold": "Gradients, slants, zoom entrances and lifting cards",
+        "minimal": "Lots of air, calm motion, no decoration",
+        "playful": "Round corners, waves, 3D tilt and colour",
+        "corporate": "Clean and tidy, alternating backgrounds, standout numbers",
+        "cinematic": "Blur entrances, glass, dark bands and glow",
+        "warm": "Soft corners, waves and a warm gradient for the story",
+        "tech": "Slide entrances, gradients and a neon glow"
+      }
     }
   },
   "admin": {
@@ -5352,7 +5471,8 @@
       "v_whatsapp": "WhatsApp status",
       "v_linkedin": "LinkedIn",
       "aiVideo": "AI video",
-      "quality": "Copy quality"
+      "quality": "Copy quality",
+      "ad": "Ad design"
     },
     "drawer": {
       "title": "Your post is ready",
@@ -5464,6 +5584,42 @@
         "story": "A human micro-story with a soft ending",
         "short": "Up to 3 lines + call to action",
         "list": "A scannable list with an emoji per line"
+      }
+    },
+    "ad": {
+      "title": "Ad studio",
+      "hint": "An agency-level ad: a cinematic key visual + a 3D headline, a price badge, benefits with icons and a glowing button — text always spelled right.",
+      "fromPost": "The ad is built from the post text. Optionally write a topic, offer and price",
+      "placeholder": "What is the ad about? e.g. a professional landing page for businesses, from $129",
+      "style": "Style",
+      "aspect": "Format",
+      "newImage": "New key visual (AI)",
+      "make": "Create ad",
+      "again": "New version",
+      "attach": "Attach to post",
+      "attached": "The ad was attached to the post",
+      "failed": "Saving the ad failed — try again",
+      "needTopic": "Write a topic or the post first",
+      "noImage": "The key visual was not created this time — the ad uses a gradient background",
+      "icon": "Icon",
+      "cost": "Ad copy: 1 credit. A new key visual: 1 more. A price appears only if you wrote it.",
+      "styles": {
+        "neon": "Blue neon",
+        "luxury": "Gold luxury",
+        "bold": "Bold",
+        "fresh": "Fresh",
+        "tech": "Tech",
+        "warm": "Warm"
+      },
+      "fields": {
+        "headline": "Headline",
+        "sub": "Sub line",
+        "badge": "Offer (on the badge)",
+        "pricePrefix": "Before the price",
+        "price": "Price",
+        "ribbon": "Ribbon",
+        "cta": "Button",
+        "tagline": "Tagline"
       }
     }
   },
