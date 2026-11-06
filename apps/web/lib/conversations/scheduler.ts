@@ -44,6 +44,22 @@ export async function runDueSchedules(budgetMs = 25_000): Promise<{ claimed: num
       continue;
     }
     const g = await checkGuard(s.conversation_id, KIND[s.kind], s.id);
+    // follow-up playbook (opt-in): the official WhatsApp window closed → the same follow-up may go to another
+    // conversation the customer opened (only where the guard allows it there too)
+    if (!g.allowed && s.kind === "followup" && g.reason === "outside_24h") {
+      const ex = await import("./followup-extras");
+      const pol = await ex.orgFollowupPolicy(s.organization_id).catch(() => null);
+      const target = pol?.crossChannel && !(pol.stopOnConvert && (await ex.converted(s.organization_id, s.contact_id).catch(() => null))) ? await ex.crossChannelTarget(s.organization_id, s.conversation_id, s.contact_id).catch(() => null) : null;
+      if (target && !ex.nightHold(pol!)) {
+        const { sendAgentFollowup } = await import("@/lib/ai/followups");
+        const r = await sendAgentFollowup(target.id, { scheduleId: s.id, step: s.step, max: pol!.max, playbook: pol!.playbook, crossFrom: target.from });
+        if (r.ok) {
+          await admin.rpc("finish_schedule", { p_id: s.id, p_status: "sent", p_reason: `cross_channel:${target.channel}`.slice(0, 200), p_message: r.messageId ?? null });
+          out.sent++;
+          continue;
+        }
+      }
+    }
     if (!g.allowed) {
       if (isRetryReason(g.reason)) {
         await admin.rpc("finish_schedule", { p_id: s.id, p_status: "pending", p_reason: g.reason });
@@ -54,10 +70,32 @@ export async function runDueSchedules(budgetMs = 25_000): Promise<{ claimed: num
       }
       continue;
     }
+    // follow-up playbook: no follow-ups at night when the business set no quiet hours, and no sales follow-ups to a
+    // customer who already booked / bought (both can only hold a message back, never allow one)
+    let fp: Awaited<ReturnType<typeof import("./followup-extras")["orgFollowupPolicy"]>> | null = null;
+    if (s.kind === "followup" || s.kind === "sequence") {
+      const ex = await import("./followup-extras");
+      fp = await ex.orgFollowupPolicy(s.organization_id).catch(() => null);
+      const wait = fp ? ex.nightHold(fp) : 0;
+      if (wait > 0) {
+        await admin.rpc("finish_schedule", { p_id: s.id, p_status: "pending", p_reason: "quiet_hours" });
+        await ex.postpone(s.id, wait).catch(() => undefined);
+        out.retried++;
+        continue;
+      }
+      if (s.kind === "followup" && fp?.stopOnConvert) {
+        const why = await ex.converted(s.organization_id, s.contact_id).catch(() => null);
+        if (why) {
+          await admin.rpc("finish_schedule", { p_id: s.id, p_status: "canceled", p_reason: `converted_${why}` });
+          out.skipped++;
+          continue;
+        }
+      }
+    }
     try {
       if (s.kind === "followup") {
         const { sendAgentFollowup } = await import("@/lib/ai/followups");
-        const r = await sendAgentFollowup(s.conversation_id, { scheduleId: s.id, step: s.step });
+        const r = await sendAgentFollowup(s.conversation_id, { scheduleId: s.id, step: s.step, ...(fp ? { max: fp.max, playbook: fp.playbook } : {}) });
         if (!r.ok) {
           await admin.rpc("finish_schedule", { p_id: s.id, p_status: r.error === "ai.busy" ? "pending" : "failed", p_reason: (r.error ?? "failed").slice(0, 200) });
           if (r.error === "ai.busy") out.retried++;

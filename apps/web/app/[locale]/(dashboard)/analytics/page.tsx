@@ -144,14 +144,29 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
     }
   }
 
+  // synced with the deals board and finance: open deals with no amount (they hide the pipeline) and money actually collected
+  const sinceIso = new Date(now.getTime() - days * 86_400_000).toISOString();
+  const prevIso = new Date(now.getTime() - 2 * days * 86_400_000).toISOString();
+  const [noValueRes, payRes] = await Promise.all([
+    supabase.from("deals").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).eq("status", "open").eq("value", 0),
+    supabase.from("payments").select("amount, paid_at").eq("organization_id", ctx.org.id).gte("paid_at", prevIso).limit(5000),
+  ]);
+  const openNoValue = noValueRes.error ? 0 : (noValueRes.count ?? 0);
+  const payRows = payRes.error ? null : ((payRes.data ?? []) as { amount: number | string; paid_at: string }[]);
+  const collected = payRows ? payRows.filter((r) => r.paid_at >= sinceIso).reduce((n, r) => n + Number(r.amount), 0) : 0;
+  const collectedPrev = payRows ? payRows.filter((r) => r.paid_at < sinceIso).reduce((n, r) => n + Number(r.amount), 0) : 0;
+  const showCollected = Boolean(payRows && payRows.length);
+
   const kpis = [
-    { id: "open", label: t("analytics.openPipeline"), value: money(a.open_value), sub: t("deals.openCount", { count: a.open_deals }), icon: <Layers className="h-4 w-4" />, tone: "accent" as const },
+    { id: "open", label: t("analytics.openPipeline"), value: money(a.open_value), sub: openNoValue > 0 ? `${t("deals.openCount", { count: a.open_deals })} · ${t("analytics.sync.noValueShort", { count: openNoValue })}` : t("deals.openCount", { count: a.open_deals }), icon: <Layers className="h-4 w-4" />, tone: "accent" as const },
     { id: "weighted", label: t("analytics.weighted"), value: money(a.weighted_value), icon: <Target className="h-4 w-4" />, tone: "teal" as const },
     { id: "won", label: t("analytics.wonValue"), value: money(a.won_value), sub: t("analytics.wonCount", { count: a.won }), icon: <Trophy className="h-4 w-4" />, tone: "success" as const, delta: prev ? delta(Number(a.won_value), prev.wonValue) : null, spark },
     { id: "winrate", label: t("analytics.winRate"), value: winRate === null ? "—" : formatPercent(locale, winRate), sub: t("analytics.closedCount", { count: closed }), icon: <Percent className="h-4 w-4" />, tone: "gold" as const, delta: prev && winRate !== null && prevWinRate !== null ? delta(winRate, prevWinRate) : null },
     { id: "avgdeal", label: t("analytics.avgDeal"), value: avgDeal === null ? "—" : money(avgDeal), icon: <Wallet className="h-4 w-4" />, tone: "accent" as const, delta: prev && avgDeal !== null && prevAvgDeal !== null ? delta(avgDeal, prevAvgDeal) : null },
     { id: "contacts", label: t("analytics.newContacts"), value: formatNumber(locale, a.contacts_new), icon: <UserPlus className="h-4 w-4" />, tone: "teal" as const, delta: prev ? delta(Number(a.contacts_new), prev.contactsNew) : null },
     { id: "tasks", label: t("analytics.openTasks"), value: formatNumber(locale, a.tasks_open), sub: t("analytics.overdueCount", { count: a.tasks_overdue }), danger: a.tasks_overdue > 0, icon: <ListChecks className="h-4 w-4" />, tone: "warning" as const },
+    // money actually received (finance payments) — shown once the business records payments
+    ...(showCollected ? [{ id: "collected", label: t("analytics.sync.collected"), value: money(collected), sub: t("analytics.sync.collectedSub"), icon: <Wallet className="h-4 w-4" />, tone: "success" as const, delta: delta(collected, collectedPrev) }] : []),
     { id: "done", label: t("analytics.tasksDone"), value: formatNumber(locale, a.tasks_done), icon: <CheckCircle2 className="h-4 w-4" />, tone: "success" as const, delta: prev ? delta(Number(a.tasks_done), prev.tasksDone) : null },
   ];
 
@@ -218,9 +233,7 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
         description={t("analytics.subtitle")}
         actions={
           <>
-          <ExportCsvButton rows={csvRows} filename={`analytics-${days}d`} />
-          <PrintButton />
-          <div className="flex gap-1 rounded-xl border border-line bg-surface p-1" role="tablist" aria-label={t("analytics.period")}>
+          <div className="flex gap-1 rounded-xl border border-line bg-surface p-1" role="tablist" aria-label={t("analytics.period")} data-testid="analytics-period">
             {PERIODS.map((p) => (
               <Link
                 key={p}
@@ -233,17 +246,29 @@ export default async function AnalyticsPage({ params, searchParams }: { params: 
               </Link>
             ))}
           </div>
+          {/* the period comes first (on a phone this row scrolls sideways); export / print follow */}
+          <ExportCsvButton rows={csvRows} filename={`analytics-${days}d`} />
+          <PrintButton />
           </>
         }
       />
       <QualitySection orgId={ctx.org.id} locale={locale} days={days} />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="analytics-kpis">
+      {/* an odd last card spans the whole row on phones (no lonely half-row) */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 max-lg:[&>*:last-child:nth-child(odd)]:col-span-2" data-testid="analytics-kpis">
         {kpis.map((k) => (
-          <KpiCard key={k.id} id={k.id} label={k.label} value={k.value} sub={k.sub} icon={k.icon} tone={k.tone} danger={"danger" in k ? k.danger : undefined} delta={"delta" in k ? k.delta : null} deltaFormat={pctFmt} vs={vs} spark={"spark" in k ? k.spark : undefined} />
+          <KpiCard key={k.id} id={k.id} label={k.label} value={k.value} sub={k.sub} icon={k.icon} tone={k.tone} danger={"danger" in k ? k.danger : undefined} delta={"delta" in k ? k.delta : null} deltaFormat={pctFmt} vs={vs} spark={"spark" in k ? k.spark : undefined} newLabel={t("analytics.sync.new")} />
         ))}
       </div>
 
+      {openNoValue > 0 ? (
+        <Link href={`/${locale}/deals`} className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-[13px] transition hover:bg-amber-500/15" data-testid="analytics-novalue">
+          <Target className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+          <span>
+            <b>{t("analytics.sync.noValueTitle", { count: openNoValue })}</b> <span className="text-muted">{t("analytics.sync.noValueHint")}</span>
+          </span>
+        </Link>
+      ) : null}
       {/* wave 53 — revenue pace: 30-day run-rate, change vs the previous period, pipeline coverage */}
       <div className="mt-4">
         <ScreenPulse screen="analytics" pulse={analyticsPulse({ wonValue: Number(a.won_value), prevWonValue: prev?.wonValue ?? 0, days, openValue: Number(a.open_value), weightedValue: Number(a.weighted_value) })} locale={locale} t={t} currency={currency} />

@@ -46,15 +46,18 @@ export function Sparkline({ values, tone = "accent", className, id }: { values: 
 }
 
 /** ▲ 12% vs. previous period. `inverse` flips good/bad (e.g. overdue tasks, CAC). */
-export function DeltaBadge({ delta, format, vs, inverse }: { delta: Delta | null; format: (pct: number) => string; vs: string; inverse?: boolean }) {
+export function DeltaBadge({ delta, format, vs, inverse, newLabel }: { delta: Delta | null; format: (pct: number) => string; vs: string; inverse?: boolean; newLabel?: string }) {
   if (!delta) return null;
+  // nothing in either period → there is nothing to compare (no "— vs previous period" noise)
+  if (newLabel !== undefined && delta.dir === "flat" && delta.pct === null) return null;
   const good = delta.dir === "flat" ? null : inverse ? delta.dir === "down" : delta.dir === "up";
   const Icon = delta.dir === "up" ? ArrowUpRight : delta.dir === "down" ? ArrowDownRight : ArrowRight;
   return (
     <span className="inline-flex items-center gap-1 text-[11.5px]" title={vs}>
       <span className={cn("inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 font-semibold tabular-nums", good === null ? "border-line bg-surface-hover text-muted" : good ? "border-success/25 bg-success-soft text-success" : "border-danger/25 bg-danger-soft text-danger")}>
         <Icon className="h-3 w-3" aria-hidden />
-        <bdi dir="ltr">{delta.pct === null ? "—" : format(Math.abs(delta.pct))}</bdi>
+        {/* up from zero: "new" instead of a dash (a percentage of zero does not exist) */}
+        {delta.pct === null && newLabel && delta.dir === "up" ? <span>{newLabel}</span> : <bdi dir="ltr">{delta.pct === null ? "—" : format(Math.abs(delta.pct))}</bdi>}
       </span>
       <span className="text-subtle">{vs}</span>
     </span>
@@ -74,9 +77,11 @@ export interface KpiProps {
   vs?: string;
   inverse?: boolean;
   spark?: number[];
+  /** shown instead of "—" when the previous period was zero (also hides the badge when both are zero) */
+  newLabel?: string;
 }
 
-export function KpiCard({ id, label, value, sub, icon, tone = "accent", danger, delta, deltaFormat, vs, inverse, spark }: KpiProps) {
+export function KpiCard({ id, label, value, sub, icon, tone = "accent", danger, delta, deltaFormat, vs, inverse, spark, newLabel }: KpiProps) {
   return (
     <Card className="kpi-card group relative overflow-hidden p-4" data-kpi={id}>
       <div aria-hidden className={cn("kpi-glow", `kpi-glow-${danger ? "danger" : tone}`)} />
@@ -91,7 +96,7 @@ export function KpiCard({ id, label, value, sub, icon, tone = "accent", danger, 
         {sub ? <div className="mt-0.5 text-[12px] text-subtle">{sub}</div> : null}
         {delta && deltaFormat && vs ? (
           <div className="mt-2">
-            <DeltaBadge delta={delta} format={deltaFormat} vs={vs} inverse={inverse} />
+            <DeltaBadge delta={delta} format={deltaFormat} vs={vs} inverse={inverse} newLabel={newLabel} />
           </div>
         ) : null}
         {spark && spark.length > 1 ? <Sparkline id={id} values={spark} tone={danger ? "danger" : tone} className="mt-2" /> : null}

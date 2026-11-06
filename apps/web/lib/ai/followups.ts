@@ -4,6 +4,7 @@ import { sendToConversation } from "@/lib/channels/send-message";
 import { runAISystem } from "./run-system";
 import { autopilotLocale, sharePhoneLabel } from "./autopilot";
 import { buildHistory, formatForChannel, parseAgentTools, salesAgentInstructions, type AgentProfile, type AutopilotChannel, type StoredMessage } from "./autopilot-core";
+import { FOLLOWUP_HONESTY, followupStage, playbookInstruction } from "./followup-playbook";
 
 /**
  * Automatic follow-ups: when the agent answered last and the customer went quiet
@@ -21,6 +22,14 @@ export async function runFollowups(budgetMs = 40_000): Promise<{ checked: number
   let sent = 0;
   for (const r of rows) {
     if (Date.now() - started > budgetMs) break;
+    // follow-up playbook: wait for the morning when the business set no quiet hours (it stays a candidate)
+    try {
+      const ex = await import("@/lib/conversations/followup-extras");
+      const pol = await ex.orgFollowupPolicy(r.organization_id);
+      if (ex.nightHold(pol) > 0) continue;
+    } catch {
+      /* the guard below still decides */
+    }
     // claim first (no double follow-ups when two runs overlap)
     const { data: claimed } = await admin
       .from("conversations")
@@ -47,6 +56,8 @@ export async function runFollowups(budgetMs = 40_000): Promise<{ checked: number
       `You are "${agent.name}", the assistant of "${(org?.name as string | undefined) ?? ""}". Business instructions:\n${((agent.instructions as string) ?? "").slice(0, 6000)}`,
       salesAgentInstructions({ profile: (agent.profile as AgentProfile | null) ?? null, goal: (agent.lead_goal as string | null) ?? "lead", channel: ch }),
       "The customer has not answered your last message for a while. Write ONE short, warm, personal follow-up (1–2 sentences) in the customer's language that refers to what they wanted and offers an easy next step. No pressure, no repeated text, no greeting formulas like 'Dear customer'.",
+      // follow-up playbook: the agent never invents pressure (fake scarcity / deadlines / discounts)
+      FOLLOWUP_HONESTY,
     ].join("\n\n");
     const out = await runAISystem({
       orgId: r.organization_id,
@@ -79,7 +90,7 @@ export async function runFollowups(budgetMs = 40_000): Promise<{ checked: number
  * the agent of the conversation's channel writes a short personal nudge and sends it.
  * The caller already checked outbound_guard. Returns the stored message id.
  */
-export async function sendAgentFollowup(conversationId: string, opts: { scheduleId?: string; step?: number } = {}): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+export async function sendAgentFollowup(conversationId: string, opts: { scheduleId?: string; step?: number; max?: number; playbook?: boolean; crossFrom?: string } = {}): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   const admin = createAdminClient();
   const { data: conv } = await admin.from("conversations").select("id, organization_id, channel, contact_id, lead_score, sentiment").eq("id", conversationId).maybeSingle();
   if (!conv) return { ok: false, error: "not_found" };
@@ -105,11 +116,16 @@ export async function sendAgentFollowup(conversationId: string, opts: { schedule
   const system = [
     `You are "${agent.name}", the assistant of "${(org?.name as string | undefined) ?? ""}". Business instructions:\n${((agent.instructions as string) ?? "").slice(0, 6000)}`,
     salesAgentInstructions({ profile: (agent.profile as AgentProfile | null) ?? null, goal: (agent.lead_goal as string | null) ?? "lead", channel: ch }),
-    step > 1
-      ? "The customer still has not answered your earlier follow-up. Write ONE very short, friendly last check-in (1 sentence) in the customer's language — different words than before, an easy yes/no question, zero pressure."
-      : "The customer has not answered your last message for a while. Write ONE short, warm, personal follow-up (1–2 sentences) in the customer's language that refers to what they wanted and offers an easy next step. No pressure, no repeated text, no greeting formulas like 'Dear customer'.",
+    // follow-up playbook (default on): a job per follow-up — nudge → new angle → respectful close — plus honesty rules;
+    // with the playbook turned off the previous two instructions are used unchanged
+    opts.playbook !== false && opts.max !== undefined
+      ? playbookInstruction(step, opts.max)
+      : step > 1
+        ? "The customer still has not answered your earlier follow-up. Write ONE very short, friendly last check-in (1 sentence) in the customer's language — different words than before, an easy yes/no question, zero pressure."
+        : "The customer has not answered your last message for a while. Write ONE short, warm, personal follow-up (1–2 sentences) in the customer's language that refers to what they wanted and offers an easy next step. No pressure, no repeated text, no greeting formulas like 'Dear customer'.",
+    opts.crossFrom ? `You are writing in this conversation because the customer's ${opts.crossFrom} chat can no longer receive messages. Do not mention other apps; simply continue the topic naturally.` : "",
     `Tone for this customer: ${tone}`,
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
   const out = await runAISystem({
     orgId: conv.organization_id as string,
     feature: "autopilot",
@@ -126,7 +142,7 @@ export async function sendAgentFollowup(conversationId: string, opts: { schedule
   if (!tools.text) return { ok: false, error: "empty_answer" };
   const r = await sendToConversation(conv.organization_id as string, conversationId, formatForChannel(tools.text, ch), undefined, {
     aiAgentId: agent.id as string,
-    meta: { followup: true, step, ...(opts.scheduleId ? { schedule_id: opts.scheduleId } : {}), ...(tools.buttons.length ? { buttons: tools.buttons } : {}) },
+    meta: { followup: true, step, ...(opts.max !== undefined ? { stage: followupStage(step, opts.max) } : {}), ...(opts.crossFrom ? { cross_from: opts.crossFrom } : {}), ...(opts.scheduleId ? { schedule_id: opts.scheduleId } : {}), ...(tools.buttons.length ? { buttons: tools.buttons } : {}) },
     rich: { buttons: tools.buttons, askPhone: tools.askPhone, askPhoneLabel: sharePhoneLabel(locale), html: true },
   });
   if (r.ok) await admin.from("conversations").update({ followup_count: 1 }).eq("id", conversationId).eq("followup_count", 0);

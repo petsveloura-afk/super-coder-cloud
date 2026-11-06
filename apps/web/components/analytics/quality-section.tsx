@@ -31,14 +31,33 @@ export async function QualitySection({ orgId, locale, days }: { orgId: string; l
       {res.aiConversations < 5 ? (
         <p className="text-[12.5px] text-muted">{t("aiQuality.card.notEnough")}</p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="quality-metrics">
+          {/* the agent handled the whole conversation alone (open or closed) — the main number */}
+          {res.handling ? (
+            <div className="rounded-xl border border-line bg-elevated p-3">
+              <p className="text-2xl font-bold text-success" data-testid="quality-alone">
+                {pct(res.handling.handledAloneRate)}
+              </p>
+              <p className="text-[12.5px] text-muted">{t("aiQuality.card.handledAlone")}</p>
+              <p className="text-[11.5px] text-subtle">{t("aiQuality.card.count", { n: res.handling.handledAlone, of: res.handling.aiConversations })}</p>
+            </div>
+          ) : null}
+          {res.handling ? (
+            <div className="rounded-xl border border-line bg-elevated p-3">
+              <p className="text-2xl font-bold">{pct(res.handling.handedOverRate)}</p>
+              <p className="text-[12.5px] text-muted">{t("aiQuality.card.handedOver")}</p>
+              <p className="text-[11.5px] text-subtle">{t("aiQuality.card.count", { n: res.handling.handedOver, of: res.handling.aiConversations })}</p>
+            </div>
+          ) : null}
+          <div className="rounded-xl border border-line bg-elevated p-3">
             <p className="text-2xl font-bold">{pct(res.closedRate)}</p>
             <p className="text-[12.5px] text-muted">{t("aiQuality.card.closedAlone")}</p>
+            <p className="text-[11.5px] text-subtle">{t("aiQuality.card.closedHint")}</p>
           </div>
-          <div>
-            <p className="text-2xl font-bold">{pct(res.repeatRate)}</p>
+          <div className="rounded-xl border border-line bg-elevated p-3">
+            <p className={res.repeatRate !== null && res.repeatRate > 15 ? "text-2xl font-bold text-danger" : "text-2xl font-bold"}>{pct(res.repeatRate)}</p>
             <p className="text-[12.5px] text-muted">{t("aiQuality.card.repeat")}</p>
+            <p className="text-[11.5px] text-subtle">{t("aiQuality.card.lowerBetter")}</p>
           </div>
         </div>
       )}

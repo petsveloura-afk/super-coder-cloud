@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { FEEDBACK_ACTION, summarizeFeedback, type FeedbackLogRow, type FeedbackSummary } from "./reply-feedback-core";
-import { resolutionStats, type ResConv, type ResMsg, type ResolutionStats } from "./resolution-core";
+import { handlingStats, resolutionStats, type HandlingStats, type ResConv, type ResMsg, type ResolutionStats } from "./resolution-core";
 
 /** Wave 69 — loaders for the quality card. Read-only; any failure returns null (the card is simply absent). */
 const DAY = 86_400_000;
 
-export async function loadResolution(orgId: string, days: number, now = Date.now()): Promise<ResolutionStats | null> {
+export async function loadResolution(orgId: string, days: number, now = Date.now()): Promise<(ResolutionStats & { handling?: HandlingStats }) | null> {
   try {
     const since = new Date(now - Math.max(1, days) * DAY).toISOString();
     const supabase = await createClient();
@@ -21,7 +21,8 @@ export async function loadResolution(orgId: string, days: number, now = Date.now
         msgs.push({ conversationId: m.conversation_id, direction: m.direction, body: m.body ?? "", aiAgentId: m.ai_agent_id, createdAt: m.created_at });
       }
     }
-    return resolutionStats(convs, msgs);
+    // analytics sync: how the agent's conversations ended up, open ones included (extra fields on the same result)
+    return Object.assign(resolutionStats(convs, msgs), { handling: handlingStats(convs, msgs) });
   } catch {
     return null;
   }

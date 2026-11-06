@@ -1326,6 +1326,14 @@
         "meetingShow": "Excellent meeting show rate: {rate}.",
         "pipelineWeak": "Only {pct} of pipeline value is weighted as likely to close — most deals are still in early stages."
       }
+    },
+    "sync": {
+      "collected": "Collected",
+      "collectedSub": "Payments recorded in finance",
+      "noValueShort": "{count} without amount",
+      "noValueTitle": "{count} open deals have no amount.",
+      "noValueHint": "Add an amount to each deal so the pipeline, forecast and win rate are right →",
+      "new": "New"
     }
   },
   "import": {
@@ -4357,7 +4365,19 @@
     },
     "markedOut": "Marked as opted out — all automated messages stopped",
     "markedIn": "The customer can receive messages again",
-    "tooMany": "Too many scheduled messages for this conversation"
+    "tooMany": "Too many scheduled messages for this conversation",
+    "playbook": {
+      "title": "Smart follow-up sequence",
+      "hint": "When a customer goes quiet, each follow-up in the sequence does something different — always honest: no invented \"only 2 spots left\", no pressure.",
+      "followup_playbook": "Staged follow-ups: personal nudge → new angle → respectful close",
+      "followup_playbook_hint": "The first is short and personal with a one-tap question, the middle ones bring a new reason from the business data, the last (with 2+ set) says we will stop writing and the door stays open.",
+      "followup_stop_on_convert": "Stop automatically when the customer booked or bought",
+      "followup_stop_on_convert_hint": "An upcoming appointment, or a deal won in the last 30 days — the follow-ups are canceled.",
+      "followup_night_guard": "No follow-ups at night even without quiet hours",
+      "followup_night_guard_hint": "When no quiet hours are set above: follow-ups and sequences wait between 21:30 and 08:30 (business time) and go out in the morning.",
+      "followup_cross_channel": "Move to another channel when the WhatsApp 24-hour window closed",
+      "followup_cross_channel_hint": "Only to a conversation the customer opened and wrote in (Telegram, e-mail, Messenger…), and only if every rule allows it there: consent, opt-out, caps and quiet hours. Off by default."
+    }
   },
   "copilot": {
     "suggest": "Suggest replies",
@@ -7498,7 +7518,12 @@
       "ofConvs": "Out of {n} tickets the agent answered",
       "rating": "Ratings of the agent's replies",
       "ratingLine": "{up} good, {down} not good",
-      "notEnough": "Not enough tickets yet to measure"
+      "notEnough": "Not enough tickets yet to measure",
+      "handledAlone": "Handled by the agent alone",
+      "handedOver": "Handed to the team",
+      "count": "{n} of {of}",
+      "closedHint": "Only conversations marked \"closed\"",
+      "lowerBetter": "Lower is better"
     }
   }
 }

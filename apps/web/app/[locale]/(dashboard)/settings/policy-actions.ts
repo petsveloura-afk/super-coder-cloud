@@ -19,6 +19,11 @@ export async function saveConversationPolicyAction(_prev: ActionState, fd: FormD
     quiet_start: String(fd.get("quiet_start") ?? "") || null,
     quiet_end: String(fd.get("quiet_end") ?? "") || null,
     opt_out_reply: fd.get("opt_out_reply") === "on",
+    // follow-up playbook (the form always sends these four)
+    followup_playbook: fd.get("followup_playbook") === "on",
+    followup_stop_on_convert: fd.get("followup_stop_on_convert") === "on",
+    followup_night_guard: fd.get("followup_night_guard") === "on",
+    followup_cross_channel: fd.get("followup_cross_channel") === "on",
   };
   const supabase = await createClient();
   const { error } = await supabase.rpc("set_conversation_policy", { p_org: ctx.org.id, p_policy: policy });

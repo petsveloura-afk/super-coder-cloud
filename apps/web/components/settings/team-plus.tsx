@@ -220,6 +220,27 @@ export function ConversationPolicyCard({ policy }: { policy: Record<string, unkn
       <label className="flex items-center gap-2 text-[13px]">
         <input type="checkbox" name="opt_out_reply" defaultChecked={policy.opt_out_reply !== false} className="h-4 w-4 accent-[var(--brand)]" /> {t("guard.optOutReply")}
       </label>
+      {/* follow-up playbook: how the follow-ups of one silence behave */}
+      <fieldset className="space-y-2 rounded-xl border border-line p-3" data-testid="followup-playbook">
+        <legend className="px-1 text-[13px] font-semibold">{t("guard.playbook.title")}</legend>
+        <p className="text-[12px] text-muted">{t("guard.playbook.hint")}</p>
+        {(
+          [
+            ["followup_playbook", true],
+            ["followup_stop_on_convert", true],
+            ["followup_night_guard", true],
+            ["followup_cross_channel", false],
+          ] as const
+        ).map(([k, def]) => (
+          <label key={k} className="flex items-start gap-2 text-[13px]">
+            <input type="checkbox" name={k} defaultChecked={def ? policy[k] !== false : policy[k] === true} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
+            <span>
+              {t(`guard.playbook.${k}`)}
+              <span className="block text-[11.5px] text-muted">{t(`guard.playbook.${k}_hint`)}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
       <ul className="list-disc space-y-1 ps-5 text-[12.5px] text-muted">
         <li>{t("guard.rule1")}</li>
         <li>{t("guard.rule2")}</li>

@@ -72,3 +72,33 @@ export function resolutionStats(convs: ResConv[], msgs: ResMsg[]): ResolutionSta
     repeatRate: enough ? Math.round((repeated / ai) * 100) : null,
   };
 }
+
+/**
+ * Analytics sync — how the agent's conversations ended up, open ones included (resolutionStats only counts CLOSED ones
+ * as resolved, and most chats are never marked closed, so it read 0% for agents that handle everything alone).
+ *   handledAlone: the agent answered and no person ever wrote / no hand-over
+ *   handedOver:   a person wrote in, or the agent handed the chat to the team
+ */
+export interface HandlingStats {
+  aiConversations: number;
+  handledAlone: number;
+  handedOver: number;
+  handledAloneRate: number | null;
+  handedOverRate: number | null;
+}
+
+export function handlingStats(convs: ResConv[], msgs: ResMsg[]): HandlingStats {
+  const outBy = new Map<string, ResMsg[]>();
+  for (const m of msgs ?? []) if (m.direction === "out") outBy.set(m.conversationId, [...(outBy.get(m.conversationId) ?? []), m]);
+  let ai = 0;
+  let alone = 0;
+  for (const c of convs ?? []) {
+    const out = outBy.get(c.id) ?? [];
+    if (!out.some((m) => m.aiAgentId)) continue;
+    ai++;
+    const personTouched = out.some((m) => !m.aiAgentId) || c.aiMode === "human" || !!c.handoffAt;
+    if (!personTouched) alone++;
+  }
+  const enough = ai >= MIN_SAMPLE;
+  return { aiConversations: ai, handledAlone: alone, handedOver: ai - alone, handledAloneRate: enough ? Math.round((alone / ai) * 100) : null, handedOverRate: enough ? Math.round(((ai - alone) / ai) * 100) : null };
+}
