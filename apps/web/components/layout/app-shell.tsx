@@ -46,6 +46,52 @@ void SECTIONS;
 
 /** feature flags that are on for the business (items with a `flag` stay hidden until it is on) */
 const FlagsContext = createContext<string[]>([]);
+/** menu design: live counts shown next to menu items (the inbox) — also on desktop now */
+const CountsContext = createContext<Record<string, number>>({});
+
+/* menu design: menu groups can be folded (remembered in this browser); the group of the open screen always stays open */
+function subscribeGroups(onChange: () => void) {
+  window.addEventListener("scc-navgroups", onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener("scc-navgroups", onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+function readGroups(): string {
+  try {
+    return localStorage.getItem("scc_nav_groups") ?? "";
+  } catch {
+    return "";
+  }
+}
+function toggleGroup(key: string) {
+  try {
+    const cur = new Set((localStorage.getItem("scc_nav_groups") ?? "").split(",").filter(Boolean));
+    if (cur.has(key)) cur.delete(key);
+    else cur.add(key);
+    localStorage.setItem("scc_nav_groups", [...cur].join(","));
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new Event("scc-navgroups"));
+}
+/* menu design: the modules opened last (phones: "recent" row on top of the menu sheet) */
+function readRecent(): string {
+  try {
+    return localStorage.getItem("scc_nav_recent") ?? "";
+  } catch {
+    return "";
+  }
+}
+function noteRecent(key: string) {
+  try {
+    const list = (localStorage.getItem("scc_nav_recent") ?? "").split(",").filter((k) => k && k !== key);
+    localStorage.setItem("scc_nav_recent", [key, ...list].slice(0, 6).join(","));
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 function useVisibleItems(permissions: Permission[], isPlatformAdmin = false) {
   const flags = useContext(FlagsContext);
@@ -58,6 +104,7 @@ function NavLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed?: b
   const href = `/${locale}/${item.key}`;
   const active = pathname === href || pathname.startsWith(`${href}/`);
   const Icon = NAV_ICONS[item.key]!;
+  const count = useContext(CountsContext)[item.key] ?? 0;
   return (
     <Link
       href={href}
@@ -65,16 +112,24 @@ function NavLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed?: b
       aria-current={active ? "page" : undefined}
       title={collapsed ? t(item.label) : undefined}
       className={cn(
-        "group relative flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] transition-colors",
+        "nav-link group relative flex h-10 items-center gap-2.5 rounded-xl px-2 text-[14px] transition-colors",
         active ? "nav-active bg-accent-soft font-semibold text-fg" : "text-muted hover:bg-surface-hover hover:text-fg",
         collapsed && "justify-center px-0",
       )}
     >
       {active ? <span className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-accent" aria-hidden /> : null}
-      <Icon className={cn("h-[18px] w-[18px] shrink-0", active ? "text-accent" : "text-subtle group-hover:text-muted")} />
+      <span className={cn("nav-icon-tile relative grid h-7 w-7 shrink-0 place-items-center rounded-lg transition", active ? "bg-accent/15" : "group-hover:bg-surface")}>
+        <Icon className={cn("h-[18px] w-[18px] shrink-0", active ? "text-accent" : "text-subtle group-hover:text-muted")} />
+        {collapsed && count > 0 ? <span className="absolute -end-1 -top-1 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-bg" aria-hidden /> : null}
+      </span>
       {!collapsed ? (
         <>
           <span className="truncate">{t(item.label)}</span>
+          {count > 0 ? (
+            <span className="ms-auto grid h-5 min-w-5 place-items-center rounded-full bg-danger px-1.5 text-[10.5px] font-bold text-white" aria-label={String(count)}>
+              <span dir="ltr">{count > 99 ? "99+" : count}</span>
+            </span>
+          ) : null}
           {item.phase !== null ? (
             <span className="ms-auto rounded-md border border-line px-1.5 text-[10px] font-medium text-subtle">
               <span dir="ltr">P{item.phase}</span>
@@ -87,25 +142,47 @@ function NavLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed?: b
 }
 
 function NavList({ permissions, collapsed, onNavigate, isPlatformAdmin }: { permissions: Permission[]; collapsed?: boolean; onNavigate?: () => void; isPlatformAdmin?: boolean }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const pathname = usePathname();
   const items = useVisibleItems(permissions, isPlatformAdmin);
+  const folded = new Set(useSyncExternalStore(subscribeGroups, readGroups, () => "").split(",").filter(Boolean));
   return (
-    <nav className="space-y-5" aria-label={t("nav.menu")}>
-      {GROUPS.filter((s) => itemsOfGroup(items, s.key).length).map((s) => (
-        <div key={s.key}>
-          {!collapsed ? (
-            <div className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">{t(s.label)}</div>
-          ) : (
-            <div className="mx-auto mb-2 h-px w-6 bg-line" />
-          )}
-          <div className="space-y-0.5">
-            {itemsOfGroup(items, s.key)
-              .map((i) => (
-                <NavLink key={i.key} item={i} collapsed={collapsed} onNavigate={onNavigate} />
-              ))}
+    <nav className="space-y-4" aria-label={t("nav.menu")}>
+      {GROUPS.filter((s) => itemsOfGroup(items, s.key).length).map((s) => {
+        const list = itemsOfGroup(items, s.key);
+        // the group of the open screen always stays open
+        const here = list.some((i) => pathname === `/${locale}/${i.key}` || pathname.startsWith(`/${locale}/${i.key}/`));
+        const open = collapsed || here || !folded.has(s.key);
+        const id = `nav-group-${s.key}`;
+        return (
+          <div key={s.key}>
+            {!collapsed ? (
+              <button
+                type="button"
+                onClick={() => toggleGroup(s.key)}
+                aria-expanded={open}
+                aria-controls={id}
+                disabled={here}
+                className="nav-group-head group/h mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-subtle transition hover:text-muted disabled:cursor-default"
+              >
+                <span className="truncate">{t(s.label)}</span>
+                <span className="h-px flex-1 bg-line/70" aria-hidden />
+                {!open ? <span className="rounded-full bg-surface-hover px-1.5 text-[10px] font-medium normal-case tracking-normal">{list.length}</span> : null}
+                {!here ? <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 transition-transform", !open && "-rotate-90 rtl:rotate-90")} aria-hidden /> : null}
+              </button>
+            ) : (
+              <div className="mx-auto mb-2 h-px w-6 bg-line" />
+            )}
+            {open ? (
+              <div id={id} className="space-y-0.5">
+                {list.map((i) => (
+                  <NavLink key={i.key} item={i} collapsed={collapsed} onNavigate={onNavigate} />
+                ))}
+              </div>
+            ) : null}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </nav>
   );
 }
@@ -114,30 +191,63 @@ function NavList({ permissions, collapsed, onNavigate, isPlatformAdmin }: { perm
 function NavGrid({ permissions, onNavigate, isPlatformAdmin }: { permissions: Permission[]; onNavigate?: () => void; isPlatformAdmin?: boolean }) {
   const { t, locale } = useI18n();
   const pathname = usePathname();
-  const items = useVisibleItems(permissions, isPlatformAdmin);
+  const counts = useContext(CountsContext);
+  const all = useVisibleItems(permissions, isPlatformAdmin);
+  // menu design: find a module by typing its name; the last opened modules on top
+  const [filter, setFilter] = useState("");
+  const f = filter.trim().toLowerCase();
+  const items = f ? all.filter((i) => t(i.label).toLowerCase().includes(f) || i.key.includes(f)) : all;
+  const recent = useSyncExternalStore(subscribeGroups, readRecent, () => "")
+    .split(",")
+    .map((k) => all.find((i) => i.key === k))
+    .filter((i): i is NavItem => Boolean(i))
+    .slice(0, 4);
+  const tile = (i: NavItem) => {
+    const Icon = NAV_ICONS[i.key]!;
+    const href = `/${locale}/${i.key}`;
+    const active = pathname === href || pathname.startsWith(`${href}/`);
+    const n = counts[i.key] ?? 0;
+    return (
+      <Link key={i.key} href={href} onClick={onNavigate} aria-current={active ? "page" : undefined} className="module-tile relative">
+        <span className="module-icon relative">
+          <Icon className="h-5 w-5" />
+          {n > 0 ? (
+            <span className="absolute -end-1.5 -top-1.5 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white ring-2 ring-elevated">
+              <span dir="ltr">{n > 9 ? "9+" : n}</span>
+            </span>
+          ) : null}
+        </span>
+        <span className="line-clamp-2">{t(i.label)}</span>
+      </Link>
+    );
+  };
   return (
     <nav className="space-y-4" aria-label={t("nav.menu")} data-testid="nav-grid">
+      <div className="relative">
+        <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden />
+        <input
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder={t("nav.findModule")}
+          aria-label={t("nav.findModule")}
+          className="h-10 w-full rounded-xl border border-line bg-surface ps-9 pe-3 text-[14px] placeholder:text-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-ring"
+          data-testid="nav-filter"
+        />
+      </div>
+      {!f && recent.length ? (
+        <div>
+          <div className="mb-1 px-1 text-[12px] font-semibold text-subtle">{t("nav.recent")}</div>
+          <div className="grid grid-cols-4 gap-1">{recent.map(tile)}</div>
+        </div>
+      ) : null}
+      {f && !items.length ? <p className="px-1 text-[13px] text-subtle">{t("nav.noModule")}</p> : null}
       {GROUPS.map((s) => {
         const list = itemsOfGroup(items, s.key);
         if (!list.length) return null;
         return (
           <div key={s.key}>
             <div className="mb-1 px-1 text-[12px] font-semibold text-subtle">{t(s.label)}</div>
-            <div className="grid grid-cols-4 gap-1">
-              {list.map((i) => {
-                const Icon = NAV_ICONS[i.key]!;
-                const href = `/${locale}/${i.key}`;
-                const active = pathname === href || pathname.startsWith(`${href}/`);
-                return (
-                  <Link key={i.key} href={href} onClick={onNavigate} aria-current={active ? "page" : undefined} className="module-tile">
-                    <span className="module-icon">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <span className="line-clamp-2">{t(i.label)}</span>
-                  </Link>
-                );
-              })}
-            </div>
+            <div className="grid grid-cols-4 gap-1">{list.map(tile)}</div>
           </div>
         );
       })}
@@ -378,7 +488,9 @@ function readSidebar() {
 export function AppShell(props: ShellProps) {
   return (
     <FlagsContext.Provider value={props.flags ?? []}>
-      <AppShellInner {...props} />
+      <CountsContext.Provider value={{ inbox: props.unreadInbox ?? 0 }}>
+        <AppShellInner {...props} />
+      </CountsContext.Provider>
     </FlagsContext.Provider>
   );
 }
@@ -389,6 +501,11 @@ function AppShellInner(props: ShellProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
   const items = useVisibleItems(props.permissions, props.isPlatformAdmin);
+  // menu design: remember the module that was opened (the "recent" row of the phone menu)
+  useEffect(() => {
+    const key = pathname.split("/")[2];
+    if (key && items.some((i) => i.key === key)) noteRecent(key);
+  }, [pathname, items]);
 
   const toggle = () => {
     try {
@@ -503,8 +620,9 @@ function AppShellInner(props: ShellProps) {
             title={t("nav.menu")}
             trigger={
               <button type="button" className="flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-subtle">
-                <span className="tab-pill">
+                <span className="tab-pill relative">
                   <Menu className="h-[21px] w-[21px]" />
+                  {props.unreadNotifications > 0 ? <span className="absolute -top-0.5 end-2.5 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-bg" aria-hidden data-testid="tab-more-dot" /> : null}
                 </span>
                 {t("nav.more")}
               </button>

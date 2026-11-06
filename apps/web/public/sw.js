@@ -95,3 +95,22 @@ self.addEventListener("notificationclick", (event) => {
     }),
   );
 });
+
+/* push fix — the browser rotated this device's push subscription (Chrome / Firefox do this): subscribe again with the same key and
+   tell the server, so notifications keep arriving without the member doing anything */
+self.addEventListener("pushsubscriptionchange", (event) => {
+  const old = event.oldSubscription;
+  const options = (old && old.options) || (event.newSubscription && event.newSubscription.options);
+  event.waitUntil(
+    (event.newSubscription ? Promise.resolve(event.newSubscription) : options ? self.registration.pushManager.subscribe(options) : Promise.reject(new Error("no_options")))
+      .then((sub) =>
+        fetch("/api/push/renew", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ old: old ? old.endpoint : null, sub: sub.toJSON() }),
+        }),
+      )
+      .catch(() => undefined),
+  );
+});

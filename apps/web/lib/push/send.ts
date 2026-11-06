@@ -1,13 +1,13 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { encryptPayload, isPushEndpoint, pushPayload, vapidAuthHeader, vapidReady } from "./webpush-core";
+import { encryptPayload, isPushEndpoint, pushPayload, pushRefusal, vapidAuthHeader, vapidReady } from "./webpush-core";
 
 /**
  * Wave 17 — job "push": an in-app notification is also shown on the member's phone /
  * desktop (every browser where he turned on notifications). Expired subscriptions
  * (404 / 410) are removed.
  */
-export async function sendPush(sub: { endpoint: string; p256dh: string; auth: string }, payload: Buffer): Promise<{ ok: boolean; status: number; gone: boolean }> {
+export async function sendPush(sub: { endpoint: string; p256dh: string; auth: string }, payload: Buffer): Promise<{ ok: boolean; status: number; gone: boolean; reason?: string }> {
   const testBase = process.env.PUSH_TEST_ENDPOINT_BASE;
   if (!isPushEndpoint(sub.endpoint) && !(testBase && sub.endpoint.startsWith(testBase))) return { ok: false, status: 0, gone: true };
   const body = encryptPayload(sub, payload);
@@ -20,9 +20,15 @@ export async function sendPush(sub: { endpoint: string; p256dh: string; auth: st
       signal: AbortSignal.timeout(10_000),
       cache: "no-store",
     });
-    return { ok: res.status >= 200 && res.status < 300, status: res.status, gone: res.status === 404 || res.status === 410 };
-  } catch {
-    return { ok: false, status: 0, gone: false };
+    if (res.status >= 200 && res.status < 300) return { ok: true, status: res.status, gone: false };
+    // push fix: read WHY the push service refused (logged for the platform owner) — a subscription made with an old key is dead too
+    const text = await res.text().catch(() => "");
+    const r = pushRefusal(res.status, text);
+    console.error("web push refused", new URL(sub.endpoint).hostname, res.status, r.reason, text.slice(0, 200));
+    return { ok: false, status: res.status, gone: r.gone, reason: r.reason };
+  } catch (e) {
+    console.error("web push failed", (e as Error).message);
+    return { ok: false, status: 0, gone: false, reason: "network" };
   }
 }
 
@@ -32,7 +38,8 @@ export async function runPushJob(orgId: string, payload: Record<string, unknown>
   const { data: n } = await admin.from("notifications").select("id, user_id, title_key, params, link, read_at").eq("id", String(payload.notification_id ?? "")).eq("organization_id", orgId).maybeSingle();
   if (!n || n.read_at) return { ok: true };
   const [{ data: subs }, { data: org }] = await Promise.all([
-    admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq("user_id", n.user_id).eq("organization_id", orgId).limit(10),
+    // push fix: a member's notification reaches ALL of their devices — the device may have been turned on while another workspace was open
+    admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq("user_id", n.user_id).limit(10),
     admin.from("organizations").select("name, locale").eq("id", orgId).maybeSingle(),
   ]);
   if (!subs?.length) return { ok: true };

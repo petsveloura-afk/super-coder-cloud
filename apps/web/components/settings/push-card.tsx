@@ -6,14 +6,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Button, Card } from "@/components/ui/primitives";
 import { subscribePushAction, testPushAction, unsubscribePushAction } from "@/app/[locale]/(dashboard)/settings/push-actions";
-
-function keyToBytes(b64u: string): Uint8Array<ArrayBuffer> {
-  const pad = "=".repeat((4 - (b64u.length % 4)) % 4);
-  const raw = atob((b64u + pad).replace(/-/g, "+").replace(/_/g, "/"));
-  const out = new Uint8Array(new ArrayBuffer(raw.length));
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  return out;
-}
+import { ensureSubscription, subPayload } from "@/lib/push/client";
 
 /** Wave 17 — notifications on this phone / computer (also when the app is closed). */
 export function PushCard({ vapidKey }: { vapidKey: string | null }) {
@@ -43,11 +36,9 @@ export function PushCard({ vapidKey }: { vapidKey: string | null }) {
           toast.error(t("push.denied"));
           return;
         }
-        const reg = (await navigator.serviceWorker.getRegistration("/")) ?? (await navigator.serviceWorker.register("/sw.js", { scope: "/" }));
-        await navigator.serviceWorker.ready;
-        const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(vapidKey) }));
-        const json = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
-        const res = await subscribePushAction({ locale, sub: { endpoint: json.endpoint, p256dh: json.keys?.p256dh, auth: json.keys?.auth }, userAgent: navigator.userAgent });
+        // push fix: a subscription made with an old server key is replaced (before, it was reused and every push was refused)
+        const sub = await ensureSubscription(vapidKey);
+        const res = await subscribePushAction({ locale, sub: subPayload(sub), userAgent: navigator.userAgent });
         if (res.error) toast.error(t(res.error));
         else {
           setEndpoint(sub.endpoint);
@@ -91,7 +82,20 @@ export function PushCard({ vapidKey }: { vapidKey: string | null }) {
                 loading={pending}
                 onClick={() =>
                   start(async () => {
-                    const r = await testPushAction({ locale });
+                    let r = await testPushAction({ locale });
+                    // push fix: the server removed a dead subscription → this device re-subscribes by itself and the test runs again once
+                    if (r.error === "push.deviceRenewed" || r.error === "push.noDevices") {
+                      try {
+                        const sub = await ensureSubscription(vapidKey);
+                        const s2 = await subscribePushAction({ locale, sub: subPayload(sub), userAgent: navigator.userAgent });
+                        if (!s2.error) {
+                          setEndpoint(sub.endpoint);
+                          r = await testPushAction({ locale });
+                        }
+                      } catch {
+                        /* keep the first answer */
+                      }
+                    }
                     if (r.error) toast.error(t(r.error));
                     else toast.success(t(r.message ?? "push.testSent"));
                   })

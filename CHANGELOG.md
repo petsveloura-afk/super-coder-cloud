@@ -1,5 +1,22 @@
 # Changelog
 
+## Push notifications fix + tidier menus
+
+- **Push notifications now arrive once allowed**:
+  - The VAPID subject is always a valid `mailto:` / `https:` URL. A bare e-mail in `VAPID_SUBJECT` made Apple refuse every message.
+  - The VAPID JWT now lives 1 hour.
+  - A notification reaches every device of the member, not only devices registered in the same workspace.
+  - Each refusal is classified. Dead subscriptions are removed and the device re-subscribes by itself. These are subscriptions that expired or were made with an old key.
+  - A device that already allowed notifications keeps a valid subscription automatically on every new session (`PushAutoSync`).
+  - The service worker re-subscribes when the browser rotates the subscription (`pushsubscriptionchange` → `/api/push/renew`).
+  - The test button heals and retries once, explains server-key problems, and allows 12 tries in 10 minutes (was 5).
+- **Menus**:
+  - Sidebar items have icon tiles.
+  - Sidebar groups fold and are remembered; the open screen's group stays open.
+  - The inbox count shows on desktop too.
+  - The phone menu has a module search and a "recently opened" row.
+  - The "More" tab shows a dot when there are unread notifications.
+
 ## Agent coordination — every agent works as one team
 
 - **Shared claims board (`agent_claims`)**: before any agent proactively reaches a customer, it claims that customer for the purpose — outreach (24h), collections (20h) or a follow-up task (20h). The agents are the smart team (collections, re-engagement, review requests, abandoned carts, sales manager) and the digital-team employees.

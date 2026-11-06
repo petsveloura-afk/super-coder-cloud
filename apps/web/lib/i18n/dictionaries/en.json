@@ -42,7 +42,10 @@
     "calculators": "Calculators",
     "health": "Mission Control",
     "aiTeam": "My AI team",
-    "sectionAi": "AI & agents"
+    "sectionAi": "AI & agents",
+    "findModule": "Find a module…",
+    "recent": "Recently opened",
+    "noModule": "No module with that name"
   },
   "common": {
     "save": "Save",
@@ -4852,7 +4855,10 @@
     "noDevices": "You haven't turned on notifications on any device yet",
     "testBody": "✅ Notifications work on this device",
     "testSent": "Test sent",
-    "testFailed": "Sending failed — try turning it off and on again"
+    "testFailed": "Sending failed — try turning it off and on again",
+    "deviceRenewed": "This device was registered with an old key and was registered again. Send the test once more",
+    "serverKeys": "The push service refused the server keys. Check VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT (as mailto:address) in Vercel",
+    "renewed": "Notifications were renewed on this device"
   },
   "growth": {
     "title": "Growth: ROI, CAC, LTV and forecast",

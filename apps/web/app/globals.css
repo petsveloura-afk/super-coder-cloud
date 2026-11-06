@@ -1023,3 +1023,15 @@ main[data-shell] :is(a, button, [role="tab"], summary):focus-visible { outline: 
   @keyframes sal-build { 0% { opacity: 0.15; transform: scaleX(0.35); } 35%, 80% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0.15; transform: scaleX(1); } }
   @keyframes sal-glow { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 }
+
+/* menu design (additive) — icon tiles in the sidebar, foldable group headings, calm hover. transform / opacity only, layered */
+@layer components {
+  .nav-link .nav-icon-tile { transition: transform 0.18s ease, background-color 0.18s ease; }
+  .nav-link:hover .nav-icon-tile { transform: scale(1.06); }
+  .nav-link[aria-current="page"] .nav-icon-tile { box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent), 0 6px 16px -8px var(--accent); }
+  .nav-group-head:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .nav-link .nav-icon-tile { transition: none; }
+    .nav-link:hover .nav-icon-tile { transform: none; }
+  }
+}

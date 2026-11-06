@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { PERMISSIONS } from "@scc/shared/permissions";
 import { AppShell } from "@/components/layout/app-shell";
 import { GuideHelpButton } from "@/components/guide/help-button";
+import { PushAutoSync } from "@/components/layout/push-auto-sync";
+import { vapidReady } from "@/lib/push/webpush-core";
 import { getOrgContext } from "@/lib/auth";
 import { resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -35,6 +37,8 @@ export default async function DashboardLayout({ children, params }: { children: 
       {children}
       {/* wave 23: help for the screen you are on → the matching step of the user guide */}
       <GuideHelpButton />
+      {/* push fix: a device that already allowed notifications keeps a working subscription by itself */}
+      <PushAutoSync vapidKey={vapidReady() ? (process.env.VAPID_PUBLIC_KEY ?? null) : null} />
     </AppShell>
   );
 }

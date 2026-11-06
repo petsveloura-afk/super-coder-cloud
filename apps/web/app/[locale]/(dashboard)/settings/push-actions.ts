@@ -43,9 +43,10 @@ export async function testPushAction(input: { locale: string }): Promise<ActionS
   const ctx = await getOrgContext(locale);
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const admin = createAdminClient();
-  const { data: allowed } = await admin.rpc("public_rate_limit", { p_bucket: `push-test:${ctx.userId}`, p_limit: 5, p_window_seconds: 600 });
+  // push fix: 12 tests in 10 minutes (5 ran out while people were trying to make it work)
+  const { data: allowed } = await admin.rpc("public_rate_limit", { p_bucket: `push-test:${ctx.userId}`, p_limit: 12, p_window_seconds: 600 });
   if (allowed === false) return { error: "errors.rateLimited" };
-  const { data: subs } = await admin.from("push_subscriptions").select("endpoint, p256dh, auth").eq("user_id", ctx.userId).limit(10);
+  const { data: subs } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq("user_id", ctx.userId).limit(10);
   if (!subs?.length) return { error: "push.noDevices" };
   const { pushPayload } = await import("@/lib/push/webpush-core");
   const { sendPush } = await import("@/lib/push/send");
@@ -53,6 +54,19 @@ export async function testPushAction(input: { locale: string }): Promise<ActionS
   const { t } = await getT(locale);
   const payload = pushPayload({ title: ctx.org.name as string, body: t("push.testBody"), url: `/${locale}/settings`, locale });
   let ok = 0;
-  for (const s of subs as { endpoint: string; p256dh: string; auth: string }[]) if ((await sendPush(s, payload)).ok) ok++;
-  return ok ? { ok: true, message: "push.testSent" } : { error: "push.testFailed" };
+  let gone = 0;
+  let badJwt = 0;
+  for (const s of subs as { id: string; endpoint: string; p256dh: string; auth: string }[]) {
+    const r = await sendPush(s, payload);
+    if (r.ok) ok++;
+    else if (r.gone) {
+      // push fix: a dead subscription (expired / made with an old key) is removed — the device re-subscribes by itself
+      gone++;
+      await admin.from("push_subscriptions").delete().eq("id", s.id);
+    } else if (r.reason === "bad_jwt") badJwt++;
+  }
+  if (ok) return { ok: true, message: "push.testSent" };
+  if (gone) return { error: "push.deviceRenewed" };
+  if (badJwt) return { error: "push.serverKeys" };
+  return { error: "push.testFailed" };
 }

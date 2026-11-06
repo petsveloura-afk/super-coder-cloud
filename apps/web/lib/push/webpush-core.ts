@@ -31,6 +31,28 @@ export function generateVapidKeys(): { publicKey: string; privateKey: string } {
   return { publicKey: b64u(ecdh.getPublicKey()), privateKey: b64u(Buffer.concat([Buffer.alloc(Math.max(0, 32 - d.length)), d])) };
 }
 
+/**
+ * push fix: the VAPID "sub" claim must be a mailto: or https: URL — Apple's push service rejects anything else (BadJwtToken), so a
+ * plain e-mail ("me@x.com") set in VAPID_SUBJECT silently broke every iPhone. A bare e-mail gets "mailto:", anything else the default.
+ */
+export function vapidSubject(raw: string | undefined, fallback = "mailto:support@supercoder.cloud"): string {
+  const s = (raw ?? "").trim().replace(/^["']|["']$/g, "");
+  if (/^mailto:[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(s)) return s;
+  if (/^https:\/\/[^\s]+$/i.test(s)) return s;
+  if (/^[^\s@:]+@[^\s@]+\.[^\s@]+$/.test(s)) return `mailto:${s}`;
+  return fallback;
+}
+
+/** push fix: why a push service refused a message → is the subscription dead (remove it; the device re-subscribes by itself)? */
+export function pushRefusal(status: number, body: string): { gone: boolean; reason: "expired" | "key_mismatch" | "bad_jwt" | "too_many" | "other" } {
+  const b = (body ?? "").toLowerCase();
+  if (status === 404 || status === 410) return { gone: true, reason: "expired" };
+  if (/vapidpkhashmismatch|does not correspond|mismatch|sender id|invalid.?registration|unregistered/.test(b)) return { gone: true, reason: "key_mismatch" };
+  if (/badjwttoken|expiredjwttoken|jwt|badwebpushtopic|vapid/.test(b) || status === 401) return { gone: false, reason: "bad_jwt" };
+  if (status === 429) return { gone: false, reason: "too_many" };
+  return { gone: false, reason: "other" };
+}
+
 /** Authorization header value for the push service of `endpoint`. */
 export function vapidAuthHeader(endpoint: string, keys: { publicKey: string; privateKey: string; subject: string }, now = Date.now()): string {
   const pub = fromB64u(keys.publicKey);
@@ -38,7 +60,8 @@ export function vapidAuthHeader(endpoint: string, keys: { publicKey: string; pri
   if (pub.length !== 65 || priv.length !== 32) throw new Error("vapid_keys_invalid");
   const aud = new URL(endpoint).origin;
   const header = b64u(Buffer.from(JSON.stringify({ typ: "JWT", alg: "ES256" })));
-  const claims = b64u(Buffer.from(JSON.stringify({ aud, exp: Math.floor(now / 1000) + 12 * 3600, sub: keys.subject })));
+  // push fix: one hour (every push service accepts it; some refuse long-lived tokens) and a valid mailto:/https: subject
+  const claims = b64u(Buffer.from(JSON.stringify({ aud, exp: Math.floor(now / 1000) + 3600, sub: vapidSubject(keys.subject) })));
   const key = createPrivateKey({ key: { kty: "EC", crv: "P-256", x: b64u(pub.subarray(1, 33)), y: b64u(pub.subarray(33, 65)), d: b64u(priv) }, format: "jwk" });
   const signer = createSign("SHA256");
   signer.update(`${header}.${claims}`);
