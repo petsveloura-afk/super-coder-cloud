@@ -21,8 +21,12 @@ function authorized(request: NextRequest): boolean {
 async function handle(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ ok: false, reason: "service_role_missing" }, { status: 503 });
-  const summary = await dispatchJobs({ limit: 25, budgetMs: 45_000 });
-  return NextResponse.json({ ok: true, ...summary }, { headers: { "Cache-Control": "no-store" } });
+  const summary = await dispatchJobs({ limit: 25, budgetMs: 40_000 });
+  // never-lost team alerts: also from the scheduled sweep (the bridge heartbeat may be down — e.g. while the bridge reconnects)
+  const alerts = await import("@/lib/notify/forward")
+    .then(async (m) => ({ retry: await m.retryNotifyDeliveries(6_000), catchUp: await m.catchUpMissedAlerts(6_000) }))
+    .catch(() => null);
+  return NextResponse.json({ ok: true, ...summary, alerts }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export const GET = handle;

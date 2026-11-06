@@ -1,5 +1,14 @@
 # Changelog
 
+## Team alerts are never lost (Telegram lead → WhatsApp alert)
+
+- Every alert to a team recipient about a customer message is recorded once per recipient, event and message (`notify_deliveries`).
+- **Retries:** a failed alert is retried after 1, 3, 10, 30 and 120 minutes instead of being lost. Typical failures: the WhatsApp bridge was reconnecting, the official API refused, a timeout.
+- **Catch-up:** an alert that was never attempted is sent by the sweep. This happens when the server ran out of time after the agent had already replied.
+- **Never twice:** the same alert is never sent twice.
+- **Where it runs:** on the bridge heartbeat (every 30s) and on the scheduled jobs sweep.
+- Shabbat / holiday awareness only changes the agent's wording and never blocks team alerts (unchanged).
+
 ## Push notifications fix + tidier menus
 
 - **Push notifications now arrive once allowed**:

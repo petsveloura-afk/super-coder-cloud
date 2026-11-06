@@ -910,10 +910,12 @@ export async function forwardAfterAutopilot(conversationId: string, res: Autopil
     const admin = createAdminClient();
     const { data: conv } = await admin.from("conversations").select("id, organization_id, channel, title, external_id").eq("id", conversationId).maybeSingle();
     if (!conv) return;
-    const { data: lastIn } = await admin.from("messages").select("body").eq("conversation_id", conversationId).eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const { data: lastIn } = await admin.from("messages").select("id, body").eq("conversation_id", conversationId).eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle();
     const { forwardToTeam } = await import("@/lib/notify/forward");
     const base = {
       conversationId,
+      // never-lost alerts: the customer message this alert is about (one delivery record per recipient → retries, no duplicates)
+      messageId: (lastIn?.id as string | undefined) ?? null,
       customer: (conv.title as string | null) ?? null,
       channel: conv.channel as string,
       customerText: (lastIn?.body as string | undefined) ?? null,

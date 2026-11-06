@@ -21,6 +21,7 @@ let teamLaneRunning = false;
 let lastWatchdog = 0;
 let lastTeam = 0;
 let lastAgents = 0;
+let lastCatchUp = 0;
 
 export async function POST(request: NextRequest) {
   const raw = await request.text();
@@ -46,6 +47,16 @@ export async function POST(request: NextRequest) {
         lastWatchdog = Date.now();
         await import("@/lib/ai/watchdog").then((m) => m.runStuckWatchdog(12_000)).catch((e) => console.error("tick: watchdog failed", (e as Error).message));
       }
+      // never-lost team alerts: failed deliveries are retried and missed ones are caught up — every heartbeat (cheap when nothing is due)
+      await import("@/lib/notify/forward")
+        .then(async (m) => {
+          await m.retryNotifyDeliveries(6_000);
+          if (Date.now() - lastCatchUp > 55_000) {
+            lastCatchUp = Date.now();
+            await m.catchUpMissedAlerts(6_000);
+          }
+        })
+        .catch((e) => console.error("tick: team alerts failed", (e as Error).message));
     } finally {
       running = false;
     }
