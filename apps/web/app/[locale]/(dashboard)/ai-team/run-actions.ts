@@ -33,11 +33,16 @@ export async function startTaskAction(input: { locale: string; taskId: string })
   const orgId = g.ctx.org.id;
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const a = createAdminClient();
+  // security (additive): at most 30 starts a minute per business (a stuck button / script can not flood the AI engines)
+  const { data: allowed } = await a.rpc("public_rate_limit", { p_bucket: `team-start:${orgId}`, p_limit: 30, p_window_seconds: 60 });
+  if (allowed === false) return { error: "aiTeam.run.tooFast" };
   const { data: t } = await a.from("team_tasks").select("id, status, origin, goal_id").eq("organization_id", orgId).eq("id", input.taskId).maybeSingle();
   if (!t) return { error: "validation.invalidId" };
   const status = String(t.status);
   if (status === "in_progress") return { ok: true, data: { status, started: false } };
   if (["failed", "blocked", "requires_connection"].includes(status)) {
+    // security (parity with the restart button): giving a stopped task a fresh start needs the "manage AI" permission
+    if (!g.ctx.can("ai.manage")) return { error: "errors.forbidden" };
     const { restartTask } = await import("@/lib/team/runner-plus8");
     const r = await restartTask(orgId, input.taskId);
     if (!r.ok) return { error: r.reason === "dependency_failed" ? "aiTeam.run.waitingDependency" : r.reason === "emergency_stop" ? "aiTeam.err.stopped" : r.reason === "budget" ? "aiTeam.run.budget" : "aiTeam.plus8.restartFailed" };

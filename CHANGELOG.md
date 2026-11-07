@@ -1,5 +1,23 @@
 # Changelog
 
+## Engineering round: credit cap root cause, security parity, load fairness, time limits
+
+- **Credit cap — root cause:**
+  - Today's team credits are counted by when the work RAN (`started_at`), not by the last change of the row (`updated_at`).
+  - Before, any later touch of an old task (a cancel, a merge, a sweep) brought its old credits back into "today", and the cap was reached without real work.
+  - The team clock and the screen now use the same count (`dayCredits`). The old count remains as a fallback.
+- **Credit cap — transparency:**
+  - "Credits today X/Y" meter on the team screen (warning at 80%, red at the cap).
+  - A held task says "waiting for credits — resumes by itself".
+  - The owners get ONE notification and push a day when the cap holds work back, with the numbers and a link (`notifyCapHold`).
+- **Security:**
+  - A fresh start of a stopped task from the screen needs "manage AI", the same as the existing restart button.
+  - Starts are rate limited to 30 a minute per business (`public_rate_limit`).
+- **Load:**
+  - The team clock visits the businesses from a rotating start each minute, so the same businesses are not always left waiting.
+  - The smart agents on the heartbeat start only with enough time left, and with a budget that ends inside the server call. Before, they were cut off after a long team round.
+- No migration.
+
 ## Digital team: "run now" / "try again" really run, follow and retry; nothing thrown away; transitions
 
 - **"Run now" / "Try again":** the button only STARTS the work, in its own server call (`startTaskAction` → `/api/cron/team-task`), and returns at once. Before, the whole task ran inside the click's 60s request: it was cut off, "something went wrong" appeared, and the task stayed "in progress".

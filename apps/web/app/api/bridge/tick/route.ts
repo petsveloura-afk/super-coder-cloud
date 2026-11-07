@@ -66,6 +66,10 @@ export async function POST(request: NextRequest) {
   if (!teamLaneRunning) {
     teamLaneRunning = true;
     after(async () => {
+      // time guard (additive): the team clock and the smart agents share ONE server call (60s) — the agents only start when
+      // enough of it is left, with a budget that ends inside it (before, a long team round + 25s of agents ran past the limit
+      // and the agents' round was cut off). Skipped agents simply run on the next heartbeat.
+      const laneStart = Date.now();
       try {
         const { runLockedJob } = await import("@/lib/ops/job-runs");
         if (Date.now() - lastTeam > 55_000) {
@@ -75,11 +79,12 @@ export async function POST(request: NextRequest) {
             return teamTick(30_000);
           }).catch((e) => console.error("tick: team clock failed", (e as Error).message));
         }
-        if (Date.now() - lastAgents > 115_000) {
+        const agentsBudget = Math.min(25_000, 50_000 - (Date.now() - laneStart));
+        if (Date.now() - lastAgents > 115_000 && agentsBudget >= 15_000) {
           lastAgents = Date.now();
           await runLockedJob("agents", async () => {
             const { runAgentsCron } = await import("@/lib/agents/run");
-            return runAgentsCron(25_000);
+            return runAgentsCron(agentsBudget);
           }).catch((e) => console.error("tick: agents failed", (e as Error).message));
         }
       } finally {

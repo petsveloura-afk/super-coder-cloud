@@ -6989,7 +6989,8 @@
       "members": "{n} employees",
       "working": "{n} working",
       "approvals": "{n} waiting for approval",
-      "questions": "{n} questions for you"
+      "questions": "{n} questions for you",
+      "credits": "Credits today: {used}/{cap}"
     },
     "tabs": {
       "team": "Team",
@@ -7256,7 +7257,8 @@
       "waitingDep": "Waiting for an earlier task that failed — it resumes by itself once that one succeeds",
       "retryNow": "Try again now",
       "partial": "⚠️ Partially done",
-      "drafts": "📝 {n} drafts on the posts board"
+      "drafts": "📝 {n} drafts on the posts board",
+      "waitingCap": "Waiting for credits ({used}/{cap} today) — resumes by itself. You can raise the cap in the team settings."
     },
     "task": {
       "direct": "A direct task",
@@ -7794,8 +7796,10 @@
       "retrying": "The engines were busy — trying again ({n}/{max})…",
       "background": "The work continues in the background — the result will appear on the task board.",
       "waitingDependency": "This task waits for an earlier task that failed — run that one first.",
-      "budget": "The team reached its daily credit limit — raise it in the team settings."
-    }
+      "budget": "The team reached its daily credit limit — raise it in the team settings.",
+      "tooFast": "Too many starts in a minute — try again in a moment."
+    },
+    "capReached": "The digital team reached its daily credit cap ({used}/{cap}) — {n} tasks are waiting. They resume by themselves, or raise the cap in the team settings."
   },
   "aiQuality": {
     "feedback": {

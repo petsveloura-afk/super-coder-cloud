@@ -473,6 +473,9 @@ function TaskBoard({ data, busy, onRun, onCancel, onRetry }: { data: TeamPageDat
                       <div className="mt-1.5 rounded-xl bg-surface-hover/60 p-2 text-[11.5px]" data-testid="task-failure">
                         {x.status === "blocked" && x.error === "dependency_failed" ? (
                           <p className="text-muted">{t("aiTeam.board.waitingDep")}</p>
+                        ) : x.status === "blocked" && x.error === "daily_credit_cap" ? (
+                          // credit cap transparency: waiting for credits, resumes by itself — and how to raise the cap
+                          <p className="text-muted" data-testid="task-cap">{t("aiTeam.board.waitingCap", { used: data.dayCredits, cap: data.settings.daily_credit_cap })}</p>
                         ) : (
                           (() => {
                             const f = ownerFailure(x.error, locale === "en" || locale === "ar" ? locale : "he");

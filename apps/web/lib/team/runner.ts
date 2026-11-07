@@ -68,9 +68,17 @@ export async function loadSettings(orgId: string): Promise<TeamSettingsRow> {
   return data ? { ...DEFAULT_SETTINGS, ...(data as Partial<TeamSettingsRow>) } : { ...DEFAULT_SETTINGS };
 }
 
-async function dayCredits(orgId: string): Promise<number> {
+export async function dayCredits(orgId: string): Promise<number> {
   const since = new Date(Date.now() - 86_400_000).toISOString();
-  const { data } = await db().from("team_tasks").select("credits_used").eq("organization_id", orgId).gte("updated_at", since).limit(1000);
+  // credit cap fix: counted by when the work RAN (started_at), not by the last change of the row (updated_at). Before, any later
+  // touch of an old task — a cancel, a merge, a maintenance sweep, a status refresh — brought its old credits back into "today"
+  // and the cap was reached without real work (sudden "the team reached its credit limit"). Falls back to the old count if the
+  // column read fails.
+  const { data, error } = await db().from("team_tasks").select("credits_used").eq("organization_id", orgId).gte("started_at", since).limit(1000);
+  if (error) {
+    const { data: old } = await db().from("team_tasks").select("credits_used").eq("organization_id", orgId).gte("updated_at", since).limit(1000);
+    return ((old ?? []) as { credits_used: number }[]).reduce((a, r) => a + (r.credits_used || 0), 0);
+  }
   return ((data ?? []) as { credits_used: number }[]).reduce((a, r) => a + (r.credits_used || 0), 0);
 }
 
@@ -859,13 +867,38 @@ export async function resumeHeldTasks(orgId: string): Promise<number> {
   return picked.length;
 }
 
+/**
+ * Credit cap transparency (additive). When tasks are held by the team's daily credit cap, the business owners / admins get ONE
+ * notification (+ push) per ~20 hours: how much was used, the cap, how many tasks wait — linking to the team settings, where
+ * the cap is raised. Held tasks already resume by themselves when credits free up (resumeHeldTasks); this only tells the owner.
+ */
+export async function notifyCapHold(orgId: string): Promise<boolean> {
+  const a = db();
+  const { count } = await a.from("team_tasks").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("status", "blocked").eq("error", "daily_credit_cap");
+  if (!count) return false;
+  const { data: recent } = await a.from("notifications").select("id").eq("organization_id", orgId).eq("kind", "team_cap").gte("created_at", new Date(Date.now() - 20 * 3600_000).toISOString()).limit(1).maybeSingle();
+  if (recent) return false;
+  const settings = await loadSettings(orgId);
+  const used = await dayCredits(orgId);
+  const { data: owners } = await a.from("organization_members").select("user_id").eq("organization_id", orgId).in("role", ["agency_owner", "owner", "admin"]).limit(5);
+  const rows = ((owners ?? []) as { user_id: string }[]).map((o) => ({ organization_id: orgId, user_id: o.user_id, kind: "team_cap", title_key: "aiTeam.capReached", params: { used: String(used), cap: String(settings.daily_credit_cap), n: String(count) }, link: "/ai-team" }));
+  if (!rows.length) return false;
+  await a.from("notifications").insert(rows);
+  return true;
+}
+
 /** the team clock (cron): for every business with the team on — run ready tasks, initiative once a day, meeting weekly */
 export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: number; blocked: number }> {
   const started = Date.now();
   const a = db();
   const { data } = await a.from("team_settings").select("organization_id").eq("enabled", true).eq("emergency_stop", false).limit(200);
   const result = { orgs: 0, ran: 0, blocked: 0 };
-  for (const { organization_id: orgId } of (data ?? []) as { organization_id: string }[]) {
+  // fairness under load (additive): the businesses are visited from a different starting point every minute, so when the time
+  // budget ends before the list does, the SAME businesses are not always the ones left waiting
+  const orgRows = (data ?? []) as { organization_id: string }[];
+  const rot = orgRows.length ? Math.floor(Date.now() / 60_000) % orgRows.length : 0;
+  const fairOrder = [...orgRows.slice(rot), ...orgRows.slice(0, rot)];
+  for (const { organization_id: orgId } of fairOrder) {
     if (Date.now() - started > budgetMs) break;
     if (!(await teamFlagOn(orgId))) continue;
     if (!(await teamPlanOn(orgId))) continue;
@@ -873,6 +906,8 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
     const { data: org } = await a.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
     const tz = (org?.timezone as string) || "Asia/Jerusalem";
     await resumeHeldTasks(orgId).catch(() => 0);
+    // credit cap (additive): the owner hears ONCE a day when the daily cap holds work back — with the numbers and one tap to raise it
+    await notifyCapHold(orgId).catch(() => false);
     // wave 64: the tick also reads title / age / due date / origin / owner so the queue can be ordered by real importance;
     // if that read fails for any reason, the original narrow read below runs exactly as before
     const tickSince = new Date(Date.now() - 30 * 86_400_000).toISOString();
