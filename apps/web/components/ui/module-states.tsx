@@ -11,9 +11,23 @@ import { eventId } from "@/lib/ops/log-core";
  * Loading skeletons and error screens for every module (spec B2). The error screen reports the crash once
  * (/api/errors → Mission Control), shows an event id the user can quote, and offers retry / copy / support.
  */
+/**
+ * design 3.0 (additive): the brand loading mark at the top of every loading screen — a turning gradient ring with a
+ * glowing core. Pure CSS (works in server components), no text, no layout shift; still for "reduce motion".
+ */
+export function BrandLoader() {
+  return (
+    <div className="brand-loader" aria-hidden data-testid="brand-loader">
+      <span className="brand-loader-ring" />
+      <span className="brand-loader-core" />
+    </div>
+  );
+}
+
 export function ModuleSkeleton({ variant = "list" }: { variant?: "list" | "board" | "grid" | "detail" | "chat" }) {
   return (
     <div aria-busy="true" aria-live="polite" className="space-y-5" data-testid="module-skeleton">
+      <BrandLoader />
       <div className="space-y-2">
         <Skeleton className="h-7 w-56" />
         <Skeleton className="h-4 w-80 max-w-full" />

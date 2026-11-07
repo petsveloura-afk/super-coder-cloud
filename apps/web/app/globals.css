@@ -1071,3 +1071,110 @@ main[data-shell] :is(a, button, [role="tab"], summary):focus-visible { outline: 
   }
   @keyframes team-dot { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.15); } }
 }
+
+/* ======================================================================== design 3.0 (additive, CSS only)
+ * A clearer, more modern finish on every screen, built only on top of what exists:
+ *   • the navigation progress bar (components/layout/nav-progress.tsx);
+ *   • cards: a fine brand-gradient edge on top (painted as a background layer — no position change, no layout shift);
+ *   • the phone tab bar: a glowing pill behind the active tab and a short indicator line;
+ *   • the digital team's board: coloured stage dots, calm hover lift for task cards, empty-column state;
+ *   • a brand-tinted shimmer for every loading skeleton;
+ *   • the compact help button on phones.
+ * Same rules as before: transform / opacity only, nothing kept after an animation ends, all motion off for "reduce motion"
+ * and on print, layered so a Tailwind utility on the same element always wins. */
+@layer components {
+  /* ---- navigation progress */
+  .nav-progress { position: fixed; inset-inline: 0; top: 0; z-index: 60; height: 3px; pointer-events: none; }
+  .nav-progress-bar {
+    display: block; height: 100%; width: 100%;
+    background: linear-gradient(90deg, var(--accent), #00d9c5 55%, #c9a66b);
+    box-shadow: 0 0 12px color-mix(in oklab, var(--accent) 70%, transparent), 0 0 4px #00d9c5;
+    border-radius: 0 999px 999px 0;
+    transform-origin: left center;
+    transform: scaleX(0.08);
+  }
+  [dir="rtl"] .nav-progress-bar { transform-origin: right center; border-radius: 999px 0 0 999px; }
+  .nav-progress[data-state="loading"] .nav-progress-bar { animation: navp-grow 8s cubic-bezier(0.1, 0.6, 0.2, 1) forwards; }
+  .nav-progress[data-state="done"] .nav-progress-bar { transform: scaleX(1); opacity: 0; transition: transform 0.2s ease-out, opacity 0.3s ease 0.12s; }
+  @keyframes navp-grow { 0% { transform: scaleX(0.08); } 20% { transform: scaleX(0.45); } 60% { transform: scaleX(0.75); } 100% { transform: scaleX(0.92); } }
+
+  /* ---- cards: a fine brand edge on top */
+  main[data-shell] .card-premium {
+    background-image:
+      linear-gradient(90deg, transparent 4%, color-mix(in oklab, var(--accent) 55%, transparent) 30%, color-mix(in oklab, #00d9c5 45%, transparent) 70%, transparent 96%),
+      var(--card-highlight);
+    background-size: 100% 1px, auto;
+    background-repeat: no-repeat, no-repeat;
+    background-position: top center, 0 0;
+  }
+  [data-theme="light"] main[data-shell] .card-premium {
+    background-image:
+      linear-gradient(90deg, transparent 4%, color-mix(in oklab, var(--accent) 35%, transparent) 30%, color-mix(in oklab, #00a596 30%, transparent) 70%, transparent 96%),
+      var(--card-highlight);
+  }
+
+  /* ---- loading skeletons: a brand-tinted shimmer */
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface) 0%, color-mix(in oklab, var(--accent) 9%, var(--surface-hover)) 45%, color-mix(in oklab, #00d9c5 6%, var(--surface-hover)) 55%, var(--surface) 100%);
+    background-size: 800px 100%;
+  }
+
+  /* ---- the phone tab bar */
+  nav a[aria-current="page"] .tab-pill {
+    background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 24%, transparent), color-mix(in oklab, #00d9c5 12%, transparent));
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent) inset, 0 8px 22px -10px var(--accent);
+  }
+  nav a[aria-current="page"] { position: relative; }
+  nav.fixed a[aria-current="page"]::before {
+    content: ""; position: absolute; top: 0; inset-inline: 30%; height: 2px; border-radius: 0 0 4px 4px;
+    background: linear-gradient(90deg, var(--accent), #00d9c5);
+    box-shadow: 0 0 10px var(--accent);
+  }
+
+  /* ---- the digital team's board */
+  .board-col { background-image: linear-gradient(180deg, color-mix(in oklab, var(--surface) 70%, transparent), transparent 120px); }
+  .board-dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: var(--subtle, #8a93a6); box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 0%, transparent); }
+  .board-dot-pending { background: var(--warning); box-shadow: 0 0 10px -1px var(--warning); }
+  .board-dot-in_progress { background: var(--accent); box-shadow: 0 0 10px -1px var(--accent); }
+  .board-dot-awaiting { background: #c9a66b; box-shadow: 0 0 10px -1px #c9a66b; }
+  .board-dot-done { background: var(--success); box-shadow: 0 0 10px -1px var(--success); }
+  .task-card { transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; }
+  @media (hover: hover) {
+    .task-card:hover { transform: translateY(-1px); border-color: color-mix(in oklab, var(--accent) 30%, var(--border)); box-shadow: 0 12px 28px -18px color-mix(in oklab, var(--accent) 60%, transparent); }
+  }
+
+  /* ---- the help button on phones: a round icon with a soft glow */
+  .help-fab { box-shadow: 0 10px 26px -12px rgb(0 0 0 / 0.6), 0 0 0 1px color-mix(in oklab, var(--accent) 18%, transparent); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    nav a[aria-current="page"] .tab-pill { animation: d3-pill-in 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
+    .board-dot-in_progress { animation: d3-beat 1.6s ease-in-out infinite; }
+  }
+  @keyframes d3-pill-in { from { opacity: 0.4; transform: scale(0.82); } }
+  @keyframes d3-beat { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(0.8); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nav-progress[data-state="loading"] .nav-progress-bar { animation: none; transform: scaleX(0.6); }
+    .task-card, .nav-progress-bar { transition: none !important; }
+    .task-card:hover { transform: none; }
+  }
+  @media print {
+    .nav-progress, .help-fab { display: none !important; }
+  }
+}
+
+/* design 3.0 — the brand loading mark (components/ui/module-states.tsx → BrandLoader) */
+@layer components {
+  .brand-loader { position: relative; display: grid; place-items: center; width: 44px; height: 44px; margin-inline: auto; }
+  .brand-loader-ring {
+    position: absolute; inset: 0; border-radius: 999px;
+    background: conic-gradient(from 0deg, transparent 0deg, var(--accent) 140deg, #00d9c5 250deg, transparent 360deg);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  }
+  .brand-loader-core { width: 12px; height: 12px; border-radius: 999px; background: linear-gradient(135deg, var(--accent), #00d9c5); box-shadow: 0 0 18px var(--accent); }
+  @media (prefers-reduced-motion: no-preference) {
+    .brand-loader-ring { animation: d2-spin 0.9s linear infinite; }
+    .brand-loader-core { animation: d3-beat 1.2s ease-in-out infinite; }
+  }
+}

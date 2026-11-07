@@ -1,8 +1,10 @@
 import { Card, Skeleton } from "@/components/ui/primitives";
+import { BrandLoader } from "@/components/ui/module-states";
 
 export default function Loading() {
   return (
     <div aria-busy="true" className="space-y-6">
+      <BrandLoader />
       <div className="space-y-2">
         <Skeleton className="h-7 w-56" />
         <Skeleton className="h-4 w-80 max-w-full" />

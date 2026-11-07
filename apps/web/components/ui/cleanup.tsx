@@ -93,6 +93,7 @@ export function CleanupBar({
   deleteMode = false,
   busy = false,
   extra,
+  allConfirmKey,
 }: {
   count: number;
   selection: ReturnType<typeof useSelection>;
@@ -104,6 +105,8 @@ export function CleanupBar({
   deleteMode?: boolean;
   busy?: boolean;
   extra?: ReactNode;
+  /** (optional) the i18n key of the "delete all {n}?" confirmation, when the items are not notifications */
+  allConfirmKey?: string;
 }) {
   const { t } = useI18n();
   const [confirmAll, setConfirmAll] = useState(false);
@@ -149,7 +152,7 @@ export function CleanupBar({
                   }}
                   data-testid="cleanup-clear-confirm"
                 >
-                  <Eraser className="h-3.5 w-3.5" /> {t(deleteMode ? "cleanup.deleteAllConfirm" : "cleanup.clearAllConfirm", { n: count })}
+                  <Eraser className="h-3.5 w-3.5" /> {t(deleteMode ? (allConfirmKey ?? "cleanup.deleteAllConfirm") : "cleanup.clearAllConfirm", { n: count })}
                 </button>
                 <button type="button" className={chip} onClick={() => setConfirmAll(false)} aria-label={t("common.cancel")}>
                   <X className="h-3.5 w-3.5" />

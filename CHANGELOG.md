@@ -1,5 +1,22 @@
 # Changelog
 
+## Design 3.0: navigation progress, brand loaders, phone finish, task history delete
+
+- **Delete old tasks in every stage** (`ai-team/history-actions.ts`, managers only — `ai.manage`):
+  - Delete one task (two-step button), select and delete several, or delete a whole stage. This works for done / failed / canceled, waiting, blocked, and waiting for an answer or approval.
+  - "Clear history (30+ days)" deletes the finished tasks older than 30 days.
+  - A task that is running now is never deleted, and goals are not deleted from here.
+  - Every delete is scoped to the business and audited. People without "manage" keep the per-user "hide from view", as before.
+- **The board on a phone:** the stages sit side by side and swipe, with stage chips (dot, name, count) that slide to a stage. The board opens on the first stage that has tasks. Each empty stage shows "no tasks here". From tablets up the grid is as before.
+- **Navigation progress:** a brand-gradient bar at the top from the tap on a link until the next screen arrives. It finishes and fades out, and never sticks (12s safety).
+- **Brand loader:** a turning gradient ring with a glowing core on every loading screen. Skeleton shimmer is now brand-tinted.
+- **Finish:**
+  - A fine brand-gradient edge on top of every card (a background layer, no layout shift).
+  - A glowing pill and an indicator line on the active phone tab.
+  - Stage dots on the team board (the running one beats), and a calm hover lift for task cards.
+  - The help button is a compact round icon on phones, so it no longer covers content.
+- Everything is CSS / additive components: transform and opacity only, layered, off for "reduce motion" and on print. No migration.
+
 ## Enterprise round: sales psychology engine, fast context cache, resilient database calls, live campaign progress
 
 - **Sales psychology engine** (`lib/ai/sales-psychology-core.ts`, pure, no AI call, under 1ms), added to the conversation agent's brief. Nothing existing was changed.

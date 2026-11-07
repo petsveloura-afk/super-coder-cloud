@@ -13,6 +13,7 @@ import { cn, initials } from "@/lib/utils";
 import { BrandLockup, BrandMark } from "./brand";
 import { NAV_ICONS } from "./nav-icons";
 import { LinkPending } from "./link-pending";
+import { NavProgress } from "./nav-progress";
 import { LanguageSwitcher, ThemeToggle } from "./locale-theme";
 import { InstallAppButton, InstallAppMenuItem } from "./install-app";
 import { Dialog } from "@/components/ui/dialog";
@@ -549,6 +550,8 @@ function AppShellInner(props: ShellProps) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar */}
+        {/* design 3.0: a brand progress bar at the top while the next screen loads */}
+        <NavProgress />
         <header className="glass sticky top-0 z-30 border-b border-line pt-safe">
           <div className="flex h-14 items-center gap-2 px-4 sm:h-16 sm:px-6">
             <div className="flex min-w-0 items-center gap-2 lg:hidden">

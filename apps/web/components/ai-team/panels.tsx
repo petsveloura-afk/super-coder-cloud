@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertOctagon, Check, CheckCheck, CircleHelp, Lightbulb, ListChecks, Play, Plus, Search, Send, ShieldAlert, Sparkles, Target, X } from "lucide-react";
+import { AlertOctagon, Check, CheckCheck, CircleHelp, Lightbulb, ListChecks, Play, Plus, Search, Send, ShieldAlert, Sparkles, Target, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea } from 
 import { AgentAvatar } from "./avatar";
 import { ThinkingDots, TeamAgentLoader, type TeamPhase } from "./team-agent-loader";
 import { startTaskAction, taskProgressAction } from "@/app/[locale]/(dashboard)/ai-team/run-actions";
+import { clearTaskHistoryAction, deleteTeamTasksAction } from "@/app/[locale]/(dashboard)/ai-team/history-actions";
 import { flowStep, FLOW_POLL_MS, FLOW_MAX_MS, FLOW_RETRY_WAIT_MS } from "@/lib/team/run-flow-core";
 import { ownerFailure } from "@/lib/team/failure-reason-core";
 import { CleanupBar, SelectTick, useCleanup, useSelection } from "@/components/ui/cleanup";
@@ -364,6 +365,8 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
         onRun={(id) => void runTaskFlow(id)}
         onCancel={(id) => run(`x${id}`, () => cancelTaskAction({ locale, taskId: id }))}
         onRetry={(id) => void runTaskFlow(id)}
+        onDelete={(ids) => run(ids.length === 1 ? `d${ids[0]}` : "del", () => deleteTeamTasksAction({ locale, ids }))}
+        onClearHistory={() => run("del", () => clearTaskHistoryAction({ locale, olderThanDays: 30 }))}
       />
 
       <Card className="p-4">
@@ -414,113 +417,264 @@ const COLUMNS: { key: string; statuses: string[] }[] = [
   { key: "done", statuses: ["done", "failed", "canceled"] },
 ];
 
-function TaskBoard({ data, busy, onRun, onCancel, onRetry }: { data: TeamPageData; busy: string | null; onRun: (id: string) => void; onCancel: (id: string) => void; onRetry?: (id: string) => void }) {
-  const { t, locale } = useI18n();
+// the board's columns. Every column but "running" can be cleaned: managers DELETE for real (any stage), other people
+// hide finished tasks from their own view (as before — nothing is deleted for them)
+function TaskBoard({ data, busy, onRun, onCancel, onRetry, onDelete, onClearHistory }: { data: TeamPageData; busy: string | null; onRun: (id: string) => void; onCancel: (id: string) => void; onRetry?: (id: string) => void; onDelete?: (ids: string[]) => void; onClearHistory?: () => void }) {
+  const { t } = useI18n();
   const tasks = data.tasks.filter((x) => !(x.plan as { goal?: boolean })?.goal && x.status !== "draft");
-  // keep it clean (additive): finished tasks can be hidden per user (select / select all / clear all) — nothing is deleted
+  // keep it clean (additive): finished tasks can be hidden per user (select / select all / clear all)
   const clean = useCleanup(`scc_clean_done_${data.orgId}`);
   const doneAt = (x: TeamTaskView) => Date.parse(x.finished_at ?? x.created_at);
   const doneShown = tasks.filter((x) => COLUMNS[3]!.statuses.includes(x.status) && clean.visible({ id: x.id, at: doneAt(x) }));
-  const selection = useSelection(doneShown.slice(0, 25).map((x) => x.id));
+  const canDelete = Boolean(data.canManage && onDelete);
+  const counts = COLUMNS.map((c) => (c.key === "done" ? doneShown.length : tasks.filter((x) => c.statuses.includes(x.status)).length));
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  // a phone chip slides only the board sideways (never the page)
+  const goTo = (key: string, smooth = true) => {
+    const box = boardRef.current;
+    const col = box?.querySelector(`[data-testid="board-col-${key}"]`) as HTMLElement | null;
+    if (!col || !box) return;
+    const delta = col.getBoundingClientRect().left - box.getBoundingClientRect().left - 4;
+    box.scrollBy({ left: delta, behavior: smooth ? "smooth" : "auto" });
+  };
+  // on a phone the board opens on the first stage that has tasks (not on an empty "waiting" column)
+  const firstFull = COLUMNS[counts.findIndex((n) => n > 0)]?.key ?? null;
+  useEffect(() => {
+    if (!firstFull || window.innerWidth >= 768) return;
+    const box = boardRef.current;
+    const col = box?.querySelector(`[data-testid="board-col-${firstFull}"]`) as HTMLElement | null;
+    if (box && col) box.scrollBy({ left: col.getBoundingClientRect().left - box.getBoundingClientRect().left - 4 });
+  }, [firstFull]);
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" data-testid="task-board">
-      {COLUMNS.map((c) => {
-        const isDone = c.key === "done";
-        const list = (isDone ? doneShown : tasks.filter((x) => c.statuses.includes(x.status))).slice(0, 25);
-        return (
-          <section key={c.key} className="rounded-3xl border border-line bg-surface/60 p-3">
-            <h3 className="mb-2 flex items-center justify-between text-[13px] font-semibold">
-              {t(`aiTeam.board.${c.key}`)} <Badge tone="neutral">{list.length}</Badge>
-            </h3>
-            {isDone ? (
-              <CleanupBar
-                count={list.length}
-                selection={selection}
-                hiddenActive={clean.active}
-                onHideSelected={(ids) => clean.hide(ids)}
-                onClearAll={() => clean.clearAll(Math.max(...doneShown.map(doneAt)))}
-                onRestore={clean.restore}
-              />
-            ) : null}
-            <ul className="space-y-2">
-              {list.map((x) => {
-                const m = memberOf(data.members, x.assignee_id);
-                const report = String((x.result as { report?: string })?.report ?? "");
-                return (
-                  <li key={x.id} className="feed-in rounded-2xl border border-line bg-surface p-2.5 text-[12.5px]">
-                    <div className="flex items-start gap-2">
-                      {isDone && selection.on ? <SelectTick checked={selection.isSelected(x.id)} onChange={() => selection.toggle(x.id)} label={x.title} /> : null}
-                      {m ? <AgentAvatar spec={m.avatar} state={x.status === "in_progress" ? "working" : x.status.startsWith("awaiting") ? "waiting" : x.status === "done" ? "success" : x.status === "failed" ? "error" : "idle"} size={28} /> : null}
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium">{x.title}</p>
-                        <p className="text-[11px] text-subtle">
-                          {m?.name ?? "—"} · {t(`aiTeam.status.${x.status}`)} · {ago(x.created_at, locale)}
-                          {x.depends_on.length ? ` · 🔗 ${x.depends_on.length}` : ""}
-                        </p>
-                        {report ? <p className="mt-1 line-clamp-3 text-[11.5px] text-muted">{report}</p> : null}
-                        {x.status === "in_progress" ? <ThinkingDots label={t("aiTeam.loader.thinking", { name: m?.name ?? "" })} /> : null}
-                        {(x.result as { partial?: boolean })?.partial ? (
-                          // upgrade 9: honest completion — asked for a result that was not fully produced
-                          <span className="mt-1 inline-block rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-warning" data-testid="task-partial">{t("aiTeam.board.partial")}</span>
-                        ) : null}
-                        {Number((x.result as { drafts?: number })?.drafts ?? 0) > 0 ? (
-                          <a href={`/${locale}/social`} className="mt-1 ms-1 inline-block rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent hover:underline" data-testid="task-drafts">
-                            {t("aiTeam.board.drafts", { n: Number((x.result as { drafts?: number }).drafts) })}
-                          </a>
-                        ) : null}
-                      </div>
-                    </div>
-                    {x.status === "failed" || (x.status === "blocked" && x.error) ? (
-                      // transparency (additive): WHY it stopped, whether it retries by itself, and "try again now"
-                      <div className="mt-1.5 rounded-xl bg-surface-hover/60 p-2 text-[11.5px]" data-testid="task-failure">
-                        {x.status === "blocked" && x.error === "dependency_failed" ? (
-                          <p className="text-muted">{t("aiTeam.board.waitingDep")}</p>
-                        ) : x.status === "blocked" && x.error === "daily_credit_cap" ? (
-                          // credit cap transparency: waiting for credits, resumes by itself — and how to raise the cap
-                          <p className="text-muted" data-testid="task-cap">{t("aiTeam.board.waitingCap", { used: data.dayCredits, cap: data.dayCap ?? data.settings.daily_credit_cap })}</p>
-                        ) : (
-                          (() => {
-                            const f = ownerFailure(x.error, locale === "en" || locale === "ar" ? locale : "he");
-                            const auto = x.status === "failed" && f.retryable && (f.code === "ai_busy" || f.code === "network" || f.code === "ai_unreadable") && (x.attempts ?? 0) < 10;
-                            return (
-                              <>
-                                <p className="text-muted">{f.text}</p>
-                                {auto ? <p className="mt-0.5 font-medium text-accent">{t("aiTeam.board.autoRetry")}</p> : null}
-                              </>
-                            );
-                          })()
-                        )}
-                        {x.status === "failed" && onRetry ? (
-                          <Button size="sm" variant="secondary" className="mt-1.5" loading={busy === `r${x.id}`} onClick={() => onRetry(x.id)} data-testid="task-retry">
-                            <Play className="h-3.5 w-3.5" /> {t("aiTeam.board.retryNow")}
-                          </Button>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    {x.status === "pending" || x.status === "blocked" ? (
-                      <div className="mt-1.5 flex gap-1">
-                        {x.status === "pending" ? (
-                          <Button size="sm" variant="secondary" loading={busy === `r${x.id}`} onClick={() => onRun(x.id)}>
-                            <Play className="h-3.5 w-3.5" /> {t("aiTeam.task.runNow")}
-                          </Button>
-                        ) : null}
-                        <Button size="sm" variant="ghost" onClick={() => onCancel(x.id)}>
-                          {t("common.cancel")}
-                        </Button>
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        );
-      })}
+    <div>
+      {/* phone: the stages as chips — a tap slides the board to that stage */}
+      <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1 md:hidden" data-testid="board-chips">
+        {COLUMNS.map((c, i) => (
+          <button key={c.key} type="button" onClick={() => goTo(c.key)} className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[12px] font-medium text-muted transition hover:text-fg" data-testid={`board-chip-${c.key}`}>
+            <span className={cn("board-dot", `board-dot-${c.key}`)} aria-hidden />
+            {t(`aiTeam.board.${c.key}`)}
+            <span className="tabular-nums text-subtle">{counts[i]}</span>
+          </button>
+        ))}
+      </div>
+      {/* on a phone the stages sit side by side and swipe (the next stage peeks in); from tablets up — the grid as before */}
+      <div ref={boardRef} className="board-scroll -mx-1 flex items-start snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 md:mx-0 md:grid md:grid-cols-2 md:items-stretch md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-4" data-testid="task-board">
+        {COLUMNS.map((c) => {
+          const isDone = c.key === "done";
+          const list = (isDone ? doneShown : tasks.filter((x) => c.statuses.includes(x.status))).slice(0, 25);
+          return (
+            <BoardColumn
+              key={c.key}
+              colKey={c.key}
+              list={list}
+              data={data}
+              busy={busy}
+              canDelete={canDelete}
+              onRun={onRun}
+              onCancel={onCancel}
+              onRetry={onRetry}
+              onDelete={(ids) => onDelete?.(ids)}
+              onClearHistory={onClearHistory}
+              hide={isDone && !canDelete ? { active: clean.active, hide: clean.hide, clearAll: () => clean.clearAll(Math.max(...doneShown.map(doneAt))), restore: clean.restore } : null}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-/* ================================================================== approvals */
+function BoardColumn({
+  colKey,
+  list,
+  data,
+  busy,
+  canDelete,
+  onRun,
+  onCancel,
+  onRetry,
+  onDelete,
+  onClearHistory,
+  hide,
+}: {
+  colKey: string;
+  list: TeamTaskView[];
+  data: TeamPageData;
+  busy: string | null;
+  canDelete: boolean;
+  onRun: (id: string) => void;
+  onCancel: (id: string) => void;
+  onRetry?: (id: string) => void;
+  onDelete: (ids: string[]) => void;
+  onClearHistory?: () => void;
+  hide: { active: boolean; hide: (ids: string[]) => void; clearAll: () => void; restore: () => void } | null;
+}) {
+  const { t, locale } = useI18n();
+  const isDone = colKey === "done";
+  const selectable = colKey !== "in_progress" && (canDelete || Boolean(hide));
+  const selection = useSelection(selectable ? list.map((x) => x.id) : []);
+  return (
+    <section className="board-col w-[86%] shrink-0 snap-start rounded-3xl border border-line bg-surface/60 p-3 md:w-auto md:shrink" data-testid={`board-col-${colKey}`}>
+      <h3 className="mb-2 flex items-center justify-between text-[13px] font-semibold">
+        <span className="flex items-center gap-2">
+          <span className={cn("board-dot", `board-dot-${colKey}`)} aria-hidden />
+          {t(`aiTeam.board.${colKey}`)}
+        </span>
+        <Badge tone="neutral">{list.length}</Badge>
+      </h3>
+      {selectable && list.length ? (
+        canDelete ? (
+          <CleanupBar
+            count={list.length}
+            selection={selection}
+            deleteMode
+            busy={busy === "del"}
+            allConfirmKey="aiTeam.history.deleteAllConfirm"
+            onHideSelected={(ids) => onDelete(ids)}
+            onClearAll={() => onDelete(list.map((x) => x.id))}
+            extra={isDone && onClearHistory ? <ClearOldHistory busy={busy === "del"} onConfirm={onClearHistory} /> : null}
+          />
+        ) : hide ? (
+          <CleanupBar count={list.length} selection={selection} hiddenActive={hide.active} onHideSelected={(ids) => hide.hide(ids)} onClearAll={hide.clearAll} onRestore={hide.restore} />
+        ) : null
+      ) : hide?.active ? (
+        <CleanupBar count={0} selection={selection} hiddenActive onHideSelected={() => undefined} onClearAll={() => undefined} onRestore={hide.restore} />
+      ) : null}
+      {list.length ? (
+        <ul className="space-y-2">
+          {list.map((x) => {
+            const m = memberOf(data.members, x.assignee_id);
+            const report = String((x.result as { report?: string })?.report ?? "");
+            return (
+            <li key={x.id} className="feed-in task-card rounded-2xl border border-line bg-surface p-2.5 text-[12.5px]" data-testid="task-card">
+              <div className="flex items-start gap-2">
+                {selection.on ? <SelectTick checked={selection.isSelected(x.id)} onChange={() => selection.toggle(x.id)} label={x.title} /> : null}
+                {m ? <AgentAvatar spec={m.avatar} state={x.status === "in_progress" ? "working" : x.status.startsWith("awaiting") ? "waiting" : x.status === "done" ? "success" : x.status === "failed" ? "error" : "idle"} size={28} /> : null}
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{x.title}</p>
+                  <p className="text-[11px] text-subtle">
+                    {m?.name ?? "—"} · {t(`aiTeam.status.${x.status}`)} · {ago(x.created_at, locale)}
+                    {x.depends_on.length ? ` · 🔗 ${x.depends_on.length}` : ""}
+                  </p>
+                  {report ? <p className="mt-1 line-clamp-3 text-[11.5px] text-muted">{report}</p> : null}
+                  {x.status === "in_progress" ? <ThinkingDots label={t("aiTeam.loader.thinking", { name: m?.name ?? "" })} /> : null}
+                  {(x.result as { partial?: boolean })?.partial ? (
+                    // upgrade 9: honest completion — asked for a result that was not fully produced
+                    <span className="mt-1 inline-block rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-warning" data-testid="task-partial">{t("aiTeam.board.partial")}</span>
+                  ) : null}
+                  {Number((x.result as { drafts?: number })?.drafts ?? 0) > 0 ? (
+                    <a href={`/${locale}/social`} className="mt-1 ms-1 inline-block rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent hover:underline" data-testid="task-drafts">
+                      {t("aiTeam.board.drafts", { n: Number((x.result as { drafts?: number }).drafts) })}
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+              {x.status === "failed" || (x.status === "blocked" && x.error) ? (
+                // transparency (additive): WHY it stopped, whether it retries by itself, and "try again now"
+                <div className="mt-1.5 rounded-xl bg-surface-hover/60 p-2 text-[11.5px]" data-testid="task-failure">
+                  {x.status === "blocked" && x.error === "dependency_failed" ? (
+                    <p className="text-muted">{t("aiTeam.board.waitingDep")}</p>
+                  ) : x.status === "blocked" && x.error === "daily_credit_cap" ? (
+                    // credit cap transparency: waiting for credits, resumes by itself — and how to raise the cap
+                    <p className="text-muted" data-testid="task-cap">{t("aiTeam.board.waitingCap", { used: data.dayCredits, cap: data.dayCap ?? data.settings.daily_credit_cap })}</p>
+                  ) : (
+                    (() => {
+                      const f = ownerFailure(x.error, locale === "en" || locale === "ar" ? locale : "he");
+                      const auto = x.status === "failed" && f.retryable && (f.code === "ai_busy" || f.code === "network" || f.code === "ai_unreadable") && (x.attempts ?? 0) < 10;
+                      return (
+                        <>
+                          <p className="text-muted">{f.text}</p>
+                          {auto ? <p className="mt-0.5 font-medium text-accent">{t("aiTeam.board.autoRetry")}</p> : null}
+                        </>
+                      );
+                    })()
+                  )}
+                  {x.status === "failed" && onRetry ? (
+                    <Button size="sm" variant="secondary" className="mt-1.5" loading={busy === `r${x.id}`} onClick={() => onRetry(x.id)} data-testid="task-retry">
+                      <Play className="h-3.5 w-3.5" /> {t("aiTeam.board.retryNow")}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+              {x.status === "pending" || x.status === "blocked" ? (
+                <div className="mt-1.5 flex gap-1">
+                  {x.status === "pending" ? (
+                    <Button size="sm" variant="secondary" loading={busy === `r${x.id}`} onClick={() => onRun(x.id)}>
+                      <Play className="h-3.5 w-3.5" /> {t("aiTeam.task.runNow")}
+                    </Button>
+                  ) : null}
+                  <Button size="sm" variant="ghost" onClick={() => onCancel(x.id)}>
+                    {t("common.cancel")}
+                  </Button>
+                </div>
+              ) : null}
+              {canDelete && x.status !== "in_progress" && !selection.on ? <DeleteTaskButton busy={busy === `d${x.id}`} onConfirm={() => onDelete([x.id])} /> : null}
+            </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="board-empty rounded-2xl border border-dashed border-line px-3 py-6 text-center text-[12px] text-subtle" data-testid={`board-empty-${colKey}`}>
+          {t("aiTeam.history.empty")}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** delete every finished task older than 30 days (a two-step button, no browser dialog) */
+function ClearOldHistory({ busy, onConfirm }: { busy: boolean; onConfirm: () => void }) {
+  const { t } = useI18n();
+  const [ask, setAsk] = useState(false);
+  useEffect(() => {
+    if (!ask) return;
+    const id = setTimeout(() => setAsk(false), 4000);
+    return () => clearTimeout(id);
+  }, [ask]);
+  return ask ? (
+    <button
+      type="button"
+      disabled={busy}
+      className="inline-flex h-8 items-center gap-1.5 rounded-full border border-danger/40 px-3 text-[12px] font-medium text-danger transition hover:bg-danger-soft disabled:opacity-50"
+      onClick={() => {
+        setAsk(false);
+        onConfirm();
+      }}
+      data-testid="history-clear-confirm"
+    >
+      <Trash2 className="h-3.5 w-3.5" /> {t("aiTeam.history.clearOldConfirm")}
+    </button>
+  ) : (
+    <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line px-3 text-[12px] font-medium text-muted transition hover:bg-surface-hover hover:text-fg" onClick={() => setAsk(true)} data-testid="history-clear">
+      <Trash2 className="h-3.5 w-3.5" /> {t("aiTeam.history.clearOld")}
+    </button>
+  );
+}
+
+/** delete one task — a two-step button (no browser dialogs): trash → "delete?" → deleted */
+function DeleteTaskButton({ busy, onConfirm }: { busy: boolean; onConfirm: () => void }) {
+  const { t } = useI18n();
+  const [ask, setAsk] = useState(false);
+  useEffect(() => {
+    if (!ask) return;
+    const id = setTimeout(() => setAsk(false), 4000);
+    return () => clearTimeout(id);
+  }, [ask]);
+  return (
+    <div className="mt-1.5 flex justify-end">
+      {ask ? (
+        <Button size="sm" variant="danger" loading={busy} onClick={onConfirm} data-testid="task-delete-confirm">
+          <Trash2 className="h-3.5 w-3.5" /> {t("aiTeam.history.confirmOne")}
+        </Button>
+      ) : (
+        <button type="button" className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] text-subtle transition hover:bg-danger-soft hover:text-danger" onClick={() => setAsk(true)} aria-label={t("aiTeam.history.deleteOne")} data-testid="task-delete">
+          <Trash2 className="h-3.5 w-3.5" /> {t("aiTeam.history.deleteOne")}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function ApprovalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh: () => void }) {
   const { t, locale } = useI18n();
   const [edits, setEdits] = useState<Record<string, string>>({});

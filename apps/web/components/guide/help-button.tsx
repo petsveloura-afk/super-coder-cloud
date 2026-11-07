@@ -26,10 +26,11 @@ export function GuideHelpButton() {
       data-step={step ?? ""}
       aria-label={t("guide.help")}
       title={t("guide.help")}
-      className={`fixed end-4 z-30 inline-flex h-11 items-center gap-1.5 rounded-full border border-line bg-surface/95 pe-4 ps-3 text-[13px] font-semibold text-fg shadow-lg backdrop-blur transition hover:-translate-y-0.5 hover:border-accent hover:text-accent ${raised ? "bottom-[calc(9.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-24" : "bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] lg:bottom-6"}`}
+      className={`help-fab fixed end-3 z-30 inline-flex h-11 w-11 items-center justify-center gap-1.5 rounded-full border border-line bg-surface/95 text-[13px] sm:end-4 sm:w-auto sm:justify-start sm:pe-4 sm:ps-3 font-semibold text-fg shadow-lg backdrop-blur transition hover:-translate-y-0.5 hover:border-accent hover:text-accent ${raised ? "bottom-[calc(9.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-24" : "bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] lg:bottom-6"}`}
     >
       <CircleHelp className="h-[18px] w-[18px] text-accent" aria-hidden />
-      <span>{t("guide.helpShort")}</span>
+      {/* on a phone the button is a compact round icon, so it never covers the content under it */}
+      <span className="hidden sm:inline">{t("guide.helpShort")}</span>
     </Link>
   );
 }

@@ -6949,6 +6949,19 @@
     }
   },
   "aiTeam": {
+    "history": {
+      "empty": "No tasks here right now",
+      "deleteOne": "Delete",
+      "confirmOne": "Delete?",
+      "deleteAllConfirm": "Delete {n} tasks permanently? (click to confirm)",
+      "clearOld": "Clear history (30+ days)",
+      "clearOldConfirm": "Delete every task finished 30+ days ago?",
+      "deletedOne": "Task deleted",
+      "deleted": "{n} tasks deleted",
+      "deletedSkipped": "{n} tasks deleted ({running} running now were not — stop them first)",
+      "runningOnly": "A task that is running now cannot be deleted — stop it first",
+      "cleared": "History cleared — {n} tasks deleted"
+    },
     "err": {
       "approvalGone": "This approval was already handled or canceled",
       "executeFailed": "Approved, but running it failed: {detail}",
