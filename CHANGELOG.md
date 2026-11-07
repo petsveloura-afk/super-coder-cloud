@@ -1,5 +1,16 @@
 # Changelog
 
+## Digital team: no "busy" failures from short server calls, a paid account without credit stops wasting tries, and the "employee at work" animation
+
+- **Its own server call:** when the team clock has too little time left for a full run, it starts the task in its OWN server call (`/api/cron/team-task`, Bearer CRON_SECRET, ~52s). Before, the task started anyway and its second AI step got "engines busy" right after a successful plan.
+- **Back to the queue, not failed:** a run that ran out of server time (`time_budget`) goes straight back to the queue. It does not show as failed and does not wait out a retry pause.
+- **Paid account without credit:** OpenAI `insufficient_quota`, Anthropic "credit balance is too low" or HTTP 402 makes the key rest for 6 hours. Before, it was tried first on every call. Gemini per-minute limits are unchanged.
+- **"Employee at work" scene:** shown while a goal is planned or a task runs or retries from the screen. It reuses the site builder's loader style: a brain with orbiting work tools, a plan that ticks itself off, the stage and a progress bar. It celebrates when the work is done and says plainly when the task will retry.
+- **Running task cards** show "… is thinking" dots.
+- **Toast:** a run that will retry shows an information toast (not a green "success").
+- **Activity log:** the market-data safety preface is no longer shown in the log. The AI still receives it.
+- No migration.
+
 ## Digital team upgrade 9 — does what was asked, completely
 
 1. **Posts become drafts:** written posts are saved AS WRITTEN as drafts on the posts board (new tool `social.save_draft`), and a picture is added in the background. They never publish without the owner. Before, posts stayed inside a report.

@@ -1059,3 +1059,15 @@ main[data-shell] :is(a, button, [role="tab"], summary):focus-visible { outline: 
     .link-pending.is-pending { animation: none; }
   }
 }
+
+/* digital team (additive): "thinking…" dots on a task card while its employee works. transform / opacity only, layered */
+@layer components {
+  .team-dots { display: inline-flex; gap: 2px; }
+  .team-dots > span { width: 4px; height: 4px; border-radius: 9999px; background: currentColor; opacity: 0.35; }
+  @media (prefers-reduced-motion: no-preference) {
+    .team-dots > span { animation: team-dot 1.1s ease-in-out infinite backwards; }
+    .team-dots > span:nth-child(2) { animation-delay: 0.18s; }
+    .team-dots > span:nth-child(3) { animation-delay: 0.36s; }
+  }
+  @keyframes team-dot { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.15); } }
+}

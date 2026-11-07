@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { AgentAvatar } from "./avatar";
 import { restartTaskAction } from "@/app/[locale]/(dashboard)/ai-team/plus8-actions";
+import { ThinkingDots, TeamAgentLoader, type TeamPhase } from "./team-agent-loader";
 import { ownerFailure } from "@/lib/team/failure-reason-core";
 import { CleanupBar, SelectTick, useCleanup, useSelection } from "@/components/ui/cleanup";
 import { HealthPanel } from "./health-panel";
@@ -84,17 +85,30 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
     return () => clearInterval(id);
   }, [live, onRefresh]);
 
-  const run = async (k: string, fn: () => Promise<{ error?: string; message?: string; messageParams?: Record<string, string | number> }>) => {
+  // the "employee at work" scene (additive): shown while a goal is planned or a task runs / retries from this screen
+  const [loader, setLoader] = useState<{ phase: TeamPhase; mode: "goal" | "task"; name: string | null; message: string | null }>({ phase: "idle", mode: "task", name: null, message: null });
+  const run = async (k: string, fn: () => Promise<{ error?: string; message?: string; messageParams?: Record<string, string | number>; data?: unknown }>) => {
+    const scene = k === "plan" ? "goal" : /^[rt][0-9a-f-]{36}$/.test(k) ? "task" : null;
+    const who = scene === "task" ? memberOf(data.members, data.tasks.find((x) => x.id === k.slice(1))?.assignee_id ?? null)?.name ?? null : null;
+    // state is set BEFORE the async work so the scene shows at once
+    if (scene) setLoader({ phase: "working", mode: scene, name: who, message: null });
     setBusy(k);
-    const r = await fn();
+    const r = await fn().catch(() => ({ error: "common.error" }) as { error?: string; message?: string; messageParams?: Record<string, string | number>; data?: unknown });
     setBusy(null);
+    const failedRun = ["failed", "pending"].includes(String((r.data as { status?: string } | undefined)?.status ?? ""));
+    if (scene) {
+      setLoader({ phase: r.error || failedRun ? "error" : "done", mode: scene, name: who, message: r.error ? t(r.error, r.messageParams) : failedRun ? t("aiTeam.loader.retryBody") : null });
+      if (!r.error && !failedRun) window.setTimeout(() => setLoader((x) => (x.phase === "done" ? { ...x, phase: "idle" } : x)), 2200);
+    }
     if (r.error) toast.error(t(r.error, r.messageParams));
+    else if (failedRun) toast.info(t("aiTeam.loader.retryTitle"));
     else toast.success(t(r.message ?? "common.saved", r.messageParams));
     onRefresh();
   };
 
   return (
     <div className="space-y-4" data-testid="goals-panel">
+      <TeamAgentLoader phase={loader.phase} mode={loader.mode} name={loader.name} message={loader.message} onClose={() => setLoader((x) => ({ ...x, phase: "idle" }))} />
       <Card className="shine-border overflow-hidden">
         <div className="hero-mesh flex items-center gap-3 border-b border-line px-5 py-3">
           <Target className="h-5 w-5 text-accent" />
@@ -372,6 +386,7 @@ function TaskBoard({ data, busy, onRun, onCancel, onRetry }: { data: TeamPageDat
                           {x.depends_on.length ? ` · 🔗 ${x.depends_on.length}` : ""}
                         </p>
                         {report ? <p className="mt-1 line-clamp-3 text-[11.5px] text-muted">{report}</p> : null}
+                        {x.status === "in_progress" ? <ThinkingDots label={t("aiTeam.loader.thinking", { name: m?.name ?? "" })} /> : null}
                         {(x.result as { partial?: boolean })?.partial ? (
                           // upgrade 9: honest completion — asked for a result that was not fully produced
                           <span className="mt-1 inline-block rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-warning" data-testid="task-partial">{t("aiTeam.board.partial")}</span>

@@ -155,7 +155,8 @@ function teamAi(orgId: string, pref: RoutingPref, onRoute: (kind: TaskKind, chos
     // never waits past it. Before, a long run was cut off by the platform mid-task, the task looked "stuck" and after a few such
     // cuts ended as an "unexpected error". Now it ends cleanly as "busy" and is retried automatically.
     const left = deadlineAt ? deadlineAt - Date.now() : null;
-    if (left !== null && left < 9_000) return { ok: false, text: "", credits: 0, error: "ai.busy" };
+    // (a distinct reason: "time_budget" — the task goes back to the queue instead of failing; see runTask)
+    if (left !== null && left < 9_000) return { ok: false, text: "", credits: 0, error: "time_budget" };
     const [avail, overrides] = await Promise.all([availableModels(), routingOverrides()]);
     const route0 = await healthyRoute(routeFor(kind, avail, { pref, override: overrides[kind] }));
     // upgrade 8: engines that cannot help right now (no key, wrong kind of work, resting, over quota) are left out of THIS attempt
@@ -482,6 +483,12 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
   const status = out.status === "done" && out.handoffs.length ? "done" : out.status === "blocked" ? "blocked" : out.status;
   // upgrade 8: a task that only needs a connection is "requires_connection" (not "failed"); the failure kind is stored for the screen
   const fin = await import("./runner-plus8").then((m) => m.finishPatch(status, out.error)).catch(() => ({ status } as { status: string; failure_kind?: string }));
+  // stability (additive): the run simply ran out of server time before an AI step — not a failure. The task goes straight
+  // back to the queue (no "failed" on the board, no retry pause) and the next clock beat gives it a fresh, full run.
+  if (out.status === "failed" && out.error === "time_budget") {
+    fin.status = "pending";
+    delete fin.failure_kind;
+  }
   const writeFinal = (withKind: boolean) =>
     a
       .from("team_tasks")
@@ -517,6 +524,24 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
     }
   }
   return out;
+}
+
+/**
+ * Runs one task in its OWN server call (/api/cron/team-task, Bearer CRON_SECRET) so it gets a full time budget. The call is
+ * started and left running (the request is sent; we do not wait for the work). False when it cannot be started — then the
+ * caller runs the task itself as before.
+ */
+export async function dispatchTaskRun(orgId: string, taskId: string): Promise<boolean> {
+  const secret = process.env.CRON_SECRET;
+  const base = (process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")).replace(/\/$/, "");
+  if (!secret || !/^https:\/\//.test(base)) return false;
+  try {
+    await fetch(`${base}/api/cron/team-task`, { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: JSON.stringify({ org: orgId, task: taskId }), signal: AbortSignal.timeout(2_500), cache: "no-store" });
+    return true;
+  } catch (e) {
+    // a timeout means the request was sent and the work is running there — that is the point
+    return (e as Error)?.name === "TimeoutError" || (e as Error)?.name === "AbortError";
+  }
 }
 
 /* ------------------------------------------------------------------ goals (the manager plans) */
@@ -883,6 +908,12 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
     }
     const toRun = plus8 ? await plus8.orderForTick(orgId, ready as ((typeof ready)[number] & { assignee_id?: string | null })[], perTick, (xs) => prioritizeTasks(xs, { board: (tasks ?? []) as { id: string; status: string; depends_on: string[] }[] })) : ready.slice(0, perTick);
     for (const t of toRun) {
+      // stability (additive): not enough time left in THIS server call for a full run → the task gets its own call (a full
+      // ~50s), instead of starting now and being cut short (before: "AI engines busy" right after a successful plan)
+      if (started + budgetMs + 5_000 - Date.now() < 40_000 && (await dispatchTaskRun(orgId, t.id))) {
+        result.ran++;
+        continue;
+      }
       if (Date.now() - started > budgetMs - 15_000) break;
       // time guard: a task started by the clock must end before the clock's own time is up
       const r = await runTask(orgId, t.id, { interactive: false, actorUser: null, deadlineAt: Math.min(started + budgetMs + 5_000, Date.now() + 50_000) });

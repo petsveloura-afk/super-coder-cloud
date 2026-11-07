@@ -109,7 +109,7 @@ describe("time guard + many keys used well", () => {
   it("a task run has an end time; AI calls never start without time left and never wait past it", () => {
     const r = read("lib/team/runner.ts");
     expect(r).toContain("const deadlineAt = opts.deadlineAt ?? Date.now() + 50_000;");
-    expect(r).toContain('if (left !== null && left < 9_000) return { ok: false, text: "", credits: 0, error: "ai.busy" };');
+    expect(r).toContain('if (left !== null && left < 9_000) return { ok: false, text: "", credits: 0, error: "time_budget" };');
     expect(r).toContain("deadlineAt: Math.min(started + budgetMs + 5_000, Date.now() + 50_000)");
     const rs = read("lib/ai/run-system.ts");
     expect(rs).toContain("if (input.hardDeadlineAt && Date.now() + wait + 8_000 > input.hardDeadlineAt) throw e;");

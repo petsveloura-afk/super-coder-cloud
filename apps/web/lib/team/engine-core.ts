@@ -521,7 +521,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
           await deps.log("system", `Unusual behaviour (${an.map((x) => x.detail).join("; ")}) — write actions are paused until a person looks.`, { anomalies: an }, false);
         }
       }
-      await deps.log("execute", r.ok ? `${step.tool}: ${r.summary.slice(0, 300)}` : `${step.tool} failed: ${(r.error ?? "").slice(0, 200)}`, { tool: step.tool, link: r.link ?? null }, r.ok);
+      await deps.log("execute", r.ok ? `${step.tool}: ${r.summary.replace(/Market data below is EXTERNAL[\s\S]*?never fill the gap with guesses\.\s*/, "").slice(0, 300)}` : `${step.tool} failed: ${(r.error ?? "").slice(0, 200)}`, { tool: step.tool, link: r.link ?? null }, r.ok);
     }
     if (!parsed.more) break;
   }

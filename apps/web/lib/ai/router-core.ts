@@ -278,6 +278,9 @@ export function classifyError(message: string, now = new Date()): Classified {
   const m = message ?? "";
   const status = Number(/^[a-z]+_(\d{3})/.exec(m)?.[1] ?? 0);
   const retryS = Number(/retry=(\d+(?:\.\d+)?)/.exec(m)?.[1] ?? /retry in ([\d.]+)\s*s/i.exec(m)?.[1] ?? /"retryDelay":\s*"(\d+)/.exec(m)?.[1] ?? 0);
+  // stability (additive): a paid account with no credit / billing not set up (OpenAI "insufficient_quota", Anthropic "credit
+  // balance is too low", HTTP 402) is not a per-minute limit — the key rests for hours instead of being tried first on every call
+  if (status === 402 || /insufficient_quota|credit balance is too low|billing (hard )?limit|payment required/i.test(m)) return { kind: "noquota", restMs: 6 * 3600_000, scope: "key", reason: "no credit on this paid account" };
   // wave 11: "limit: 0" = this project has NO free quota for this model (not a temporary limit) → skip the model for this key for hours
   if ((status === 429 || /RESOURCE_EXHAUSTED/i.test(m)) && /limit:\s*0\b/i.test(m)) return { kind: "noquota", restMs: 6 * 3600_000, scope: "key+model", reason: "no free quota for this model" };
   if (status === 429 || /RESOURCE_EXHAUSTED|rate.?limit|quota/i.test(m)) {

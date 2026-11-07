@@ -7765,7 +7765,29 @@
       "settings": "Health and reliability"
     },
     "permissionNeeded": "{name} needs one more permission to finish a task — approve in one click",
-    "draftsReady": "{name} prepared {n} post drafts — waiting for your approval on the posts board"
+    "draftsReady": "{name} prepared {n} post drafts — waiting for your approval on the posts board",
+    "loader": {
+      "titleGoal": "The manager is building the team's plan",
+      "titleTask": "{name} is working on the task",
+      "doneTitle": "Done!",
+      "doneBody": "The result is on the task board.",
+      "retryTitle": "One moment — it will retry by itself",
+      "retryBody": "The AI engines are busy right now. The task is back in the queue and runs again automatically — nothing to do.",
+      "hint": "You can close this — the work continues in the background.",
+      "thinking": "{name} is thinking…",
+      "stage": {
+        "understand": "Understanding the task…",
+        "context": "Loading the business data and memory…",
+        "plan": "Building a work plan…",
+        "work": "Doing the steps…",
+        "selfcheck": "Checking the result…",
+        "deliver": "Preparing the output…",
+        "team": "Choosing the right employees…",
+        "split": "Breaking it into tasks…",
+        "order": "Setting the order and dependencies…",
+        "check": "Checking the plan…"
+      }
+    }
   },
   "aiQuality": {
     "feedback": {
