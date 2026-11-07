@@ -129,6 +129,8 @@ export function TeamScreen({ data }: { data: TeamPageData }) {
         })}
       </div>
 
+      {/* smooth tab change (additive): the new tab's content fades in — re-mounted per tab, opacity / transform only */}
+      <div key={tab} className="route-fade space-y-4" data-testid="team-tab-content">
       {tab === "team" ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -221,6 +223,7 @@ export function TeamScreen({ data }: { data: TeamPageData }) {
           <SkippedEnginesCard data={data} />
         </div>
       ) : null}
+      </div>
 
       <Dialog open={hireOpen} onOpenChange={setHireOpen} title={t("aiTeam.hire.title")} description={t("aiTeam.hire.body")} className="sm:max-w-4xl">
         <HireGallery roles={ROLE_KEYS} onPick={hire} />

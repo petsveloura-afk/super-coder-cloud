@@ -90,7 +90,7 @@ describe("never a silent failure on the board + a paid safety net", () => {
   it("failed tasks show why, whether they retry by themselves, and 'try again now'", () => {
     const p = read("components/ai-team/panels.tsx");
     expect(p).toContain('data-testid="task-failure"');
-    expect(p).toContain("const r = await restartTaskAction({ locale, id });");
+    expect(p).toContain("onRetry={(id) => void runTaskFlow(id)}"); // the retry restarts AND follows the task (run-actions startTaskAction)
     expect(p).toContain("ownerFailure(x.error,");
     expect(read("lib/team/page-data.ts")).toContain("updated_at, error, attempts");
     for (const l of ["he", "en", "ar"]) {

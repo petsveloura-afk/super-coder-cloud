@@ -64,6 +64,9 @@ export async function ai(org: Org, feature: "marketing" | "sales_manager" | "bri
     temperature: 0.5,
     maxTokens,
     patienceMs: 15_000,
+    // time guard (additive): a smart-team call never waits + retries past ~22s (the clock that runs these agents shares one
+    // server call with other work — a long busy-wait used to cut the whole round off)
+    hardDeadlineAt: Date.now() + 22_000,
   });
   return out.ok ? out.text.trim() : null;
 }

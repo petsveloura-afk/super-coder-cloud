@@ -383,7 +383,16 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
       if (fix.ok) parsedRaw = parsePlanModel(fix.text);
       await deps.log("system", parsedRaw ? "The first answer was unreadable — the second attempt worked." : "The first answer was unreadable and the second attempt failed too.", {}, !!parsedRaw);
     }
-    if (!parsedRaw) return fail("failed", "plan_unreadable", "The plan could not be read.");
+    if (!parsedRaw) {
+      // stability (additive): the AI answered, only not in the plan format — the work is NOT thrown away any more.
+      // Later rounds: continue with what is already done. First round: work directly on the task (write the result).
+      if (round > 0 && plan) {
+        await deps.log("system", "The next steps could not be read — continuing with what is already done.", {}, false);
+        break;
+      }
+      parsedRaw = { understanding: task.title, missing: [], question: null, assumptions: [], steps: [], more: false, deliverable: { type: wantsPosts(`${task.title} ${task.brief}`) ? "post" : "text", customer_facing: false, instructions: task.brief || task.title }, risks: [], estimate: { credits: 2, minutes: 1 } } as PlanModel;
+      await deps.log("system", "The plan format was not readable — working directly on the task instead.", {}, true);
+    }
     const parsed = parsedRaw;
     plan = parsed;
     out.plan = parsed;

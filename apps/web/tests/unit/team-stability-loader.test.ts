@@ -38,7 +38,7 @@ describe("the 'employee at work' animation", () => {
     expect(l).toContain('data-testid="team-agent-loader"');
     expect(l).toContain("sal-orbit");
     const p = read("components/ai-team/panels.tsx");
-    expect(p).toContain("<TeamAgentLoader phase={loader.phase}");
+    expect(p).toContain("<TeamAgentLoader\n        phase={loader.phase}");
     expect(p).toContain('{x.status === "in_progress" ? <ThinkingDots');
     expect(read("app/globals.css")).toContain("@keyframes team-dot");
     for (const lang of ["he", "en", "ar"]) {

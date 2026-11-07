@@ -165,7 +165,14 @@ function teamAi(orgId: string, pref: RoutingPref, onRoute: (kind: TaskKind, chos
     const { runAISystem } = await import("@/lib/ai/run-system");
     const plus8 = await import("./runner-plus8").catch(() => null);
     plus8?.markCallStart(first?.provider);
-    const res = await runAISystem({ orgId, feature: "copilot", system, messages: [{ role: "user", content: user }], temperature: kind === "classify" || kind === "review" || kind === "plan" ? 0.2 : 0.6, maxTokens, patienceMs: left !== null ? Math.max(8_000, Math.min(30_000, left - 6_000)) : 30_000, routeProvider: first?.provider ?? null, routeModel: first?.model ?? null, ...(deadlineAt ? { hardDeadlineAt: deadlineAt - 3_000 } : {}) });
+    let res = await runAISystem({ orgId, feature: "copilot", system, messages: [{ role: "user", content: user }], temperature: kind === "classify" || kind === "review" || kind === "plan" ? 0.2 : 0.6, maxTokens, patienceMs: left !== null ? Math.max(8_000, Math.min(30_000, left - 6_000)) : 30_000, routeProvider: first?.provider ?? null, routeModel: first?.model ?? null, ...(deadlineAt ? { hardDeadlineAt: deadlineAt - 3_000 } : {}) });
+    // stability (additive): busy on the first try → ONE more try a moment later, inside the same run, when there is time for it
+    // (most "busy" answers clear within seconds; before, the whole task failed and waited for the next retry round)
+    if (!res.ok && (res.error === "ai.busy" || res.error === "ai.failed") && (deadlineAt === undefined || deadlineAt - Date.now() > 24_000)) {
+      await new Promise((r) => setTimeout(r, 2_500));
+      const left2 = deadlineAt ? deadlineAt - Date.now() : null;
+      res = await runAISystem({ orgId, feature: "copilot", system, messages: [{ role: "user", content: user }], temperature: kind === "classify" || kind === "review" || kind === "plan" ? 0.2 : 0.6, maxTokens, patienceMs: left2 !== null ? Math.max(8_000, Math.min(25_000, left2 - 6_000)) : 25_000, routeProvider: null, routeModel: null, ...(deadlineAt ? { hardDeadlineAt: deadlineAt - 3_000 } : {}) });
+    }
     // upgrade 2: the circuit breaker learns from every call (a model that keeps failing is skipped for a while)
     // upgrade 8 (bug fix): a call that SUCCEEDED through a fallback no longer counts as a failure of the first engine
     // (it used to be written as "fallback_used" every time, which made every model look sick) — see stability-core.healthUpdates
@@ -512,7 +519,7 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
     delete fin.failure_kind;
     await writeFinal(false);
   }
-  if (claimed.goal_id) await refreshGoal(orgId, claimed.goal_id as string);
+  if (claimed.goal_id) await refreshGoal(orgId, claimed.goal_id as string, deadlineAt);
   // upgrade 9: new post drafts wait for the owner — the owners / admins get a notification (+ push) that points to the posts board
   if (out.drafts) {
     try {
@@ -610,7 +617,7 @@ export async function confirmGoal(orgId: string, goalId: string, actorUser: stri
 }
 
 /** the manager's executive summary of a finished goal: one prioritised answer instead of a list of task reports (best effort) */
-async function synthesizeGoal(orgId: string, managerId: string | null, title: string, rows: { title: string; status: string; result: { report?: string; output?: string } }[]): Promise<string | null> {
+async function synthesizeGoal(orgId: string, managerId: string | null, title: string, rows: { title: string; status: string; result: { report?: string; output?: string } }[], deadlineAt?: number): Promise<string | null> {
   const done = rows.filter((r) => r.status === "done");
   if (done.length < 2) return null;
   const settings = await loadSettings(orgId);
@@ -620,13 +627,13 @@ async function synthesizeGoal(orgId: string, managerId: string | null, title: st
   const system = [`You are ${(m?.name as string) ?? "the manager"}, the general manager of this business's AI team. Write for the business owner in the business's language.`, WORKING_DOCTRINE, expertisePrompt("manager"), SAFETY_RULES, `THE BUSINESS:\n${profilePrompt(profile)}`].join("\n\n");
   const material = done.map((r, i) => `${i + 1}. ${r.title}\n${asData("task result", String(r.result?.output ?? r.result?.report ?? "").slice(0, 2500), 2500)}`).join("\n\n");
   const user = [`GOAL: ${title.slice(0, 300)}`, "Your team finished its tasks. Their results:", material, "Now synthesise ONE executive summary for the owner. Combine the findings, resolve contradictions, rank what matters by impact and effort, and say what is still unknown.", REPORT_STANDARD, "Answer with the final text only."].join("\n\n");
-  const ai = teamAi(orgId, settings.routing_pref, () => undefined);
+  const ai = teamAi(orgId, settings.routing_pref, () => undefined, deadlineAt);
   const res = await ai("summarize", system, user, 2200);
   return res.ok && res.text.trim().length > 20 ? res.text.trim().slice(0, 8000) : null;
 }
 
 /** goal status from its tasks; when all are done the manager writes the summary report */
-async function refreshGoal(orgId: string, goalId: string) {
+async function refreshGoal(orgId: string, goalId: string, deadlineAt?: number) {
   const a = db();
   const { data: goal } = await a.from("team_tasks").select("id, title, status, assignee_id, result").eq("id", goalId).maybeSingle();
   if (!goal || !["in_progress", "blocked"].includes(goal.status as string)) return;
@@ -638,7 +645,8 @@ async function refreshGoal(orgId: string, goalId: string) {
   if (open.length) return;
   const failed = rows.filter((r) => r.status === "failed" || r.status === "blocked" || r.status === "requires_connection");
   const report = rows.map((r) => `${r.status === "done" ? "✅" : "⚠️"} ${r.title}: ${(r.result?.report ?? r.status).slice(0, 300)}`).join("\n");
-  const synthesis = await synthesizeGoal(orgId, goal.assignee_id as string | null, goal.title as string, rows).catch(() => null);
+  // time guard: the goal summary never pushes a run past its end time (no summary then — the report is still written)
+  const synthesis = deadlineAt && deadlineAt - Date.now() < 12_000 ? null : await synthesizeGoal(orgId, goal.assignee_id as string | null, goal.title as string, rows, deadlineAt).catch(() => null);
   await a.from("team_tasks").update({ status: failed.length === rows.length ? "failed" : "done", result: { ...((goal.result as Record<string, unknown>) ?? {}), report, ...(synthesis ? { summary: synthesis } : {}), done: rows.length - failed.length, failed: failed.length, outcome: failed.length === 0 ? "complete" : failed.length === rows.length ? "failed" : "partial" }, finished_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", goalId);
   await logActivity(orgId, goalId, goal.assignee_id as string, "learn", `Goal finished: ${rows.length - failed.length}/${rows.length} tasks done.`, { failed: failed.length });
 }
@@ -805,7 +813,7 @@ export async function teamStats(orgId: string): Promise<Record<string, MemberSta
   return out;
 }
 
-async function weeklyMeeting(orgId: string, tz: string) {
+async function weeklyMeeting(orgId: string, tz: string, deadlineAt?: number) {
   const a = db();
   const now = new Date();
   const local = new Date(now.toLocaleString("en-US", { timeZone: tz || "Asia/Jerusalem" }));
@@ -825,7 +833,8 @@ async function weeklyMeeting(orgId: string, tz: string) {
   ]);
   const facts = meetingFacts({ members: all.map((m) => ({ id: m.id, name: m.name, role: m.role_key })), stats, learnings: (learn ?? []) as { content: string; member_id: string | null; status: string }[], pendingApprovals: pending ?? 0, blocked: blocked ?? 0 });
   const settings = await loadSettings(orgId);
-  const ai = teamAi(orgId, settings.routing_pref, () => undefined);
+  // time guard: the meeting summary ends inside the clock's own time
+  const ai = teamAi(orgId, settings.routing_pref, () => undefined, deadlineAt);
   const { data: org } = await a.from("organizations").select("locale").eq("id", orgId).maybeSingle();
   const lang = org?.locale === "en" ? "English" : org?.locale === "ar" ? "Arabic" : "Hebrew";
   const res = await ai("summarize", [`You are ${manager.name}, the team's general manager.`, playbookPrompt("manager"), SAFETY_RULES].join("\n\n"), `Write the weekly team meeting summary for the owner in ${lang} (max 12 short lines): what was done, what we learned, what to change. Use ONLY these facts:\n${asData("week facts", JSON.stringify(facts), 3000)}`, 900);
@@ -921,7 +930,7 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
     }
     const s = await loadSettings(orgId);
     if (s.initiative && Date.now() - started < budgetMs - 10_000) await runInitiative(orgId, tz).catch(() => undefined);
-    if (Date.now() - started < budgetMs - 10_000) await weeklyMeeting(orgId, tz).catch(() => undefined);
+    if (Date.now() - started < budgetMs - 10_000) await weeklyMeeting(orgId, tz, started + budgetMs + 5_000).catch(() => undefined);
   }
   return result;
 }

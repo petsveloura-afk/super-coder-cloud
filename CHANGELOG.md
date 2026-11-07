@@ -1,5 +1,23 @@
 # Changelog
 
+## Digital team: "run now" / "try again" really run, follow and retry; nothing thrown away; transitions
+
+- **"Run now" / "Try again":** the button only STARTS the work, in its own server call (`startTaskAction` → `/api/cron/team-task`), and returns at once. Before, the whole task ran inside the click's 60s request: it was cut off, "something went wrong" appeared, and the task stayed "in progress".
+- **The scene follows the task live** (`taskProgressAction`, every 2.5s):
+  - it shows the employee's real latest step;
+  - it shows the real result (drafts / waiting for approval / a question);
+  - when the engines were busy, it starts the task again by itself, up to 2 more times ("trying again 2/3…");
+  - when there is a real reason (budget, rules, a failed earlier task), it says so plainly, with a "Try again" button.
+- **One more AI try inside the same run:** a busy first answer is retried after 2.5s, with a free engine choice, when there is time.
+- **An unreadable plan no longer fails the task:** the employee works directly on the task and writes the result. In later rounds, the work continues with what is already done.
+- **Time limits respected:**
+  - the goal summary and the weekly meeting stay inside the time limit of their run;
+  - smart-team AI calls never wait past ~22s.
+- **Animations:** the team screen's tabs fade in when switched.
+- **Activity log:** the new log lines are shown in the business language.
+- **CI / deploy:** Supabase CLI = the newest release (looked up with the run's token) with an automatic fallback to the known-good 2.122.1 — for installing, for the migrations and for the local CI database.
+- No migration.
+
 ## Digital team: no "busy" failures from short server calls, a paid account without credit stops wasting tries, and the "employee at work" animation
 
 - **Its own server call:** when the team clock has too little time left for a full run, it starts the task in its OWN server call (`/api/cron/team-task`, Bearer CRON_SECRET, ~52s). Before, the task started anyway and its second AI step got "engines busy" right after a successful plan.

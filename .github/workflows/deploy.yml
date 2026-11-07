@@ -41,16 +41,46 @@ jobs:
           fi
       - uses: actions/checkout@v4
         if: steps.cfg.outputs.skip == 'false'
-      - uses: supabase/setup-cli@v1
+      # Supabase CLI: the NEWEST release when GitHub answers (asked with this run's token → no anonymous rate limit),
+      # otherwise the known-good 2.122.1. If the newest one cannot be installed, the known-good one is installed instead.
+      - name: Choose the Supabase CLI version
+        id: cliver
         if: steps.cfg.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="$(gh api repos/supabase/cli/releases/latest --jq .tag_name 2>/dev/null | sed 's/^v//')" || true
+          if ! echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then v="2.122.1"; echo "::notice::Using the known-good Supabase CLI 2.122.1"; fi
+          echo "Supabase CLI $v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - uses: supabase/setup-cli@v1
+        id: clisetup
+        if: steps.cfg.outputs.skip == 'false'
+        continue-on-error: true
         with:
-          # pinned (no GitHub API lookup → no "rate limit exceeded" when GitHub throttles anonymous calls)
+          version: ${{ steps.cliver.outputs.version }}
+      - uses: supabase/setup-cli@v1
+        if: ${{ (steps.cfg.outputs.skip == 'false') && steps.clisetup.outcome == 'failure' }}
+        with:
           version: 2.122.1
       - name: Show migration status
         if: steps.cfg.outputs.skip == 'false'
+        # information only — never stops the migrations below
+        continue-on-error: true
         run: supabase migration list --db-url "$SUPABASE_DB_URL"
       - name: Apply migrations
+        id: apply
         if: steps.cfg.outputs.skip == 'false'
+        continue-on-error: true
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all --yes
+      # safety net: a NEWER CLI that could not apply the migrations → the known-good CLI applies them (db push only applies
+      # what is missing, so a second run never repeats anything). If this fails too, the job fails as before.
+      - uses: supabase/setup-cli@v1
+        if: ${{ steps.cfg.outputs.skip == 'false' && steps.apply.outcome == 'failure' && steps.cliver.outputs.version != '2.122.1' }}
+        with:
+          version: 2.122.1
+      - name: Apply migrations (known-good CLI)
+        if: ${{ steps.cfg.outputs.skip == 'false' && steps.apply.outcome == 'failure' }}
         run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all --yes
       # wave 44: starts the 30-second Facebook / Instagram message clock inside the database (Supabase pg_cron + pg_net),
       # so customers' messages are fetched and answered even when nobody is logged in. Safe to repeat on every deploy

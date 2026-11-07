@@ -7787,6 +7787,14 @@
         "order": "Setting the order and dependencies…",
         "check": "Checking the plan…"
       }
+    },
+    "run": {
+      "awaitingApproval": "Done — waiting for your approval in \"Approvals\".",
+      "awaitingInput": "The employee needs an answer from you to continue.",
+      "retrying": "The engines were busy — trying again ({n}/{max})…",
+      "background": "The work continues in the background — the result will appear on the task board.",
+      "waitingDependency": "This task waits for an earlier task that failed — run that one first.",
+      "budget": "The team reached its daily credit limit — raise it in the team settings."
     }
   },
   "aiQuality": {

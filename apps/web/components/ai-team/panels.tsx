@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertOctagon, Check, CheckCheck, CircleHelp, Lightbulb, ListChecks, Play, Plus, Search, Send, ShieldAlert, Sparkles, Target, X } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { AgentAvatar } from "./avatar";
-import { restartTaskAction } from "@/app/[locale]/(dashboard)/ai-team/plus8-actions";
 import { ThinkingDots, TeamAgentLoader, type TeamPhase } from "./team-agent-loader";
+import { startTaskAction, taskProgressAction } from "@/app/[locale]/(dashboard)/ai-team/run-actions";
+import { flowStep, FLOW_POLL_MS, FLOW_MAX_MS, FLOW_RETRY_WAIT_MS } from "@/lib/team/run-flow-core";
 import { ownerFailure } from "@/lib/team/failure-reason-core";
 import { CleanupBar, SelectTick, useCleanup, useSelection } from "@/components/ui/cleanup";
 import { HealthPanel } from "./health-panel";
@@ -27,7 +28,6 @@ import {
   emergencyStopAction,
   memoryAction,
   planGoalAction,
-  runTaskNowAction,
   saveRoutingAction,
   saveTeamSettingsAction,
   savePlaybookExtraAction,
@@ -106,9 +106,86 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
     onRefresh();
   };
 
+  // run / retry a task professionally: START it (its own server call), FOLLOW it live, and retry by itself when the engines were
+  // busy (up to 2 more times) — the scene always shows the real state, never "try again" while nothing happens
+  const flowRef = useRef(0);
+  const [flow, setFlow] = useState<{ live: string | null; note: string | null; taskId: string | null }>({ live: null, note: null, taskId: null });
+  const runTaskFlow = async (taskId: string) => {
+    const my = ++flowRef.current;
+    const alive = () => flowRef.current === my;
+    const who = memberOf(data.members, data.tasks.find((x) => x.id === taskId)?.assignee_id ?? null)?.name ?? null;
+    setLoader({ phase: "working", mode: "task", name: who, message: null });
+    setFlow({ live: null, note: null, taskId });
+    setBusy(`r${taskId}`);
+    let retries = 0;
+    try {
+      for (;;) {
+        const st = await startTaskAction({ locale, taskId }).catch(() => ({ error: "common.error" }) as { error?: string });
+        if (!alive()) return;
+        if (st.error) {
+          setLoader({ phase: "error", mode: "task", name: who, message: t(st.error) });
+          return;
+        }
+        const t0 = Date.now();
+        let next: "retry" | "stop" = "stop";
+        while (alive() && Date.now() - t0 < FLOW_MAX_MS) {
+          await new Promise((r) => window.setTimeout(r, FLOW_POLL_MS));
+          if (!alive()) return;
+          const p = await taskProgressAction({ locale, taskId }).catch(() => null);
+          if (!p || p.error || !p.data) continue;
+          const step = flowStep({ status: p.data.status, error: p.data.error, retries });
+          setFlow((f) => ({ ...f, live: p.data!.line }));
+          if (step.kind === "wait") continue;
+          if (step.kind === "done") {
+            const msg = p.data.drafts > 0 ? t("aiTeam.board.drafts", { n: p.data.drafts }) : p.data.partial ? t("aiTeam.board.partial") : p.data.status === "awaiting_approval" ? t("aiTeam.run.awaitingApproval") : p.data.status === "awaiting_input" ? t("aiTeam.run.awaitingInput") : null;
+            setLoader({ phase: "done", mode: "task", name: who, message: msg });
+            window.setTimeout(() => setLoader((x) => (x.phase === "done" ? { ...x, phase: "idle" } : x)), 2600);
+            return;
+          }
+          if (step.kind === "retry") {
+            retries++;
+            setFlow((f) => ({ ...f, note: t("aiTeam.run.retrying", { n: retries + 1, max: 3 }) }));
+            await new Promise((r) => window.setTimeout(r, FLOW_RETRY_WAIT_MS));
+            next = "retry";
+            break;
+          }
+          // stop: a real reason (budget, policy, a failed earlier task) — said plainly, with "try again"
+          setLoader({ phase: "error", mode: "task", name: who, message: ownerFailure(p.data.error, locale === "en" || locale === "ar" ? locale : "he").text });
+          return;
+        }
+        if (!alive()) return;
+        if (next === "retry") continue;
+        // still running after the follow window → it continues in the background (nothing is lost)
+        setLoader({ phase: "done", mode: "task", name: who, message: t("aiTeam.run.background") });
+        window.setTimeout(() => setLoader((x) => (x.phase === "done" ? { ...x, phase: "idle" } : x)), 3200);
+        return;
+      }
+    } finally {
+      if (alive()) {
+        setBusy(null);
+        setFlow((f) => ({ ...f, note: null }));
+      }
+      onRefresh();
+    }
+  };
+
   return (
     <div className="space-y-4" data-testid="goals-panel">
-      <TeamAgentLoader phase={loader.phase} mode={loader.mode} name={loader.name} message={loader.message} onClose={() => setLoader((x) => ({ ...x, phase: "idle" }))} />
+      <TeamAgentLoader
+        phase={loader.phase}
+        mode={loader.mode}
+        name={loader.name}
+        message={loader.message}
+        live={flow.live}
+        note={loader.phase === "working" ? flow.note : null}
+        onRetry={loader.mode === "task" && flow.taskId ? () => void runTaskFlow(flow.taskId!) : undefined}
+        onClose={() => {
+          // closing only hides the scene — the work continues on the server
+          flowRef.current++;
+          setBusy(null);
+          setLoader((x) => ({ ...x, phase: "idle" }));
+        }}
+      />
       <Card className="shine-border overflow-hidden">
         <div className="hero-mesh flex items-center gap-3 border-b border-line px-5 py-3">
           <Target className="h-5 w-5 text-accent" />
@@ -226,7 +303,7 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
                     <span className="font-semibold">{p.title}</span>
                     <span className="block text-[12px] text-muted">{p.brief}</span>
                   </span>
-                  <Button size="sm" loading={busy === `r${p.id}`} onClick={() => run(`r${p.id}`, () => runTaskNowAction({ locale, taskId: p.id }))}>
+                  <Button size="sm" loading={busy === `r${p.id}`} onClick={() => void runTaskFlow(p.id)}>
                     <Play className="h-3.5 w-3.5" /> {t("aiTeam.proposals.start")}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => run(`x${p.id}`, () => cancelTaskAction({ locale, taskId: p.id }))}>
@@ -282,16 +359,9 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
       <TaskBoard
         data={data}
         busy={busy}
-        onRun={(id) => run(`r${id}`, () => runTaskNowAction({ locale, taskId: id }))}
+        onRun={(id) => void runTaskFlow(id)}
         onCancel={(id) => run(`x${id}`, () => cancelTaskAction({ locale, taskId: id }))}
-        onRetry={(id) =>
-          run(`t${id}`, async () => {
-            // a failed task gets a fresh start (the existing restart) and runs right away
-            const r = await restartTaskAction({ locale, id });
-            if (r.error) return r;
-            return runTaskNowAction({ locale, taskId: id });
-          })
-        }
+        onRetry={(id) => void runTaskFlow(id)}
       />
 
       <Card className="p-4">
@@ -416,7 +486,7 @@ function TaskBoard({ data, busy, onRun, onCancel, onRetry }: { data: TeamPageDat
                           })()
                         )}
                         {x.status === "failed" && onRetry ? (
-                          <Button size="sm" variant="secondary" className="mt-1.5" loading={busy === `t${x.id}`} onClick={() => onRetry(x.id)} data-testid="task-retry">
+                          <Button size="sm" variant="secondary" className="mt-1.5" loading={busy === `r${x.id}`} onClick={() => onRetry(x.id)} data-testid="task-retry">
                             <Play className="h-3.5 w-3.5" /> {t("aiTeam.board.retryNow")}
                           </Button>
                         ) : null}

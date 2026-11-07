@@ -63,13 +63,41 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      # Supabase CLI: the NEWEST release when GitHub answers (asked with this run's token → no anonymous rate limit),
+      # otherwise the known-good 2.122.1. If the newest one cannot be installed, the known-good one is installed instead.
+      - name: Choose the Supabase CLI version
+        id: cliver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="$(gh api repos/supabase/cli/releases/latest --jq .tag_name 2>/dev/null | sed 's/^v//')" || true
+          if ! echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then v="2.122.1"; echo "::notice::Using the known-good Supabase CLI 2.122.1"; fi
+          echo "Supabase CLI $v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
       - uses: supabase/setup-cli@v1
+        id: clisetup
+        continue-on-error: true
         with:
-          # pinned (no GitHub API lookup → no "rate limit exceeded" when GitHub throttles anonymous calls)
+          version: ${{ steps.cliver.outputs.version }}
+      - uses: supabase/setup-cli@v1
+        if: ${{ steps.clisetup.outcome == 'failure' }}
+        with:
           version: 2.122.1
       - run: pnpm install --frozen-lockfile
       - name: Start Supabase (applies migrations + seed)
+        id: sbstart
+        continue-on-error: true
         run: supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor
+      # safety net: a NEWER CLI that could not start the local database → the known-good CLI starts it (fails as before if it cannot)
+      - uses: supabase/setup-cli@v1
+        if: ${{ steps.sbstart.outcome == 'failure' && steps.cliver.outputs.version != '2.122.1' }}
+        with:
+          version: 2.122.1
+      - name: Start Supabase (known-good CLI)
+        if: ${{ steps.sbstart.outcome == 'failure' }}
+        run: |
+          supabase stop --no-backup || true
+          supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor
       - name: Export local Supabase env
         run: |
           supabase status -o env > /tmp/sb.env

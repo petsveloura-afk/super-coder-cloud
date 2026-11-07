@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { RotateCcw, X } from "lucide-react";
+import { Button } from "@/components/ui/primitives";
 import { useI18n } from "@/lib/i18n/client";
 
 /**
@@ -16,7 +17,7 @@ export type TeamPhase = "idle" | "working" | "done" | "error";
 
 const ORBIT = ["📊", "🔎", "✍️", "✅", "📅", "💡"] as const;
 
-export function TeamAgentLoader({ phase, mode, name, message, onClose }: { phase: TeamPhase; mode: "goal" | "task"; name?: string | null; message?: string | null; onClose: () => void }) {
+export function TeamAgentLoader({ phase, mode, name, message, onClose, live, note, onRetry }: { phase: TeamPhase; mode: "goal" | "task"; name?: string | null; message?: string | null; onClose: () => void; /** the employee's latest real step (from the activity log) */ live?: string | null; /** e.g. "the engines were busy — trying again (2/3)" */ note?: string | null; onRetry?: () => void }) {
   const { t, dir } = useI18n();
   const stages = (mode === "goal" ? ["understand", "team", "split", "order", "check"] : ["understand", "context", "plan", "work", "selfcheck", "deliver"]).map((k) => t(`aiTeam.loader.stage.${k}`));
   const [stage, setStage] = useState(0);
@@ -81,6 +82,12 @@ export function TeamAgentLoader({ phase, mode, name, message, onClose }: { phase
           {phase === "error" ? (message ?? t("aiTeam.loader.retryBody")) : phase === "done" ? (message ?? t("aiTeam.loader.doneBody")) : stages[stage]}
         </p>
 
+        {phase === "working" && live ? (
+          <p className="mx-auto mt-2 max-w-xs truncate rounded-full bg-surface px-3 py-1 text-[11.5px] text-muted" data-testid="team-agent-loader-live" title={live}>
+            {live}
+          </p>
+        ) : null}
+        {note ? <p className="mt-2 text-[12px] font-medium text-warning" data-testid="team-agent-loader-note">{note}</p> : null}
         {phase !== "error" ? (
           // the plan ticking itself off
           <ul className="mx-auto mt-4 w-60 space-y-1.5 rounded-xl border border-line bg-surface p-2.5 text-start text-[12px]" aria-hidden>
@@ -96,6 +103,16 @@ export function TeamAgentLoader({ phase, mode, name, message, onClose }: { phase
         <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
           <div className="sal-bar h-full rounded-full bg-accent-solid transition-[width] duration-700" style={{ width: `${phase === "error" ? 100 : pct}%` }} />
         </div>
+        {phase === "error" && onRetry ? (
+          <div className="mt-4 flex justify-center gap-2">
+            <Button onClick={onRetry} data-testid="team-agent-loader-retry">
+              <RotateCcw className="h-4 w-4" /> {t("aiTeam.board.retryNow")}
+            </Button>
+            <Button variant="secondary" onClick={onClose}>
+              {t("common.close")}
+            </Button>
+          </div>
+        ) : null}
         {phase === "working" ? <p className="mt-3 text-[11.5px] text-subtle">{t("aiTeam.loader.hint")}</p> : null}
       </div>
     </div>,

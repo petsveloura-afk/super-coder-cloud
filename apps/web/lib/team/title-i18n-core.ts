@@ -65,6 +65,14 @@ export function localizeTitle(title: string, lang: Lang): string {
 
 type Rule = { re: RegExp; he: (m: RegExpMatchArray) => string; ar: (m: RegExpMatchArray) => string };
 const RULES: Rule[] = [
+  // upgrade 9 / stability (additive): the new log lines in the business language
+  { re: /^The plan format was not readable — working directly on the task instead\.?$/i, he: () => "פורמט התוכנית לא היה קריא — עובד/ת ישירות על המשימה.", ar: () => "تعذّرت قراءة صيغة الخطة — العمل مباشرة على المهمة." },
+  { re: /^The next steps could not be read — continuing with what is already done\.?$/i, he: () => "לא הצלחתי לקרוא את הצעדים הבאים — ממשיך/ה עם מה שכבר בוצע.", ar: () => "تعذّرت قراءة الخطوات التالية — المتابعة بما تم إنجازه." },
+  { re: /^Saved (\d+) post draft\(s\) on the posts board — waiting for the owner's approval there\.?$/i, he: (m) => `נשמרו ${m[1]} טיוטות פוסטים בלוח הפרסומים — מחכות לאישורך שם.`, ar: (m) => `تم حفظ ${m[1]} مسودات منشورات في لوحة المنشورات — بانتظار موافقتك هناك.` },
+  { re: /^The post drafts could not be saved\.?$/i, he: () => "לא הצלחתי לשמור את טיוטות הפוסטים.", ar: () => "تعذّر حفظ مسودات المنشورات." },
+  { re: /^Partially done: (.+?)\.?$/i, he: (m) => `הושלם חלקית: ${m[1]!.replace("no post drafts", "לא נוצרו טיוטות פוסטים").replace("stopped by limit", "נעצר בגלל מגבלה").replace("nothing produced", "לא נוצר תוצר")}.`, ar: (m) => `اكتمل جزئيًا: ${m[1]}.` },
+  { re: /^A limit stopped the work before the end — the rest continues automatically in a new run\.?$/i, he: () => "מגבלה עצרה את העבודה לפני הסוף — ההמשך ירוץ אוטומטית בריצה חדשה.", ar: () => "أوقف حدّ العمل قبل النهاية — يستمر الباقي تلقائيًا في تشغيل جديد." },
+  { re: /^The task asks for a result — the final output will be written\.?$/i, he: () => "המשימה מבקשת תוצר — התוצר הסופי ייכתב.", ar: () => "المهمة تطلب نتيجة — سيُكتب الناتج النهائي." },
   { re: /^Loaded the business profile, (\d+) memories and the (.+?) playbook\.?$/i, he: (m) => `נטענו פרופיל העסק, ${m[1]} זיכרונות ונוהל העבודה של "${m[2]!.replace(/_/g, " ")}".`, ar: (m) => `تم تحميل ملف النشاط و${m[1]} ذكريات ودليل عمل "${m[2]!.replace(/_/g, " ")}".` },
   { re: /^The plan could not be read\.?$/i, he: () => "לא הצלחתי לקרוא את התוכנית — ננסה שוב.", ar: () => "تعذّرت قراءة الخطة — ستتم إعادة المحاولة." },
   { re: /^Model fallback used (\d+)×(.*)$/i, he: (m) => `הופעל מנוע חלופי ${m[1]} פעמים${m[2] ?? ""}`, ar: (m) => `تم استخدام محرّك بديل ${m[1]} مرات${m[2] ?? ""}` },
