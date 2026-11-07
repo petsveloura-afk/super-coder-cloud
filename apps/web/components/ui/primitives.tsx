@@ -147,9 +147,9 @@ const tones: Record<Tone, string> = {
   warning: "bg-warning-soft text-warning border-warning/25",
   danger: "bg-danger-soft text-danger border-danger/25",
 };
-export function Badge({ tone = "neutral", className, children }: { tone?: Tone; className?: string; children: ReactNode }) {
+export function Badge({ tone = "neutral", className, children, "data-testid": testId, title }: { tone?: Tone; className?: string; children: ReactNode; "data-testid"?: string; title?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[12px] font-medium", tones[tone], className)}>
+    <span data-testid={testId} title={title} className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[12px] font-medium", tones[tone], className)}>
       {children}
     </span>
   );

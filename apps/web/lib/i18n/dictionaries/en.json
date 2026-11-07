@@ -5719,7 +5719,24 @@
       }
     },
     "pastDue": "⏰ This draft's planned time has passed — approving publishes it right away (or edit the time).",
-    "errTelegramBot": "The bot is not a member of the Telegram channel (or is not an admin). Add the bot as an admin with permission to post, then try again."
+    "errTelegramBot": "The bot is not a member of the Telegram channel (or is not an admin). Add the bot as an admin with permission to post, then try again.",
+    "editPost": {
+      "title": "Edit post",
+      "subtitle": "Changes are saved to this post only"
+    },
+    "author": {
+      "employee": "Written by {name} (AI team)",
+      "team": "Written by the AI team",
+      "autopilot": "Written by the autopilot"
+    },
+    "sort": {
+      "label": "Order",
+      "newest": "Newest first",
+      "schedule": "By publish time",
+      "fresh": "New",
+      "createdAt": "Created {when}",
+      "plannedFor": "Planned publish time"
+    }
   },
   "market": {
     "title": "Connections marketplace",
@@ -7788,7 +7805,8 @@
         "split": "Breaking it into tasks…",
         "order": "Setting the order and dependencies…",
         "check": "Checking the plan…"
-      }
+      },
+      "stillWorking": "Still working on it — {s}s (long tasks take up to 2 minutes)…"
     },
     "run": {
       "awaitingApproval": "Done — waiting for your approval in \"Approvals\".",

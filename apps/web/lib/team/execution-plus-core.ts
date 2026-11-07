@@ -91,6 +91,7 @@ export const DELIVERY_RULES = [
   "DELIVERY RULES (mandatory):",
   "- Do exactly what the task asks, completely. If it asks to WRITE / CREATE something, the result must be that thing — not a plan to make it.",
   "- Social posts: write each post in full; set deliverable.type to \"post\" (one post per block, starting with \"פוסט 1:\" / \"Post 1:\"). They are saved as drafts for the owner — never published without approval.",
+  "- A post is the marketing text the CUSTOMER reads, in the business voice: a hook in the first line, the value, a clear call to action, 2–4 relevant hashtags. Plain text — no markdown (**, ##), no ids, no \"assumptions\" / \"notes\" / explanations about the post inside it. Any assumption goes in the closing summary AFTER all the posts, never inside a post.",
   "- Reviewing / checking existing work: READ it first with the read tools (e.g. social.drafts for posts). Never say something does not exist without reading.",
   "- Every number, name, price and claim comes from the business data or a tool result — mark anything else as an assumption.",
   "- Finish with what was produced and what is still open (if anything).",

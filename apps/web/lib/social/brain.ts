@@ -350,10 +350,11 @@ export async function planWeek(orgId: string, count = 7): Promise<{ ok: true; co
   }
   if (!plan.length) return { ok: false, error: "ai.failed" };
   const primary: "facebook" | "instagram" = s.platforms.includes("instagram") ? "instagram" : "facebook";
+  const { plainForSocial } = await import("./post-hygiene-core");
   const rows = plan.map((p, i) => ({
     organization_id: orgId,
     platforms: ["facebook"],
-    body: mergeHashtags(p.post, s.hashtags, primary).slice(0, 5000),
+    body: mergeHashtags(plainForSocial(p.post) || p.post, s.hashtags, primary).slice(0, 5000),
     scheduled_at: slots[i]!.at.toISOString(),
     status: "draft",
     source: "agent",

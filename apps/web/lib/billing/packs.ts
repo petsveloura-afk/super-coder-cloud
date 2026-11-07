@@ -37,5 +37,15 @@ async function grant(purchaseId: string, orgId: string, amount: number, currency
     const { recordPayment } = await import("./receipts");
     await recordPayment({ orgId, provider: externalId.startsWith("paypal") ? "paypal" : "nowpayments", externalId, plan: null, interval: null, amount, currency, meta: { credit_pack: purchaseId, credits: r.credits } }).catch(() => null);
   }
+  if (r.ok && !r.already) {
+    // the credits work at once (additive): the digital team's tasks that stopped for lack of credits — or are held by today's
+    // cap — go back to the queue right after the purchase, instead of waiting for the next clock beat
+    await import("@/lib/team/runner")
+      .then(async (m) => {
+        await m.reviveCreditTasks(orgId);
+        await m.resumeHeldTasks(orgId);
+      })
+      .catch(() => undefined);
+  }
   return { handled: true, ok: r.ok, orgId, credits: r.credits, error: r.error };
 }

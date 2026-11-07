@@ -52,9 +52,17 @@ const TOO_LONG: Record<Lang, { text: string; action: string }> = {
   ar: { text: "انقطع العمل لأنه استغرق وقتًا طويلًا (كانت المحركات بطيئة)", action: "اضغطوا \"أعد المحاولة الآن\" — التشغيل الجديد محدود بالوقت وينتهي كما يجب." },
 };
 
+const NO_CREDITS: Record<Lang, { text: string; action: string }> = {
+  he: { text: "נגמרו קרדיטי ה-AI של העסק", action: "רכשו חבילת קרדיטים בדף החיוב — המשימות יחזרו לעבודה לבד מיד אחרי הרכישה." },
+  en: { text: "The business's AI credits ran out", action: "Buy a credit pack on the billing page — the tasks go back to work by themselves right after the purchase." },
+  ar: { text: "نفدت أرصدة الذكاء الاصطناعي للنشاط", action: "اشتروا حزمة رصيد من صفحة الفوترة — تعود المهام للعمل تلقائيًا فور الشراء." },
+};
+
 /** ONE reason (a sentence in the business language) and ONE action; never a technical code */
 export function ownerFailure(error: string | null | undefined, lang: Lang): OwnerFailure {
   const L: Lang = lang === "en" || lang === "ar" ? lang : "he";
+  // additive: the business's AI credits ran out — a clear reason + the cure; the task restarts by itself after a purchase
+  if (/ai\.limitReached|plan_limit:ai_credits/.test(error ?? "")) return { code: "credits", text: NO_CREDITS[L].text, action: NO_CREDITS[L].action, retryable: false, needsConnection: false };
   // additive: a run that the server cut off (left "in progress", recovered several times) is a time problem, not a bug
   if (/^(stuck_too_often|recovered_stuck)$/.test(error ?? "")) return { code: "too_long", text: TOO_LONG[L].text, action: TOO_LONG[L].action, retryable: true, needsConnection: false };
   try {

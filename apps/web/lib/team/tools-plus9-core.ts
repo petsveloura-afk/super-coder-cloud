@@ -10,7 +10,7 @@ import type { ToolSpec } from "./tools-core";
 
 export const UPGRADE9_TOOLS: ToolSpec[] = [
   { key: "social.drafts", kind: "read", sensitivity: "internal", permission: "campaigns.manage", args: { days: "number" }, about: "The post drafts and scheduled posts of the next / last N days (id, date, status, platforms, the text). Read this BEFORE reviewing, improving or scheduling posts — never say there is no draft without reading it." },
-  { key: "social.save_draft", kind: "write", sensitivity: "internal", permission: "campaigns.manage", args: { "text!": "string", when_iso: "iso" }, about: "Save ONE finished post text exactly as written as a DRAFT on the posts board (a picture is added automatically). Drafts never publish by themselves — the owner approves them." },
+  { key: "social.save_draft", kind: "write", sensitivity: "internal", permission: "campaigns.manage", args: { "text!": "string", when_iso: "iso" }, about: "Save ONE finished post text exactly as written as a DRAFT on the posts board (a picture is added automatically). Drafts never publish by themselves — the owner approves them. text = only the customer-facing marketing post (no notes, assumptions, ids or markdown)." },
 ];
 
 export const ROLE_EXTRA_TOOLS9: Record<string, string[]> = {

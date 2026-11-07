@@ -28,3 +28,16 @@ export function flowStep(input: { status: string; error: string | null; retries:
   // blocked / requires_connection / canceled / merged → the plain reason, never a silent retry
   return { kind: "stop" };
 }
+
+/** a log line made fit for the owner's screen: no uuids / "id …" / bracket noise / tool keys, one short line */
+export function cleanLiveLine(text: string): string | null {
+  const t = String(text ?? "")
+    .replace(/\b(?:id\s*)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "")
+    .replace(/\[[^\]]{0,80}\]/g, "")
+    .replace(/\b[a-z]+\.[a-z_]+:\s*/g, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s·:,—-]+|[\s·:,—-]+$/g, "")
+    .trim();
+  if (t.length < 3) return null;
+  return t.length > 110 ? `${t.slice(0, 108)}…` : t;
+}

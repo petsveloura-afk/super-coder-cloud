@@ -139,7 +139,9 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
           if (step.kind === "done") {
             const msg = p.data.drafts > 0 ? t("aiTeam.board.drafts", { n: p.data.drafts }) : p.data.partial ? t("aiTeam.board.partial") : p.data.status === "awaiting_approval" ? t("aiTeam.run.awaitingApproval") : p.data.status === "awaiting_input" ? t("aiTeam.run.awaitingInput") : null;
             setLoader({ phase: "done", mode: "task", name: who, message: msg });
-            window.setTimeout(() => setLoader((x) => (x.phase === "done" ? { ...x, phase: "idle" } : x)), 2600);
+            // the scene closes by itself a moment later; the confirmation stays as a toast
+            toast.success(msg ?? t("aiTeam.loader.doneTitle"));
+            window.setTimeout(() => setLoader((x) => (x.phase === "done" ? { ...x, phase: "idle" } : x)), 1800);
             return;
           }
           if (step.kind === "retry") {
@@ -475,7 +477,7 @@ function TaskBoard({ data, busy, onRun, onCancel, onRetry }: { data: TeamPageDat
                           <p className="text-muted">{t("aiTeam.board.waitingDep")}</p>
                         ) : x.status === "blocked" && x.error === "daily_credit_cap" ? (
                           // credit cap transparency: waiting for credits, resumes by itself — and how to raise the cap
-                          <p className="text-muted" data-testid="task-cap">{t("aiTeam.board.waitingCap", { used: data.dayCredits, cap: data.settings.daily_credit_cap })}</p>
+                          <p className="text-muted" data-testid="task-cap">{t("aiTeam.board.waitingCap", { used: data.dayCredits, cap: data.dayCap ?? data.settings.daily_credit_cap })}</p>
                         ) : (
                           (() => {
                             const f = ownerFailure(x.error, locale === "en" || locale === "ar" ? locale : "he");

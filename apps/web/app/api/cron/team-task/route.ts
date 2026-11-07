@@ -2,7 +2,8 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// a full run gets up to ~2 minutes here (the channel webhooks use the same limit) — fewer "out of time" retries
+export const maxDuration = 120;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
   if (!UUID.test(org) || !UUID.test(task)) return NextResponse.json({ error: "invalid" }, { status: 400 });
   after(async () => {
     const { runTask } = await import("@/lib/team/runner");
-    const r = await runTask(org, task, { interactive: false, actorUser: null, deadlineAt: started + 52_000 }).catch((e: Error) => ({ notRun: `error: ${e.message.slice(0, 200)}` }));
+    const r = await runTask(org, task, { interactive: false, actorUser: null, deadlineAt: started + 110_000 }).catch((e: Error) => ({ notRun: `error: ${e.message.slice(0, 200)}` }));
     // one line in the server log per run (what happened to the task) — visible in Vercel → Logs
     console.info("team-task", task, "notRun" in r ? `not run: ${r.notRun}` : r.status);
   });

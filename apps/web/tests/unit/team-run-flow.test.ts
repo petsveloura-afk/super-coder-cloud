@@ -70,6 +70,6 @@ describe("an unreadable plan no longer throws the work away", () => {
     expect(localizeLog("Saved 2 post draft(s) on the posts board — waiting for the owner's approval there.", "he")).toContain("נשמרו 2 טיוטות");
   });
   it("smart-team calls stay inside their time", () => {
-    expect(read("lib/agents/run.ts")).toContain("hardDeadlineAt: Date.now() + 22_000,");
+    expect(read("lib/agents/run.ts")).toContain("hardDeadlineAt: roundEndsAt !== null ? Math.min(Date.now() + 22_000, roundEndsAt - 2_000) : Date.now() + 22_000,");
   });
 });

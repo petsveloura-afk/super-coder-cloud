@@ -1,0 +1,170 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { cleanPostBody, isFreshPost, nextFreeSlot, outgoingText, plainForSocial, postAuthor, sortPosts } from "@/lib/social/post-hygiene-core";
+import { extractPosts } from "@/lib/team/execution-plus-core";
+
+const root = join(__dirname, "..", "..");
+const read = (p: string) => readFileSync(join(root, p), "utf8");
+
+describe("post hygiene — only the post itself reaches the board", () => {
+  it("a notes / assumptions block is not a post (the screenshot case)", () => {
+    const notes = "**הנחות:**\n- הפוסט שנבחר לתזמון הינו טקסט התוכן המלא של דור (\"איך לחסוך 5 שעות בשבוע...\").";
+    expect(cleanPostBody(notes).ok).toBe(false);
+    expect(cleanPostBody("Assumptions:\n- the post is for the business page").ok).toBe(false);
+    expect(cleanPostBody("ملاحظات:\n- المنشور مخصص لصفحة العمل").ok).toBe(false);
+  });
+
+  it("a report about the post (ids, scheduling confirmation) is refused", () => {
+    const report = "**אישור תזמון פוסט במערכת**\n\n**מזהה פוסט (ID):** `bf18ba7a-1532-4524-93cf-433e7e743806`\n**נושא הפוסט:** איך לחסוך 5 שעות בשבוע";
+    const r = cleanPostBody(report);
+    expect(r).toEqual({ ok: false, reason: "not_a_post" });
+    expect(cleanPostBody("Post draft saved (id 1234) — waiting for the owner on the posts board").ok).toBe(false);
+  });
+
+  it("a real post keeps its words, loses markdown and the trailing notes", () => {
+    const post = "**רוצים לבדוק איך אפשר לייעל ולחבר את האוטומציות והמערכות בעסק שלכם?**\nשלחו לנו הודעה פרטית עכשיו ונשמח לייעץ ולבחון יחד את הצעד הבא שלכם! 🚀\n\n**הנחות:**\n- לא צוינו מחירים";
+    const r = cleanPostBody(post);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.text).toContain("רוצים לבדוק איך אפשר לייעל");
+      expect(r.text).toContain("🚀");
+      expect(r.text).not.toContain("**");
+      expect(r.text).not.toContain("הנחות");
+      expect(r.text).not.toContain("לא צוינו מחירים");
+    }
+  });
+
+  it("a label line in front of the post goes, the post stays", () => {
+    const r = cleanPostBody("**הפוסט:**\nבוקר טוב! השבוע אנחנו פותחים הרשמה לסדנה החדשה — מקומות מוגבלים 🙌");
+    expect(r.ok && r.text.startsWith("בוקר טוב")).toBe(true);
+  });
+
+  it("plain text helper — headings, bold, code marks", () => {
+    expect(plainForSocial("## כותרת\n**חזק** ו`קוד`")).toBe("כותרת\nחזק וקוד");
+    expect(plainForSocial("שורה\n\n\n\nשורה")).toBe("שורה\n\nשורה");
+  });
+
+  it("a person's post goes out exactly as written; an agent's goes out clean", () => {
+    expect(outgoingText("**שלי** כמו שכתבתי", "manual")).toBe("**שלי** כמו שכתבתי");
+    expect(outgoingText("**מבצע** לסוף השבוע — 20% הנחה על כל הקולקציה", "agent")).toBe("מבצע לסוף השבוע — 20% הנחה על כל הקולקציה");
+  });
+
+  it("the team's extracted posts drop the notes part (extractPosts + cleanPostBody, as the engine does)", () => {
+    const deliverable = "בוקר טוב לכל הלקוחות! השבוע אנחנו משיקים שירות חדש שיחסוך לכם שעות של עבודה ידנית 🙌\n\n---\n\n**הנחות:**\n- הפוסט מיועד לפרסום בדף הפייסבוק של העסק כפוסט ערך לבעלי עסקים.\n- לא צוינו מחירים או התחייבויות.";
+    const raw = extractPosts(deliverable);
+    expect(raw.length).toBe(2);
+    const posts = [...new Set(raw.map((x) => cleanPostBody(x)).flatMap((c) => (c.ok ? [c.text] : [])))];
+    expect(posts).toHaveLength(1);
+    expect(posts[0]).toContain("בוקר טוב");
+  });
+});
+
+describe("the board — who wrote it, order, new", () => {
+  it("the employee's name for agent posts; nothing for a person's post", () => {
+    expect(postAuthor({ source: "agent", agent_name: "נועה" })).toEqual({ key: "social.author.employee", params: { name: "נועה" } });
+    expect(postAuthor({ source: "agent", origin: "studio" })).toEqual({ key: "social.author.team" });
+    expect(postAuthor({ source: "agent", origin: "week" })).toEqual({ key: "social.author.autopilot" });
+    expect(postAuthor({ source: "agent" })).toEqual({ key: "social.byAgent" });
+    expect(postAuthor({ source: "manual", agent_name: "x" })).toBeNull();
+  });
+
+  it("a stable order: newest created first, ties broken by planned time and id", () => {
+    const same = "2026-11-08T08:00:00.000Z";
+    const posts = [
+      { id: "a", scheduled_at: same, created_at: "2026-11-07T10:00:00Z" },
+      { id: "b", scheduled_at: same, created_at: "2026-11-07T12:00:00Z" },
+      { id: "c", scheduled_at: "2026-11-09T08:00:00Z", created_at: "2026-11-06T09:00:00Z" },
+    ];
+    expect(sortPosts(posts, "newest").map((x) => x.id)).toEqual(["b", "a", "c"]);
+    expect(sortPosts(posts, "schedule").map((x) => x.id)).toEqual(["c", "b", "a"]);
+    expect(sortPosts([...posts].reverse(), "newest").map((x) => x.id)).toEqual(["b", "a", "c"]);
+  });
+
+  it("new = created within the last day", () => {
+    const now = Date.parse("2026-11-07T20:00:00Z");
+    expect(isFreshPost({ created_at: "2026-11-07T10:00:00Z" }, now)).toBe(true);
+    expect(isFreshPost({ created_at: "2026-11-05T10:00:00Z" }, now)).toBe(false);
+    expect(isFreshPost({ created_at: null }, now)).toBe(false);
+  });
+
+  it("agent drafts without a time get the next FREE morning (no pile-up on one minute)", () => {
+    const now = new Date("2026-11-07T20:00:00Z");
+    const first = nextFreeSlot([], now);
+    expect(first.toISOString()).toBe("2026-11-08T08:00:00.000Z");
+    const second = nextFreeSlot([first.toISOString()], now);
+    expect(second.toISOString()).toBe("2026-11-09T08:00:00.000Z");
+  });
+});
+
+describe("wiring", () => {
+  it("the team's save-draft tool cleans, refuses reports and records the employee", () => {
+    const tools = read("lib/team/tools.ts");
+    expect(tools).toContain("cleanPostBody(s(args.text))");
+    expect(tools).toContain("agent_name: agentName }");
+    expect(tools).toContain("nextFreeSlot(");
+    expect(read("lib/team/runner.ts")).toContain("agentName: member.name");
+    expect(read("lib/team/engine-core.ts")).toContain("extractPosts(draft).map((x) => cleanPostBody(x))");
+  });
+
+  it("publishing sends an agent post clean (Facebook / Instagram / Telegram)", () => {
+    const pub = read("lib/social/publish.ts");
+    expect(pub.match(/outgoingText\(p\.body, p\.source\)/g)?.length).toBe(3);
+  });
+
+  it("the board shows the author, the created time, a stable order and a sort choice", () => {
+    const ui = read("components/social/social-client.tsx");
+    expect(ui).toContain("postAuthor(p)");
+    expect(ui).toContain('data-testid="post-created"');
+    expect(ui).toContain("sortPosts(filterPosts(p.posts, pf), postSort)");
+    const page = read("app/[locale]/(dashboard)/social/page.tsx");
+    expect(page).toContain('.order("created_at", { ascending: false })');
+    expect(page).toContain('select("id, agent_name")');
+  });
+
+  it("the migration is additive and only sets aside agent drafts (nothing deleted)", () => {
+    const sql = read("../../supabase/migrations/20261107000001_social_post_hygiene.sql");
+    expect(sql).toContain("add column if not exists agent_name");
+    expect(sql).not.toMatch(/\bdelete\s+from\b/i);
+    expect(sql).not.toMatch(/\bdrop\s+(table|column)\b/i);
+    expect(sql).toContain("source = 'agent'");
+  });
+
+  it("i18n — the new labels exist in he / en / ar", () => {
+    for (const l of ["he", "en", "ar"]) {
+      const d = JSON.parse(read(`lib/i18n/dictionaries/${l}.json`)) as { social: { author: Record<string, string>; sort: Record<string, string> } };
+      expect(d.social.author.employee).toContain("{name}");
+      expect(Object.keys(d.social.sort)).toEqual(["label", "newest", "schedule", "fresh", "createdAt", "plannedFor"]);
+    }
+  });
+});
+
+describe("post hygiene — round 2 (publishing guard, edit pop-up, writing rules)", () => {
+  it("publishing never sends an agent 'post' that is only notes / a report — it returns to the owner as a draft", () => {
+    const src = read("lib/social/publish.ts");
+    expect(src).toContain('p.source === "agent" && !cleanPostBody(p.body).ok');
+    expect(src).toContain('hygiene: "not_a_post"');
+  });
+
+  it("editing an existing post opens a pop-up dialog (not the top of the board)", () => {
+    const src = read("components/social/social-client.tsx");
+    expect(src).toContain('open={editing !== null && editing !== "new"}');
+    expect(src).toContain('data-testid="post-edit-dialog"');
+    for (const l of ["he", "en", "ar"]) {
+      const d = JSON.parse(read(`lib/i18n/dictionaries/${l}.json`)) as { social: { editPost?: { title?: string } } };
+      expect(d.social.editPost?.title).toBeTruthy();
+    }
+  });
+
+  it("the team is told a post is customer-facing marketing text — notes go after all posts", () => {
+    const src = read("lib/team/execution-plus-core.ts");
+    expect(src).toContain("A post is the marketing text the CUSTOMER reads");
+    expect(read("lib/team/tools-plus9-core.ts")).toContain("only the customer-facing marketing post");
+  });
+
+  it("the tidy-up migration covers scheduled agent posts too (canceled, never deleted)", () => {
+    const sql = readFileSync(join(root, "..", "..", "supabase/migrations/20261107000001_social_post_hygiene.sql"), "utf8");
+    expect(sql).toContain("status in ('draft', 'scheduled')");
+    expect(sql).not.toMatch(/\bdelete\s+from\b/i);
+  });
+});

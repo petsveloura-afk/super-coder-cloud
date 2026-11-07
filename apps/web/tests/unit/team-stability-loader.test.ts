@@ -18,8 +18,8 @@ describe("no more 'busy' failures from a short server call", () => {
     expect(r).toContain("export async function dispatchTaskRun(orgId: string, taskId: string): Promise<boolean> {");
     const route = read("app/api/cron/team-task/route.ts");
     expect(route).toContain("timingSafeEqual(given, expected)");
-    expect(route).toContain("deadlineAt: started + 52_000");
-    expect(route).toContain("export const maxDuration = 60;");
+    expect(route).toContain("deadlineAt: started + 110_000");
+    expect(route).toContain("export const maxDuration = 120;");
   });
   it("a paid AI account without credit rests for hours (no wasted first try on every call); Gemini limits are untouched", () => {
     expect(classifyError("anthropic_400:Your credit balance is too low to access the Anthropic API").kind).toBe("noquota");

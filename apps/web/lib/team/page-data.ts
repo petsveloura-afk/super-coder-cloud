@@ -62,6 +62,7 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     toolCatalog: TOOLS.map((x) => ({ key: x.key, kind: x.kind, sensitivity: x.sensitivity, about: x.about })),
     // the same count the team clock uses for the cap (by when the work ran) — the screen and the cap never disagree
     dayCredits: await runner.dayCredits(org).catch(() => taskRows.filter((x) => Date.parse(x.updated_at) > now - 86_400_000).reduce((s, x) => s + (x.credits_used || 0), 0)),
+    dayCap: await runner.effectiveDayCap(org, settings.daily_credit_cap).catch(() => settings.daily_credit_cap),
   };
 
   try {

@@ -11,6 +11,8 @@ import type { ActionState } from "@/lib/action-state";
  * then follows the task (taskProgressAction) and shows the real result — and retries by itself when the engines were busy.
  */
 const loc = (l: string): "he" | "en" | "ar" => (l === "ar" || l === "en" ? l : "he");
+/** longer than any run can last (own server call ≤ 120s) → the run is dead */
+const STALE_RUN_MS = 150_000;
 const uuid = z.string().uuid();
 
 async function gate(locale: "he" | "en" | "ar") {
@@ -36,10 +38,18 @@ export async function startTaskAction(input: { locale: string; taskId: string })
   // security (additive): at most 30 starts a minute per business (a stuck button / script can not flood the AI engines)
   const { data: allowed } = await a.rpc("public_rate_limit", { p_bucket: `team-start:${orgId}`, p_limit: 30, p_window_seconds: 60 });
   if (allowed === false) return { error: "aiTeam.run.tooFast" };
-  const { data: t } = await a.from("team_tasks").select("id, status, origin, goal_id").eq("organization_id", orgId).eq("id", input.taskId).maybeSingle();
+  const { data: t } = await a.from("team_tasks").select("id, status, origin, goal_id, started_at, attempts").eq("organization_id", orgId).eq("id", input.taskId).maybeSingle();
   if (!t) return { error: "validation.invalidId" };
-  const status = String(t.status);
-  if (status === "in_progress") return { ok: true, data: { status, started: false } };
+  let status = String(t.status);
+  if (status === "in_progress") {
+    // a run never lasts more than ~2 minutes: "in progress" for longer means its server call was cut off. Instead of following
+    // a dead run (the scene looked frozen), it goes straight back to the queue and starts now — an attempt is counted.
+    const startedAt = Date.parse(String(t.started_at ?? ""));
+    if (!Number.isFinite(startedAt) || Date.now() - startedAt < STALE_RUN_MS) return { ok: true, data: { status, started: false } };
+    const { data: back } = await a.from("team_tasks").update({ status: "pending", error: "recovered_stuck", attempts: Number(t.attempts ?? 0) + 1, updated_at: new Date().toISOString() }).eq("organization_id", orgId).eq("id", input.taskId).eq("status", "in_progress").select("id");
+    if (!back?.length) return { ok: true, data: { status, started: false } };
+    status = "pending";
+  }
   if (["failed", "blocked", "requires_connection"].includes(status)) {
     // security (parity with the restart button): giving a stopped task a fresh start needs the "manage AI" permission
     if (!g.ctx.can("ai.manage")) return { error: "errors.forbidden" };
@@ -73,5 +83,9 @@ export async function taskProgressAction(input: { locale: string; taskId: string
   ]);
   if (!t) return { error: "validation.invalidId" };
   const res = (t.result ?? {}) as { partial?: boolean; drafts?: number };
-  return { ok: true, data: { status: String(t.status), error: (t.error as string | null) ?? null, line: (act?.summary as string | null)?.slice(0, 160) ?? null, partial: Boolean(res.partial), drafts: Number(res.drafts ?? 0) } };
+  // the live line is shown to the owner: in the business language, without technical ids / brackets
+  const { cleanLiveLine } = await import("@/lib/team/run-flow-core");
+  const { localizeLog } = await import("@/lib/team/title-i18n-core");
+  const line = act?.summary ? cleanLiveLine(localizeLog(String(act.summary), locale)) : null;
+  return { ok: true, data: { status: String(t.status), error: (t.error as string | null) ?? null, line, partial: Boolean(res.partial), drafts: Number(res.drafts ?? 0) } };
 }

@@ -13,6 +13,7 @@
  *   8 summarize    a short report + episodic memory
  */
 import { GRANT_TOOL, grantPreview, grantReason, grantable } from "./permission-core";
+import { cleanPostBody } from "@/lib/social/post-hygiene-core";
 import { DELIVERY_RULES, FINISH_RESERVE, completionVerdict, continuationBrief, continuationTitle, extractPosts, wantsOutput, wantsPosts } from "./execution-plus-core";
 import { firstJsonObject as firstJsonObjectStrict } from "@/lib/operator/operator-core";
 import { firstJsonObjectTolerant } from "./json-repair-core";
@@ -597,7 +598,9 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
     // upgrade 9: written posts become DRAFTS on the posts board (never published without the owner) — before, they stayed in a report
     const postTask = plan.deliverable.type === "post" || wantsPosts(`${task.title} ${task.brief}`);
     if (postTask && plan.deliverable.type !== "review_reply" && plan.deliverable.type !== "message" && plan.deliverable.type !== "reminder") {
-      const posts = extractPosts(draft);
+      // hygiene (additive): a notes / assumptions part or a report about the post is not a post — only real posts are saved,
+      // cleaned of markdown, each once
+      const posts = [...new Set(extractPosts(draft).map((x) => cleanPostBody(x)).flatMap((c) => (c.ok ? [c.text] : [])))];
       const dd = decide("social.save_draft", member, settings, { interactive: deps.interactive });
       if (posts.length && dd.do === "execute") {
         let saved = 0;

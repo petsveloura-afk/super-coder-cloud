@@ -82,6 +82,23 @@ export async function dayCredits(orgId: string): Promise<number> {
   return ((data ?? []) as { credits_used: number }[]).reduce((a, r) => a + (r.credits_used || 0), 0);
 }
 
+/**
+ * Purchased credits count for the team at once (additive). The team's daily cap is the owner's spending guard; when the business
+ * BUYS an AI credit pack, the credits it bought in the last 24 hours are added on top of today's cap — so the work that was
+ * waiting starts again right after the purchase instead of the next day. 0 (no cap) stays 0. Any read error → the cap as set.
+ */
+export async function effectiveDayCap(orgId: string, cap: number): Promise<number> {
+  if (!cap || cap <= 0) return cap;
+  try {
+    const since = new Date(Date.now() - 86_400_000).toISOString();
+    const { data } = await db().from("credit_ledger").select("delta").eq("organization_id", orgId).eq("kind", "ai").eq("reason", "purchase").gte("created_at", since).limit(50);
+    const bought = ((data ?? []) as { delta: number }[]).reduce((a, r) => a + Math.max(0, Number(r.delta) || 0), 0);
+    return cap + bought;
+  } catch {
+    return cap;
+  }
+}
+
 /* ------------------------------------------------------------------ the live business profile */
 
 export async function loadProfile(orgId: string): Promise<ProfileFacts> {
@@ -381,7 +398,7 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
       } catch {
         /* the matrix never blocks the team by failing */
       }
-      const r = await runTeamTool(orgId, tool, args, { actorUser, locale: lang, interactive: opts.interactive });
+      const r = await runTeamTool(orgId, tool, args, { actorUser, locale: lang, interactive: opts.interactive, agentName: member.name });
       // customer text read by a tool passes the inbound guard before it reaches the worker's context
       if (r.ok && r.summary && ["inbox.unanswered", "crm.contact_brief", "reviews.recent", "crm.find_contacts"].includes(tool)) {
         try {
@@ -461,7 +478,7 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
     }
   })();
   const task: EngineTask = { id: taskId, title: claimed.title as string, brief: safeBrief, depth: claimed.depth as number, steps_used: claimed.steps_used as number, credits_used: claimed.credits_used as number, review_rounds: claimed.review_rounds as number, chain: await chainOf(orgId, (claimed.parent_id as string | null) ?? null), answer: ((claimed.result as Record<string, unknown>)?.answer as string | undefined) ?? null };
-  const engineSettings: EngineSettings = { enabled: settings.enabled, emergency_stop: settings.emergency_stop, max_depth: settings.max_depth, max_steps: settings.max_steps, daily_credit_cap: settings.daily_credit_cap, day_credits: await dayCredits(orgId) };
+  const engineSettings: EngineSettings = { enabled: settings.enabled, emergency_stop: settings.emergency_stop, max_depth: settings.max_depth, max_steps: settings.max_steps, daily_credit_cap: await effectiveDayCap(orgId, settings.daily_credit_cap), day_credits: await dayCredits(orgId) };
   // upgrade 8 / stage B1: the department's credit budget is honoured IN ADDITION to the daily cap (the tighter one wins)
   try {
     const dc = await import("./runner-org8").then((m) => m.deptCapFor(orgId, member.id, { cap: engineSettings.daily_credit_cap, used: engineSettings.day_credits }, lang));
@@ -715,7 +732,8 @@ export async function decideApproval(orgId: string, approvalId: string, decision
     let result: { ok: boolean; summary: string; error?: string } = { ok: true, summary: "noted" };
     if (v && v.ok && ap.tool !== "team.ask_user") {
       const { data: org } = await a.from("organizations").select("locale").eq("id", orgId).maybeSingle();
-      result = await runTeamTool(orgId, ap.tool as string, v.args, { actorUser: userId, locale: (org?.locale as string) ?? "he", interactive: true });
+      const { data: who } = ap.member_id ? await a.from("team_members").select("name").eq("organization_id", orgId).eq("id", ap.member_id as string).maybeSingle() : { data: null };
+      result = await runTeamTool(orgId, ap.tool as string, v.args, { actorUser: userId, locale: (org?.locale as string) ?? "he", interactive: true, agentName: (who?.name as string | null) ?? null });
     } else if (v && !v.ok) result = { ok: false, summary: "", error: v.error };
     const edited = decision.kind === "edit" && Boolean(decision.text) && decision.text !== before;
     await a.from("team_approvals").update({ status: result.ok ? "executed" : "failed", decided_by: userId, decided_at: now, decision_note: decision.note?.slice(0, 1000) ?? null, edited_payload: edited ? payload : null, result: { ok: result.ok, summary: result.summary, error: result.error ?? null } }).eq("id", ap.id);
@@ -857,7 +875,7 @@ async function weeklyMeeting(orgId: string, tz: string, deadlineAt?: number) {
 export async function resumeHeldTasks(orgId: string): Promise<number> {
   const a = db();
   const settings = await loadSettings(orgId);
-  const n = resumeBudget(settings.daily_credit_cap, await dayCredits(orgId));
+  const n = resumeBudget(await effectiveDayCap(orgId, settings.daily_credit_cap), await dayCredits(orgId));
   if (n <= 0) return 0;
   const { data } = await a.from("team_tasks").select("id, status, error, created_at").eq("organization_id", orgId).eq("status", "blocked").eq("error", "daily_credit_cap").order("created_at").limit(20);
   const picked = pickResumable((data ?? []) as { id: string; status: string; error: string | null; created_at: string }[], n);
@@ -865,6 +883,43 @@ export async function resumeHeldTasks(orgId: string): Promise<number> {
     await a.from("team_tasks").update({ status: "pending", error: null, finished_at: null, updated_at: new Date().toISOString() }).eq("organization_id", orgId).eq("id", r.id).eq("status", "blocked").eq("error", "daily_credit_cap");
   }
   return picked.length;
+}
+
+/**
+ * Did AI credits come back for the business after `sinceIso` (additive)? True when a credit pack was BOUGHT after that moment
+ * (credit_ledger, reason "purchase") or a new month began since then (the monthly allowance renews). Read from the tables
+ * directly — the plan / usage database functions are not callable by the service role. Errors → false (nothing is revived).
+ */
+export async function creditsBackSince(orgId: string, sinceIso: string): Promise<boolean> {
+  try {
+    const since = Date.parse(sinceIso);
+    if (!Number.isFinite(since)) return false;
+    const now = new Date();
+    const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+    if (since < monthStart) return true;
+    const { data } = await db().from("credit_ledger").select("id").eq("organization_id", orgId).eq("kind", "ai").eq("reason", "purchase").gt("created_at", new Date(since).toISOString()).limit(1).maybeSingle();
+    return Boolean(data);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Credits are back (additive). A task that stopped because the business's AI credits ran out ("ai.limitReached") goes back to the
+ * queue by itself as soon as credits came back — a pack bought after it stopped, or the next month's allowance. Only the last
+ * 7 days, a few per beat, never a task the owner canceled.
+ */
+export async function reviveCreditTasks(orgId: string): Promise<number> {
+  const a = db();
+  const { data } = await a.from("team_tasks").select("id, finished_at, updated_at").eq("organization_id", orgId).eq("status", "failed").in("error", ["ai.limitReached", "billing.limitReached"]).gte("updated_at", new Date(Date.now() - 7 * 86_400_000).toISOString()).order("created_at").limit(10);
+  const rows = (data ?? []) as { id: string; finished_at: string | null; updated_at: string }[];
+  let n = 0;
+  for (const r of rows) {
+    if (!(await creditsBackSince(orgId, r.finished_at ?? r.updated_at))) continue;
+    const { data: done } = await a.from("team_tasks").update({ status: "pending", error: null, finished_at: null, updated_at: new Date().toISOString() }).eq("organization_id", orgId).eq("id", r.id).eq("status", "failed").select("id");
+    if (done?.length) n++;
+  }
+  return n;
 }
 
 /**
@@ -880,8 +935,9 @@ export async function notifyCapHold(orgId: string): Promise<boolean> {
   if (recent) return false;
   const settings = await loadSettings(orgId);
   const used = await dayCredits(orgId);
+  const capNow = await effectiveDayCap(orgId, settings.daily_credit_cap);
   const { data: owners } = await a.from("organization_members").select("user_id").eq("organization_id", orgId).in("role", ["agency_owner", "owner", "admin"]).limit(5);
-  const rows = ((owners ?? []) as { user_id: string }[]).map((o) => ({ organization_id: orgId, user_id: o.user_id, kind: "team_cap", title_key: "aiTeam.capReached", params: { used: String(used), cap: String(settings.daily_credit_cap), n: String(count) }, link: "/ai-team" }));
+  const rows = ((owners ?? []) as { user_id: string }[]).map((o) => ({ organization_id: orgId, user_id: o.user_id, kind: "team_cap", title_key: "aiTeam.capReached", params: { used: String(used), cap: String(capNow), n: String(count) }, link: "/ai-team" }));
   if (!rows.length) return false;
   await a.from("notifications").insert(rows);
   return true;
@@ -906,6 +962,8 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
     const { data: org } = await a.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
     const tz = (org?.timezone as string) || "Asia/Jerusalem";
     await resumeHeldTasks(orgId).catch(() => 0);
+    // credits bought (or the new month began) → tasks that stopped because the AI credits ran out go back to work by themselves
+    await reviveCreditTasks(orgId).catch(() => 0);
     // credit cap (additive): the owner hears ONCE a day when the daily cap holds work back — with the numbers and one tap to raise it
     await notifyCapHold(orgId).catch(() => false);
     // wave 64: the tick also reads title / age / due date / origin / owner so the queue can be ordered by real importance;

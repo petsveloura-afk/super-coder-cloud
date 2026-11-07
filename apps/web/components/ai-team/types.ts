@@ -175,6 +175,8 @@ export interface TeamPageData {
   models: { provider: string; model: string }[];
   toolCatalog: { key: string; kind: string; sensitivity: string; about: string }[];
   dayCredits: number;
+  /** today's cap including credits bought in the last 24h (the cap the team really works against) */
+  dayCap?: number;
   health?: TeamHealthData;
   /** wave 68: today's health card (absent when it could not be loaded) */
   dayHealth?: DayHealthView;

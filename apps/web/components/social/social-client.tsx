@@ -19,6 +19,7 @@ import type { AutopilotSettings, Learned } from "@/lib/social/brain-core";
 import { getPostAction, recyclePostAction } from "@/app/[locale]/(dashboard)/social/brain-actions";
 import { Dialog } from "@/components/ui/dialog";
 import { BrainCircuit, Flame, Heart, MessageCircle, Repeat2, Share2 } from "lucide-react";
+import { isFreshPost, outgoingText, postAuthor, sortPosts, type PostSort } from "@/lib/social/post-hygiene-core";
 import { filterComments, filterPosts, filterReviews, type CommentFilter, type PostFilter, type ReviewFilter } from "@/lib/social/insights";
 import { approveAllDraftsAction, commentStatusAction, duplicatePostAction, postStatusAction, replyCommentAction, replyReviewAction, reviewSettingsAction, savePostAction, saveSocialSettingsAction } from "@/app/[locale]/(dashboard)/social/actions";
 
@@ -55,6 +56,9 @@ export interface PostRow {
   engagement?: number | null;
   metrics?: { likes?: number; comments?: number; shares?: number; saves?: number } | null;
   media_pending?: string | null;
+  // post hygiene — when it was created + the AI employee who wrote it (managers only; optional)
+  created_at?: string | null;
+  agent_name?: string | null;
 }
 /** wave 61 — everything the brain tab needs (optional: the page works without it) */
 export interface BrainView {
@@ -161,7 +165,7 @@ function CommentCard({ c, canReply }: { c: CommentRow; canReply: boolean }) {
 export function PostEditor({ initial, onDone, presetAt, brand }: { initial?: PostRow | null; onDone: () => void; presetAt?: string | null; brand?: string }) {
   const { t, locale } = useI18n();
   const router = useRouter();
-  const [body, setBody] = useState(initial?.body ?? "");
+  const [body, setBody] = useState(initial ? outgoingText(initial.body, initial.source) : "");
   const [image, setImage] = useState(initial?.image_url ?? "");
   // stage B — hand-off from the AI writer to the image panel
   const [studioSeed, setStudioSeed] = useState<StudioSeed | null>(null);
@@ -297,7 +301,7 @@ function PostDrawer({ post, onClose, brand }: { post: PostRow; onClose: () => vo
           <PostEditor initial={post} brand={brand} onDone={onClose} />
         ) : (
           <p className="whitespace-pre-wrap rounded-xl border border-line bg-surface p-3 text-sm" dir="auto">
-            {post.body}
+            {outgoingText(post.body, post.source)}
           </p>
         )}
       </div>
@@ -321,6 +325,9 @@ function PostCard({ p, onEdit, isNew = false }: { p: PostRow; onEdit: () => void
       }
     });
   const editable = ["draft", "scheduled", "failed"].includes(p.status);
+  // who wrote it (the posts board is only loaded for people who manage it) + the text as it will go out
+  const author = postAuthor(p);
+  const shown = outgoingText(p.body, p.source);
   const duplicate = () =>
     start(async () => {
       const r = await duplicatePostAction({ locale, id: p.id });
@@ -339,24 +346,30 @@ function PostCard({ p, onEdit, isNew = false }: { p: PostRow; onEdit: () => void
       ) : null}
       <div className="flex flex-wrap items-center gap-2 text-[12px]">
         <Badge tone={p.status === "published" ? "success" : p.status === "failed" ? "danger" : p.status === "draft" ? "warning" : "accent"}>{t(`social.postStatus.${p.status}`)}</Badge>
-        {p.source === "agent" ? (
-          <Badge tone="neutral">
-            <Sparkles className="me-1 inline h-3 w-3" /> {t("social.byAgent")}
+        {author ? (
+          <Badge tone="neutral" data-testid="post-author">
+            <Sparkles className="me-1 inline h-3 w-3" /> {t(author.key, author.params)}
           </Badge>
+        ) : null}
+        {!isNew && isFreshPost(p, shownAt) ? (
+          <Badge tone="accent" data-testid="post-fresh">{t("social.sort.fresh")}</Badge>
         ) : null}
         <span className="text-muted">{p.platforms.map((x) => (x === "instagram" ? "Instagram" : "Facebook")).join(" · ")}</span>
         {p.pillar ? <Badge tone="neutral">{p.pillar}</Badge> : null}
         {p.origin === "review" || p.origin === "holiday" || p.origin === "evergreen" || p.origin === "autopilot" ? <Badge tone="accent">{t(`social.brain.origin_${p.origin}`)}</Badge> : null}
         {p.media_pending ? <Badge tone="warning">{t("social.brain.mediaPending")}</Badge> : null}
-        <span className="ms-auto text-subtle">{when(locale, p.scheduled_at)}</span>
+        <span className="ms-auto text-subtle" title={t("social.sort.plannedFor")}>{when(locale, p.scheduled_at)}</span>
       </div>
+      {p.created_at ? (
+        <p className="mt-1 text-[11px] text-subtle" data-testid="post-created">{t("social.sort.createdAt", { when: when(locale, p.created_at) })}</p>
+      ) : null}
       <div className={cn(p.image_url && !p.video_url ? "mt-2 flex gap-3" : "")}>
         {p.image_url && !p.video_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={p.image_url} alt="" loading="lazy" className="mt-0.5 h-20 w-20 shrink-0 rounded-xl border border-line object-cover" />
         ) : null}
         <p className={cn("line-clamp-6 whitespace-pre-wrap text-sm", !(p.image_url && !p.video_url) && "mt-2")} dir="auto">
-          {p.body}
+          {shown}
         </p>
       </div>
       <PostMediaBadges p={p} />
@@ -573,7 +586,9 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
   const [rf, setRf] = useState<ReviewFilter>({ stars: "all", unanswered: false, q: "" });
   const [bulk, startBulk] = useTransition();
   const router = useRouter();
-  const shownPosts = filterPosts(p.posts, pf);
+  // the board's order (additive): newest first by default, or by planned publishing time — always stable
+  const [postSort, setPostSort] = useState<PostSort>("newest");
+  const shownPosts = sortPosts(filterPosts(p.posts, pf), postSort);
   const shownComments = filterComments(p.comments, cf);
   const shownReviews = filterReviews(p.reviews, rf);
   const open = p.comments.filter((c) => c.status === "new" || c.status === "dm_sent").length;
@@ -643,8 +658,8 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
       ) : null}
       {tab === "posts" ? (
         <div className="space-y-3">
-          {editing ? (
-            <PostEditor initial={editing === "new" ? null : editing} presetAt={presetAt} brand={p.brain?.brand} onDone={() => { setEditing(null); setPresetAt(null); }} />
+          {editing === "new" ? (
+            <PostEditor initial={null} presetAt={presetAt} brand={p.brain?.brand} onDone={() => { setEditing(null); setPresetAt(null); }} />
           ) : (
             <div className="flex flex-wrap items-center gap-2">
               <Button onClick={() => setEditing("new")} data-testid="post-new">
@@ -677,7 +692,10 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
                 <Chips label={t("social.pro.filters")} value={pf.status} onChange={(v) => setPf({ ...pf, status: v })} options={[{ key: "all", label: t("social.pro.all"), count: p.posts.length }, ...(["draft", "scheduled", "published", "failed"] as const).map((k) => ({ key: k, label: t(`social.pro.status.${k}`), count: filterPosts(p.posts, { ...pf, status: k, platform: "all", q: "" }).length }))]} />
                 <SearchBox value={pf.q} onChange={(q) => setPf({ ...pf, q })} />
               </div>
-              <Chips label="platform" value={pf.platform} onChange={(v) => setPf({ ...pf, platform: v })} options={[{ key: "all", label: t("social.pro.all") }, { key: "facebook", label: "Facebook" }, { key: "instagram", label: "Instagram" }]} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Chips label="platform" value={pf.platform} onChange={(v) => setPf({ ...pf, platform: v })} options={[{ key: "all", label: t("social.pro.all") }, { key: "facebook", label: "Facebook" }, { key: "instagram", label: "Instagram" }]} />
+                <Chips label={t("social.sort.label")} value={postSort} onChange={(v) => setPostSort(v)} options={[{ key: "newest", label: t("social.sort.newest") }, { key: "schedule", label: t("social.sort.schedule") }]} />
+              </div>
               {shownPosts.length ? (
                 <ul className="grid gap-3 lg:grid-cols-2">
                   {shownPosts.map((x) => (
@@ -693,6 +711,22 @@ export function SocialClient(p: { comments: CommentRow[]; posts: PostRow[]; revi
           )}
         </div>
       ) : null}
+      {/* editing an existing post opens right where the person is (a pop-up), not at the top of a long board */}
+      <Dialog
+        open={editing !== null && editing !== "new"}
+        onOpenChange={(o) => {
+          if (!o) setEditing(null);
+        }}
+        title={t("social.editPost.title")}
+        description={t("social.editPost.subtitle")}
+        className="sm:max-w-2xl"
+      >
+        {editing && editing !== "new" ? (
+          <div data-testid="post-edit-dialog">
+            <PostEditor key={editing.id} initial={editing} presetAt={null} brand={p.brain?.brand} onDone={() => setEditing(null)} />
+          </div>
+        ) : null}
+      </Dialog>
       {tab === "calendar" ? (
         <CalendarPanel
           posts={p.posts}

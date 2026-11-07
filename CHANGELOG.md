@@ -1,5 +1,26 @@
 # Changelog
 
+## Full round: credits after purchase, posts board hygiene, edit pop-up, run stability, API guard
+
+- **Credits bought → work resumes at once:**
+  - The team's day cap counts credits bought in the last 24h on top of the cap (`effectiveDayCap`), on the clock, on the screen meter and in the hold notification.
+  - A pack purchase (`grant()`) immediately wakes the tasks stopped for credits (`reviveCreditTasks`) and the tasks held by the cap (`resumeHeldTasks`).
+  - A task stopped for credits is revived when a new month starts or after a purchase (`creditsBackSince`, direct table reads — the old RPCs are not callable by the server role).
+  - A task stopped for credits says so plainly ("no AI credits — buy a pack / wait for the month").
+- **Posts board:**
+  - An AI employee's notes ("**הנחות:**", "Assumptions:"), reports about a post ("scheduling confirmation, post id …") and markdown no longer become "posts". Only the customer-facing text is saved (`cleanPostBody`), each once, on the next free morning slot instead of all on the same minute.
+  - The team is told a post is marketing text for the customer (hook, value, call to action, hashtags), with any assumption written after all the posts.
+  - Publishing never sends an agent "post" that is only notes or a report; it returns to the owner as a draft with the reason. Agent posts go out as plain text.
+  - Managers see which employee wrote each post (`agent_name`), when it was created, and a "new" mark for the last 24h. A stable order: newest first, or by planned publishing time.
+  - Editing an existing post opens a pop-up where the person is, instead of at the top of a long board.
+  - Migration `20261107000001_social_post_hygiene.sql`: `agent_name` column, an index, and a tidy-up of what is already on the board (notes-only agent drafts / scheduled posts are set to canceled — nothing is deleted — and `**` is removed from agent posts).
+- **Run stability:**
+  - The team task call has 120s with a 110s deadline.
+  - The smart agents' AI calls end inside the round.
+  - A task stuck "in progress" for more than 150s is recovered by a new start.
+  - The live line on the loader is clean (no ids or tool keys); a "still working — N seconds" note appears on long tasks; "done" shows a toast and closes faster.
+- **Security:** a permanent test checks that every API route is authenticated or on a reviewed public list.
+
 ## Engineering round: credit cap root cause, security parity, load fairness, time limits
 
 - **Credit cap — root cause:**

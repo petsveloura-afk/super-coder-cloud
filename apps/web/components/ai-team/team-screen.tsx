@@ -104,10 +104,10 @@ export function TeamScreen({ data }: { data: TeamPageData }) {
         <Badge tone={working ? "accent" : "neutral"}>{t("aiTeam.summary.working", { n: working })}</Badge>
         <Badge tone={pending ? "warning" : "neutral"}>{t("aiTeam.summary.approvals", { n: pending })}</Badge>
         {waiting ? <Badge tone="warning">{t("aiTeam.summary.questions", { n: waiting })}</Badge> : null}
-        {data.settings.daily_credit_cap > 0 ? (
+        {(data.dayCap ?? data.settings.daily_credit_cap) > 0 ? (
           // credit cap transparency (additive): today's use against the cap — warns at 80%, red when reached
-          <Badge tone={data.dayCredits >= data.settings.daily_credit_cap ? "danger" : data.dayCredits >= data.settings.daily_credit_cap * 0.8 ? "warning" : "neutral"} data-testid="team-credit-meter">
-            {t("aiTeam.summary.credits", { used: data.dayCredits, cap: data.settings.daily_credit_cap })}
+          <Badge tone={data.dayCredits >= (data.dayCap ?? data.settings.daily_credit_cap) ? "danger" : data.dayCredits >= (data.dayCap ?? data.settings.daily_credit_cap) * 0.8 ? "warning" : "neutral"} data-testid="team-credit-meter">
+            {t("aiTeam.summary.credits", { used: data.dayCredits, cap: data.dayCap ?? data.settings.daily_credit_cap })}
           </Badge>
         ) : null}
       </div>

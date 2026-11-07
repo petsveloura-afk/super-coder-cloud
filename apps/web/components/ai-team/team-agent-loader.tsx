@@ -21,6 +21,8 @@ export function TeamAgentLoader({ phase, mode, name, message, onClose, live, not
   const { t, dir } = useI18n();
   const stages = (mode === "goal" ? ["understand", "team", "split", "order", "check"] : ["understand", "context", "plan", "work", "selfcheck", "deliver"]).map((k) => t(`aiTeam.loader.stage.${k}`));
   const [stage, setStage] = useState(0);
+  // seconds since the work started — shown once the planned stages are through, so a longer run never looks frozen
+  const [elapsed, setElapsed] = useState(0);
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     const id = window.setTimeout(() => setMounted(true), 0);
@@ -29,7 +31,10 @@ export function TeamAgentLoader({ phase, mode, name, message, onClose, live, not
   useEffect(() => {
     if (phase !== "working") return;
     const t0 = Date.now();
-    const tick = () => setStage(Math.min(stages.length - 1, Math.floor((Date.now() - t0) / 5500)));
+    const tick = () => {
+      setStage(Math.min(stages.length - 1, Math.floor((Date.now() - t0) / 5500)));
+      setElapsed(Math.floor((Date.now() - t0) / 1000));
+    };
     const first = window.setTimeout(tick, 0);
     const id = window.setInterval(tick, 500);
     return () => {
@@ -79,7 +84,7 @@ export function TeamAgentLoader({ phase, mode, name, message, onClose, live, not
           {phase === "error" ? t("aiTeam.loader.retryTitle") : phase === "done" ? t("aiTeam.loader.doneTitle") : t(mode === "goal" ? "aiTeam.loader.titleGoal" : "aiTeam.loader.titleTask", { name: name ?? "" })}
         </h2>
         <p className="mt-1 min-h-[1.5rem] text-[13px] text-muted" data-testid="team-agent-loader-stage">
-          {phase === "error" ? (message ?? t("aiTeam.loader.retryBody")) : phase === "done" ? (message ?? t("aiTeam.loader.doneBody")) : stages[stage]}
+          {phase === "error" ? (message ?? t("aiTeam.loader.retryBody")) : phase === "done" ? (message ?? t("aiTeam.loader.doneBody")) : stage === stages.length - 1 && elapsed > stages.length * 5.5 + 4 ? t("aiTeam.loader.stillWorking", { s: elapsed }) : stages[stage]}
         </p>
 
         {phase === "working" && live ? (

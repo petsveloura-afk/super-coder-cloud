@@ -51,3 +51,13 @@ describe("credit cap root cause: counted by when the work ran", () => {
     expect(read("lib/team/page-data.ts")).toContain("dayCredits: await runner.dayCredits(org)");
   });
 });
+
+describe("time limits of the background rounds", () => {
+  it("a smart-agents round never starts an AI call without time and never waits past its end; resets after", () => {
+    const r = read("lib/agents/run.ts");
+    expect(r).toContain("roundEndsAt = started + budgetMs + 6_000;");
+    expect(r).toContain("if (roundEndsAt !== null && roundEndsAt - Date.now() < 6_000) return null;");
+    expect(r).toContain("hardDeadlineAt: roundEndsAt !== null ? Math.min(Date.now() + 22_000, roundEndsAt - 2_000) : Date.now() + 22_000,");
+    expect(r).toContain("  roundEndsAt = null;\n  return out;");
+  });
+});

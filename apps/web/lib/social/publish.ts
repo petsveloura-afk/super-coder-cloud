@@ -15,7 +15,9 @@ export async function publishDuePosts(budgetMs = 20_000): Promise<{ claimed: num
   const recovered = stuck?.length ?? 0;
   const { data, error } = await admin.rpc("claim_due_social_posts", { p_limit: 10 });
   if (error) return { claimed: 0, published: 0, failed: 0, retried: 0, recovered };
-  const rows = (data ?? []) as { id: string; organization_id: string; platforms: string[]; body: string; image_url: string | null; results?: Record<string, unknown> | null; link_url?: string | null; video_url?: string | null; cta_type?: string | null; cta_value?: string | null; first_comment?: string | null }[];
+  const rows = (data ?? []) as { id: string; organization_id: string; platforms: string[]; body: string; image_url: string | null; results?: Record<string, unknown> | null; link_url?: string | null; video_url?: string | null; cta_type?: string | null; cta_value?: string | null; first_comment?: string | null; source?: string | null }[];
+  // hygiene (additive): what an AI agent wrote goes out as plain text — networks print markdown ("**bold**") literally
+  const { outgoingText, cleanPostBody } = await import("./post-hygiene-core");
   // wave 51 — posts with a link / button / video / first comment take the rich path (old posts: unchanged path)
   const { isRichPost } = await import("./post-core");
   const orgLang = new Map<string, string>();
@@ -26,6 +28,12 @@ export async function publishDuePosts(budgetMs = 20_000): Promise<{ claimed: num
   for (const p of rows) {
     if (Date.now() - started > budgetMs) {
       await admin.from("social_posts").update({ status: "scheduled" }).eq("id", p.id);
+      continue;
+    }
+    // hygiene guard (additive): an agent "post" that is only the employee's notes / a report about a post never goes out —
+    // it goes back to the owner as a draft with the reason (nothing is deleted)
+    if (p.source === "agent" && !cleanPostBody(p.body).ok) {
+      await admin.from("social_posts").update({ status: "draft", results: { ...(p.results ?? {}), hygiene: "not_a_post" } }).eq("id", p.id);
       continue;
     }
     const { data: accs } = await admin.from("channel_accounts").select("id, kind").eq("organization_id", p.organization_id).in("kind", ["messenger", "instagram"]);
@@ -52,7 +60,7 @@ export async function publishDuePosts(budgetMs = 20_000): Promise<{ claimed: num
           igId: acc.config.ig_id ?? null,
           igUsername: acc.config.username || null,
           pageToken: acc.secrets.page_token,
-          text: p.body,
+          text: outgoingText(p.body, p.source),
           imageUrl: p.image_url,
           videoUrl: p.video_url ?? null,
           linkUrl: p.link_url ?? null,
@@ -61,7 +69,7 @@ export async function publishDuePosts(budgetMs = 20_000): Promise<{ claimed: num
           lang: orgLang.get(p.organization_id) ?? "he",
         });
       } else {
-        r = await publishPost({ platform, pageId: acc.config.page_id ?? "", igId: acc.config.ig_id ?? null, pageToken: acc.secrets.page_token, text: p.body, imageUrl: p.image_url });
+        r = await publishPost({ platform, pageId: acc.config.page_id ?? "", igId: acc.config.ig_id ?? null, pageToken: acc.secrets.page_token, text: outgoingText(p.body, p.source), imageUrl: p.image_url });
       }
       results[platform] = r.ok ? r : { ...r, kind: classifyPublishError(r.error) };
       if (r.ok) ok++;
@@ -70,7 +78,7 @@ export async function publishDuePosts(budgetMs = 20_000): Promise<{ claimed: num
     const tgChat = (p as { telegram_chat?: string | null }).telegram_chat;
     if (tgChat && ok > 0 && !(p.results as { telegram?: { ok?: boolean } } | null | undefined)?.telegram?.ok) {
       const { publishTelegram } = await import("./brain");
-      results.telegram = await publishTelegram(p.organization_id, tgChat, { body: p.body, image_url: p.image_url, video_url: p.video_url ?? null }).catch((e) => ({ ok: false, error: (e as Error).message }));
+      results.telegram = await publishTelegram(p.organization_id, tgChat, { body: outgoingText(p.body, p.source), image_url: p.image_url, video_url: p.video_url ?? null }).catch((e) => ({ ok: false, error: (e as Error).message }));
     }
     const status = ok === p.platforms.length ? "published" : ok > 0 ? "partial" : "failed";
     const attempts = Number((p.results as { _attempts?: number } | null | undefined)?._attempts ?? 0) + 1;

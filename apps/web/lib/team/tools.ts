@@ -58,7 +58,7 @@ export async function automatedContactIds(orgId: string, ids: (string | null)[])
   return out;
 }
 
-export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: { actorUser: string | null; locale: string; interactive: boolean }): Promise<ToolRun> {
+export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: { actorUser: string | null; locale: string; interactive: boolean; /** the employee running the tool (shown to managers on what it creates) */ agentName?: string | null }): Promise<ToolRun> {
   const db = createAdminClient();
   try {
     switch (tool) {
@@ -137,13 +137,29 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
       }
       case "social.save_draft": {
         // upgrade 9: the employee's finished post, saved AS WRITTEN as a draft (a picture follows in the background); never publishes
-        const text = s(args.text).trim().slice(0, 5000);
-        if (text.length < 20) return { ok: false, summary: "", error: "too_short" };
+        // hygiene (additive): only the post itself is saved — the employee's notes / assumptions, markdown and reports about the
+        // post ("scheduling confirmation, post id …") never reach the board as a "post"
+        const { cleanPostBody, nextFreeSlot } = await import("@/lib/social/post-hygiene-core");
+        const cleaned = cleanPostBody(s(args.text));
+        if (!cleaned.ok) return { ok: false, summary: "", error: cleaned.reason === "not_a_post" ? "not_a_post: send only the post text a customer will read (no notes, ids or confirmations)" : "too_short" };
+        const text = cleaned.text;
         // the same post is never saved twice (a retry / a continuation of the same task)
         const { data: same } = await db.from("social_posts").select("id").eq("organization_id", orgId).eq("body", text).in("status", ["draft", "scheduled", "published"]).gte("created_at", ago(3 * 1440)).limit(1).maybeSingle();
         if (same) return { ok: true, summary: `post draft already saved (id ${same.id})`, data: { id: same.id }, link: "/social" };
-        const when = s(args.when_iso) && Date.parse(s(args.when_iso)) > Date.now() ? new Date(s(args.when_iso)) : (() => { const d = new Date(Date.now() + 86_400_000); d.setUTCHours(8, 0, 0, 0); return d; })();
-        const { data: row, error } = await db.from("social_posts").insert({ organization_id: orgId, platforms: ["facebook"], body: text, scheduled_at: when.toISOString(), status: "draft", source: "agent", origin: "studio", media_pending: "image" }).select("id").single();
+        let when: Date;
+        if (s(args.when_iso) && Date.parse(s(args.when_iso)) > Date.now()) when = new Date(s(args.when_iso));
+        else {
+          // no time asked → the next free morning (drafts no longer pile up on the same minute)
+          const { data: taken } = await db.from("social_posts").select("scheduled_at").eq("organization_id", orgId).in("status", ["draft", "scheduled"]).gte("scheduled_at", new Date().toISOString()).limit(60);
+          when = nextFreeSlot(((taken ?? []) as { scheduled_at: string }[]).map((x) => x.scheduled_at), new Date());
+        }
+        const base = { organization_id: orgId, platforms: ["facebook"], body: text, scheduled_at: when.toISOString(), status: "draft", source: "agent", origin: "studio", media_pending: "image" };
+        const agentName = String(ctx.agentName ?? "").trim().slice(0, 60);
+        // the employee who wrote it (for the managers on the board); before the column exists the post is saved without it
+        const withAgent: Record<string, unknown> = agentName ? { ...base, agent_name: agentName } : base;
+        let ins = await db.from("social_posts").insert(withAgent).select("id").single();
+        if (ins.error && agentName && /agent_name/.test(ins.error.message ?? "")) ins = await db.from("social_posts").insert(base).select("id").single();
+        const { data: row, error } = ins;
         return row ? { ok: true, summary: `post draft saved (id ${row.id}) — waiting for the owner on the posts board`, data: { id: row.id }, link: "/social" } : { ok: false, summary: "", error: error?.message?.slice(0, 200) ?? "save_failed" };
       }
       case "social.performance": {

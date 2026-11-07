@@ -48,7 +48,17 @@ export async function notifyOwners(orgId: string, titleKey: string, params: Reco
   if (rows.length) await admin.from("notifications").insert(rows);
 }
 
+/**
+ * Time guard of the current agents round (additive): set by runAgentsCron to the end of its server call. An AI call never starts
+ * with less than 6s left and never waits past that end (before, a call that started near the end of the budget ran past the
+ * server call's limit and the round was cut off mid-write). Outside a round (a button, a test) there is no end time.
+ */
+let roundEndsAt: number | null = null;
+
 export async function ai(org: Org, feature: "marketing" | "sales_manager" | "brief" | "collections", system0: string, user: string, maxTokens = 700): Promise<string | null> {
+  // (a round that ended long ago — e.g. it threw before resetting — never blocks later calls)
+  if (roundEndsAt !== null && Date.now() > roundEndsAt + 120_000) roundEndsAt = null;
+  if (roundEndsAt !== null && roundEndsAt - Date.now() < 6_000) return null;
   // shared brain (additive): the smart team reads the same owner-confirmed business facts as the digital team, so every agent works
   // from ONE truth (prices, hours, policies) and no agent contradicts another. Empty when there are none / unavailable.
   const facts = await import("@/lib/team/business-facts").then((m) => m.factsPromptFor(org.id, `${system0.slice(0, 400)} ${user.slice(0, 600)}`)).catch(() => "");
@@ -66,7 +76,7 @@ export async function ai(org: Org, feature: "marketing" | "sales_manager" | "bri
     patienceMs: 15_000,
     // time guard (additive): a smart-team call never waits + retries past ~22s (the clock that runs these agents shares one
     // server call with other work — a long busy-wait used to cut the whole round off)
-    hardDeadlineAt: Date.now() + 22_000,
+    hardDeadlineAt: roundEndsAt !== null ? Math.min(Date.now() + 22_000, roundEndsAt - 2_000) : Date.now() + 22_000,
   });
   return out.ok ? out.text.trim() : null;
 }
@@ -404,7 +414,8 @@ export async function runMarketing(orgId: string, config: Record<string, unknown
   }
   const slots = scheduleSlots(plan.length, new Date());
   // Instagram needs an image — text-only posts go to Facebook only
-  const rows = plan.map((p, i) => ({ organization_id: orgId, platforms: p.platforms.filter((x) => x === "facebook"), body: p.text, scheduled_at: slots[i]!.toISOString(), status: autoPublish ? "scheduled" : "draft", source: "agent" }));
+  const { plainForSocial } = await import("@/lib/social/post-hygiene-core");
+  const rows = plan.map((p, i) => ({ organization_id: orgId, platforms: p.platforms.filter((x) => x === "facebook"), body: plainForSocial(p.text) || p.text, scheduled_at: slots[i]!.toISOString(), status: autoPublish ? "scheduled" : "draft", source: "agent" }));
   const { error } = await admin.from("social_posts").insert(rows.map((r) => ({ ...r, platforms: r.platforms.length ? r.platforms : ["facebook"] })));
   if (error) {
     await logRun(orgId, "marketing", `save failed: ${error.message}`.slice(0, 300), {}, 0);
@@ -423,6 +434,8 @@ export async function runMarketing(orgId: string, config: Record<string, unknown
 /* ------------------------------------------------------------------ scheduler */
 export async function runAgentsCron(budgetMs = 50_000): Promise<Record<string, unknown>> {
   const started = Date.now();
+  // the round ends a little after its budget (the server call has ~10s more); every AI call of the round respects it
+  roundEndsAt = started + budgetMs + 6_000;
   const admin = createAdminClient();
   const out: Record<string, unknown> = {};
   const left = () => budgetMs - (Date.now() - started);
@@ -482,5 +495,6 @@ export async function runAgentsCron(budgetMs = 50_000): Promise<Record<string, u
     const { runReviewsSync } = await import("@/lib/social/reviews-agent");
     out.reviews = await runReviewsSync(Math.min(20_000, left() - 3000)).catch((e) => ({ error: (e as Error).message }));
   }
+  roundEndsAt = null;
   return out;
 }
