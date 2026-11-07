@@ -7247,7 +7247,10 @@
       "pending": "To do",
       "in_progress": "Working",
       "awaiting": "Waiting for you",
-      "done": "Finished"
+      "done": "Finished",
+      "autoRetry": "🔄 The system will try again by itself — nothing to do",
+      "waitingDep": "Waiting for an earlier task that failed — it resumes by itself once that one succeeds",
+      "retryNow": "Try again now"
     },
     "task": {
       "direct": "A direct task",

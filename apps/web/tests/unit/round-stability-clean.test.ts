@@ -85,3 +85,22 @@ describe("AI stability + sync + speed", () => {
     expect(read("next.config.ts")).toContain("staleTimes: { dynamic: 30, static: 180 }");
   });
 });
+
+describe("never a silent failure on the board + a paid safety net", () => {
+  it("failed tasks show why, whether they retry by themselves, and 'try again now'", () => {
+    const p = read("components/ai-team/panels.tsx");
+    expect(p).toContain('data-testid="task-failure"');
+    expect(p).toContain("const r = await restartTaskAction({ locale, id });");
+    expect(p).toContain("ownerFailure(x.error,");
+    expect(read("lib/team/page-data.ts")).toContain("updated_at, error, attempts");
+    for (const l of ["he", "en", "ar"]) {
+      const b = JSON.parse(read(`lib/i18n/dictionaries/${l}.json`)).aiTeam.board;
+      for (const k of ["autoRetry", "waitingDep", "retryNow"]) expect(typeof b[k], `${l}.${k}`).toBe("string");
+    }
+  });
+  it("when every free engine failed, ONE configured paid engine is tried before giving up", () => {
+    const r = read("lib/ai/router.ts");
+    expect(r).toContain("paid safety net (additive)");
+    expect(r).toContain("PAID_PROVIDERS.includes(c.provider) && !isResting(c, rests)");
+  });
+});

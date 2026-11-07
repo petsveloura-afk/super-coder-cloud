@@ -15,7 +15,7 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
   const [settings, { data: members }, { data: tasks }, { data: approvals }, { data: memory }, { data: activity }, { data: extras }, { data: meetingRow }, stats, routingRows] = await Promise.all([
     runner.loadSettings(org),
     a.from("team_members").select("id, role_key, name, title, avatar, tone, instructions, tools, autonomy, auto_actions, reports_to, status, limits, position").eq("organization_id", org).order("position"),
-    a.from("team_tasks").select("id, title, brief, status, priority, assignee_id, goal_id, parent_id, origin, question, depends_on, credits_used, created_at, finished_at, plan, result, updated_at").eq("organization_id", org).gte("updated_at", since).order("created_at", { ascending: false }).limit(250),
+    a.from("team_tasks").select("id, title, brief, status, priority, assignee_id, goal_id, parent_id, origin, question, depends_on, credits_used, created_at, finished_at, plan, result, updated_at, error, attempts").eq("organization_id", org).gte("updated_at", since).order("created_at", { ascending: false }).limit(250),
     a.from("team_approvals").select("id, task_id, member_id, tool, preview, reason, sensitivity, status, payload, created_at").eq("organization_id", org).eq("status", "pending").order("created_at").limit(100),
     a.from("team_memory").select("id, member_id, layer, kind, subject, content, confidence, status, created_at").eq("organization_id", org).neq("status", "expired").order("created_at", { ascending: false }).limit(400),
     a.from("team_activity").select("id, task_id, member_id, phase, summary, ok, created_at").eq("organization_id", org).order("id", { ascending: false }).limit(60),

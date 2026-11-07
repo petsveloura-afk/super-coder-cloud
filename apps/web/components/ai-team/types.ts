@@ -49,6 +49,9 @@ export interface TeamTaskView {
   finished_at: string | null;
   plan: Record<string, unknown>;
   result: Record<string, unknown>;
+  /** why a failed / blocked task stopped (technical code — shown to the owner as one clear sentence) */
+  error?: string | null;
+  attempts?: number | null;
 }
 
 export interface ApprovalView {

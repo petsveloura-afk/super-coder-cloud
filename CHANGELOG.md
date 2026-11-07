@@ -1,5 +1,15 @@
 # Changelog
 
+## The task board explains every failure, plus a paid safety net for AI
+
+- **Failed tasks:**
+  - Each failed task shows WHY, in one clear sentence.
+  - It shows whether the system will retry by itself (temporary AI or network problems).
+  - It has a "Try again now" button: the existing restart, then an immediate run.
+- **Blocked tasks:** a task blocked by a failed earlier task says it is waiting and that it resumes by itself.
+- **Paid safety net:** when every free AI engine failed or the call limit was reached, ONE configured paid engine (OpenAI / Anthropic) is tried before giving up. Before, the paid engines sat at the end of a long list and were never reached.
+- No migration.
+
 ## Stable AI for the digital team, synced counters, faster menus, clean-up, spam filter, security layer
 
 - **AI stability:**

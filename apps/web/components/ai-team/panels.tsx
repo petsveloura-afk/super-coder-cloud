@@ -7,6 +7,8 @@ import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { AgentAvatar } from "./avatar";
+import { restartTaskAction } from "@/app/[locale]/(dashboard)/ai-team/plus8-actions";
+import { ownerFailure } from "@/lib/team/failure-reason-core";
 import { CleanupBar, SelectTick, useCleanup, useSelection } from "@/components/ui/cleanup";
 import { HealthPanel } from "./health-panel";
 import { DayHealthCard } from "./day-health-card";
@@ -263,7 +265,20 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
         </Card>
       ) : null}
 
-      <TaskBoard data={data} busy={busy} onRun={(id) => run(`r${id}`, () => runTaskNowAction({ locale, taskId: id }))} onCancel={(id) => run(`x${id}`, () => cancelTaskAction({ locale, taskId: id }))} />
+      <TaskBoard
+        data={data}
+        busy={busy}
+        onRun={(id) => run(`r${id}`, () => runTaskNowAction({ locale, taskId: id }))}
+        onCancel={(id) => run(`x${id}`, () => cancelTaskAction({ locale, taskId: id }))}
+        onRetry={(id) =>
+          run(`t${id}`, async () => {
+            // a failed task gets a fresh start (the existing restart) and runs right away
+            const r = await restartTaskAction({ locale, id });
+            if (r.error) return r;
+            return runTaskNowAction({ locale, taskId: id });
+          })
+        }
+      />
 
       <Card className="p-4">
         <h3 className="mb-2 flex items-center gap-2 font-semibold">
@@ -313,7 +328,7 @@ const COLUMNS: { key: string; statuses: string[] }[] = [
   { key: "done", statuses: ["done", "failed", "canceled"] },
 ];
 
-function TaskBoard({ data, busy, onRun, onCancel }: { data: TeamPageData; busy: string | null; onRun: (id: string) => void; onCancel: (id: string) => void }) {
+function TaskBoard({ data, busy, onRun, onCancel, onRetry }: { data: TeamPageData; busy: string | null; onRun: (id: string) => void; onCancel: (id: string) => void; onRetry?: (id: string) => void }) {
   const { t, locale } = useI18n();
   const tasks = data.tasks.filter((x) => !(x.plan as { goal?: boolean })?.goal && x.status !== "draft");
   // keep it clean (additive): finished tasks can be hidden per user (select / select all / clear all) — nothing is deleted
@@ -359,6 +374,30 @@ function TaskBoard({ data, busy, onRun, onCancel }: { data: TeamPageData; busy: 
                         {report ? <p className="mt-1 line-clamp-3 text-[11.5px] text-muted">{report}</p> : null}
                       </div>
                     </div>
+                    {x.status === "failed" || (x.status === "blocked" && x.error) ? (
+                      // transparency (additive): WHY it stopped, whether it retries by itself, and "try again now"
+                      <div className="mt-1.5 rounded-xl bg-surface-hover/60 p-2 text-[11.5px]" data-testid="task-failure">
+                        {x.status === "blocked" && x.error === "dependency_failed" ? (
+                          <p className="text-muted">{t("aiTeam.board.waitingDep")}</p>
+                        ) : (
+                          (() => {
+                            const f = ownerFailure(x.error, locale === "en" || locale === "ar" ? locale : "he");
+                            const auto = x.status === "failed" && f.retryable && (f.code === "ai_busy" || f.code === "network" || f.code === "ai_unreadable") && (x.attempts ?? 0) < 10;
+                            return (
+                              <>
+                                <p className="text-muted">{f.text}</p>
+                                {auto ? <p className="mt-0.5 font-medium text-accent">{t("aiTeam.board.autoRetry")}</p> : null}
+                              </>
+                            );
+                          })()
+                        )}
+                        {x.status === "failed" && onRetry ? (
+                          <Button size="sm" variant="secondary" className="mt-1.5" loading={busy === `t${x.id}`} onClick={() => onRetry(x.id)} data-testid="task-retry">
+                            <Play className="h-3.5 w-3.5" /> {t("aiTeam.board.retryNow")}
+                          </Button>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {x.status === "pending" || x.status === "blocked" ? (
                       <div className="mt-1.5 flex gap-1">
                         {x.status === "pending" ? (

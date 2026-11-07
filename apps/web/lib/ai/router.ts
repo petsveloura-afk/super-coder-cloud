@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { anthropicCall, geminiCall, openaiCall, openaiCompatibleCall, type AIMessage } from "./providers";
-import { buildCandidates, callTimeoutMs, classifyError, isResting, isTinyModel, laneOrder, NO_JSON_MODE, restKey, soonestReady, type RouteCandidate, type RouteProvider } from "./router-core";
+import { PAID_PROVIDERS, buildCandidates, callTimeoutMs, classifyError, isResting, isTinyModel, laneOrder, NO_JSON_MODE, restKey, soonestReady, type RouteCandidate, type RouteProvider } from "./router-core";
 import { capRest, probeOrder, restKeysOf, withDeadline } from "./resilience-core";
 
 /**
@@ -248,6 +248,31 @@ export async function generateRouted(input: {
       failedBy.set(c.provider, (failedBy.get(c.provider) ?? 0) + 1);
       if (cl.kind !== "rate" && cl.kind !== "daily" && cl.kind !== "server") onlyBusy = false;
       await rest(restKey(c, cl.scope), capRest(cl, process.env), `${cl.kind}: ${cl.reason}`);
+    }
+  }
+  // paid safety net (additive): free engines all failed / ran out of calls → ONE try on a configured paid engine (OpenAI / Anthropic)
+  // before giving up. Before, the paid engines sat at the end of a long list and the call limit was reached before them.
+  if (!attempts.some((a) => a.ok)) {
+    const paid = cands.find((c) => PAID_PROVIDERS.includes(c.provider) && !isResting(c, rests) && !attempts.some((a) => a.keyId === c.keyId && a.model === c.model) && !(input.skipProviders ?? []).includes(c.provider));
+    const left = budget - (Date.now() - started);
+    if (paid && left >= 5000) {
+      const t0 = Date.now();
+      try {
+        const r = await callOne(paid, { system: input.system, messages: input.messages, temperature: input.temperature ?? 0.4, maxTokens: input.maxTokens ?? 600, json: input.json }, Math.min(20_000, left));
+        if (r.text) {
+          attempts.push({ provider: paid.provider, model: paid.model, keyId: paid.keyId, ok: true, ms: Date.now() - t0 });
+          noteHealth(attempts[attempts.length - 1]);
+          clearRestsOf(paid);
+          lease();
+          return { ...r, provider: paid.provider, attempts };
+        }
+        attempts.push({ provider: paid.provider, model: paid.model, keyId: paid.keyId, ok: false, ms: Date.now() - t0, reason: "empty answer (paid safety net)" });
+      } catch (e) {
+        const cl = classifyError((e as Error).message ?? String(e));
+        attempts.push({ provider: paid.provider, model: paid.model, keyId: paid.keyId, ok: false, ms: Date.now() - t0, reason: `${cl.reason} (paid safety net)` });
+        noteHealth(attempts[attempts.length - 1]);
+        await rest(restKey(paid, cl.scope), capRest(cl, process.env), `${cl.kind}: ${cl.reason}`);
+      }
     }
   }
   // quality gate: nothing stronger answered → the tiny model's answer is still better than no answer
