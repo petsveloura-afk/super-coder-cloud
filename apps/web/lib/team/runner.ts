@@ -174,7 +174,24 @@ export async function availableModels(): Promise<{ provider: string; model: stri
   return buildCandidates({ env: process.env, random: () => 0 }).map((c) => ({ provider: c.provider, model: c.model }));
 }
 
+// stability (additive): at most 4 team AI calls at once per server instance — no self-made burst against the same keys
+let teamAiGate: import("./ai-gate-core").AiGate | null = null;
+
 function teamAi(orgId: string, pref: RoutingPref, onRoute: (kind: TaskKind, chosen: string, used: string) => void, deadlineAt?: number): EngineDeps["ai"] {
+  const inner = teamAiCall(orgId, pref, onRoute, deadlineAt);
+  return async (kind, system, user, maxTokens) => {
+    const { AiGate, gateWaitMs } = await import("./ai-gate-core");
+    teamAiGate ??= new AiGate(4);
+    const release = await teamAiGate.acquire(gateWaitMs(deadlineAt ? deadlineAt - Date.now() : null));
+    try {
+      return await inner(kind, system, user, maxTokens);
+    } finally {
+      release();
+    }
+  };
+}
+
+function teamAiCall(orgId: string, pref: RoutingPref, onRoute: (kind: TaskKind, chosen: string, used: string) => void, deadlineAt?: number): EngineDeps["ai"] {
   return async (kind, system, user, maxTokens) => {
     // time guard (additive): the server function ends at a fixed time — an AI call never starts without enough time left, and
     // never waits past it. Before, a long run was cut off by the platform mid-task, the task looked "stuck" and after a few such
@@ -197,6 +214,13 @@ function teamAi(orgId: string, pref: RoutingPref, onRoute: (kind: TaskKind, chos
       await new Promise((r) => setTimeout(r, 2_500));
       const left2 = deadlineAt ? deadlineAt - Date.now() : null;
       res = await runAISystem({ orgId, feature: "copilot", system, messages: [{ role: "user", content: user }], temperature: kind === "classify" || kind === "review" || kind === "plan" ? 0.2 : 0.6, maxTokens, patienceMs: left2 !== null ? Math.max(8_000, Math.min(25_000, left2 - 6_000)) : 25_000, routeProvider: null, routeModel: null, ...(deadlineAt ? { hardDeadlineAt: deadlineAt - 3_000 } : {}) });
+    }
+    // stability (additive): still busy → one last, calmer try a few seconds later (a short rate-limit window usually clears),
+    // only when the run still has the time for it — before, the task failed here and waited minutes for the retry round
+    if (!res.ok && (res.error === "ai.busy" || res.error === "ai.failed") && (deadlineAt === undefined || deadlineAt - Date.now() > 20_000)) {
+      await new Promise((r) => setTimeout(r, 4_000));
+      const left3 = deadlineAt ? deadlineAt - Date.now() : null;
+      res = await runAISystem({ orgId, feature: "copilot", system, messages: [{ role: "user", content: user }], temperature: kind === "classify" || kind === "review" || kind === "plan" ? 0.2 : 0.6, maxTokens, patienceMs: left3 !== null ? Math.max(6_000, Math.min(20_000, left3 - 6_000)) : 20_000, routeProvider: null, routeModel: null, ...(deadlineAt ? { hardDeadlineAt: deadlineAt - 3_000 } : {}) });
     }
     // upgrade 2: the circuit breaker learns from every call (a model that keeps failing is skipped for a while)
     // upgrade 8 (bug fix): a call that SUCCEEDED through a fallback no longer counts as a failure of the first engine
@@ -370,6 +394,7 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
     share: (items) => writeShared(orgId, items),
     rememberClient: (contactId, items) => writeShared(orgId, items.map((i) => ({ ...i, subject: i.subject.startsWith(clientSubject(contactId)) ? i.subject : `${clientSubject(contactId)}:${i.subject}` }))),
     lang,
+    tz: (orgTz?.timezone as string) || "Asia/Jerusalem",
     interactive: opts.interactive,
     ai: teamAi(orgId, settings.routing_pref, (kind, chosen, used) => routes.push({ kind, chosen, used }), deadlineAt),
     runTool: async (tool, args) => {

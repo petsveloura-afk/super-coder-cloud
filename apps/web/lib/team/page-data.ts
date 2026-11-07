@@ -174,6 +174,18 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     } catch {
       /* display translation is optional */
     }
+    // display tidy-up (additive): no database ids, validation codes, raw timestamps or "(ASSUMPTION)" markers on the screen
+    try {
+      const { tidyActivityText } = await import("@/lib/team/activity-tidy-core");
+      data.activity = data.activity.map((x) => ({ ...x, summary: tidyActivityText(x.summary, lang8) }));
+      if (data.ownerLog) data.ownerLog = data.ownerLog.map((e) => (e.text ? { ...e, text: tidyActivityText(e.text, lang8) } : e));
+      data.tasks = data.tasks.map((x) => {
+        const r = (x.result ?? null) as { report?: unknown } | null;
+        return r && typeof r.report === "string" ? { ...x, result: { ...r, report: tidyActivityText(r.report, lang8) } } : x;
+      });
+    } catch {
+      /* display clean-up is optional */
+    }
     const [skipped, { data: bad }, resp] = await Promise.all([
       // "add a key in Vercel" is platform work — business owners never see it
       opts.platformAdmin ? p8.loadSkippedProviders(lang8) : Promise.resolve([]),

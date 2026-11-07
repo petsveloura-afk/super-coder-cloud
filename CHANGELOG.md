@@ -1,5 +1,21 @@
 # Changelog
 
+## Digital team: steps no longer fail on unknown ids or dates, no AI bursts, clean log
+
+- **Root cause:** an employee plans its steps BEFORE it reads anything. Steps like "add a note to each lead" or "create a follow-up task tomorrow 9:00" were planned with ids it did not have yet ("the lead from step 1") and dates in free form ("2026-11-10 09:00 (ASSUMPTION)", "מחר"). Strict validation refused them ("bad:contact_id", "bad:due_iso"), the same refusal repeated for every similar step, and the task ended "partially done".
+- **Argument repair** (`lib/team/arg-repair-core.ts`, before validation):
+  - Dates in any common form become real times in the business's time zone: ISO with or without a zone, day-first `10/11/2026 14:30`, `10.11`, today / tomorrow / מחר / בעוד 3 ימים / بكرة / next week. An optional unreadable date is left out instead of failing the step.
+  - Ids written inside text are extracted.
+  - A contact that is not an id is taken from the contacts the employee already read in this run. One contact → used; several → the step runs once for each (up to 4); none → a clear reason ("find the contact first"), not a raw code.
+  - The same tool failing the same way twice is not tried a third time in the run.
+  - The planner is told to read ids first (more=true) and to write dates as ISO.
+- **No self-made AI bursts** (`lib/team/ai-gate-core.ts`):
+  - At most 4 team AI calls at once per server instance. The next one waits a few seconds for a slot, never past its own time.
+  - A third, calmer AI try (after 4s) when the run still has 20s+. Before, the task failed here and waited minutes for the retry round.
+- **The board:** a failed task the system retries by itself (busy engines / network) shows as "retrying by itself" with a waiting avatar, not as a red failure.
+- **Clean log on the team screen** (display only, `lib/team/activity-tidy-core.ts`): no database ids, validation codes, list indexes or raw timestamps; "(ASSUMPTION)" is shown in the business language.
+- No migration.
+
 ## Design 3.0: navigation progress, brand loaders, phone finish, task history delete
 
 - **Delete old tasks in every stage** (`ai-team/history-actions.ts`, managers only — `ai.manage`):

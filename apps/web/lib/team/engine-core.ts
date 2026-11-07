@@ -20,6 +20,7 @@ import { firstJsonObjectTolerant } from "./json-repair-core";
 import { ROLES, type RoleKey, type Autonomy } from "./roles";
 import { playbookPrompt } from "./playbooks";
 import { TOOL_MAP, toolsPrompt, validateArgs } from "./tools-core";
+import { SAME_FAILURE_LIMIT, failureKey, knownContactIds, repairArgs } from "./arg-repair-core";
 import { budgetStop, decide, isLoop } from "./policy-core";
 import { memoryPrompt, recall, type MemoryItem } from "./memory-core";
 import { SAFETY_RULES, asData, escalationSignal, inventedPrices, leaks } from "./safety-core";
@@ -96,6 +97,8 @@ export interface TeamContext {
 
 export interface EngineDeps {
   lang: "he" | "en" | "ar";
+  /** (optional) the business's time zone — dates the employee writes ("tomorrow 9:00") are read in it */
+  tz?: string;
   interactive: boolean;
   ai(kind: TaskKind, system: string, user: string, maxTokens: number): Promise<AiResult>;
   runTool(tool: string, args: Record<string, string | number>): Promise<ToolRun>;
@@ -253,6 +256,7 @@ const PLAN_FORMAT = [
   ' "deliverable": {"type": "none|text|report|message|review_reply|reminder|post", "customer_facing": true|false, "contact_id": "uuid when the deliverable is a message/reminder to a customer", "review_id": "uuid for review_reply", "instructions": "what the final output must contain"},',
   ' "risks": ["…"], "estimate": {"credits": n, "minutes": n}}',
   "Use only your tools. Read before you write. Never invent ids — get them from read tools. Prefer the smallest plan that does the job well.",
+  "Ids and dates: a write step that needs an id you have not read yet (contact_id, deal_id …) belongs in the NEXT round — read first, set more=true, then write with the real ids from the results. Dates as ISO 8601 (2026-11-10T09:00:00+02:00).",
   "Plan like a senior professional: put ALL the relevant read tools in the first round so you decide on evidence (set more=true), then write; in \"understanding\" state the measurable goal; in \"assumptions\" list every assumption; in \"risks\" list what could make the result wrong; in deliverable.instructions say exactly which sections the output needs.",
 ].join("\n");
 
@@ -416,6 +420,8 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
     // 4 — execute
     // upgrade 2 (additive): independent read-only tools start together (same checks as below); results are consumed in plan order
     const prefetch = new Map<PlanStep, Promise<ToolRun>>();
+    // identical failures per tool in this round (see arg-repair-core.SAME_FAILURE_LIMIT)
+    const sameFail = new Map<string, number>();
     {
       const reads = parsed.steps
         .filter((st) => {
@@ -445,8 +451,30 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
         await deps.log("execute", `Blocked: "${step.tool}" is not a platform tool.`, { tool: step.tool }, false);
         continue;
       }
+      // argument repair (additive): dates in any common form, ids written inside text, and "the lead from step 1" resolved from
+      // what this employee already read — several contacts → the step runs for each of them (see arg-repair-core)
+      {
+        const rep = repairArgs(TOOL_MAP[step.tool]!.args, step.args, { known: knownContactIds(results.map((r) => r.summary)), tz: deps.tz ?? "Asia/Jerusalem" });
+        if (rep.blocked) {
+          results.push({ tool: step.tool, ok: false, summary: rep.blocked });
+          await deps.log("execute", `${step.tool}: ${rep.blocked}.`, { tool: step.tool, repair: "blocked" }, false);
+          continue;
+        }
+        if (rep.fanOut.length > 1) {
+          const at = parsed.steps.indexOf(step);
+          parsed.steps.splice(at + 1, 0, ...rep.fanOut.slice(1).map((args) => ({ ...step, args })));
+        }
+        step.args = rep.args;
+        if (rep.notes.length) await deps.log("execute", `${step.tool}: arguments completed (${rep.notes.join("; ").slice(0, 200)}).`, { tool: step.tool, repair: rep.notes }, true);
+      }
+      // the same tool failing the same way twice is not tried again in this run (no wall of identical failures)
+      if ([...sameFail.entries()].some(([k, n]) => k.startsWith(`${step.tool}::`) && n >= SAME_FAILURE_LIMIT)) {
+        results.push({ tool: step.tool, ok: false, summary: "skipped: the same step already failed twice in this run" });
+        continue;
+      }
       const v = validateArgs(step.tool, step.args);
       if (!v.ok) {
+        sameFail.set(failureKey(step.tool, v.error), (sameFail.get(failureKey(step.tool, v.error)) ?? 0) + 1);
         results.push({ tool: step.tool, ok: false, summary: v.error });
         await deps.log("execute", `${step.tool}: invalid arguments (${v.error}).`, { tool: step.tool }, false);
         continue;
@@ -522,6 +550,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
       }
       const r = await (prefetch.get(step) ?? retryTool(deps, step.tool, v.args));
       results.push({ tool: step.tool, ok: r.ok, summary: r.ok ? r.summary : r.error ?? "failed" });
+      if (!r.ok) sameFail.set(failureKey(step.tool, r.error), (sameFail.get(failureKey(step.tool, r.error)) ?? 0) + 1);
       if (spec.kind !== "read") {
         // only WRITE actions count: five reads in a row are normal work, five identical writes are not
         ran.push({ tool: step.tool, at: Date.now(), ok: r.ok });

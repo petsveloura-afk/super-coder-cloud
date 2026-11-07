@@ -410,6 +410,13 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
   );
 }
 
+/** a failed task the system retries by itself (busy engines / network) — shown as "retrying", not as a red failure */
+function autoRetrying(x: TeamTaskView): boolean {
+  if (x.status !== "failed") return false;
+  const f = ownerFailure(x.error, "he");
+  return f.retryable && (f.code === "ai_busy" || f.code === "network" || f.code === "ai_unreadable") && (x.attempts ?? 0) < 10;
+}
+
 const COLUMNS: { key: string; statuses: string[] }[] = [
   { key: "pending", statuses: ["pending", "blocked"] },
   { key: "in_progress", statuses: ["in_progress"] },
@@ -549,11 +556,11 @@ function BoardColumn({
             <li key={x.id} className="feed-in task-card rounded-2xl border border-line bg-surface p-2.5 text-[12.5px]" data-testid="task-card">
               <div className="flex items-start gap-2">
                 {selection.on ? <SelectTick checked={selection.isSelected(x.id)} onChange={() => selection.toggle(x.id)} label={x.title} /> : null}
-                {m ? <AgentAvatar spec={m.avatar} state={x.status === "in_progress" ? "working" : x.status.startsWith("awaiting") ? "waiting" : x.status === "done" ? "success" : x.status === "failed" ? "error" : "idle"} size={28} /> : null}
+                {m ? <AgentAvatar spec={m.avatar} state={x.status === "in_progress" ? "working" : x.status.startsWith("awaiting") ? "waiting" : x.status === "done" ? "success" : x.status === "failed" ? (autoRetrying(x) ? "waiting" : "error") : "idle"} size={28} /> : null}
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{x.title}</p>
                   <p className="text-[11px] text-subtle">
-                    {m?.name ?? "—"} · {t(`aiTeam.status.${x.status}`)} · {ago(x.created_at, locale)}
+                    {m?.name ?? "—"} · {autoRetrying(x) ? t("aiTeam.board.retrying") : t(`aiTeam.status.${x.status}`)} · {ago(x.created_at, locale)}
                     {x.depends_on.length ? ` · 🔗 ${x.depends_on.length}` : ""}
                   </p>
                   {report ? <p className="mt-1 line-clamp-3 text-[11.5px] text-muted">{report}</p> : null}
