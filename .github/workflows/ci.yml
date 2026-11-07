@@ -65,7 +65,8 @@ jobs:
           cache: pnpm
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # pinned (no GitHub API lookup → no "rate limit exceeded" when GitHub throttles anonymous calls)
+          version: 2.122.1
       - run: pnpm install --frozen-lockfile
       - name: Start Supabase (applies migrations + seed)
         run: supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor

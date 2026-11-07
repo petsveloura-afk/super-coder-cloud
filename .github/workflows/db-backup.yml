@@ -40,7 +40,8 @@ jobs:
       - uses: supabase/setup-cli@v1
         if: steps.cfg.outputs.skip == 'false'
         with:
-          version: latest
+          # pinned (no GitHub API lookup → no "rate limit exceeded" when GitHub throttles anonymous calls)
+          version: 2.122.1
       - name: Dump schema and data
         if: steps.cfg.outputs.skip == 'false'
         run: |
