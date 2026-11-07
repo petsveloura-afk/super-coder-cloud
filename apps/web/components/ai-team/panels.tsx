@@ -372,6 +372,15 @@ function TaskBoard({ data, busy, onRun, onCancel, onRetry }: { data: TeamPageDat
                           {x.depends_on.length ? ` · 🔗 ${x.depends_on.length}` : ""}
                         </p>
                         {report ? <p className="mt-1 line-clamp-3 text-[11.5px] text-muted">{report}</p> : null}
+                        {(x.result as { partial?: boolean })?.partial ? (
+                          // upgrade 9: honest completion — asked for a result that was not fully produced
+                          <span className="mt-1 inline-block rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-warning" data-testid="task-partial">{t("aiTeam.board.partial")}</span>
+                        ) : null}
+                        {Number((x.result as { drafts?: number })?.drafts ?? 0) > 0 ? (
+                          <a href={`/${locale}/social`} className="mt-1 ms-1 inline-block rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent hover:underline" data-testid="task-drafts">
+                            {t("aiTeam.board.drafts", { n: Number((x.result as { drafts?: number }).drafts) })}
+                          </a>
+                        ) : null}
                       </div>
                     </div>
                     {x.status === "failed" || (x.status === "blocked" && x.error) ? (

@@ -307,6 +307,8 @@ function PostDrawer({ post, onClose, brand }: { post: PostRow; onClose: () => vo
 
 function PostCard({ p, onEdit, isNew = false }: { p: PostRow; onEdit: () => void; isNew?: boolean }) {
   const { t, locale } = useI18n();
+  // the moment this card was first shown (past-due drafts badge) — read once, not on every render
+  const [shownAt] = useState(() => Date.now());
   const router = useRouter();
   const [pending, start] = useTransition();
   const act = (action: "approve" | "cancel" | "now") =>
@@ -358,6 +360,10 @@ function PostCard({ p, onEdit, isNew = false }: { p: PostRow; onEdit: () => void
         </p>
       </div>
       <PostMediaBadges p={p} />
+      {p.status === "draft" && Date.parse(p.scheduled_at) < shownAt ? (
+        // additive: a draft whose planned time already passed — approving it publishes right away (or pick a new time)
+        <p className="mt-2 rounded-lg bg-warning/10 px-2 py-1 text-[12px] text-warning" data-testid="post-past-due">{t("social.pastDue")}</p>
+      ) : null}
       {(p.status === "published" || p.status === "partial") && p.metrics && typeof p.engagement === "number" ? (
         <div className="mt-2 flex flex-wrap items-center gap-3 text-[12px] text-muted" data-testid="post-metrics">
           <span className="inline-flex items-center gap-1"><Heart className="h-3.5 w-3.5" /> {p.metrics.likes ?? 0}</span>

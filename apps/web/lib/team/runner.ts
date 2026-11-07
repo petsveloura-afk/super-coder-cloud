@@ -11,6 +11,7 @@ import { withRoleExtras } from "./tools-plus-core";
 import { withRoleExtras7 } from "./tools-plus7-core";
 import { withRoleExtras7c } from "./tools-plus7c-core";
 import { withRoleExtrasOrg8 } from "./tools-org8-core";
+import { withRoleExtras9 } from "./tools-plus9-core";
 import { automatedContactIds, runTeamTool } from "./tools";
 import { playbookPrompt } from "./playbooks";
 import { REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt } from "./doctrine";
@@ -194,7 +195,7 @@ interface MemberRow {
 const MEMBER_COLS = "id, role_key, name, tone, instructions, tools, autonomy, auto_actions, status, limits, reports_to, linked";
 
 function toEngine(m: MemberRow): EngineMember {
-  return { id: m.id, role: isRoleKey(m.role_key) ? m.role_key : "custom", name: m.name, tone: m.tone, instructions: m.instructions, tools: withRoleExtrasOrg8(m.role_key, withRoleExtras7c(m.role_key, withRoleExtras7(m.role_key, withRoleExtras(m.role_key, m.tools)))), autonomy: m.autonomy, auto_actions: m.auto_actions, status: m.status, limits: { max_steps: m.limits?.max_steps, max_credits: m.limits?.max_credits } };
+  return { id: m.id, role: isRoleKey(m.role_key) ? m.role_key : "custom", name: m.name, tone: m.tone, instructions: m.instructions, tools: withRoleExtras9(m.role_key, withRoleExtrasOrg8(m.role_key, withRoleExtras7c(m.role_key, withRoleExtras7(m.role_key, withRoleExtras(m.role_key, m.tools))))), autonomy: m.autonomy, auto_actions: m.auto_actions, status: m.status, limits: { max_steps: m.limits?.max_steps, max_credits: m.limits?.max_credits } };
 }
 
 async function members(orgId: string): Promise<MemberRow[]> {
@@ -405,6 +406,11 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
     message: async (kind, toMember, body) => {
       await a.from("team_messages").insert({ organization_id: orgId, task_id: taskId, from_member: member.id, to_member: toMember, kind, body });
     },
+    // upgrade 9: the SAME employee continues the work in a new run (a per-task limit stopped it before the end)
+    continueLater: async (input) => {
+      const { data } = await a.from("team_tasks").insert({ organization_id: orgId, parent_id: taskId, goal_id: claimed.goal_id ?? null, title: input.title.slice(0, 300), brief: input.brief.slice(0, 6000), assignee_id: member.id, depth: (claimed.depth as number) + 1, origin: "handoff", created_by: actorUser }).select("id").single();
+      return data ? { ok: true, taskId: data.id as string } : { ok: false };
+    },
     remember: (items) => writeMemories(orgId, member.id, items),
     context: async (): Promise<TeamContext> => {
       const profile = await cachedProfile(orgId, () => loadProfile(orgId));
@@ -486,7 +492,7 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
       steps_used: out.steps,
       credits_used: (claimed.credits_used as number) + out.credits,
       plan: out.plan ? (out.plan as unknown as Record<string, unknown>) : {},
-      result: { ...((claimed.result as Record<string, unknown>) ?? {}), report: out.report, output: out.output, approvals: out.approvals, handoffs: out.handoffs, routes: routes.slice(0, 12) },
+      result: { ...((claimed.result as Record<string, unknown>) ?? {}), report: out.report, output: out.output, approvals: out.approvals, handoffs: out.handoffs, routes: routes.slice(0, 12), ...(out.partial ? { partial: true, partial_reason: out.partialReason ?? null } : {}), ...(out.drafts ? { drafts: out.drafts, link: "/social" } : {}) },
       error: out.error,
       updated_at: new Date().toISOString(),
       finished_at: ["done", "failed", "blocked", "requires_connection"].includes(fin.status) ? new Date().toISOString() : null,
@@ -500,6 +506,16 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
     await writeFinal(false);
   }
   if (claimed.goal_id) await refreshGoal(orgId, claimed.goal_id as string);
+  // upgrade 9: new post drafts wait for the owner — the owners / admins get a notification (+ push) that points to the posts board
+  if (out.drafts) {
+    try {
+      const { data: owners } = await a.from("organization_members").select("user_id").eq("organization_id", orgId).in("role", ["agency_owner", "owner", "admin"]).limit(5);
+      const rows = ((owners ?? []) as { user_id: string }[]).map((o) => ({ organization_id: orgId, user_id: o.user_id, kind: "team_drafts", title_key: "aiTeam.draftsReady", params: { name: String(member.name), n: String(out.drafts) }, link: "/social" }));
+      if (rows.length) await a.from("notifications").insert(rows);
+    } catch {
+      /* a notification is a bonus — never fails the finished task */
+    }
+  }
   return out;
 }
 

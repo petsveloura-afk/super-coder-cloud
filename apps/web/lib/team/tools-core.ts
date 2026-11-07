@@ -8,6 +8,7 @@ import { UPGRADE4_TOOLS } from "./tools-plus-core";
 import { UPGRADE7_TOOLS } from "./tools-plus7-core";
 import { UPGRADE7C_TOOLS } from "./tools-plus7c-core";
 import { UPGRADE8_ORG_TOOLS } from "./tools-org8-core";
+import { UPGRADE9_TOOLS } from "./tools-plus9-core";
 
 export type ToolKind = "read" | "write";
 /** internal: only inside the business · customer: visible to customers · money: involves payment · irreversible */
@@ -70,6 +71,7 @@ TOOLS.push(...UPGRADE4_TOOLS);
 TOOLS.push(...UPGRADE7_TOOLS);
 TOOLS.push(...UPGRADE7C_TOOLS);
 TOOLS.push(...UPGRADE8_ORG_TOOLS);
+TOOLS.push(...UPGRADE9_TOOLS);
 
 export const TOOL_MAP: Record<string, ToolSpec> = Object.fromEntries(TOOLS.map((t) => [t.key, t]));
 

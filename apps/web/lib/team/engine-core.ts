@@ -13,6 +13,7 @@
  *   8 summarize    a short report + episodic memory
  */
 import { GRANT_TOOL, grantPreview, grantReason, grantable } from "./permission-core";
+import { DELIVERY_RULES, FINISH_RESERVE, completionVerdict, continuationBrief, continuationTitle, extractPosts, wantsOutput, wantsPosts } from "./execution-plus-core";
 import { firstJsonObject as firstJsonObjectStrict } from "@/lib/operator/operator-core";
 import { firstJsonObjectTolerant } from "./json-repair-core";
 import { ROLES, type RoleKey, type Autonomy } from "./roles";
@@ -100,6 +101,8 @@ export interface EngineDeps {
   log(phase: Phase, summary: string, details?: Record<string, unknown>, ok?: boolean): Promise<void>;
   approval(input: { tool: string; payload: Record<string, unknown>; preview: string; reason: string; sensitivity: string; /** upgrade 3: needs two explicit confirmations */ double?: boolean }): Promise<string | null>;
   handoff(input: { role: string; title: string; brief: string }): Promise<{ ok: boolean; taskId?: string; error?: string }>;
+  /** upgrade 9: the SAME employee continues this task in a new run (a limit stopped the work before the end) */
+  continueLater?(input: { title: string; brief: string }): Promise<{ ok: boolean; taskId?: string }>;
   message(kind: "request" | "answer" | "clarify" | "handoff" | "report" | "review", toMember: string | null, body: Record<string, unknown>): Promise<void>;
   remember(items: { layer: "episodic" | "semantic"; kind: MemoryItem["kind"]; content: string; subject?: string | null; confidence: number; status: "active" | "proposed" }[]): Promise<void>;
   context(): Promise<TeamContext>;
@@ -127,6 +130,11 @@ export interface Outcome {
   handoffs: string[];
   error: string | null;
   plan: PlanModel | null;
+  /** upgrade 9: asked to produce something but produced nothing (or a limit stopped it) — honest "partially done" */
+  partial?: boolean;
+  partialReason?: string | null;
+  /** upgrade 9: post drafts saved on the posts board by this run */
+  drafts?: number;
 }
 
 export interface PlanStep {
@@ -142,7 +150,7 @@ export interface PlanModel {
   assumptions: string[];
   steps: PlanStep[];
   more: boolean;
-  deliverable: { type: "none" | "text" | "report" | "message" | "review_reply" | "reminder"; customer_facing: boolean; contact_id?: string; review_id?: string; instructions: string };
+  deliverable: { type: "none" | "text" | "report" | "message" | "review_reply" | "reminder" | "post"; customer_facing: boolean; contact_id?: string; review_id?: string; instructions: string };
   risks: string[];
   estimate: { credits: number; minutes: number };
 }
@@ -155,7 +163,7 @@ export function parsePlanModel(raw: string): PlanModel | null {
   const j = firstJsonObject(raw) as Record<string, unknown> | null;
   if (!j || typeof j !== "object") return null;
   const d = (j.deliverable && typeof j.deliverable === "object" ? j.deliverable : {}) as Record<string, unknown>;
-  const types = ["none", "text", "report", "message", "review_reply", "reminder"] as const;
+  const types = ["none", "text", "report", "message", "review_reply", "reminder", "post"] as const;
   const type = (types as readonly string[]).includes(String(d.type)) ? (String(d.type) as PlanModel["deliverable"]["type"]) : "text";
   const steps = (Array.isArray(j.steps) ? j.steps : [])
     .map((s) => (s && typeof s === "object" ? (s as Record<string, unknown>) : {}))
@@ -195,6 +203,18 @@ const REPORT_TEXT: Record<"he" | "en" | "ar", { done: (n: number) => string; not
 
 const LANG = { he: "Hebrew", en: "English", ar: "Arabic" } as const;
 
+/** upgrade 9: report lines (business language) */
+const DRAFTS_TEXT: Record<"he" | "en" | "ar", (n: number) => string> = {
+  he: (n) => `📝 ${n} טיוטות פוסטים נשמרו בלוח הפרסומים ומחכות לאישורך.`,
+  en: (n) => `📝 ${n} post draft(s) saved on the posts board, waiting for your approval.`,
+  ar: (n) => `📝 تم حفظ ${n} مسودات منشورات في لوحة المنشورات بانتظار موافقتك.`,
+};
+const PARTIAL_TEXT: Record<"he" | "en" | "ar", string> = {
+  he: "⚠️ הושלם חלקית: התוצר המבוקש לא נוצר במלואו — אפשר ללחוץ \"נסה שוב עכשיו\" או לחדד את ההוראה.",
+  en: "⚠️ Partially done: the requested result was not fully produced — press \"Try again now\" or sharpen the instruction.",
+  ar: "⚠️ اكتمل جزئيًا: لم تُنتَج النتيجة المطلوبة بالكامل — اضغط \"أعد المحاولة الآن\" أو وضّح التعليمات.",
+};
+
 /** the employee's system prompt: identity + playbook + safety + business + memory + tools */
 /** agent coordination (additive): the employee works next to the smart team, the conversation agent and the operator — never against them */
 export const COORDINATION_RULES = [
@@ -229,7 +249,7 @@ const PLAN_FORMAT = [
   "Work cycle — answer with ONE JSON object only:",
   '{"understanding": "the goal in one measurable sentence", "missing": ["what is missing"], "question": null or "ONE focused question to the owner (only if you cannot do the work without it)",',
   ' "assumptions": ["what you assume (marked as assumptions)"], "steps": [{"tool": "tool.key", "args": {…}, "why": "…"}], "more": true if you need the results of these steps before deciding further steps,',
-  ' "deliverable": {"type": "none|text|report|message|review_reply|reminder", "customer_facing": true|false, "contact_id": "uuid when the deliverable is a message/reminder to a customer", "review_id": "uuid for review_reply", "instructions": "what the final output must contain"},',
+  ' "deliverable": {"type": "none|text|report|message|review_reply|reminder|post", "customer_facing": true|false, "contact_id": "uuid when the deliverable is a message/reminder to a customer", "review_id": "uuid for review_reply", "instructions": "what the final output must contain"},',
   ' "risks": ["…"], "estimate": {"credits": n, "minutes": n}}',
   "Use only your tools. Read before you write. Never invent ids — get them from read tools. Prefer the smallest plan that does the job well.",
   "Plan like a senior professional: put ALL the relevant read tools in the first round so you decide on evidence (set more=true), then write; in \"understanding\" state the measurable goal; in \"assumptions\" list every assumption; in \"risks\" list what could make the result wrong; in deliverable.instructions say exactly which sections the output needs.",
@@ -279,6 +299,10 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
   const maxSteps = Math.min(settings.max_steps, member.limits.max_steps ?? settings.max_steps);
   const maxCredits = member.limits.max_credits ?? 25;
   const stop = () => budgetStop({ depth: task.depth, maxDepth: settings.max_depth, steps: out.steps, maxSteps, credits: task.credits_used + out.credits, maxCredits, dayCredits: settings.day_credits + out.credits, dayCap: settings.daily_credit_cap });
+  // upgrade 9: writing + checking the final output has its own small reserve, so the per-task limit never cuts the last step
+  const stopFinal = () => budgetStop({ depth: task.depth, maxDepth: settings.max_depth, steps: 0, maxSteps, credits: task.credits_used + out.credits, maxCredits: maxCredits + FINISH_RESERVE, dayCredits: settings.day_credits + out.credits, dayCap: settings.daily_credit_cap });
+  /** upgrade 9: the limit that stopped planned work in this run (for the continuation + the honest verdict) */
+  let limitStop: string | null = null;
   const fail = async (status: Outcome["status"], error: string, summary: string) => {
     out.status = status;
     out.error = error;
@@ -344,9 +368,10 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
     const b = stop();
     if (b) {
       await deps.log("system", `Stopped: ${b}.`, { reason: b }, false);
+      limitStop = b;
       break;
     }
-    const prompt = round === 0 ? `${taskText}\n\n${PLAN_FORMAT}` : `${taskText}\n\nResults so far:\n${results.map((r) => `- ${r.tool}: ${r.ok ? "ok" : "failed"} — ${asData(r.tool, r.summary, 1500)}`).join("\n")}\n\nDecide the NEXT steps (or none) and the deliverable.\n${PLAN_FORMAT}`;
+    const prompt = round === 0 ? `${taskText}\n\n${PLAN_FORMAT}\n${DELIVERY_RULES}` : `${taskText}\n\nResults so far:\n${results.map((r) => `- ${r.tool}: ${r.ok ? "ok" : "failed"} — ${asData(r.tool, r.summary, 1500)}`).join("\n")}\n\nDecide the NEXT steps (or none) and the deliverable.\n${PLAN_FORMAT}`;
     const res = await deps.ai("plan", system, prompt, 1500);
     out.credits += res.credits;
     if (!res.ok) return fail("failed", res.error ?? "ai_failed", "The AI did not answer (all engines busy) — the task will be retried.");
@@ -370,6 +395,11 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
         await deps.message("clarify", null, { question: parsed.question });
         await deps.log("understand", `Asked the owner one question: ${parsed.question}`, {});
         return out;
+      }
+      // upgrade 9: the task asks to PRODUCE something (posts, a text …) but the plan produces nothing → the output is written anyway
+      if (parsed.deliverable.type === "none" && wantsOutput(`${task.title} ${task.brief}`)) {
+        parsed.deliverable = { ...parsed.deliverable, type: wantsPosts(`${task.title} ${task.brief}`) ? "post" : "text", instructions: parsed.deliverable.instructions || parsed.understanding || task.title };
+        await deps.log("plan", "The task asks for a result — the final output will be written.", {});
       }
       await deps.log("plan", `${parsed.steps.length} steps · deliverable: ${parsed.deliverable.type}${parsed.deliverable.customer_facing ? " (customer-facing)" : ""} · est. ${parsed.estimate.credits} credits`, { steps: parsed.steps.map((s) => ({ tool: s.tool, why: s.why })), risks: parsed.risks });
     }
@@ -395,6 +425,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
       const b2 = stop();
       if (b2) {
         await deps.log("system", `Stopped the remaining steps: ${b2.replace(/_/g, " ")}.`, { reason: b2 }, false);
+        limitStop = b2;
         if (b2 === "daily_credit_cap") capHold = true;
         break;
       }
@@ -524,7 +555,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
     // 5 — self-check (one fix round)
     let issues = selfCheck(draft, { customerFacing: customer, known: ctx.known, lang: deps.lang, forbidden });
     await deps.log("self_check", issues.length ? `Self-check found ${issues.length} issue(s) — fixing.` : "Self-check passed.", { issues }, !issues.length);
-    if (issues.length && !stop()) {
+    if (issues.length && !stopFinal()) {
       w = await deps.ai("write", system, writePrompt(issues, draft), outTokens);
       out.credits += w.credits;
       if (w.ok) draft = w.text.trim();
@@ -534,7 +565,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
     // 6 — peer review (customer-facing)
     let reviewDisagreement: string[] = [];
     if (customer && ctx.reviewer && ctx.reviewer.id !== member.id) {
-      for (let round = task.review_rounds; round < 2 && !stop(); round++) {
+      for (let round = task.review_rounds; round < 2 && !stopFinal(); round++) {
         const rsys = employeeSystem(ctx.reviewer, { ...ctx, playbookExtra: ctx.reviewerExtra ?? "" }, deps.lang, draft);
         const rv = await deps.ai("review", rsys, `Review this customer-facing ${plan.deliverable.type} written by ${member.name} for the task "${task.title}".\n${asData("output to review", draft, 3000)}\nCheck facts against the business profile, brand tone, policy, language, length and the goal.\nAnswer JSON only: {"verdict": "approve"|"revise", "issues": ["numbered, specific fixes"]}`, 600);
         out.credits += rv.credits;
@@ -554,6 +585,25 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
       }
     }
     out.output = draft;
+    // upgrade 9: written posts become DRAFTS on the posts board (never published without the owner) — before, they stayed in a report
+    const postTask = plan.deliverable.type === "post" || wantsPosts(`${task.title} ${task.brief}`);
+    if (postTask && plan.deliverable.type !== "review_reply" && plan.deliverable.type !== "message" && plan.deliverable.type !== "reminder") {
+      const posts = extractPosts(draft);
+      const dd = decide("social.save_draft", member, settings, { interactive: deps.interactive });
+      if (posts.length && dd.do === "execute") {
+        let saved = 0;
+        for (const p of posts) {
+          const r = await retryTool(deps, "social.save_draft", { text: p });
+          if (r.ok) saved++;
+        }
+        out.drafts = saved;
+        if (saved) out.steps += 1;
+        await deps.log("deliver", saved ? `Saved ${saved} post draft(s) on the posts board — waiting for the owner's approval there.` : "The post drafts could not be saved.", { tool: "social.save_draft", link: "/social" }, saved > 0);
+      } else if (posts.length && dd.do === "blocked" && dd.why === "tool_not_allowed" && grantable("social.save_draft", TOOL_MAP)) {
+        const id = await deps.approval({ tool: GRANT_TOOL, payload: { tool: "social.save_draft" }, preview: grantPreview(deps.lang, { member: member.name, tool: "social.save_draft", task: task.title }), reason: grantReason(deps.lang, "save the written posts as drafts"), sensitivity: "internal" });
+        if (id) out.approvals.push(id);
+      }
+    }
     // 7 — deliver
     const tool = deliverableTool(plan.deliverable.type);
     if (tool) {
@@ -592,6 +642,27 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
   }
 
   if (out.approvals.length && out.status === "done") out.status = "awaiting_approval";
+  // upgrade 9: a limit stopped the planned work → the same employee continues in a new run (bounded by the depth limit)
+  if ((limitStop === "task_credit_limit" || limitStop === "step_limit") && deps.continueLater && task.depth < settings.max_depth && out.status !== "failed") {
+    const c = await deps.continueLater({ title: continuationTitle(task.title, deps.lang), brief: continuationBrief({ title: task.title, done: results, reason: limitStop }) }).catch(() => ({ ok: false }) as { ok: boolean; taskId?: string });
+    if (c.ok && c.taskId) {
+      out.handoffs.push(c.taskId);
+      await deps.log("system", "A limit stopped the work before the end — the rest continues automatically in a new run.", { reason: limitStop, task: c.taskId });
+    }
+  }
+  // upgrade 9: honest completion — asked to produce something and nothing was produced → "partially done", with the reason
+  {
+    const v = completionVerdict({
+      task: `${task.title} ${task.brief}`,
+      expectsPosts: wantsPosts(`${task.title} ${task.brief}`),
+      produced: { drafts: out.drafts ?? 0, writes: ran.filter((e) => e.ok).length, approvals: out.approvals.length, handoffs: out.handoffs.length, deliverableChars: (out.output ?? "").length, stopped: Boolean(limitStop) },
+    });
+    if (v.partial && out.status === "done") {
+      out.partial = true;
+      out.partialReason = v.reason;
+      await deps.log("system", `Partially done: ${String(v.reason).replace(/_/g, " ")}.`, { reason: v.reason }, false);
+    }
+  }
   // 8 — summarize + learn
   const did = results.filter((r) => r.ok).length;
   const failed = results.filter((r) => !r.ok).length;
@@ -601,6 +672,8 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
     plan.understanding || task.title,
     `${L.done(did)}${failed ? `, ${L.notDone(failed)}` : ""}${out.approvals.length ? `, ${L.waiting(out.approvals.length)}` : ""}${out.handoffs.length ? `, ${L.handed(out.handoffs.length)}` : ""}.`,
     plan.assumptions.length ? `${L.assumptions}: ${plan.assumptions.join("; ")}` : "",
+    out.drafts ? DRAFTS_TEXT[deps.lang](out.drafts) : "",
+    out.partial ? PARTIAL_TEXT[deps.lang] : "",
   ]
     .filter(Boolean)
     .join(" ");

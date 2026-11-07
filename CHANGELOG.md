@@ -1,5 +1,26 @@
 # Changelog
 
+## Digital team upgrade 9 — does what was asked, completely
+
+1. **Posts become drafts:** written posts are saved AS WRITTEN as drafts on the posts board (new tool `social.save_draft`), and a picture is added in the background. They never publish without the owner. Before, posts stayed inside a report.
+2. **Honest completion:** a task that was asked to produce something and produced nothing is marked "⚠️ Partially done", with the reason. Before, it was a silent "done".
+3. **Finishing reserve:** writing and checking the final output have their own credit reserve, so the per-task limit never cuts the last step.
+4. **Continuation:** when a per-task limit stops the work, the SAME employee continues in a new run ("Continue: …"), bounded by the depth limit.
+5. **New read tool `social.drafts`:** quality checks and marketing read the REAL drafts before judging. Before, a check said "there is no draft" without looking.
+6. **Delivery rules** in every work plan: do exactly what was asked, write posts in full, read before reviewing, facts only from data.
+7. **New deliverable type "post"**, one block per post.
+8. **Forced deliverable:** a plan with no output for a "write / create" task still writes the output.
+9. **Report lines:** the report says what was produced (drafts) and when it is only partial.
+10. **Owner notification:** owners and admins get a notification and a push ("X post drafts are waiting for your approval") that links to the posts board.
+11. **Task board badges:** "Partially done" and "📝 N drafts on the posts board", with a link.
+12. **Quality control** can hand work back to the writer with the exact fixes (`team.handoff`).
+13. **No duplicate drafts:** the same post is never saved twice (retries, continuations).
+14. **Posts board, past-due drafts:** a draft whose planned time has passed says so ("approving publishes it right away").
+15. **Posts board, Telegram errors:** "bot is not a member of the channel" is explained in plain words, with how to fix it.
+16. **New tool grants:** `social.drafts` for the manager, team lead, analyst and quality control. `social.drafts` + `social.save_draft` for marketing and the content writer. Nothing was removed.
+
+No migration.
+
 ## Digital team: no more cut-off runs, and every API key is really used
 
 - **Time guard:**

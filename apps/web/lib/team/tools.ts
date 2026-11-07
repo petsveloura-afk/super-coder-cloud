@@ -128,6 +128,24 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
         const rows = (data ?? []) as { id: string; author: string | null; rating: number | null; body: string; status: string; reply: string | null }[];
         return { ok: true, data: rows, summary: rows.length ? rows.map((r) => `${r.rating ?? "?"}★ ${r.author ?? "customer"} (id ${r.id}, ${r.reply ? "replied" : "NOT replied"}): ${r.body.slice(0, 160)}`).join("; ") : "no recent reviews" };
       }
+      case "social.drafts": {
+        // upgrade 9: the drafts / scheduled posts that already exist (a quality check reads them instead of guessing)
+        const days = Math.max(1, Math.min(60, Number(args.days) || 30));
+        const { data } = await db.from("social_posts").select("id, body, status, scheduled_at, platforms").eq("organization_id", orgId).in("status", ["draft", "scheduled"]).gte("scheduled_at", ago(days * 1440)).order("scheduled_at").limit(15);
+        const rows = (data ?? []) as { id: string; body: string; status: string; scheduled_at: string | null; platforms: string[] | null }[];
+        return { ok: true, data: rows.map((r) => ({ id: r.id, status: r.status })), summary: rows.length ? rows.map((r) => `[${r.status} ${String(r.scheduled_at ?? "").slice(0, 16)} ${(r.platforms ?? []).join("+")} id ${r.id}] ${r.body.replace(/\s+/g, " ").slice(0, 220)}`).join(" | ").slice(0, 3500) : "no post drafts or scheduled posts", link: "/social" };
+      }
+      case "social.save_draft": {
+        // upgrade 9: the employee's finished post, saved AS WRITTEN as a draft (a picture follows in the background); never publishes
+        const text = s(args.text).trim().slice(0, 5000);
+        if (text.length < 20) return { ok: false, summary: "", error: "too_short" };
+        // the same post is never saved twice (a retry / a continuation of the same task)
+        const { data: same } = await db.from("social_posts").select("id").eq("organization_id", orgId).eq("body", text).in("status", ["draft", "scheduled", "published"]).gte("created_at", ago(3 * 1440)).limit(1).maybeSingle();
+        if (same) return { ok: true, summary: `post draft already saved (id ${same.id})`, data: { id: same.id }, link: "/social" };
+        const when = s(args.when_iso) && Date.parse(s(args.when_iso)) > Date.now() ? new Date(s(args.when_iso)) : (() => { const d = new Date(Date.now() + 86_400_000); d.setUTCHours(8, 0, 0, 0); return d; })();
+        const { data: row, error } = await db.from("social_posts").insert({ organization_id: orgId, platforms: ["facebook"], body: text, scheduled_at: when.toISOString(), status: "draft", source: "agent", origin: "studio", media_pending: "image" }).select("id").single();
+        return row ? { ok: true, summary: `post draft saved (id ${row.id}) — waiting for the owner on the posts board`, data: { id: row.id }, link: "/social" } : { ok: false, summary: "", error: error?.message?.slice(0, 200) ?? "save_failed" };
+      }
       case "social.performance": {
         const [{ data: posts }, { data: brain }] = await Promise.all([
           db.from("social_posts").select("body, engagement, scheduled_at, pillar").eq("organization_id", orgId).eq("status", "published").gte("scheduled_at", ago(30 * 1440)).order("engagement", { ascending: false, nullsFirst: false }).limit(12),

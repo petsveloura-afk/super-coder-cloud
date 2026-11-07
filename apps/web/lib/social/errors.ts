@@ -2,13 +2,15 @@
  * Wave 35 — what went wrong when a social post could not be published, in plain classes.
  * Pure (no server-only) so the server publisher, the server action and the UI all agree.
  */
-export type PublishErrorKind = "permission" | "token" | "transient" | "not_connected" | "needs_image" | "other";
+export type PublishErrorKind = "permission" | "token" | "transient" | "not_connected" | "needs_image" | "telegram_bot" | "other";
 
 export function classifyPublishError(error?: string | null): PublishErrorKind {
   const e = String(error ?? "");
   if (!e) return "other";
   if (/instagram_needs_image/i.test(e)) return "needs_image";
   if (/not_connected|instagram_not_connected/i.test(e)) return "not_connected";
+  // additive: the Telegram bot was not added to the channel (or is not an admin there) — the owner fixes it in Telegram
+  if (/telegram/i.test(e) && /not a member|chat not found|need administrator rights|not enough rights|bot was kicked/i.test(e)) return "telegram_bot";
   // an expired / revoked login: reconnecting is the only cure
   if (/#190\b|session has expired|error validating access token|invalid oauth|token_revoked/i.test(e)) return "token";
   // the Page login does not carry the publishing permissions (e.g. "(#283) Requires pages_read_engagement permission")
@@ -31,6 +33,8 @@ export function publishHintKey(kind: PublishErrorKind): string | null {
       return "social.notConnected";
     case "needs_image":
       return "social.instagramNeedsImage";
+    case "telegram_bot":
+      return "social.errTelegramBot";
     default:
       return null;
   }

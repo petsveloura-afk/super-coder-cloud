@@ -5717,7 +5717,9 @@
         "cta": "Button",
         "tagline": "Tagline"
       }
-    }
+    },
+    "pastDue": "⏰ This draft's planned time has passed — approving publishes it right away (or edit the time).",
+    "errTelegramBot": "The bot is not a member of the Telegram channel (or is not an admin). Add the bot as an admin with permission to post, then try again."
   },
   "market": {
     "title": "Connections marketplace",
@@ -7197,7 +7199,9 @@
       "reports_latest": "The latest weekly / monthly report",
       "sop_lookup": "Look up a work procedure",
       "sop_propose": "Propose a procedure change",
-      "team_grant_tool": "Permission request"
+      "team_grant_tool": "Permission request",
+      "social_drafts": "View post drafts",
+      "social_save_draft": "Save a post as a draft"
     },
     "goal": {
       "title": "A goal for the team",
@@ -7250,7 +7254,9 @@
       "done": "Finished",
       "autoRetry": "🔄 The system will try again by itself — nothing to do",
       "waitingDep": "Waiting for an earlier task that failed — it resumes by itself once that one succeeds",
-      "retryNow": "Try again now"
+      "retryNow": "Try again now",
+      "partial": "⚠️ Partially done",
+      "drafts": "📝 {n} drafts on the posts board"
     },
     "task": {
       "direct": "A direct task",
@@ -7758,7 +7764,8 @@
       "activity": "Decisions and oversight",
       "settings": "Health and reliability"
     },
-    "permissionNeeded": "{name} needs one more permission to finish a task — approve in one click"
+    "permissionNeeded": "{name} needs one more permission to finish a task — approve in one click",
+    "draftsReady": "{name} prepared {n} post drafts — waiting for your approval on the posts board"
   },
   "aiQuality": {
     "feedback": {
