@@ -534,20 +534,23 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
 }
 
 /**
- * Runs one task in its OWN server call (/api/cron/team-task, Bearer CRON_SECRET) so it gets a full time budget. The call is
- * started and left running (the request is sent; we do not wait for the work). False when it cannot be started — then the
- * caller runs the task itself as before.
+ * Runs one task in its OWN server call (/api/cron/team-task, Bearer CRON_SECRET) so it gets a full time budget. True ONLY when
+ * that call confirmed it accepted the task (HTTP 202 + accepted) — any other answer (wrong secret, a protected / redirected
+ * address, an error page, no answer) is false, and the caller runs the task itself as before. Fix: the first version also said
+ * "started" when the other call refused (e.g. a protected deployment address) — such tasks then waited without running.
  */
 export async function dispatchTaskRun(orgId: string, taskId: string): Promise<boolean> {
   const secret = process.env.CRON_SECRET;
-  const base = (process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")).replace(/\/$/, "");
+  const raw = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "") || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+  const base = raw.replace(/\/$/, "");
   if (!secret || !/^https:\/\//.test(base)) return false;
   try {
-    await fetch(`${base}/api/cron/team-task`, { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: JSON.stringify({ org: orgId, task: taskId }), signal: AbortSignal.timeout(2_500), cache: "no-store" });
-    return true;
-  } catch (e) {
-    // a timeout means the request was sent and the work is running there — that is the point
-    return (e as Error)?.name === "TimeoutError" || (e as Error)?.name === "AbortError";
+    const res = await fetch(`${base}/api/cron/team-task`, { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: JSON.stringify({ org: orgId, task: taskId }), signal: AbortSignal.timeout(8_000), cache: "no-store", redirect: "manual" });
+    if (res.status !== 202) return false;
+    const j = (await res.json().catch(() => null)) as { accepted?: boolean } | null;
+    return j?.accepted === true;
+  } catch {
+    return false;
   }
 }
 

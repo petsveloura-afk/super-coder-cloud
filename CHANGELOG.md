@@ -15,6 +15,12 @@
   - smart-team AI calls never wait past ~22s.
 - **Animations:** the team screen's tabs fade in when switched.
 - **Activity log:** the new log lines are shown in the business language.
+- **Fix — tasks that waited without running:**
+  - The clock (and the run button) now hand a task to its own server call ONLY when that call confirms (HTTP 202 `{accepted: true}`).
+  - Before, a refused hand-over — a wrong secret, a protected deployment address, an error page — still counted as "started", and the task waited forever.
+  - Any refusal now means the task runs right where it is.
+  - The address used is the production domain (`NEXT_PUBLIC_APP_URL` → `VERCEL_PROJECT_PRODUCTION_URL`), not the protected deployment URL.
+  - `/api/cron/team-task` answers at once and does the work right after the answer (`after()`), with one line per run in the server log.
 - **CI / deploy:** Supabase CLI = the newest release (looked up with the run's token) with an automatic fallback to the known-good 2.122.1 — for installing, for the migrations and for the local CI database.
 - No migration.
 
