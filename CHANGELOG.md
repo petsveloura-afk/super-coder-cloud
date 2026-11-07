@@ -1,5 +1,15 @@
 # Changelog
 
+## Digital team: no more cut-off runs, and every API key is really used
+
+- **Time guard:**
+  - Every task run, and every goal plan, has an end time inside the server function's 60s limit.
+  - An AI call never starts without enough time left, and never waits or runs a second pass past that end time.
+  - Before, a long run was cut off by the platform mid-task. The task looked "stuck", and after a few such cuts it ended as an "unexpected error" that no longer retried by itself. Now it ends cleanly as "busy" and retries automatically.
+- **Many keys used well:** a quick "this key is full right now" refusal (429 / quota, under 2.5s) no longer uses up the engine's 2-failure allowance. Each key of the engine gets one quick try, so the business's other keys are really used. Slow failures count as before, and there is a hard cap of 40 attempts per request.
+- **Clearer reason:** a cut-off run is explained as "took too long — try again", not as a bug.
+- No migration.
+
 ## The task board explains every failure, plus a paid safety net for AI
 
 - **Failed tasks:**

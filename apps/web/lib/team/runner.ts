@@ -148,8 +148,13 @@ export async function availableModels(): Promise<{ provider: string; model: stri
   return buildCandidates({ env: process.env, random: () => 0 }).map((c) => ({ provider: c.provider, model: c.model }));
 }
 
-function teamAi(orgId: string, pref: RoutingPref, onRoute: (kind: TaskKind, chosen: string, used: string) => void): EngineDeps["ai"] {
+function teamAi(orgId: string, pref: RoutingPref, onRoute: (kind: TaskKind, chosen: string, used: string) => void, deadlineAt?: number): EngineDeps["ai"] {
   return async (kind, system, user, maxTokens) => {
+    // time guard (additive): the server function ends at a fixed time — an AI call never starts without enough time left, and
+    // never waits past it. Before, a long run was cut off by the platform mid-task, the task looked "stuck" and after a few such
+    // cuts ended as an "unexpected error". Now it ends cleanly as "busy" and is retried automatically.
+    const left = deadlineAt ? deadlineAt - Date.now() : null;
+    if (left !== null && left < 9_000) return { ok: false, text: "", credits: 0, error: "ai.busy" };
     const [avail, overrides] = await Promise.all([availableModels(), routingOverrides()]);
     const route0 = await healthyRoute(routeFor(kind, avail, { pref, override: overrides[kind] }));
     // upgrade 8: engines that cannot help right now (no key, wrong kind of work, resting, over quota) are left out of THIS attempt
@@ -158,7 +163,7 @@ function teamAi(orgId: string, pref: RoutingPref, onRoute: (kind: TaskKind, chos
     const { runAISystem } = await import("@/lib/ai/run-system");
     const plus8 = await import("./runner-plus8").catch(() => null);
     plus8?.markCallStart(first?.provider);
-    const res = await runAISystem({ orgId, feature: "copilot", system, messages: [{ role: "user", content: user }], temperature: kind === "classify" || kind === "review" || kind === "plan" ? 0.2 : 0.6, maxTokens, patienceMs: 30_000, routeProvider: first?.provider ?? null, routeModel: first?.model ?? null });
+    const res = await runAISystem({ orgId, feature: "copilot", system, messages: [{ role: "user", content: user }], temperature: kind === "classify" || kind === "review" || kind === "plan" ? 0.2 : 0.6, maxTokens, patienceMs: left !== null ? Math.max(8_000, Math.min(30_000, left - 6_000)) : 30_000, routeProvider: first?.provider ?? null, routeModel: first?.model ?? null, ...(deadlineAt ? { hardDeadlineAt: deadlineAt - 3_000 } : {}) });
     // upgrade 2: the circuit breaker learns from every call (a model that keeps failing is skipped for a while)
     // upgrade 8 (bug fix): a call that SUCCEEDED through a fallback no longer counts as a failure of the first engine
     // (it used to be written as "fallback_used" every time, which made every model look sick) — see stability-core.healthUpdates
@@ -292,7 +297,9 @@ export async function writeMemories(orgId: string, memberId: string | null, item
 
 /* ------------------------------------------------------------------ run ONE task */
 
-export async function runTask(orgId: string, taskId: string, opts: { interactive: boolean; actorUser: string | null }): Promise<Outcome | { notRun: string }> {
+export async function runTask(orgId: string, taskId: string, opts: { interactive: boolean; actorUser: string | null; deadlineAt?: number }): Promise<Outcome | { notRun: string }> {
+  // time guard: every run has an end time inside the server function's limit (60s) — given by the caller or 50s from now
+  const deadlineAt = opts.deadlineAt ?? Date.now() + 50_000;
   if (!(await teamFlagOn(orgId))) return { notRun: "team_flag_off" };
   if (!(await teamPlanOn(orgId))) return { notRun: "plan_locked" };
   const a = db();
@@ -330,7 +337,7 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
     rememberClient: (contactId, items) => writeShared(orgId, items.map((i) => ({ ...i, subject: i.subject.startsWith(clientSubject(contactId)) ? i.subject : `${clientSubject(contactId)}:${i.subject}` }))),
     lang,
     interactive: opts.interactive,
-    ai: teamAi(orgId, settings.routing_pref, (kind, chosen, used) => routes.push({ kind, chosen, used })),
+    ai: teamAi(orgId, settings.routing_pref, (kind, chosen, used) => routes.push({ kind, chosen, used }), deadlineAt),
     runTool: async (tool, args) => {
       // upgrade 8 (part B contract): text that leaves the business passes the outbound guard; if it is not ok it becomes an approval
       const outTool = TOOL_MAP[tool] && (TOOL_MAP[tool]!.sensitivity === "customer" || TOOL_MAP[tool]!.sensitivity === "money");
@@ -515,7 +522,8 @@ export async function planGoal(orgId: string, goal: string, actorUser: string): 
   if (existingGoal) return { ok: true, goalId: existingGoal };
   const titleLang = profile.locale === "en" || profile.locale === "ar" ? profile.locale : "he";
   const system = [`You are ${manager.name}, the general manager of this business's AI team.`, playbookPrompt("manager"), WORKING_DOCTRINE, expertisePrompt("manager"), SAFETY_RULES, plus8 ? plus8.titleInstruction(titleLang) : "", `THE BUSINESS:\n${profilePrompt(profile)}`].filter(Boolean).join("\n\n");
-  const ai = teamAi(orgId, settings.routing_pref, () => undefined);
+  // time guard: the goal is planned inside the request's time limit (ends as "busy, try again" instead of being cut off)
+  const ai = teamAi(orgId, settings.routing_pref, () => undefined, Date.now() + 50_000);
   const res = await ai("plan", system, goalPrompt(goal, roles), 1800);
   if (!res.ok) return { ok: false, error: res.error ?? "ai.failed" };
   const available = [...new Set(roles.map((r) => r.role))];
@@ -860,7 +868,8 @@ export async function teamTick(budgetMs = 50_000): Promise<{ orgs: number; ran: 
     const toRun = plus8 ? await plus8.orderForTick(orgId, ready as ((typeof ready)[number] & { assignee_id?: string | null })[], perTick, (xs) => prioritizeTasks(xs, { board: (tasks ?? []) as { id: string; status: string; depends_on: string[] }[] })) : ready.slice(0, perTick);
     for (const t of toRun) {
       if (Date.now() - started > budgetMs - 15_000) break;
-      const r = await runTask(orgId, t.id, { interactive: false, actorUser: null });
+      // time guard: a task started by the clock must end before the clock's own time is up
+      const r = await runTask(orgId, t.id, { interactive: false, actorUser: null, deadlineAt: Math.min(started + budgetMs + 5_000, Date.now() + 50_000) });
       if (!("notRun" in r)) result.ran++;
     }
     const s = await loadSettings(orgId);

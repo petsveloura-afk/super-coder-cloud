@@ -219,6 +219,8 @@ describe("router: one limited provider never blocks the next (wave 11)", () => {
     const { generateRouted } = await import("@/lib/ai/router");
     const r = await generateRouted({ preferred: "gemini", model: "gemini-flash-latest", system: "s", messages: [{ role: "user", content: "x" }] });
     expect(r.provider).toBe("groq");
-    expect(r.attempts.map((a) => a.provider)).toEqual(["gemini", "gemini", "groq"]);
+    // many-keys upgrade: each Gemini key gets one quick try (3), then two more refusals use up the allowance — then Groq answers
+    expect(r.attempts.map((a) => a.provider)).toEqual(["gemini", "gemini", "gemini", "gemini", "gemini", "groq"]);
+    expect(new Set(r.attempts.slice(0, 3).map((a) => a.keyId)).size).toBe(3);
   });
 });

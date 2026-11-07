@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { anthropicCall, geminiCall, openaiCall, openaiCompatibleCall, type AIMessage } from "./providers";
-import { PAID_PROVIDERS, buildCandidates, callTimeoutMs, classifyError, isResting, isTinyModel, laneOrder, NO_JSON_MODE, restKey, soonestReady, type RouteCandidate, type RouteProvider } from "./router-core";
+import { MAX_TOTAL_ATTEMPTS, PAID_PROVIDERS, buildCandidates, callTimeoutMs, classifyError, isQuickRefusal, isResting, isTinyModel, laneOrder, NO_JSON_MODE, restKey, soonestReady, type RouteCandidate, type RouteProvider } from "./router-core";
 import { capRest, probeOrder, restKeysOf, withDeadline } from "./resilience-core";
 
 /**
@@ -30,6 +30,8 @@ export interface RouteAttempt {
   ok: boolean;
   ms: number;
   reason?: string;
+  /** a fast 429 / quota refusal — does not count toward the call limit (see isQuickRefusal) */
+  quick?: boolean;
 }
 
 const memoryRests = new Map<string, number>();
@@ -209,10 +211,12 @@ export async function generateRouted(input: {
   // limited (all keys share one Google quota) must never eat the whole budget before the next provider
   const perProvider = Math.max(1, Number(process.env.AI_ROUTER_PER_PROVIDER) || 2);
   const failedBy = new Map<string, number>();
+  /** keys that already gave a quick "full right now" refusal in this request */
+  const quickKeys = new Set<string>();
   // quality gate: a tiny model's answer is kept aside while stronger engines remain — used only if nothing better answers
   let tinyFallback: (Omit<RoutedResult, "provider"> & { provider: RouteProvider }) | null = null;
   for (const [ci, c] of cands.entries()) {
-    if (attempts.length >= maxCalls) break;
+    if (attempts.filter((a) => !a.quick).length >= maxCalls || attempts.length >= MAX_TOTAL_ATTEMPTS) break;
     const left = budget - (Date.now() - started);
     if (attempts.length > 0 && left < 4000) break;
     if (isResting(c, rests)) continue;
@@ -241,11 +245,16 @@ export async function generateRouted(input: {
     } catch (e) {
       const msg = (e as Error).message ?? String(e);
       const cl = classifyError(msg);
-      attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, reason: cl.reason });
+      const quick = isQuickRefusal(cl.kind, Date.now() - t0);
+      attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, reason: cl.reason, ...(quick ? { quick } : {}) });
       noteHealth(attempts[attempts.length - 1]);
       console.error("ai router: candidate failed", c.provider, c.model, c.keyId, cl.kind, msg.slice(0, 240));
       if (cl.kind === "model") triedModelGone.add(`${c.provider}|${c.model}`);
-      failedBy.set(c.provider, (failedBy.get(c.provider) ?? 0) + 1);
+      // a quick "this key is full" refusal does not use up the engine's allowance — the next key of the same engine is tried
+      // (one free pass per KEY: a second refusal on the same key counts as usual, so an engine whose keys share one quota still yields quickly)
+      const firstOnKey = quick && !quickKeys.has(c.keyId);
+      if (quick) quickKeys.add(c.keyId);
+      if (!firstOnKey) failedBy.set(c.provider, (failedBy.get(c.provider) ?? 0) + 1);
       if (cl.kind !== "rate" && cl.kind !== "daily" && cl.kind !== "server") onlyBusy = false;
       await rest(restKey(c, cl.scope), capRest(cl, process.env), `${cl.kind}: ${cl.reason}`);
     }

@@ -104,3 +104,29 @@ describe("never a silent failure on the board + a paid safety net", () => {
     expect(r).toContain("PAID_PROVIDERS.includes(c.provider) && !isResting(c, rests)");
   });
 });
+
+describe("time guard + many keys used well", () => {
+  it("a task run has an end time; AI calls never start without time left and never wait past it", () => {
+    const r = read("lib/team/runner.ts");
+    expect(r).toContain("const deadlineAt = opts.deadlineAt ?? Date.now() + 50_000;");
+    expect(r).toContain('if (left !== null && left < 9_000) return { ok: false, text: "", credits: 0, error: "ai.busy" };');
+    expect(r).toContain("deadlineAt: Math.min(started + budgetMs + 5_000, Date.now() + 50_000)");
+    const rs = read("lib/ai/run-system.ts");
+    expect(rs).toContain("if (input.hardDeadlineAt && Date.now() + wait + 8_000 > input.hardDeadlineAt) throw e;");
+  });
+  it("a cut-off run is explained as 'took too long', not as a bug", async () => {
+    const { ownerFailure } = await import("@/lib/team/failure-reason-core");
+    expect(ownerFailure("stuck_too_often", "he").code).toBe("too_long");
+    expect(ownerFailure("stuck_too_often", "he").retryable).toBe(true);
+    expect(ownerFailure("ai.busy", "he").code).toBe("ai_busy");
+  });
+  it("quick 'key is full' refusals do not end an engine — each key gets one try", async () => {
+    const { isQuickRefusal, MAX_TOTAL_ATTEMPTS } = await import("@/lib/ai/router-core");
+    expect(isQuickRefusal("rate", 300)).toBe(true);
+    expect(isQuickRefusal("daily", 900)).toBe(true);
+    expect(isQuickRefusal("rate", 9000)).toBe(false);
+    expect(isQuickRefusal("server", 200)).toBe(false);
+    expect(MAX_TOTAL_ATTEMPTS).toBe(40);
+    expect(read("lib/ai/router.ts")).toContain("const firstOnKey = quick && !quickKeys.has(c.keyId);");
+  });
+});

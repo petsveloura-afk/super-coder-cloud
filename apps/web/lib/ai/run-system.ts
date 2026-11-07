@@ -29,6 +29,8 @@ export async function runAISystem(input: {
   patienceMs?: number;
   /** digital team model routing: the engine to try first for this kind of work (the router's chain still follows) */
   routeProvider?: string | null;
+  /** time guard (additive): epoch ms the whole call must be finished by — no busy-wait / second pass past it */
+  hardDeadlineAt?: number;
   routeModel?: string | null;
 }): Promise<AIOutcome> {
   const provider = pickProvider(input.provider) ?? (routerExtrasConfigured() ? input.provider ?? "gemini" : null);
@@ -83,9 +85,11 @@ export async function runAISystem(input: {
       const elapsed = Date.now() - callStarted;
       const wait = busyWaitMs({ retryInMs: e.retryInMs, lane: routedArgs.lane, elapsedMs: elapsed, busy: e.busy }, process.env);
       if (!wait) throw e;
+      // time guard: never wait (and run a second pass) past the caller's end time
+      if (input.hardDeadlineAt && Date.now() + wait + 8_000 > input.hardDeadlineAt) throw e;
       console.info("ai busy — waiting before one more pass", wait, "ms", routedArgs.lane);
       await new Promise((r) => setTimeout(r, wait));
-      return generateRouted({ ...routedArgs, budgetMs: secondPassBudget(elapsed, wait, process.env) });
+      return generateRouted({ ...routedArgs, budgetMs: input.hardDeadlineAt ? Math.min(secondPassBudget(elapsed, wait, process.env), Math.max(8_000, input.hardDeadlineAt - Date.now())) : secondPassBudget(elapsed, wait, process.env) });
     });
     await admin.rpc("finalize_ai_usage_system", {
       p_usage_id: usageId,

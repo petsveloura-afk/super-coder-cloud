@@ -332,3 +332,16 @@ export function callTimeoutMs(lane: "interactive" | "background", leftMs: number
   const cap = lane === "background" ? 18_000 : 25_000;
   return Math.min(cap, leftMs);
 }
+
+/**
+ * Many keys, used well (additive). A per-minute / quota refusal (429) comes back in well under a second — it says "this key is
+ * full right now", not "this engine is broken". Such QUICK refusals no longer use up the engine's 2-failure allowance or the
+ * request's call limit, so the router walks on to the business's OTHER keys and models of the same engine instead of skipping
+ * the whole engine after two full keys. Slow failures (timeouts, server errors) count exactly as before. A hard cap keeps
+ * a request bounded.
+ */
+export const QUICK_REFUSAL_MS = 2500;
+export const MAX_TOTAL_ATTEMPTS = 40;
+export function isQuickRefusal(kind: string, ms: number): boolean {
+  return (kind === "rate" || kind === "daily" || kind === "noquota") && ms < QUICK_REFUSAL_MS;
+}
