@@ -7779,5 +7779,20 @@
       "closedHint": "רק פניות שסומנו \"סגורה\"",
       "lowerBetter": "כמה שפחות — יותר טוב"
     }
+  },
+  "cleanup": {
+    "select": "בחירה",
+    "selectAll": "סמן הכול",
+    "hideSelected": "הסר מהתצוגה ({n})",
+    "deleteSelected": "מחק נבחרים ({n})",
+    "clearAll": "נקה הכול",
+    "clearAllConfirm": "לנקות {n} פריטים? (לחיצה לאישור)",
+    "deleteAll": "מחק הכול",
+    "deleteAllConfirm": "למחוק {n} התראות? (לחיצה לאישור)",
+    "restore": "הצג הכול שוב",
+    "cleanTitle": "הכול נקי ✨",
+    "cleanBody": "עדכונים חדשים יופיעו כאן. אפשר להחזיר את מה שנוקה ב\"הצג הכול שוב\".",
+    "deleted": "נמחק",
+    "markAllRead": "סמן הכול כנקרא"
   }
 }

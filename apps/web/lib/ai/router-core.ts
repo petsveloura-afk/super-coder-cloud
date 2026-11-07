@@ -94,7 +94,8 @@ const BASES: Record<string, [string, string]> = {
   huggingface: ["AI_HUGGINGFACE_BASE_URL", "https://router.huggingface.co/v1"],
   together: ["AI_TOGETHER_BASE_URL", "https://api.together.xyz/v1"],
   cohere: ["AI_COHERE_BASE_URL", "https://api.cohere.ai/compatibility/v1"],
-  zhipu: ["AI_ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4"],
+  // fix: keys made at z.ai (the international Zhipu platform) only work on api.z.ai — a key from open.bigmodel.cn sets AI_ZHIPU_BASE_URL
+  zhipu: ["AI_ZHIPU_BASE_URL", "https://api.z.ai/api/paas/v4"],
 };
 
 /**
@@ -145,8 +146,14 @@ export function cloudflareKeys(env: Env): string[] {
  * opposite order of live conversations, so the fast free engines stay available for customers and
  * for the people using the app; paid engines stay last in both lanes.
  */
-export function laneOrder(cands: RouteCandidate[], lane: "interactive" | "background" = "interactive"): RouteCandidate[] {
+export function laneOrder(cands: RouteCandidate[], lane: "interactive" | "background" = "interactive", pinned?: string | null): RouteCandidate[] {
   if (lane === "interactive") return cands;
+  // fix (additive): an explicit engine choice (the digital team's routing per kind of work) stays FIRST in the background lane too —
+  // before, the lane re-sorted it away and the newest / slowest engines were tried first
+  if (pinned && cands.some((c) => c.provider === pinned)) {
+    const rest = laneOrder(cands.filter((c) => c.provider !== pinned), lane);
+    return [...cands.filter((c) => c.provider === pinned), ...rest];
+  }
   const providers = [...new Set(cands.map((c) => c.provider))];
   const free = providers.filter((p) => !PAID_PROVIDERS.includes(p)).reverse();
   const paid = providers.filter((p) => PAID_PROVIDERS.includes(p));
@@ -314,4 +321,14 @@ export function soonestReady(cands: RouteCandidate[], rests: Map<string, number>
  */
 export function isTinyModel(model: string | null | undefined): boolean {
   return /(^|[^0-9.])[0-3](\.\d+)?b(\b|[^a-z])/i.test(String(model ?? ""));
+}
+
+/**
+ * Per-call deadline (additive). Background work used to give ONE slow engine up to 25s of a 30s budget, so a single slow or far
+ * engine ended the whole request as "busy". Now a background call that is not the last chance gets at most 18s, leaving time to
+ * fail over to the next engine. Live work keeps 25s.
+ */
+export function callTimeoutMs(lane: "interactive" | "background", leftMs: number): number {
+  const cap = lane === "background" ? 18_000 : 25_000;
+  return Math.min(cap, leftMs);
 }

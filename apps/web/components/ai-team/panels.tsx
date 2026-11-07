@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { AgentAvatar } from "./avatar";
+import { CleanupBar, SelectTick, useCleanup, useSelection } from "@/components/ui/cleanup";
 import { HealthPanel } from "./health-panel";
 import { DayHealthCard } from "./day-health-card";
 import { OwnerControlCard, OwnerLogCard } from "./owner-control-card";
@@ -315,15 +316,31 @@ const COLUMNS: { key: string; statuses: string[] }[] = [
 function TaskBoard({ data, busy, onRun, onCancel }: { data: TeamPageData; busy: string | null; onRun: (id: string) => void; onCancel: (id: string) => void }) {
   const { t, locale } = useI18n();
   const tasks = data.tasks.filter((x) => !(x.plan as { goal?: boolean })?.goal && x.status !== "draft");
+  // keep it clean (additive): finished tasks can be hidden per user (select / select all / clear all) — nothing is deleted
+  const clean = useCleanup(`scc_clean_done_${data.orgId}`);
+  const doneAt = (x: TeamTaskView) => Date.parse(x.finished_at ?? x.created_at);
+  const doneShown = tasks.filter((x) => COLUMNS[3]!.statuses.includes(x.status) && clean.visible({ id: x.id, at: doneAt(x) }));
+  const selection = useSelection(doneShown.slice(0, 25).map((x) => x.id));
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" data-testid="task-board">
       {COLUMNS.map((c) => {
-        const list = tasks.filter((x) => c.statuses.includes(x.status)).slice(0, 25);
+        const isDone = c.key === "done";
+        const list = (isDone ? doneShown : tasks.filter((x) => c.statuses.includes(x.status))).slice(0, 25);
         return (
           <section key={c.key} className="rounded-3xl border border-line bg-surface/60 p-3">
             <h3 className="mb-2 flex items-center justify-between text-[13px] font-semibold">
               {t(`aiTeam.board.${c.key}`)} <Badge tone="neutral">{list.length}</Badge>
             </h3>
+            {isDone ? (
+              <CleanupBar
+                count={list.length}
+                selection={selection}
+                hiddenActive={clean.active}
+                onHideSelected={(ids) => clean.hide(ids)}
+                onClearAll={() => clean.clearAll(Math.max(...doneShown.map(doneAt)))}
+                onRestore={clean.restore}
+              />
+            ) : null}
             <ul className="space-y-2">
               {list.map((x) => {
                 const m = memberOf(data.members, x.assignee_id);
@@ -331,6 +348,7 @@ function TaskBoard({ data, busy, onRun, onCancel }: { data: TeamPageData; busy: 
                 return (
                   <li key={x.id} className="feed-in rounded-2xl border border-line bg-surface p-2.5 text-[12.5px]">
                     <div className="flex items-start gap-2">
+                      {isDone && selection.on ? <SelectTick checked={selection.isSelected(x.id)} onChange={() => selection.toggle(x.id)} label={x.title} /> : null}
                       {m ? <AgentAvatar spec={m.avatar} state={x.status === "in_progress" ? "working" : x.status.startsWith("awaiting") ? "waiting" : x.status === "done" ? "success" : x.status === "failed" ? "error" : "idle"} size={28} /> : null}
                       <div className="min-w-0 flex-1">
                         <p className="font-medium">{x.title}</p>
@@ -756,16 +774,31 @@ export function ActivityPanel({ data, onRefresh }: { data: TeamPageData; onRefre
     const id = setInterval(onRefresh, 8000);
     return () => clearInterval(id);
   }, [onRefresh]);
+  // keep it clean (additive): each user hides old updates on their own screen — the team's log itself is never deleted
+  const clean = useCleanup(`scc_clean_activity_${data.orgId}`);
+  const shown = data.activity.filter((a: ActivityView) => clean.visible({ id: String(a.id), at: Date.parse(a.created_at) }));
+  const selection = useSelection(shown.map((a) => String(a.id)));
   if (!data.activity.length) return <EmptyState icon={<Sparkles className="h-6 w-6" />} title={t("aiTeam.activity.emptyTitle")} body={t("aiTeam.activity.emptyBody")} />;
   return (
+    <div>
+    <CleanupBar
+      count={shown.length}
+      selection={selection}
+      hiddenActive={clean.active}
+      onHideSelected={(ids) => clean.hide(ids)}
+      onClearAll={() => clean.clearAll(Math.max(...shown.map((a) => Date.parse(a.created_at))))}
+      onRestore={clean.restore}
+    />
+    {!shown.length ? <EmptyState icon={<Sparkles className="h-6 w-6" />} title={t("cleanup.cleanTitle")} body={t("cleanup.cleanBody")} /> : null}
     <ol className="relative space-y-2 border-s border-line ps-5" aria-live="polite" data-testid="activity-panel">
-      {data.activity.map((a: ActivityView) => {
+      {shown.map((a: ActivityView) => {
         const m = memberOf(data.members, a.member_id);
         return (
           <li key={a.id} className="feed-in relative">
             <span className={cn("absolute -start-[27px] top-2 h-3 w-3 rounded-full border-2 border-bg", a.ok ? "bg-accent" : "bg-danger")} aria-hidden />
             <div className="rounded-2xl border border-line bg-surface p-2.5 text-[12.5px]">
               <div className="flex flex-wrap items-center gap-2">
+                {selection.on ? <SelectTick checked={selection.isSelected(String(a.id))} onChange={() => selection.toggle(String(a.id))} label={a.summary.slice(0, 60)} /> : null}
                 {m ? <AgentAvatar spec={m.avatar} size={24} /> : null}
                 <span className="font-semibold">{m?.name ?? t("aiTeam.activity.system")}</span>
                 <Badge tone="neutral">{t(`aiTeam.phase.${a.phase}`)}</Badge>
@@ -777,6 +810,7 @@ export function ActivityPanel({ data, onRefresh }: { data: TeamPageData; onRefre
         );
       })}
     </ol>
+    </div>
   );
 }
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## Stable AI for the digital team, synced counters, faster menus, clean-up, spam filter, security layer
+
+- **AI stability:**
+  - **Engine choice kept:** the digital team's chosen engine now stays first for background work too. Before, the background order re-sorted it away, and the newest or slowest engines were tried first.
+  - **Per-call limit:** a single background AI call gets at most 18s, so one slow engine can no longer use up a whole request and report "all engines busy".
+  - **Zhipu (GLM) endpoint:** keys made at z.ai now use `api.z.ai` by default. A key from open.bigmodel.cn sets `AI_ZHIPU_BASE_URL`.
+- **Synced counters:** the "working" badge counts the same thing the board's "In progress" column shows.
+- **Faster navigation:**
+  - A menu link pulses the moment it is tapped.
+  - Pages visited in the last 30s reopen instantly from the client router cache (`staleTimes`).
+- **Clean-up (per user):**
+  - **Notifications:** select, select all, delete selected, delete all, mark all read. Only your own notifications are deleted, and the list shows up to 100.
+  - **Team activity and finished tasks:** select, select all, remove from view, clear all, show all again. This is a personal view; the team's audit log is never deleted.
+- **Not-a-customer filter:** newsletters, product updates, automatic notifications and clear spam pitches get no automatic answer and no team alert. They stay in the inbox. The filter is conservative: a short personal question is never filtered.
+- **Security layer:** scanner probes (`/.env`, `/.git`, `/wp-login.php`, `/phpmyadmin`, `*.php`, path traversal …) get a bare 404 at the edge, before any session or database work.
+- No migration.
+
 ## Digital team: a missing permission asks the owner instead of failing
 
 - **Permission requests:** when an employee plans a step with a platform tool it was not given, the task no longer fails or blocks silently. It opens ONE approval per task and tool (`team.grant_tool`) that says who needs which permission and for which task.

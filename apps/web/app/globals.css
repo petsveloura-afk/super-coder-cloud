@@ -1035,3 +1035,27 @@ main[data-shell] :is(a, button, [role="tab"], summary):focus-visible { outline: 
     .nav-link:hover .nav-icon-tile { transform: none; }
   }
 }
+
+@layer components {
+  /* speed feel: a tapped menu link pulses until the next page arrives (components/layout/link-pending.tsx) */
+  .link-pending {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .link-pending.is-pending {
+    opacity: 1;
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    animation: link-pending-pulse 0.9s ease-in-out infinite;
+  }
+  @keyframes link-pending-pulse {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .link-pending.is-pending { animation: none; }
+  }
+}

@@ -66,7 +66,9 @@ export function TeamScreen({ data }: { data: TeamPageData }) {
   const refresh = useCallback(() => startRefresh(() => router.refresh()), [router]);
   const pending = data.approvals.filter((a) => a.status === "pending").length;
   const waiting = data.tasks.filter((x) => x.status === "awaiting_input").length;
-  const working = data.members.filter((m) => m.live === "working").length;
+  // sync fix: the "working" count is the same thing the board's "In progress" column shows (real tasks being worked on, not goal
+  // headers) — before, a running goal counted the manager as working while the column showed 0
+  const working = new Set(data.tasks.filter((x) => x.status === "in_progress" && !(x.plan as { goal?: boolean } | null)?.goal && x.assignee_id).map((x) => x.assignee_id)).size;
 
   const open = (m: TeamMemberView) =>
     setEditor({ id: m.id, role_key: m.role_key, name: m.name, title: m.title ?? "", avatar: m.avatar, tone: m.tone ?? "", instructions: m.instructions, tools: m.tools, autonomy: m.autonomy, auto_actions: m.auto_actions, reports_to: m.reports_to, status: m.status, limits: m.limits });

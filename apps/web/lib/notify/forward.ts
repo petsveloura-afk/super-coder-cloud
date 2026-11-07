@@ -258,6 +258,8 @@ export async function catchUpMissedAlerts(budgetMs = 10_000): Promise<{ checked:
           admin.from("messages").select("id").eq("conversation_id", m.conversation_id).eq("direction", "in").gt("created_at", m.created_at).limit(1).maybeSingle(),
         ]);
         if (!conv || later) continue;
+        // not-a-customer filter: a newsletter / spam message is not a missed alert
+        if ((await import("@/lib/ai/spam-core")).notCustomerKind({ text: m.body ?? "", channel: conv.channel as string, subject: (conv.title as string | null) ?? null })) continue;
         const act = catchUpAction({ messageAt: Date.parse(m.created_at), now, firstDeliveryAt: firstAt, hasDelivery: false, agentReplied: Boolean(reply?.body), aiMode: (conv.ai_mode as string | null) ?? null });
         if (act === "skip") continue;
         // counted once it is in the delivery ledger: a failed send is retried by retryNotifyDeliveries

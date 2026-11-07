@@ -37,6 +37,8 @@ const REVIEWED: Record<string, string> = {
   "setMyAvailabilityAction": "own availability",
   "updateProfileAction": "own profile",
   "markNotificationsReadAction": "own notifications",
+  "deleteNotificationsAction": "own notifications only (user_id = the signed-in person)",
+  "readNotificationsAction": "own notifications only (user_id = the signed-in person)",
   "updateProfileProAction": "own profile",
   "createAvatarUploadAction": "own avatar",
   "setAvatarAction": "own avatar",

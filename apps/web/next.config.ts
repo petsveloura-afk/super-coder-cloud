@@ -119,7 +119,8 @@ const nextConfig: NextConfig = {
   // node-only mail libraries (IMAP / SMTP / MIME) stay external to the server bundle
   serverExternalPackages: ["imapflow", "nodemailer", "mailparser"],
   // agent gallery uploads (images are also resized in the browser first)
-  experimental: { serverActions: { bodySizeLimit: "6mb" } },
+  // speed: a page visited in the last 30s opens instantly from the client router cache (actions still refresh what they change)
+  experimental: { serverActions: { bodySizeLimit: "6mb" }, staleTimes: { dynamic: 30, static: 180 } },
   poweredByHeader: false,
   transpilePackages: ["@scc/shared", "@scc/database"],
   async headers() {

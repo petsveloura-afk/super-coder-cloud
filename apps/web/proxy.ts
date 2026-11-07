@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { LOCALE_COOKIE, firstVisitLocale, isLocale } from "@/lib/i18n/config";
 import { updateSession } from "@/lib/supabase/proxy-session";
+import { isProbePath } from "@/lib/security/probe-core";
 
 /** Routes reachable without a session (after the /{locale} prefix). */
 // wave 21: "/legal" — the platform's privacy policy, terms and data-deletion pages (Meta / Google app review)
@@ -55,6 +56,8 @@ async function siteForHost(host: string): Promise<{ slug: string; lang: string }
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+  // security layer (additive): scanner probes for files / admin panels this app never has get a bare 404 at once
+  if (isProbePath(pathname)) return new NextResponse(null, { status: 404, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } });
   // wave 13: a published website on its own domain — "/" and its legal pages are served from /{lang}/s/{slug}
   const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "").toLowerCase().split(":")[0]!.trim();
   if (pathname === "/" || SITE_LEGAL.test(pathname)) {

@@ -12,6 +12,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { cn, initials } from "@/lib/utils";
 import { BrandLockup, BrandMark } from "./brand";
 import { NAV_ICONS } from "./nav-icons";
+import { LinkPending } from "./link-pending";
 import { LanguageSwitcher, ThemeToggle } from "./locale-theme";
 import { InstallAppButton, InstallAppMenuItem } from "./install-app";
 import { Dialog } from "@/components/ui/dialog";
@@ -118,6 +119,7 @@ function NavLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed?: b
       )}
     >
       {active ? <span className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-accent" aria-hidden /> : null}
+      <LinkPending />
       <span className={cn("nav-icon-tile relative grid h-7 w-7 shrink-0 place-items-center rounded-lg transition", active ? "bg-accent/15" : "group-hover:bg-surface")}>
         <Icon className={cn("h-[18px] w-[18px] shrink-0", active ? "text-accent" : "text-subtle group-hover:text-muted")} />
         {collapsed && count > 0 ? <span className="absolute -end-1 -top-1 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-bg" aria-hidden /> : null}
@@ -603,6 +605,7 @@ function AppShellInner(props: ShellProps) {
                 className={cn("flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium", active ? "text-accent" : "text-subtle")}
               >
                 <span className="tab-pill relative">
+                  <LinkPending />
                   <Icon className="h-[21px] w-[21px]" />
                   {key === "inbox" && (props.unreadInbox ?? 0) > 0 ? (
                     <span className="absolute -top-0.5 end-2 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white ring-2 ring-bg" data-testid="tab-inbox-badge">

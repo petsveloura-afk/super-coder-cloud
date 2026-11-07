@@ -140,3 +140,38 @@ export async function setAvatarAction(input: { locale: string; url: string }): P
   revalidatePath(`/${locale}`, "layout");
   return { ok: true, message: url ? "settings.pro.avatarSaved" : "settings.pro.avatarRemoved" };
 }
+
+/* ---------------------------------------------------------------- keep notifications clean (additive) */
+
+const deleteNotifSchema = z.object({ ids: z.array(z.string().uuid()).max(500).optional(), all: z.boolean().optional() });
+
+/** Deletes the signed-in user's OWN notifications in this business — the ticked ones, or all of them. Nobody else's. */
+export async function deleteNotificationsAction(input: { locale: string; ids?: string[]; all?: boolean }): Promise<ActionState<{ deleted: number }>> {
+  const locale = isLocale(input.locale) ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  const p = deleteNotifSchema.safeParse(input);
+  if (!p.success || (!p.data.all && !p.data.ids?.length)) return { error: "validation.invalid" };
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: "common.error" };
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  let q = createAdminClient().from("notifications").delete().eq("organization_id", ctx.org.id).eq("user_id", ctx.userId);
+  if (!p.data.all) q = q.in("id", p.data.ids!);
+  const { data, error } = await q.select("id");
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}`, "layout");
+  return { ok: true, message: "cleanup.deleted", data: { deleted: data?.length ?? 0 } };
+}
+
+/** Marks the ticked notifications (or all) as read for the signed-in user. */
+export async function readNotificationsAction(input: { locale: string; ids?: string[]; all?: boolean }): Promise<ActionState> {
+  const locale = isLocale(input.locale) ? input.locale : "he";
+  const ctx = await getOrgContext(locale);
+  const p = deleteNotifSchema.safeParse(input);
+  if (!p.success || (!p.data.all && !p.data.ids?.length)) return { error: "validation.invalid" };
+  const supabase = await createClient();
+  let q = supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("organization_id", ctx.org.id).eq("user_id", ctx.userId).is("read_at", null);
+  if (!p.data.all) q = q.in("id", p.data.ids!);
+  const { error } = await q;
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}`, "layout");
+  return { ok: true };
+}

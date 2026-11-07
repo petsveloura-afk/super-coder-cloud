@@ -4,6 +4,7 @@ import nodemailer from "nodemailer";
 import { simpleParser, type AddressObject } from "mailparser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAutomatedEmail } from "@/lib/ai/autopilot-core";
+import { notCustomerKind } from "@/lib/ai/spam-core";
 import { loadAccount, markAccountError, type LoadedAccount } from "./accounts";
 import { ingest } from "./ingest";
 import type { ProviderResult } from "./providers";
@@ -165,8 +166,9 @@ export async function pollMailbox(acc: LoadedAccount, maxMessages = 15): Promise
         if (!sender || sender.address === cfg.address.toLowerCase()) continue;
         const headers: Record<string, string> = {};
         for (const [k, v] of parsed.headers) headers[k] = typeof v === "string" ? v : Array.isArray(v) ? v.join(", ") : JSON.stringify(v);
-        const automated = isAutomatedEmail({ from: sender.address, headers });
         const body = stripQuotedReply(parsed.text || (typeof parsed.html === "string" ? parsed.html.replace(/<[^>]+>/g, " ") : "") || "");
+        // not-a-customer filter (additive): newsletters / product updates that slipped past the headers are recognised by their content
+        const automated = isAutomatedEmail({ from: sender.address, headers }) || notCustomerKind({ text: body, subject: parsed.subject ?? null, channel: "email" }) !== null;
         const references = Array.isArray(parsed.references) ? parsed.references.join(" ") : (parsed.references ?? "");
         await ingest({
           kind: "email",

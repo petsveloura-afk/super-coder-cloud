@@ -251,9 +251,16 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
       .order("created_at")
       .limit(1)
       .maybeSingle(),
-    admin.from("messages").select("id, body").eq("conversation_id", conv.id).eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    admin.from("messages").select("id, body, meta").eq("conversation_id", conv.id).eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (!g.allowed) return { replied: false, handoff: false, reason: `guard:${g.reason}` };
+  // not-a-customer filter (additive): newsletters, automatic notifications and clear spam pitches get no answer and no team alert
+  {
+    const { notCustomerKind } = await import("./spam-core");
+    const lastMeta = ((lastInRow as { meta?: { automated?: boolean } | null } | null)?.meta ?? null) as { automated?: boolean } | null;
+    const nk = lastInRow ? notCustomerKind({ text: String((lastInRow as { body?: string | null }).body ?? ""), channel, automated: lastMeta?.automated === true, subject: (conv.title as string | null) ?? null }) : null;
+    if (nk) return { replied: false, handoff: false, reason: `filtered:${nk}` };
+  }
   let agent = agentRow;
   // Facebook Messenger / Instagram: an agent created before these channels existed (or by the quick-create
   // button) does not list them — the business's first enabled agent answers there too, and the channel is added to it
@@ -905,6 +912,8 @@ export async function forwardAfterAutopilot(conversationId: string, res: Autopil
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return;
     const skip = ["no_service_key", "not_found", "channel", "already_answered", "superseded", "rate_limited", "empty"];
     if (res.reason && skip.includes(res.reason)) return;
+    // not-a-customer filter: newsletters / spam do not wake the team
+    if (res.reason?.startsWith("filtered:")) return;
     const busy = Boolean(res.reason && /^ai\.(busy|failed)/.test(res.reason));
     if (busy) return; // the real answer follows — forwarded then
     const admin = createAdminClient();

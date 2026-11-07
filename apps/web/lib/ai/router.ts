@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { anthropicCall, geminiCall, openaiCall, openaiCompatibleCall, type AIMessage } from "./providers";
-import { buildCandidates, classifyError, isResting, isTinyModel, laneOrder, NO_JSON_MODE, restKey, soonestReady, type RouteCandidate, type RouteProvider } from "./router-core";
+import { buildCandidates, callTimeoutMs, classifyError, isResting, isTinyModel, laneOrder, NO_JSON_MODE, restKey, soonestReady, type RouteCandidate, type RouteProvider } from "./router-core";
 import { capRest, probeOrder, restKeysOf, withDeadline } from "./resilience-core";
 
 /**
@@ -185,10 +185,13 @@ export async function generateRouted(input: {
   lane?: "interactive" | "background";
   /** wave 66: kind-of-work hint for the choice of MODEL inside a provider (never the provider itself); null / missing = today's order */
   hint?: "fast" | "strong" | null;
+  /** fix: keep `preferred` first in the background lane too (an explicit routing choice, e.g. the digital team) */
+  pinPreferred?: boolean;
 }): Promise<RoutedResult & { attempts: RouteAttempt[] }> {
   const cands = laneOrder(
     buildCandidates({ preferred: input.preferred, model: input.model, env: process.env }).filter((c) => !(input.skipProviders ?? []).includes(c.provider)),
     input.lane ?? "interactive",
+    input.pinPreferred ? input.preferred : null,
   );
   if (!cands.length) throw new RouterError("ai_not_configured", [], null, false);
   // wave 66: background work may step aside (max 3s) for live requests; then the model hint + provider health re-rank the candidates
@@ -217,7 +220,7 @@ export async function generateRouted(input: {
     if ((failedBy.get(c.provider) ?? 0) >= perProvider) continue;
     const t0 = Date.now();
     try {
-      const r = await callOne(c, { system: input.system, messages: input.messages, temperature: input.temperature ?? 0.4, maxTokens: input.maxTokens ?? 600, json: input.json }, Math.min(25_000, left));
+      const r = await callOne(c, { system: input.system, messages: input.messages, temperature: input.temperature ?? 0.4, maxTokens: input.maxTokens ?? 600, json: input.json }, callTimeoutMs(input.lane ?? "interactive", left));
       if (!r.text) {
         attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, reason: "empty answer" });
         noteHealth(attempts[attempts.length - 1]);

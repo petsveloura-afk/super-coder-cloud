@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { UpgradeNote } from "@/components/billing/upgrade-note";
 import { orgHasFeature } from "@/lib/billing/features";
 import type { Metadata } from "next";
@@ -12,6 +11,7 @@ import { auditLabel } from "@/lib/i18n/translate";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { markNotificationsReadAction } from "./actions";
+import { NotificationsList } from "@/components/settings/notifications-list";
 import { ConversationPolicyCard, LeadRoutingCard, MyChannelsCard, type MyChannel } from "@/components/settings/team-plus";
 import { memberOptions } from "@/lib/lookups";
 import { CalendarCard, type CalendarConn } from "@/components/settings/calendar-card";
@@ -38,7 +38,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
       .select("id, title_key, params, created_at, read_at, link")
       .eq("organization_id", ctx.org.id)
       .order("created_at", { ascending: false })
-      .limit(20),
+      .limit(100),
     ctx.can("audit.read") && (await orgHasFeature(ctx.org.id, "audit_log"))
       ? supabase
           .from("audit_logs")
@@ -178,21 +178,8 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           {notifications.length === 0 ? (
             <EmptyState icon={<Bell className="h-6 w-6" />} title={t("common.noNotifications")} />
           ) : (
-            <ul className="divide-y divide-line">
-              {notifications.map((n) => (
-                <li key={n.id} className="flex items-center gap-3 px-5 py-3 text-sm">
-                  {!n.read_at ? <span className="h-2 w-2 rounded-full bg-accent" /> : <span className="h-2 w-2" />}
-                  {n.link && /^\/[a-z]/.test(n.link) ? (
-                    <Link href={`/${locale}${n.link}`} className="flex-1 hover:text-accent hover:underline">
-                      {t(n.title_key, n.params)}
-                    </Link>
-                  ) : (
-                    <span className="flex-1">{t(n.title_key, n.params)}</span>
-                  )}
-                  <span className="text-[12px] text-subtle">{formatDateTime(locale, n.created_at)}</span>
-                </li>
-              ))}
-            </ul>
+            // keep it clean (additive): select / select all / delete / delete all / mark all read — the same rows as before
+            <NotificationsList rows={notifications} locale={locale} when={Object.fromEntries(notifications.map((n) => [n.id, formatDateTime(locale, n.created_at)]))} />
           )}
         </Card>
 

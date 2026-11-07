@@ -60,6 +60,8 @@ export async function runAISystem(input: {
       lane: (["autopilot", "voice", "kb", "vision", "transcribe"].includes(input.feature) ? "interactive" : "background") as "interactive" | "background",
       // wave 66: kind-of-work hint for the MODEL inside a provider; a team routeProvider/routeModel (explicit choice) always wins
       hint: input.routeProvider ? null : hintForFeature(input.feature),
+      // fix: the team's explicit engine choice stays first in the background lane
+      pinPreferred: Boolean(input.routeProvider),
     };
     // speed upgrade — live conversations (chat, phone, help-center answers): when the main engine is
     // slow, a second configured engine starts in parallel after AI_HEDGE_MS (default 6s); first answer wins

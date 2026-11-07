@@ -7779,5 +7779,20 @@
       "closedHint": "Only conversations marked \"closed\"",
       "lowerBetter": "Lower is better"
     }
+  },
+  "cleanup": {
+    "select": "Select",
+    "selectAll": "Select all",
+    "hideSelected": "Remove from view ({n})",
+    "deleteSelected": "Delete selected ({n})",
+    "clearAll": "Clear all",
+    "clearAllConfirm": "Clear {n} items? (tap to confirm)",
+    "deleteAll": "Delete all",
+    "deleteAllConfirm": "Delete {n} notifications? (tap to confirm)",
+    "restore": "Show all again",
+    "cleanTitle": "All clean ✨",
+    "cleanBody": "New updates will appear here. Cleared items come back with \"Show all again\".",
+    "deleted": "Deleted",
+    "markAllRead": "Mark all read"
   }
 }
