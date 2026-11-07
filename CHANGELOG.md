@@ -1,5 +1,21 @@
 # Changelog
 
+## Enterprise round: sales psychology engine, fast context cache, resilient database calls, live campaign progress
+
+- **Sales psychology engine** (`lib/ai/sales-psychology-core.ts`, pure, no AI call, under 1ms), added to the conversation agent's brief. Nothing existing was changed.
+  - Customer sentiment −1.0…1.0 in Hebrew, English and Arabic: a lexicon with Hebrew word boundaries, negation, intensifiers, emoji and shouting. Plus the trend over the last 5 messages.
+  - Deep objections: an objection that comes back means the earlier answer failed, so the agent changes approach.
+  - An adaptive plan of up to 3 tactics: empathy first, value anchoring, risk reversal, social proof, urgency framing, smaller step, next step.
+  - Proof, guarantee and urgency tactics are used only when the business's own information has them (`proofsFromFacts`). An upset customer is never sold to.
+- **Fast context cache** (`lib/cache/ttl-cache*.ts`):
+  - In-memory LRU + TTL + single-flight. An optional shared Redis (Upstash REST) layer is used only when `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` are set, with a 250ms limit and a silent fallback.
+  - The agent caches only business-level facts ("can book", "can take payment") for 30s. Conversation state is never cached.
+- **Resilient database calls** (`lib/db/resilient*.ts`):
+  - Exponential backoff with full jitter, only for transient errors: connection, pool, gateway, serialization and deadlock.
+  - Used only on idempotent calls: the credit-pack grant (4 tries, 6s) and the agent's history read (3 tries, 2.5s).
+- **Live campaign progress** (`components/campaigns/campaign-live.tsx`): while a campaign sends, its real counts refresh every 4s while the tab is visible, with a "live" mark. It stops by itself.
+- No migration.
+
 ## Full round: credits after purchase, posts board hygiene, edit pop-up, run stability, API guard
 
 - **Credits bought → work resumes at once:**

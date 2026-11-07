@@ -16,6 +16,7 @@ import { channelsReady } from "@/lib/campaign-channels";
 import { CampaignCoach } from "@/components/campaigns/campaign-coach";
 import { InsightList } from "@/components/campaigns/campaign-overview";
 import { campaignInsights } from "@/lib/campaigns/brain";
+import { CampaignLive } from "@/components/campaigns/campaign-live";
 
 type Params = Promise<{ locale: string; id: string }>;
 
@@ -103,6 +104,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
           <span className="text-muted">{t("campaigns.progressLabel", { pct: Math.round(rates.progress * 100) })}</span>
           {rates.failed ? <span className="text-danger">{t("campaigns.failureRate", { pct: Math.round(rates.failureRate * 100) })}</span> : null}
           {rates.pending ? <span className="text-subtle">{t("campaigns.pending", { count: rates.pending })}</span> : null}
+          <CampaignLive status={c.status as string} pending={rates.pending ?? 0} />
         </div>
         <div className="flex h-2.5 overflow-hidden rounded-full bg-surface-hover" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(rates.progress * 100)}>
           <span className="block h-full bg-success" style={{ width: `${rates.recipients ? (rates.sent / rates.recipients) * 100 : 0}%` }} />

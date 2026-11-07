@@ -2370,6 +2370,7 @@
     },
     "duplicate": "Duplicate",
     "duplicated": "A new draft was created from the campaign",
+    "live": "Live",
     "progressLabel": "{pct}% of the send is done",
     "failureRate": "{pct}% failed",
     "pending": "{count} waiting",

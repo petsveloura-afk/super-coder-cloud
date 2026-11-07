@@ -30,7 +30,10 @@ export async function processPackCrypto(ref: string, amount: number, currency: s
 
 async function grant(purchaseId: string, orgId: string, amount: number, currency: string, externalId: string) {
   const admin = createAdminClient();
-  const { data, error } = await admin.rpc("grant_credit_purchase", { p_purchase: purchaseId, p_amount: amount, p_currency: currency.toUpperCase() });
+  // resilient (additive): the grant RPC is idempotent ("already" on a second run), so a transient database error is retried
+  // with backoff instead of leaving a paid purchase without its credits until the provider calls again
+  const { withDbRetry } = await import("@/lib/db/resilient");
+  const { data, error } = await withDbRetry(() => admin.rpc("grant_credit_purchase", { p_purchase: purchaseId, p_amount: amount, p_currency: currency.toUpperCase() }), { attempts: 4, budgetMs: 6000, label: "grant_credit_purchase" });
   if (error) return { handled: true, ok: false, orgId, error: error.message };
   const r = (data ?? {}) as { ok: boolean; already?: boolean; credits?: number; error?: string };
   if (r.ok && !r.already) {

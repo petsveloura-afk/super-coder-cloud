@@ -327,12 +327,17 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   // loop / abuse protection
   const [{ data: allowed }, { data: rows }] = await Promise.all([
     admin.rpc("public_rate_limit", { p_bucket: `autopilot:${conv.id}`, p_limit: 30, p_window_seconds: 3600 }),
-    admin
-      .from("messages")
-      .select("direction, body, created_at, meta")
-      .eq("conversation_id", conv.id)
-      .order("created_at", { ascending: false })
-      .limit(30),
+    // resilient read (additive): the conversation history is retried on a transient database error instead of failing the reply
+    (await import("@/lib/db/resilient")).withDbRetry(
+      () =>
+        admin
+          .from("messages")
+          .select("direction, body, created_at, meta")
+          .eq("conversation_id", conv.id)
+          .order("created_at", { ascending: false })
+          .limit(30),
+      { attempts: 3, budgetMs: 2500, label: "autopilot.history" },
+    ),
   ]);
   if (allowed === false) return { replied: false, handoff: false, reason: "rate_limited" };
   // "I'm checking…" holding replies are not part of the real conversation
@@ -491,7 +496,14 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   const salesStateP = import("./sales-state").then((m) => m.loadSalesState(conv.id as string)).catch(() => null);
   // wave 59: + can the agent send a payment link (the business's own Stripe / PayPal is connected)
   const { canPayOnline } = await import("@/lib/finance/pay-chat");
-  const [memories, bookable, payable] = await Promise.all([loadMemories(orgId, (conv.contact_id as string | null) ?? null).catch(() => []), canBook(orgId).catch(() => false), canPayOnline(orgId).catch(() => false)]);
+  // fast context cache (additive): "can book" / "can take payment" are business-level facts that change rarely — read once per
+  // 30s per business instead of on every customer message (a cache failure falls back to the real read)
+  const { cached } = await import("@/lib/cache/ttl-cache");
+  const [memories, bookable, payable] = await Promise.all([
+    loadMemories(orgId, (conv.contact_id as string | null) ?? null).catch(() => []),
+    cached(`ap:canBook:${orgId}`, 30_000, () => canBook(orgId)).catch(() => canBook(orgId).catch(() => false)),
+    cached(`ap:canPay:${orgId}`, 30_000, () => canPayOnline(orgId)).catch(() => canPayOnline(orgId).catch(() => false)),
+  ]);
   const actionsSection = [memoryBlock(memories), agentActionsInstructions({ canBook: bookable, hasContact: Boolean(conv.contact_id), canPay: payable })].filter(Boolean).join("\n\n");
   // wave 55 — the conversation's sales funnel state and the precise goal of this reply
   const { loadSalesState } = await import("./sales-state");
@@ -524,6 +536,17 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   } catch {
     /* never blocks the reply */
   }
+  // sales psychology engine (additive): numeric sentiment + trend, deep objections and the persuasion tactics that fit this
+  // moment — bound to the business's real facts (proofs read from the agent's own profile / instructions). Never blocks.
+  let psychologySection = "";
+  try {
+    const { salesPsychology, proofsFromFacts } = await import("./sales-psychology-core");
+    const factsText = `${String(agent.instructions ?? "")}\n${JSON.stringify(agent.profile ?? {})}`;
+    const sp = salesPsychology({ history, proofs: proofsFromFacts(factsText) });
+    if (sp.brief) psychologySection = `\n\n${sp.brief}`;
+  } catch {
+    /* never blocks the reply */
+  }
   // wave 7 — business profile, goal, sales method and tools (lead capture, buttons, share-phone)
   const system = `${baseInstructions}\n\n${salesAgentInstructions({
     profile: (agent.profile as AgentProfile | null) ?? null,
@@ -531,7 +554,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     channel: ch,
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
     locale,
-  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}\n\n${actionsSection}\n\n${salesSection}${socialSection}${openerLine}${resumedUnattended ? `\n\n${(await import("./autopilot-heal")).resumedNote(replyLocale)}` : ""}`;
+  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}${psychologySection}\n\n${actionsSection}\n\n${salesSection}${socialSection}${openerLine}${resumedUnattended ? `\n\n${(await import("./autopilot-heal")).resumedNote(replyLocale)}` : ""}`;
   void typingIndicator(orgId, ch, conv.external_id as string); // speed upgrade: never waited for (the typing loop already runs)
   // wave 16: help-center answers (knowledge base) for this question
   let kb = "";

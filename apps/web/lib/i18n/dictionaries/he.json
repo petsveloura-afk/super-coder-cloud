@@ -2370,6 +2370,7 @@
     },
     "duplicate": "שכפול קמפיין",
     "duplicated": "נוצרה טיוטה חדשה מהקמפיין",
+    "live": "מתעדכן בזמן אמת",
     "progressLabel": "{pct}% מהשליחה הושלמה",
     "failureRate": "{pct}% כשלים",
     "pending": "{count} ממתינים",

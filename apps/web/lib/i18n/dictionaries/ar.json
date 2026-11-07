@@ -2370,6 +2370,7 @@
     },
     "duplicate": "تكرار الحملة",
     "duplicated": "تم إنشاء مسودة جديدة من الحملة",
+    "live": "مباشر",
     "progressLabel": "اكتمل {pct}% من الإرسال",
     "failureRate": "{pct}% فشل",
     "pending": "{count} بالانتظار",
