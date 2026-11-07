@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { anthropicCall, geminiCall, openaiCall, openaiCompatibleCall, type AIMessage } from "./providers";
-import { buildCandidates, classifyError, isResting, laneOrder, NO_JSON_MODE, restKey, soonestReady, type RouteCandidate, type RouteProvider } from "./router-core";
+import { buildCandidates, classifyError, isResting, isTinyModel, laneOrder, NO_JSON_MODE, restKey, soonestReady, type RouteCandidate, type RouteProvider } from "./router-core";
 import { capRest, probeOrder, restKeysOf, withDeadline } from "./resilience-core";
 
 /**
@@ -206,7 +206,9 @@ export async function generateRouted(input: {
   // limited (all keys share one Google quota) must never eat the whole budget before the next provider
   const perProvider = Math.max(1, Number(process.env.AI_ROUTER_PER_PROVIDER) || 2);
   const failedBy = new Map<string, number>();
-  for (const c of cands) {
+  // quality gate: a tiny model's answer is kept aside while stronger engines remain — used only if nothing better answers
+  let tinyFallback: (Omit<RoutedResult, "provider"> & { provider: RouteProvider }) | null = null;
+  for (const [ci, c] of cands.entries()) {
     if (attempts.length >= maxCalls) break;
     const left = budget - (Date.now() - started);
     if (attempts.length > 0 && left < 4000) break;
@@ -221,6 +223,11 @@ export async function generateRouted(input: {
         noteHealth(attempts[attempts.length - 1]);
         failedBy.set(c.provider, (failedBy.get(c.provider) ?? 0) + 1);
         onlyBusy = false;
+        continue;
+      }
+      if (isTinyModel(r.model) && !tinyFallback && cands.slice(ci + 1).some((n) => !isResting(n, rests) && !isTinyModel(n.model) && n.provider !== c.provider) && budget - (Date.now() - started) > 6000) {
+        tinyFallback = { ...r, provider: c.provider };
+        attempts.push({ provider: c.provider, model: r.model, keyId: c.keyId, ok: false, ms: Date.now() - t0, reason: "model too small — kept as last resort" });
         continue;
       }
       attempts.push({ provider: c.provider, model: c.model, keyId: c.keyId, ok: true, ms: Date.now() - t0 });
@@ -239,6 +246,12 @@ export async function generateRouted(input: {
       if (cl.kind !== "rate" && cl.kind !== "daily" && cl.kind !== "server") onlyBusy = false;
       await rest(restKey(c, cl.scope), capRest(cl, process.env), `${cl.kind}: ${cl.reason}`);
     }
+  }
+  // quality gate: nothing stronger answered → the tiny model's answer is still better than no answer
+  if (tinyFallback && !attempts.some((a) => a.ok)) {
+    attempts.push({ provider: tinyFallback.provider, model: tinyFallback.model, keyId: "tiny-fallback", ok: true, ms: 0 });
+    lease();
+    return { ...tinyFallback, attempts };
   }
   // wave 15 — LAST RESORT: when nothing could answer (everything resting or failed), probe the
   // candidates that expire soonest anyway. A rest is a guess about the future; a probe is a fact.

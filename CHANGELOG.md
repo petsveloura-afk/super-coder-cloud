@@ -1,5 +1,14 @@
 # Changelog
 
+## Digital team: a missing permission asks the owner instead of failing
+
+- **Permission requests:** when an employee plans a step with a platform tool it was not given, the task no longer fails or blocks silently. It opens ONE approval per task and tool (`team.grant_tool`) that says who needs which permission and for which task.
+- **Notifications:** the business owner and admins get an in-app notification and a push.
+- **One click:** approving adds the tool to that employee and puts the task back in the queue. Declining keeps it blocked, as before.
+- **Unchanged:** the allowed steps of the same task still run, and the "Not allowed" log line is still written. If the approval cannot be opened, the old behaviour is kept.
+- **AI quality gate:** a tiny model (≤ ~3B, e.g. a 2.6B free model) is no longer accepted for plans and reviews while a stronger engine is still available. Its answer is kept and used only as the last resort, which is still better than no answer.
+- No migration.
+
 ## Team alerts are never lost (Telegram lead → WhatsApp alert)
 
 - Every alert to a team recipient about a customer message is recorded once per recipient, event and message (`notify_deliveries`).

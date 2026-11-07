@@ -306,3 +306,12 @@ export function soonestReady(cands: RouteCandidate[], rests: Map<string, number>
   }
   return best;
 }
+
+/**
+ * Quality gate (additive): a tiny model (≤ ~3B parameters — e.g. "lfm-2.5-2.6b", "gemma-3-1b") answers too weakly for plans,
+ * reviews and customer replies. The router skips such an answer while a stronger engine is still available, and uses it only as
+ * the last resort (better than no answer). "gpt-oss-120b", "llama-3.3-70b", "qwen-27b" are NOT tiny.
+ */
+export function isTinyModel(model: string | null | undefined): boolean {
+  return /(^|[^0-9.])[0-3](\.\d+)?b(\b|[^a-z])/i.test(String(model ?? ""));
+}

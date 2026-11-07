@@ -7196,7 +7196,8 @@
       "board_post": "Post a note on the team board",
       "reports_latest": "The latest weekly / monthly report",
       "sop_lookup": "Look up a work procedure",
-      "sop_propose": "Propose a procedure change"
+      "sop_propose": "Propose a procedure change",
+      "team_grant_tool": "Permission request"
     },
     "goal": {
       "title": "A goal for the team",
@@ -7753,7 +7754,8 @@
       "memory": "Business facts and procedures",
       "activity": "Decisions and oversight",
       "settings": "Health and reliability"
-    }
+    },
+    "permissionNeeded": "{name} needs one more permission to finish a task — approve in one click"
   },
   "aiQuality": {
     "feedback": {

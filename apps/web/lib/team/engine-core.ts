@@ -12,6 +12,7 @@
  *   7 deliver      by autonomy and sensitivity: executed, or one approval with the employee's reasoning
  *   8 summarize    a short report + episodic memory
  */
+import { GRANT_TOOL, grantPreview, grantReason, grantable } from "./permission-core";
 import { firstJsonObject as firstJsonObjectStrict } from "@/lib/operator/operator-core";
 import { firstJsonObjectTolerant } from "./json-repair-core";
 import { ROLES, type RoleKey, type Autonomy } from "./roles";
@@ -337,6 +338,8 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
   // 1 + 3 — understand and plan (bounded act rounds: read → decide → write)
   const results: { tool: string; ok: boolean; summary: string }[] = [];
   let plan: PlanModel | null = null;
+  /** permission requests already opened in this run (one per tool) */
+  const askedGrant = new Set<string>();
   for (let round = 0; round < 3; round++) {
     const b = stop();
     if (b) {
@@ -409,6 +412,19 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
       }
       const d = decide(step.tool, member, settings, { interactive: deps.interactive });
       if (d.do === "blocked") {
+        // missing permission (additive): instead of failing silently, ask the owner ONCE per task + tool to grant it —
+        // approving adds the tool to this employee and the task runs again
+        if (d.why === "tool_not_allowed" && grantable(step.tool, TOOL_MAP) && !askedGrant.has(step.tool)) {
+          askedGrant.add(step.tool);
+          const id = await deps.approval({ tool: GRANT_TOOL, payload: { tool: step.tool }, preview: grantPreview(deps.lang, { member: member.name, tool: step.tool, task: task.title }), reason: grantReason(deps.lang, step.why ?? ""), sensitivity: "internal" });
+          if (id) {
+            out.approvals.push(id);
+            results.push({ tool: step.tool, ok: false, summary: "waiting for the owner to grant this permission" });
+            await deps.log("execute", `Not allowed: ${step.tool} (${d.why.replace(/_/g, " ")}).`, { tool: step.tool, why: d.why }, false);
+            await deps.log("approval", `Asked the owner for permission to use ${step.tool}.`, { tool: step.tool, why: d.why });
+            continue;
+          }
+        }
         results.push({ tool: step.tool, ok: false, summary: `blocked: ${d.why}` });
         await deps.log("execute", `Not allowed: ${step.tool} (${d.why.replace(/_/g, " ")}).`, { tool: step.tool, why: d.why }, false);
         continue;

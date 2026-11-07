@@ -1,4 +1,5 @@
 import "server-only";
+import { GRANT_TOOL, grantable, withGrantedTool } from "./permission-core";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ROLES, STARTER_TEAM, isRoleKey, type RoleKey } from "./roles";
 import { assign, goalPrompt, parseGoalPlan, readyTasks, runEmployeeTask, type EngineDeps, type EngineMember, type EngineSettings, type EngineTask, type Outcome, type TeamContext } from "./engine-core";
@@ -370,6 +371,12 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
     log: (phase, summary, details, ok) => log(phase, summary, details, ok),
     approval: async (input) => {
       const { data } = await a.from("team_approvals").insert({ organization_id: orgId, task_id: taskId, member_id: member.id, tool: input.tool, payload: input.payload, preview: input.preview.slice(0, 4000), reason: input.reason.slice(0, 2000), sensitivity: ["internal", "customer", "irreversible", "money"].includes(input.sensitivity) ? input.sensitivity : "customer" }).select("id").single();
+      // missing permission: the owners hear about it right away (bell + phone push), so nothing waits unnoticed
+      if (data?.id && input.tool === GRANT_TOOL) {
+        const { data: owners } = await a.from("organization_members").select("user_id").eq("organization_id", orgId).in("role", ["agency_owner", "owner", "admin"]).limit(5);
+        const rows = ((owners ?? []) as { user_id: string }[]).map((o) => ({ organization_id: orgId, user_id: o.user_id, kind: "team_permission", title_key: "aiTeam.permissionNeeded", params: { name: member.name, tool: String(input.payload.tool ?? "") }, link: "/ai-team" }));
+        if (rows.length) await a.from("notifications").insert(rows).then(() => undefined, () => undefined);
+      }
       return (data?.id as string) ?? null;
     },
     handoff: async (input) => {
@@ -620,6 +627,21 @@ export async function decideApproval(orgId: string, approvalId: string, decision
     await a.from("team_approvals").update({ status: "rejected", decided_by: userId, decided_at: now, decision_note: decision.note?.slice(0, 1000) ?? null }).eq("id", ap.id);
     await writeMemories(orgId, (ap.member_id as string | null) ?? null, learnFromFeedback({ tool: ap.tool as string, preview: before, feedback: { kind: "rejected", note: decision.note } }));
     await logActivity(orgId, ap.task_id as string, ap.member_id as string, "approval", `Rejected by the owner${decision.note ? `: ${decision.note.slice(0, 200)}` : ""}.`, { tool: ap.tool }, true, userId);
+  } else if (ap.tool === GRANT_TOOL) {
+    // missing permission (additive): the owner granted the tool → it is added to the employee and the task runs again
+    const tool = String(payload.tool ?? "");
+    const { data: mem } = await a.from("team_members").select("tools").eq("organization_id", orgId).eq("id", ap.member_id as string).maybeSingle();
+    const ok = Boolean(mem) && grantable(tool, TOOL_MAP);
+    if (ok) await a.from("team_members").update({ tools: withGrantedTool(((mem?.tools ?? []) as string[]), tool) }).eq("organization_id", orgId).eq("id", ap.member_id as string);
+    await a.from("team_approvals").update({ status: ok ? "executed" : "failed", decided_by: userId, decided_at: now, decision_note: decision.note?.slice(0, 1000) ?? null, result: { ok, summary: ok ? `permission granted: ${tool}` : "", error: ok ? null : "unknown_tool" } }).eq("id", ap.id);
+    await logActivity(orgId, ap.task_id as string, ap.member_id as string, "approval", ok ? `Permission granted by the owner: ${tool} — the task runs again.` : `Permission request could not be applied (${tool}).`, { tool }, ok, userId);
+    if (ok && ap.task_id) {
+      // the task runs again with the new permission (unless other approvals still wait — then they finish it as before)
+      const { count } = await a.from("team_approvals").select("id", { count: "exact", head: true }).eq("task_id", ap.task_id).eq("status", "pending");
+      if (!count) await a.from("team_tasks").update({ status: "pending", error: null, finished_at: null, updated_at: now }).eq("id", ap.task_id).in("status", ["awaiting_approval", "done", "failed"]);
+      return { ok: true, result: "permission_granted" };
+    }
+    if (!ok) return { ok: false, error: "aiTeam.err.executeFailed", result: "unknown_tool" };
   } else {
     const v = TOOL_MAP[ap.tool as string] ? validateArgs(ap.tool as string, payload) : null;
     let result: { ok: boolean; summary: string; error?: string } = { ok: true, summary: "noted" };
