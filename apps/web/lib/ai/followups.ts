@@ -73,11 +73,13 @@ export async function runFollowups(budgetMs = 40_000): Promise<{ checked: number
     if (!out.ok) continue;
     const tools = parseAgentTools(out.text);
     if (!tools.text) continue;
-    await sendToConversation(r.organization_id, r.conversation_id, formatForChannel(tools.text, ch), undefined, {
+    const sentNow = await sendToConversation(r.organization_id, r.conversation_id, formatForChannel(tools.text, ch), undefined, {
       aiAgentId: agent.id as string,
       meta: { followup: true, ...(tools.buttons.length ? { buttons: tools.buttons } : {}) },
       rich: { buttons: tools.buttons, askPhone: tools.askPhone, askPhoneLabel: sharePhoneLabel(locale), html: true },
     });
+    // wave A3: a follow-up the customer-ready guard held was NOT sent — it is not counted as sent and does not cancel the planned follow-up
+    if (!sentNow.ok && sentNow.error === "held_by_outbound_guard") continue;
     // the planned follow-up of the same silence is no longer needed
     await admin.rpc("cancel_pending_schedules", { p_org: r.organization_id, p_conversation: r.conversation_id, p_reason: "followup_sent", p_kinds: ["followup"], p_only_cancel_on_reply: false }).then(() => undefined, () => undefined);
     sent++;

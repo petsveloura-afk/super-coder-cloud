@@ -2706,6 +2706,7 @@
     "ownerPhone": "Sent by you from the phone — the agent paused here",
     "aiLatency": "Agent response time",
     "heldByGuard": "The message was held and not sent: it was not ready for a customer (for example an unfilled field). Review it and write the reply yourself.",
+    "heldNotification": "⚠️ An AI agent's message was held and not sent to the customer because it was not ready. Tap to review and reply yourself",
     "aiNote": {
       "owner_phone": "You wrote to the customer from your phone, so the agent paused in this conversation.",
       "resumeIn": "It comes back by itself in {n} minutes if you don't write again.",
@@ -5733,6 +5734,11 @@
     "editPost": {
       "title": "Edit post",
       "subtitle": "Changes are saved to this post only"
+    },
+    "heldNotReady": {
+      "badge": "Held: not ready for customers. Edit before publishing",
+      "hint": "The text has a part that was never finished (for example an unfilled field) or internal instructions. The post will not be approved, scheduled or published until you fix the text.",
+      "blocked": "The text is not ready for customers yet (for example an unfilled field), so it cannot be approved, scheduled or published. Edit the text and try again."
     },
     "notAPost": {
       "badge": "Not a post — edit or cancel",

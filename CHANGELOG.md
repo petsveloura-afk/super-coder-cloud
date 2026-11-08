@@ -1,5 +1,17 @@
 # Changelog
 
+## Wave A3 — AI brains: what the guard holds is now visible, honest and no longer a false "broken connection"
+
+- **Checked and NOT changed (nothing to fix):** Telegram posting goes only through `publishDuePosts` (`lib/social/publish.ts → publishTelegram`), so it passes the same customer-ready guard as Facebook / Instagram — there is no second path. Read in full: `router.ts` (candidate order, per-provider call limit, rests, paid safety net, last-resort probe, lane lease released on every exit), `provider-health.ts`, `lane-gate.ts`, `guardrails.ts` and `run-system.ts`; and the SQL `finalize_ai_usage_system` (a failed AI call costs 0 credits). No defect found. Not read line by line: `resilience-core.ts`, `provider-health-core.ts`, `busy-wait-core.ts` (covered by their existing tests).
+- **Reported only:** the price guard (`guardrails.price_guard`) is opt-in (default off); turning it on by default would change behaviour for every business, so it was left as is. A small inconsistency in the router: the "tiny model" last-resort answer is not recorded in the provider health window (harmless).
+- **A post the guard held now shows on the board (`lib/social/held-post-core.ts`, pure):** the publisher already put such a post back to a draft, but the board did not know. Now the card shows "Held: not ready for customers — edit before publishing", the "approve" and "publish now" buttons are hidden (card and drawer), "approve all drafts" skips it, and the server refuses to approve / schedule / publish it with a clear message (he / en / ar). The check is the same one the publisher uses, so once the owner fixes the words the post is free again. Only while `OUTBOUND_GUARD=enforce` (default).
+- **"Publish now" no longer says "publishing" when the post was held again** — it now says it was held.
+- **A held follow-up is no longer counted as sent** (`runFollowups`) and no longer cancels the planned follow-up with the reason "followup_sent".
+- **No more false "your connection is broken" alerts:** AI messages the guard held (status failed, error `held_by_outbound_guard`) were counted as failed sends of the channel, so two of them in a day turned a healthy WhatsApp into "send failures" and alerted the owners to reconnect. They are now left out of the channel health numbers and of the alert cron; every other failed send still counts.
+- **The owners are told when an AI message is held outside the autopilot's own hand-over** (in-app notification `inbox.heldNotification`, at most once per conversation per 6 hours) so a customer is not left waiting unnoticed.
+- Reported only, not changed: `fetchMediaUrl` (`lib/ai/inbound-media.ts`) downloads an attachment link without a public-address check.
+- No migration, no new environment variable. Tests: `wave-a3-held-and-health.test.ts`.
+
 ## Wave B2 — performance: indexes for foreign keys that had none
 
 - **Why it matters:** when a parent row is deleted (a campaign, a team task, a calendar connection, an AI agent, a contact, a deal …) the database checks every table that points to it. With no index on the pointing column that check reads the whole child table — once per deleted row. `messages`, `conversations` and `jobs` are among the biggest tables.

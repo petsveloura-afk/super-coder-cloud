@@ -114,6 +114,7 @@ export async function sendToConversation(orgId: string, conversationId: string, 
       .from("messages")
       .insert({ organization_id: orgId, conversation_id: conv.id, direction: "out", body: text.slice(0, 4000), status: "failed", error: "held_by_outbound_guard", sent_by: sentBy ?? null, ai_agent_id: opts?.aiAgentId, meta: { ...(opts?.meta ?? {}), held: guard.held } })
       .then(() => undefined, () => undefined);
+    await notifyHeldMessage(orgId, conv.id as string).catch(() => undefined);
     return { ok: false, error: "held_by_outbound_guard", permanent: true };
   }
   const body = (guard?.text ?? text).slice(0, 4000);
@@ -142,6 +143,19 @@ export async function sendToConversation(orgId: string, conversationId: string, 
     .update({ last_message_at: new Date().toISOString(), last_message_preview: body.slice(0, 200) })
     .eq("id", conv.id);
   return { ok: r.ok, messageId: msg.id as string, error: r.error, status: r.status, permanent: r.permanent };
+}
+
+/**
+ * wave A3 — the owners learn (in-app notification, once per conversation per 6 hours) that an AI message was held and not sent, so a
+ * customer is not left waiting unnoticed. Best effort: never throws, never blocks the send path.
+ */
+async function notifyHeldMessage(orgId: string, conversationId: string): Promise<void> {
+  const admin = createAdminClient();
+  const since = new Date(Date.now() - 6 * 3600_000).toISOString();
+  const { count } = await admin.from("notifications").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("title_key", "inbox.heldNotification").eq("link", `/inbox?c=${conversationId}`).gte("created_at", since);
+  if ((count ?? 0) > 0) return;
+  const { notifyOwners } = await import("@/lib/agents/run");
+  await notifyOwners(orgId, "inbox.heldNotification", {}, `/inbox?c=${conversationId}`);
 }
 
 /**

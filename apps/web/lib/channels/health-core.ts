@@ -50,3 +50,18 @@ export function overallHealth(levels: HealthLevel[]): HealthLevel {
   const order: HealthLevel[] = ["ok", "quiet", "warning", "error"];
   return levels.reduce<HealthLevel>((w, l) => (order.indexOf(l) > order.indexOf(w) ? l : w), "ok");
 }
+
+/**
+ * Wave A3 — what counts as a failed SEND of a channel. A message the customer-ready guard held (status "failed", error
+ * "held_by_outbound_guard") never reached the channel: the connection is fine, so it is neither a send nor a failure here.
+ * Without this, two held AI messages in a day turned a healthy WhatsApp into "send failures" and alerted the owner to reconnect.
+ */
+export const GUARD_HELD_ERROR = "held_by_outbound_guard";
+
+export function isChannelSendFailure(m: { status: string; error?: string | null }): boolean {
+  return m.status === "failed" && m.error !== GUARD_HELD_ERROR;
+}
+
+export function isGuardHeld(m: { status: string; error?: string | null }): boolean {
+  return m.status === "failed" && m.error === GUARD_HELD_ERROR;
+}

@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { dbErrorKey, type ActionState } from "@/lib/action-state";
 import { classifyPublishError, publishHintKey } from "@/lib/social/errors";
 import { isNotAPost } from "@/lib/social/post-hygiene-core";
+import { wouldBeHeld } from "@/lib/social/held-post-core";
 
 /** Wave 19 — comments board, scheduled posts, Google reviews, social settings. */
 const loc = (l: string) => (l === "ar" || l === "en" ? l : "he");
@@ -102,6 +103,8 @@ export async function savePostAction(input: { locale: string; id?: string | null
   if (input.id && !input.draft && uuidSchema.safeParse(input.id).success) {
     const { data: cur } = await (await createClient()).from("social_posts").select("source").eq("id", input.id).eq("organization_id", ctx.org.id).maybeSingle();
     if (cur?.source === "agent" && isNotAPost({ body: p.data.body, source: "agent" })) return { error: "social.notAPost.blocked" };
+    // wave A3: an employee's post that the customer-ready guard would hold again cannot be scheduled either (saving it as a draft stays possible)
+    if (cur?.source === "agent" && wouldBeHeld({ body: p.data.body, source: "agent" }, process.env.OUTBOUND_GUARD)) return { error: "social.heldNotReady.blocked" };
   }
   const row = {
     body: p.data.body,
@@ -136,6 +139,8 @@ export async function postStatusAction(input: { locale: string; id: string; acti
   if (input.action !== "cancel") {
     const { data: cur } = await supabase.from("social_posts").select("body, source").eq("id", input.id).eq("organization_id", ctx.org.id).maybeSingle();
     if (cur && isNotAPost({ body: String(cur.body ?? ""), source: cur.source })) return { error: "social.notAPost.blocked" };
+    // wave A3: a post the customer-ready guard would hold again is not approved / scheduled / published — the owner edits the text first
+    if (cur && wouldBeHeld({ body: String(cur.body ?? ""), source: cur.source }, process.env.OUTBOUND_GUARD)) return { error: "social.heldNotReady.blocked" };
   }
   const patch = input.action === "cancel" ? { status: "canceled" } : input.action === "now" ? { status: "scheduled", scheduled_at: new Date().toISOString() } : { status: "scheduled" };
   const { error } = await supabase.from("social_posts").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", input.id).eq("organization_id", ctx.org.id).in("status", ["draft", "scheduled", "failed"]);
@@ -147,6 +152,8 @@ export async function postStatusAction(input: { locale: string; id: string; acti
     const { data: after } = await supabase.from("social_posts").select("status, results").eq("id", input.id).eq("organization_id", ctx.org.id).maybeSingle();
     revalidatePath(`/${locale}/social`);
     const res = (after?.results ?? {}) as Record<string, { ok?: boolean; error?: string }>;
+    // wave A3: the publisher held it (back to a draft) — say so instead of "publishing"
+    if (after?.status === "draft") return { error: "social.heldNotReady.blocked" };
     if (after?.status === "published") return { ok: true, message: "social.publishedNow" };
     if (after?.status === "partial") return { ok: true, message: "social.postStatus.partial" };
     if (after?.status === "failed" || (after?.status === "scheduled" && Object.values(res).some((r) => r && r.ok === false))) {
@@ -259,7 +266,7 @@ export async function approveAllDraftsAction(input: { locale: string }): Promise
   const nowIso = new Date().toISOString();
   // hygiene: drafts that are only notes / a report are skipped (they stay drafts for the owner to edit or cancel)
   const { data: agentDrafts } = await supabase.from("social_posts").select("id, body, source").eq("organization_id", ctx.org.id).eq("status", "draft").eq("source", "agent");
-  const skip = ((agentDrafts ?? []) as { id: string; body: string; source: string }[]).filter((d) => isNotAPost({ body: String(d.body ?? ""), source: d.source })).map((d) => d.id);
+  const skip = ((agentDrafts ?? []) as { id: string; body: string; source: string }[]).filter((d) => isNotAPost({ body: String(d.body ?? ""), source: d.source }) || wouldBeHeld({ body: String(d.body ?? ""), source: d.source }, process.env.OUTBOUND_GUARD)).map((d) => d.id);
   const skipList = skip.length ? `(${skip.join(",")})` : null;
   const lateQ = supabase.from("social_posts").update({ status: "scheduled", scheduled_at: new Date(Date.now() + 10 * 60_000).toISOString(), updated_at: nowIso }).eq("organization_id", ctx.org.id).eq("status", "draft").lt("scheduled_at", nowIso);
   const futureQ = supabase.from("social_posts").update({ status: "scheduled", updated_at: nowIso }).eq("organization_id", ctx.org.id).eq("status", "draft").gte("scheduled_at", nowIso);
