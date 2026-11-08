@@ -108,6 +108,7 @@
     if (embed) root.classList.add("embed");
     root.innerHTML = `
       <div class="g-bar">
+        ${embed ? "" : `<div class="g-hero"><span class="g-hero-ic" aria-hidden="true">${ICON.search}</span><span class="g-hero-t"><b>חיפוש במדריך ובמצגת המלאה</b><small>${total} שלבים · ${DATA.chapters.length} פרקים · מתחילים מהחיפוש או מבחירת פרק</small></span></div>`}
         <div class="g-row">
           <div class="g-search" role="combobox" aria-expanded="false" aria-haspopup="listbox">
             ${ICON.search}
@@ -118,6 +119,7 @@
           </div>
           <div class="g-progress" aria-live="polite"><span class="pos">1 / ${total}</span><span class="track"><span class="fill"></span></span></div>
         </div>
+        ${embed ? "" : `<div class="g-quick" aria-label="חיפושים מהירים"><span>נסו:</span>${["וואטסאפ", "סוכן קולי", "תיבת הודעות", "אנשי קשר", "אוטומציות", "תשלום"].map((w) => `<button type="button" data-q="${w}">${w}</button>`).join("")}</div>`}
         <div class="g-chapters" role="tablist" aria-label="פרקים">${DATA.chapters.map((c) => `<button type="button" role="tab" data-ch="${c.id}"><span>${esc(c.name)}</span><small>${esc(c.time)}</small></button>`).join("")}</div>
       </div>
       <div class="g-viewport"><div class="g-track" tabindex="0" aria-label="שלבי המדריך">${steps.map((s) => slideHTML(s, total)).join("")}</div></div>
@@ -299,6 +301,7 @@
     }
     function pick(i) { res.hidden = true; box.setAttribute("aria-expanded", "false"); q.blur(); go(i); }
     q.addEventListener("input", render);
+    root.querySelectorAll(".g-quick button").forEach((b) => b.addEventListener("click", () => { q.value = b.dataset.q; q.focus(); render(); }));
     q.addEventListener("focus", render);
     q.addEventListener("keydown", (e) => {
       const opts = [...res.querySelectorAll("button")];

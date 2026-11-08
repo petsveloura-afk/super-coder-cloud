@@ -19,9 +19,12 @@ export default async function GuidePage({ params }: { params: Promise<{ locale: 
     <>
       <PageHeader title={t("guide.title")} description={t("guide.subtitle")} />
       {locale !== "he" ? <p className="-mt-3 mb-4 text-[13px] text-subtle">{t("guide.onlyHebrew")}</p> : null}
-      {/* wave 57: what's new (waves 51–57), animated — the screenshot guide below is unchanged */}
-      <WhatsNew />
+      {/* order: the search bar first, then the big presentation (all the steps, incl. the voice agent), then the rest */}
       <GuideViewer />
+      {/* wave 57: what's new (waves 51–59), animated — unchanged, now below the presentation */}
+      <div className="mt-8">
+        <WhatsNew />
+      </div>
     </>
   );
 }
