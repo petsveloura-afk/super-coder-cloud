@@ -10,7 +10,7 @@ import { WHATS_NEW, type NewCard, type Scene } from "@/lib/guide/whats-new";
 /**
  * Wave 57 — "what's new" in the guide: chapter chips, animated cards (a small live illustration of each
  * capability), numbered steps, a highlighted tip and a link to the screen. Motion respects
- * prefers-reduced-motion. Placed above the screenshot guide; the guide itself is unchanged.
+ * prefers-reduced-motion. Placed above the screenshot guide; the guide itself is unchanged. The voice-agent cards are shown in the presentation instead.
  */
 const CSS = `
 .gn-scene{position:relative;height:9.5rem;overflow:hidden;border-radius:1rem;background:linear-gradient(135deg,var(--accent-soft),transparent 70%),var(--elevated)}
@@ -203,10 +203,28 @@ function CardView({ c, i, locale }: { c: NewCard; i: number; locale: string }) {
   );
 }
 
+/**
+ * The voice-agent explanations now live inside the presentation below (chapter "סוכן קולי" in /public/guide/guide-voice.js),
+ * so they are not shown twice. The data in lib/guide/whats-new.ts is untouched — these cards are only skipped here.
+ */
+const IN_PRESENTATION = new Set([
+  "phone-enable",
+  "phone-test",
+  "phone-live",
+  "phone-summary",
+  "voice-persona",
+  "voice-works",
+  "missed-call-text",
+  "auto-calls",
+  "recordings",
+  "minute-packs",
+]);
+const CHAPTERS = WHATS_NEW.map((c) => ({ ...c, cards: c.cards.filter((k) => !IN_PRESENTATION.has(k.id)) })).filter((c) => c.cards.length > 0);
+
 export function WhatsNew() {
   const { t, locale } = useI18n();
-  const [ch, setCh] = useState(WHATS_NEW[0]!.id);
-  const chapter = WHATS_NEW.find((c) => c.id === ch) ?? WHATS_NEW[0]!;
+  const [ch, setCh] = useState(CHAPTERS[0]!.id);
+  const chapter = CHAPTERS.find((c) => c.id === ch) ?? CHAPTERS[0]!;
   return (
     <section className="mb-6" aria-labelledby="whats-new-title" data-testid="whats-new">
       <style>{CSS}</style>
@@ -219,7 +237,7 @@ export function WhatsNew() {
         </div>
       </div>
       <div className="mb-4 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label={t("guide.newTitle")}>
-        {WHATS_NEW.map((c) => (
+        {CHAPTERS.map((c) => (
           <button
             key={c.id}
             type="button"
