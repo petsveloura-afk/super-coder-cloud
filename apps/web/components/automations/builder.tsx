@@ -4,13 +4,14 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Copy, Filter, Play, Plus, Save, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
-import { ACTION_TYPES, AUTOMATION_TRIGGERS, CONDITION_FIELDS, CONDITION_OPS, type ActionType, type AutomationTrigger } from "@scc/shared/automations";
+import { ACTION_TYPES, AUTOMATION_TRIGGERS, CONDITION_FIELDS, CONDITION_OPS, variablesForTrigger, type ActionType, type AutomationTrigger, type IntelAction } from "@scc/shared/automations";
 import { CONTACT_STATUSES } from "@scc/shared/validators";
 import { useI18n } from "@/lib/i18n/client";
 import { stageLabel, pipelineLabel, triggerLabel } from "@/lib/labels";
 import { Button, Card, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { saveAutomationAction, testAutomationAction } from "@/app/[locale]/(dashboard)/automations/actions";
 import { stepDetailLabel } from "@/components/automations/step-detail";
+import { InsightsPanel, MAX_ACTIONS } from "@/components/automations/insights-panel";
 
 export interface BuilderAction {
   type: ActionType;
@@ -31,20 +32,9 @@ export interface BuilderOptions {
   tags: string[];
   contacts: { id: string; label: string; sub?: string | null }[];
   forms: { id: string; label: string }[];
+  /** Optional: the org's AI agents (read-only context for the smart check). */
+  agents?: { name: string; enabled: boolean; autopilotChannels: string[] }[];
 }
-
-const VARIABLES = [
-  "contact.first_name",
-  "contact.last_name",
-  "contact.email",
-  "contact.phone",
-  "contact.company_name",
-  "deal.title",
-  "deal.value",
-  "deal.currency",
-  "org.name",
-  "payload.tag",
-];
 
 const DELAYS = [0, 5, 60, 1440, 4320, 10080];
 
@@ -300,10 +290,24 @@ export function AutomationBuilder({ id, initial, options, inboundUrl }: { id?: s
         </h2>
         <p className="mb-3 text-[12.5px] text-subtle">
           {t("automations.variablesHint")}{" "}
-          {VARIABLES.map((v) => (
-            <code key={v} dir="ltr" className="mx-0.5 inline-block rounded bg-elevated px-1.5 py-0.5 text-[11.5px]">
+          {variablesForTrigger(value.trigger_type).map((v) => (
+            <button
+              key={v}
+              type="button"
+              dir="ltr"
+              title={t("common.copy")}
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(`{{${v}}}`);
+                  toast.success(t("common.copied"));
+                } catch {
+                  /* clipboard can be blocked (http / permissions) — the chip text is still selectable */
+                }
+              }}
+              className="mx-0.5 inline-block rounded bg-elevated px-1.5 py-0.5 text-[11.5px] transition-colors hover:bg-accent-soft hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               {`{{${v}}}`}
-            </code>
+            </button>
           ))}
         </p>
         {err("actions") ? <p className="mb-2 text-[13px] text-danger">{err("actions")}</p> : null}
@@ -335,10 +339,16 @@ export function AutomationBuilder({ id, initial, options, inboundUrl }: { id?: s
             </li>
           ))}
         </ol>
-        <Button variant="secondary" size="sm" className="mt-3" onClick={() => set({ actions: [...value.actions, { type: "create_task", config: defaultConfig("create_task") }] })}>
+        <Button variant="secondary" size="sm" className="mt-3" disabled={value.actions.length >= MAX_ACTIONS} onClick={() => set({ actions: [...value.actions, { type: "create_task", config: defaultConfig("create_task") }] })}>
           <Plus className="h-4 w-4" /> {t("automations.addAction")}
         </Button>
       </Card>
+
+      <InsightsPanel
+        draft={value}
+        agents={options.agents}
+        onAddAction={(a: IntelAction) => value.actions.length < MAX_ACTIONS && set({ actions: [...value.actions, { type: a.type as ActionType, config: { ...a.config } }] })}
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {id ? (

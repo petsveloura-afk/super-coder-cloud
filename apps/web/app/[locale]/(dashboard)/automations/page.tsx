@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { triggerLabel } from "@/lib/labels";
 import type { Metadata } from "next";
-import { AlertTriangle, Plus, Sparkles, Workflow } from "lucide-react";
-import { AUTOMATION_RECIPES } from "@scc/shared/automations";
+import { Activity, AlertTriangle, CheckCircle2, Layers, PlayCircle, Plus, ShieldAlert, Workflow } from "lucide-react";
+import { analyzeAutomation, automationHealth, dailyBuckets, summarizeRuns, type IntelDraft, type RunLike } from "@scc/shared/automations";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui/primitives";
-import { AutomationToggle } from "@/components/automations/list-client";
+import { AutomationListView, type AutomationListItem } from "@/components/automations/list-view";
+import { RecipeGallery } from "@/components/automations/recipe-gallery";
+import { KpiTile } from "@/components/automations/visuals";
+import { intelT } from "@/components/automations/intel-i18n";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -16,6 +18,12 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 }
 
 const RUN_TONE: Record<string, "success" | "warning" | "danger" | "neutral"> = { success: "success", partial: "warning", failed: "danger", skipped: "neutral" };
+
+const STATS_DAYS = 30;
+/** ISO timestamp `days` ago (kept outside the component: it is a clock read). */
+function sinceIso(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString();
+}
 
 export default async function AutomationsPage({ params }: { params: Promise<{ locale: string }> }) {
   const locale = await resolveLocale(params);
@@ -29,14 +37,61 @@ export default async function AutomationsPage({ params }: { params: Promise<{ lo
     );
   }
   const supabase = await createClient();
-  const [{ data: automations }, { data: runs }, { count: dead }, { count: queued }] = await Promise.all([
-    supabase.from("automations").select("id, name, description, enabled, trigger_type, run_count, last_run_at").eq("organization_id", ctx.org.id).order("created_at", { ascending: false }),
+  const it = intelT(locale);
+  const since = sinceIso(STATS_DAYS);
+  const [{ data: automations }, { data: runs }, { count: dead }, { count: queued }, { data: statRuns }, { count: executed30 }, { count: success30 }] = await Promise.all([
+    supabase.from("automations").select("id, name, description, enabled, trigger_type, trigger_config, conditions, actions, run_count, last_run_at").eq("organization_id", ctx.org.id).order("created_at", { ascending: false }),
     supabase.from("automation_runs").select("id, automation_id, status, created_at, error").eq("organization_id", ctx.org.id).neq("status", "skipped").order("created_at", { ascending: false }).limit(15),
     supabase.from("jobs").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).eq("status", "dead"),
     supabase.from("jobs").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).eq("status", "queued"),
+    // per-automation health / trend (latest 1000 runs of the window; the KPI tiles use exact counts below)
+    supabase.from("automation_runs").select("automation_id, status, created_at").eq("organization_id", ctx.org.id).gte("created_at", since).order("created_at", { ascending: false }).limit(1000),
+    supabase.from("automation_runs").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).neq("status", "skipped").gte("created_at", since),
+    supabase.from("automation_runs").select("id", { count: "exact", head: true }).eq("organization_id", ctx.org.id).eq("status", "success").gte("created_at", since),
   ]);
   const list = automations ?? [];
   const nameOf = new Map(list.map((a) => [a.id as string, a.name as string]));
+
+  const runsBy = new Map<string, RunLike[]>();
+  for (const r of statRuns ?? []) {
+    const k = r.automation_id as string;
+    const arr = runsBy.get(k);
+    const row = { status: r.status as string, created_at: r.created_at as string };
+    if (arr) arr.push(row);
+    else runsBy.set(k, [row]);
+  }
+  const nowMs = Date.parse(sinceIso(0));
+  const items: AutomationListItem[] = list.map((a) => {
+    const rs = runsBy.get(a.id as string) ?? [];
+    const summary = summarizeRuns(rs);
+    const draft: IntelDraft = {
+      name: a.name as string,
+      enabled: Boolean(a.enabled),
+      trigger_type: a.trigger_type as string,
+      trigger_config: (a.trigger_config as Record<string, string> | null) ?? {},
+      conditions: (a.conditions as IntelDraft["conditions"]) ?? [],
+      actions: (a.actions as IntelDraft["actions"]) ?? [],
+    };
+    const analysis = analyzeAutomation(draft);
+    return {
+      id: a.id as string,
+      name: a.name as string,
+      description: (a.description as string | null) ?? null,
+      enabled: Boolean(a.enabled),
+      trigger_type: a.trigger_type as string,
+      run_count: Number(a.run_count),
+      last_run_at: (a.last_run_at as string | null) ?? null,
+      steps: draft.actions.length,
+      health: automationHealth(Boolean(a.enabled), summary),
+      rate: summary.successRate,
+      runs30: summary.executed,
+      buckets: dailyBuckets(rs, STATS_DAYS, nowMs),
+      errors: analysis.counts.error,
+      warnings: analysis.counts.warning,
+    };
+  });
+  const attention = items.filter((a) => a.health === "failing" || a.health === "attention" || a.errors > 0).length;
+  const successRate = executed30 ? Math.round(((success30 ?? 0) / executed30) * 100) : null;
 
   return (
     <>
@@ -50,50 +105,38 @@ export default async function AutomationsPage({ params }: { params: Promise<{ lo
         }
       />
 
+      {list.length > 0 ? (
+        <section aria-label={it("o.kpiTotal")} className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5" data-testid="automation-kpis">
+          <KpiTile icon={<Layers className="h-4 w-4" />} label={it("o.kpiTotal")} value={formatNumber(locale, list.length)} />
+          <KpiTile icon={<PlayCircle className="h-4 w-4" />} label={it("o.kpiActive")} value={formatNumber(locale, items.filter((a) => a.enabled).length)} tone="accent" />
+          <KpiTile icon={<Activity className="h-4 w-4" />} label={it("o.kpiRuns")} value={formatNumber(locale, executed30 ?? 0)} />
+          <KpiTile icon={<CheckCircle2 className="h-4 w-4" />} label={it("o.kpiSuccess")} value={successRate == null ? "—" : `${successRate}%`} tone={successRate == null ? "neutral" : successRate >= 85 ? "success" : successRate >= 50 ? "warning" : "danger"} />
+          <KpiTile icon={<ShieldAlert className="h-4 w-4" />} label={it("o.kpiAttention")} value={formatNumber(locale, attention)} tone={attention > 0 ? "warning" : "success"} />
+        </section>
+      ) : null}
+
       {(dead ?? 0) > 0 ? (
         <Card className="mb-4 flex items-center gap-3 border-danger/30 p-4 text-sm">
           <AlertTriangle className="h-5 w-5 shrink-0 text-danger" />
-          <span>{t("automations.deadJobs", { count: dead ?? 0 })}</span>
+          <span>
+            {t("automations.deadJobs", { count: dead ?? 0 })}
+            <span className="mt-0.5 block text-[12px] text-muted">{it("o.deadHint")}</span>
+          </span>
         </Card>
       ) : null}
 
-      <Card className="mb-4">
-        <CardHeader title={t("automations.templates")} description={t("automations.templatesHint")} />
-        <ul className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
-          {AUTOMATION_RECIPES.map((r) => (
-            <li key={r.key}>
-              <Link href={`/${locale}/automations/new?recipe=${r.key}`} className="flex h-full flex-col gap-1.5 rounded-xl border border-line p-4 transition-colors hover:border-accent hover:bg-surface-hover">
-                <span className="flex items-center gap-2 font-semibold">
-                  <Sparkles className="h-4 w-4 text-gold" /> {t(`automations.recipes.${r.key}.name`)}
-                </span>
-                <span className="text-[12.5px] text-muted">{t(`automations.recipes.${r.key}.body`)}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Card>
-
       {list.length === 0 ? (
-        <Card>
-          <EmptyState icon={<Workflow className="h-6 w-6" />} title={t("automations.empty")} body={t("automations.emptyBody")} />
-        </Card>
+        <>
+          <RecipeGallery recommended={["welcomeLead", "dealWon", "inboundLead"]} />
+          <Card className="mb-4">
+            <EmptyState icon={<Workflow className="h-6 w-6" />} title={t("automations.empty")} body={t("automations.emptyBody")} />
+          </Card>
+        </>
       ) : (
-        <Card className="mb-4 overflow-hidden">
-          <ul className="divide-y divide-line">
-            {list.map((a) => (
-              <li key={a.id} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center">
-                <Link href={`/${locale}/automations/${a.id}`} className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold hover:text-accent">{a.name}</span>
-                  <span className="mt-0.5 block text-[12.5px] text-muted">
-                    {triggerLabel(t, a.trigger_type as string)} · {t("automations.runs", { count: formatNumber(locale, Number(a.run_count)) })}
-                    {a.last_run_at ? ` · ${formatDateTime(locale, a.last_run_at as string)}` : ""}
-                  </span>
-                </Link>
-                <AutomationToggle id={a.id as string} enabled={Boolean(a.enabled)} />
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <>
+          <AutomationListView items={items} />
+          <RecipeGallery />
+        </>
       )}
 
       <Card>

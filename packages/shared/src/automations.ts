@@ -260,3 +260,6 @@ export const AUTOMATION_RECIPES: { key: string; trigger_type: AutomationTrigger;
     actions: [{ type: "create_task", config: { title: "📄 {{deal.title}}", due_in_days: 1, assignee: "owner" } }],
   },
 ];
+
+/* Automation intelligence (analyzer, flow preview, suggestions, stats) — pure logic, no engine changes. */
+export * from "./automation-intel";

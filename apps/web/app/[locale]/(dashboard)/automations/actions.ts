@@ -98,3 +98,47 @@ export async function testAutomationAction(input: { locale: string; id: string; 
   revalidatePath(`/${locale}/automations/${id.data}`);
   return { ok: true, message: "automations.testDone", data: data as { steps: { type: string; status: string; detail?: string }[] } };
 }
+
+const COPY_SUFFIX: Record<Locale, string> = { he: "(עותק)", en: "(copy)", ar: "(نسخة)" };
+
+/**
+ * Duplicates an automation of the SAME organization. The copy starts switched OFF
+ * (so nothing fires by surprise), gets a fresh inbound token from the column default,
+ * and zeroed counters. Nothing about the original is touched.
+ */
+export async function duplicateAutomationAction(input: { locale: string; id: string }): Promise<ActionState<{ id: string }>> {
+  const locale = asLocale(input.locale);
+  const ctx = await getOrgContext(locale);
+  if (!ctx.can("automations.manage")) return { error: "errors.forbidden" };
+  const id = uuidSchema.safeParse(input.id);
+  if (!id.success) return { error: "validation.invalidId" };
+  const supabase = await createClient();
+  const { data: src, error: readError } = await supabase
+    .from("automations")
+    .select("name, description, trigger_type, trigger_config, conditions, actions")
+    .eq("id", id.data)
+    .eq("organization_id", ctx.org.id)
+    .maybeSingle();
+  if (readError) return { error: dbErrorKey(readError) };
+  if (!src) return { error: "errors.notFound" };
+  const suffix = ` ${COPY_SUFFIX[locale]}`;
+  const base = String(src.name ?? "").slice(0, Math.max(1, 120 - suffix.length));
+  const { data, error } = await supabase
+    .from("automations")
+    .insert({
+      organization_id: ctx.org.id,
+      name: `${base}${suffix}`,
+      description: src.description ?? null,
+      enabled: false,
+      trigger_type: src.trigger_type,
+      trigger_config: src.trigger_config ?? {},
+      conditions: src.conditions ?? [],
+      actions: src.actions ?? [],
+      created_by: ctx.userId,
+    })
+    .select("id")
+    .single();
+  if (error) return { error: dbErrorKey(error) };
+  revalidatePath(`/${locale}/automations`);
+  return { ok: true, message: "automations.created", data: { id: data.id as string } };
+}

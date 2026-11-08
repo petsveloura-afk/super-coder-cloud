@@ -3,11 +3,14 @@ import { triggerLabel } from "@/lib/labels";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import type { ActionType, AutomationTrigger } from "@scc/shared/automations";
+import { automationHealth, dailyBuckets, summarizeRuns, type ActionType, type AutomationTrigger } from "@scc/shared/automations";
 import { uuidSchema } from "@scc/shared/validators";
 import { Badge, Card, CardHeader, PageHeader } from "@/components/ui/primitives";
 import { AutomationBuilder, type BuilderValue } from "@/components/automations/builder";
 import { DeleteAutomationButton } from "@/components/automations/delete-button";
+import { DuplicateAutomationButton } from "@/components/automations/duplicate-button";
+import { Sparkline } from "@/components/automations/visuals";
+import { intelT } from "@/components/automations/intel-i18n";
 import { getOrgContext } from "@/lib/auth";
 import { getT, resolveLocale } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
@@ -25,6 +28,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 const RUN_TONE: Record<string, "success" | "warning" | "danger" | "neutral"> = { success: "success", partial: "warning", failed: "danger", skipped: "neutral" };
 const JOB_TONE: Record<string, "success" | "warning" | "danger" | "neutral" | "accent"> = { done: "success", queued: "accent", running: "accent", failed: "warning", dead: "danger", canceled: "neutral" };
+
+/** Current time in ms, read outside the component body. */
+const nowMs = () => Date.now();
 
 export default async function AutomationPage({ params }: { params: Params }) {
   const locale = await resolveLocale(params);
@@ -56,6 +62,13 @@ export default async function AutomationPage({ params }: { params: Params }) {
     conditions: (a.conditions as BuilderValue["conditions"]) ?? [],
     actions: ((a.actions as { type: ActionType; config: Record<string, unknown> }[]) ?? []).map((x) => ({ type: x.type, config: x.config ?? {} })),
   };
+  const it = intelT(locale);
+  const runRows = (runs ?? []).map((r) => ({ status: r.status as string, created_at: r.created_at as string }));
+  const summary = summarizeRuns(runRows);
+  const health = automationHealth(Boolean(a.enabled), summary);
+  const buckets = dailyBuckets(runRows, 30, nowMs());
+  const pendingJobs = (jobs ?? []).filter((j) => j.status === "queued" || j.status === "running").length;
+  const HEALTH_TONE = { healthy: "success", attention: "warning", failing: "danger", idle: "neutral", disabled: "neutral" } as const;
   const inboundUrl = a.trigger_type === "webhook.inbound" ? `${publicEnv.appUrl.replace(/\/$/, "")}/api/hooks/${a.inbound_token}` : undefined;
   const Back = locale === "en" ? ArrowLeft : ArrowRight;
 
@@ -64,10 +77,46 @@ export default async function AutomationPage({ params }: { params: Params }) {
       <Link href={`/${locale}/automations`} className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg">
         <Back className="h-4 w-4" /> {t("automations.title")}
       </Link>
-      <PageHeader title={a.name as string} description={triggerLabel(t, a.trigger_type as string)} actions={<DeleteAutomationButton id={a.id as string} />} />
+      <PageHeader title={a.name as string} description={triggerLabel(t, a.trigger_type as string)} actions={
+          <>
+            <DuplicateAutomationButton id={a.id as string} />
+            <DeleteAutomationButton id={a.id as string} />
+          </>
+        } />
       <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
         <AutomationBuilder id={a.id as string} initial={initial} options={options} inboundUrl={inboundUrl} />
         <div className="space-y-4">
+          <Card data-testid="automation-stats">
+            <CardHeader title={it("d.stats")} description={it("o.trend")} action={<Badge tone={HEALTH_TONE[health]}>{it(`h.${health}`)}</Badge>} />
+            {summary.total === 0 ? (
+              <p className="p-5 text-center text-sm text-subtle">{it("d.noStats")}</p>
+            ) : (
+              <div className="space-y-3 p-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4">
+                  <div>
+                    <p className="text-[12px] text-subtle">{it("o.kpiSuccess")}</p>
+                    <p className="text-xl font-bold tabular-nums">{summary.successRate == null ? "—" : `${summary.successRate}%`}</p>
+                  </div>
+                  <div>
+                    <p className="text-[12px] text-subtle">{it("d.success")}</p>
+                    <p className="text-xl font-bold tabular-nums text-success">{summary.success}</p>
+                  </div>
+                  <div>
+                    <p className="text-[12px] text-subtle">{it("d.failed")}</p>
+                    <p className={`text-xl font-bold tabular-nums ${summary.failed + summary.partial > 0 ? "text-danger" : ""}`}>{summary.failed + summary.partial}</p>
+                  </div>
+                  <div>
+                    <p className="text-[12px] text-subtle">{it("d.skipped")}</p>
+                    <p className="text-xl font-bold tabular-nums text-muted">{summary.skipped}</p>
+                  </div>
+                </div>
+                <div className="flex items-end justify-between gap-3">
+                  <Sparkline data={buckets} height={36} label={it("o.trend")} />
+                  {pendingJobs > 0 ? <span className="text-[12px] text-subtle">{it("d.pendingJobs")}: {pendingJobs}</span> : null}
+                </div>
+              </div>
+            )}
+          </Card>
           <Card>
             <CardHeader title={t("automations.history")} />
             {(runs ?? []).length === 0 ? (
