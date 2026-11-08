@@ -6,17 +6,18 @@ import { guideLinks } from "@/lib/guide/map";
 
 /**
  * Wave 23 — the user guide inside the app: a row of pages (one step each), real screenshots with
- * numbered markers, labels and arrows, chapter chips and search. The guide engine is a small
+ * numbered markers, labels and arrows, chapter chips and search. The voice-agent chapter (guide-voice.js)
+ * is part of the same presentation: animated phone stages with numbered lines and arrows. The guide engine is a small
  * self-contained script + scoped stylesheet in /public/guide (also used by the marketing site).
  */
 declare global {
   interface Window {
-    SCCGuide?: { mount: (root: HTMLElement, opts?: { links?: Record<string, string | null> }) => () => void };
+    SCCGuide?: { mount: (root: HTMLElement, opts?: { links?: Record<string, string | null>; locale?: string }) => () => void };
     SCC_GUIDE?: unknown;
   }
 }
 
-const VERSION = "23";
+const VERSION = "24";
 
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -58,9 +59,10 @@ export function GuideViewer() {
     (async () => {
       try {
         await loadScript("/guide/guide-data.js");
+        await loadScript("/guide/guide-voice.js");
         await loadScript("/guide/scc-guide.js");
         if (cancelled || !ref.current || !window.SCCGuide) return;
-        destroy = window.SCCGuide.mount(ref.current, { links: guideLinks(locale) });
+        destroy = window.SCCGuide.mount(ref.current, { links: guideLinks(locale), locale });
         setState("ready");
       } catch {
         if (!cancelled) setState("error");

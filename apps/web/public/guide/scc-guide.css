@@ -145,3 +145,112 @@
 /* phones: keep the numbers inside the picture, and the address bar on one line */
 @media (max-width: 900px) { .scc-guide .mk .badge { top: 3px; inset-inline-end: 3px; } }
 .scc-guide .frame .bar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+
+/* =====================================================================================================
+   Voice-agent chapter (added to the presentation): each slide has a live phone stage instead of a screenshot.
+   Items appear one after another, the matching numbered line lights up, arrows point from the line to the stage.
+   Everything is scoped under .scc-guide; motion respects prefers-reduced-motion. */
+.scc-guide .g-vslide { flex: 0 0 100%; scroll-snap-align: start; min-width: 0; position: relative; isolation: isolate; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr); gap: clamp(20px, 3.2vw, 44px); align-items: center; padding: clamp(18px, 3vw, 34px); border-radius: 28px; border: 1px solid rgba(0, 217, 197, 0.24); background: radial-gradient(70% 55% at 100% 0%, rgba(0, 217, 197, 0.13), transparent 62%), radial-gradient(70% 60% at 0% 100%, rgba(71, 123, 255, 0.16), transparent 62%), var(--ink-2); }
+.scc-guide .g-vslide::before { content: ""; position: absolute; z-index: -1; width: 420px; height: 420px; inset-block-start: -160px; inset-inline-start: -120px; border-radius: 50%; background: radial-gradient(circle, rgba(0, 217, 197, 0.16), transparent 68%); filter: blur(8px); animation: v-drift 14s ease-in-out infinite alternate; }
+.scc-guide .g-vslide .g-text { align-content: center; }
+.scc-guide .g-vslide .g-meta .v-new { padding: 3px 10px; border-radius: 999px; font-family: var(--f-body); font-weight: 700; font-size: 0.74rem; color: #04101e; background: linear-gradient(120deg, #ffd36b, #f0a93c); }
+.scc-guide .g-vslide .g-list button { position: relative; min-height: 48px; }
+.scc-guide .g-vslide .g-list button.on { background: linear-gradient(90deg, rgba(0, 217, 197, 0.14), rgba(71, 123, 255, 0.12)); border-color: rgba(0, 217, 197, 0.55); }
+.scc-guide .g-vslide .g-list button.on .k { background: linear-gradient(120deg, #ffd36b, #f0a93c); box-shadow: 0 0 0 4px rgba(255, 211, 107, 0.22); animation: v-pulse 1.3s ease-in-out infinite; }
+/* the arrow from the highlighted line to the stage (to the left on a wide screen, upwards on a phone) */
+.scc-guide .g-vslide .g-list button::after { content: "←"; position: absolute; inset-inline-end: 12px; top: 50%; transform: translateY(-50%) translateX(8px); font-size: 1.25rem; font-weight: 700; color: var(--teal); opacity: 0; transition: opacity 0.25s, transform 0.25s var(--ease); pointer-events: none; }
+.scc-guide .g-vslide .g-list button.on::after { opacity: 1; transform: translateY(-50%); animation: v-nudge 1s ease-in-out infinite; }
+.scc-guide .g-vslide .g-list button { padding-inline-end: 38px; }
+.scc-guide .g-vslide .g-tip { background: linear-gradient(135deg, rgba(201, 166, 107, 0.14), rgba(201, 166, 107, 0.05)); border-color: rgba(201, 166, 107, 0.4); }
+.scc-guide .g-vslide .g-tip b { color: var(--gold); }
+.scc-guide .g-vslide .g-open { min-height: 44px; }
+
+/* the phone stage */
+.scc-guide .v-fig { display: flex; justify-content: center; min-width: 0; }
+.scc-guide .v-phone { position: relative; width: min(100%, 332px); padding: 10px; border-radius: 42px; background: linear-gradient(160deg, #22325c, #0a1020 55%); box-shadow: var(--shadow), 0 0 70px -12px rgba(0, 217, 197, 0.3); }
+.scc-guide .v-phone::before { content: ""; position: absolute; z-index: 2; top: 17px; inset-inline: 0; margin-inline: auto; width: 78px; height: 20px; border-radius: 99px; background: #05080f; }
+.scc-guide .v-screen { position: relative; display: flex; flex-direction: column; gap: 12px; min-height: 470px; padding: 44px 14px 14px; border-radius: 33px; overflow: hidden; background: linear-gradient(180deg, #0f1a34, #09101f); }
+.scc-guide .v-head { display: flex; align-items: center; gap: 11px; }
+.scc-guide .v-orb { position: relative; flex: none; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; font-size: 1.45rem; background: var(--signal); box-shadow: 0 8px 22px -8px rgba(0, 217, 197, 0.7); }
+.scc-guide .v-orb::before, .scc-guide .v-orb::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--teal); opacity: 0; animation: v-ring 2.4s ease-out infinite; }
+.scc-guide .v-orb::after { animation-delay: 1.2s; }
+.scc-guide .v-ttl { display: grid; min-width: 0; line-height: 1.25; }
+.scc-guide .v-ttl b { font-size: 1rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scc-guide .v-ttl small { color: var(--muted); font-size: 0.78rem; }
+.scc-guide .v-pp { margin-inline-start: auto; flex: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); color: var(--text); font-size: 0.72rem; cursor: pointer; display: grid; place-items: center; transition: background 0.2s, border-color 0.2s; }
+.scc-guide .v-pp:hover { background: rgba(0, 217, 197, 0.14); border-color: var(--teal); }
+.scc-guide .v-pp .p2 { display: none; font-size: 0.9rem; }
+.scc-guide .v-pp.paused .p1 { display: none; }
+.scc-guide .v-pp.paused .p2 { display: inline; }
+.scc-guide .v-wave { display: flex; align-items: center; justify-content: center; gap: 4px; height: 40px; }
+.scc-guide .v-wave i { width: 4px; height: 8px; border-radius: 4px; background: var(--signal); animation: v-wave 1.05s ease-in-out infinite; animation-delay: calc(var(--k) * 0.07s); }
+.scc-guide .v-flow .v-wave, .scc-guide .v-card .v-wave, .scc-guide .v-packs .v-wave { height: 14px; opacity: 0.55; }
+.scc-guide .v-body { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 10px; min-height: 0; }
+.scc-guide .v-foot { display: flex; justify-content: center; gap: 6px; padding-top: 2px; }
+.scc-guide .v-foot i { width: 7px; height: 7px; border-radius: 7px; background: var(--line); transition: width 0.3s var(--ease), background 0.3s; }
+.scc-guide .v-foot i.on { width: 22px; background: var(--signal); }
+
+/* stage items: they come in one by one; the current one glows and carries the number of the matching line */
+.scc-guide .v-it { position: relative; cursor: pointer; opacity: 0; transform: translateY(12px) scale(0.97); transition: opacity 0.45s var(--ease), transform 0.45s var(--ease), box-shadow 0.3s, border-color 0.3s; }
+.scc-guide .v-it.show { opacity: 1; transform: none; }
+.scc-guide .v-it.cur { box-shadow: 0 0 0 2px rgba(255, 211, 107, 0.65), 0 12px 30px -10px rgba(255, 211, 107, 0.4); }
+.scc-guide .v-n { position: absolute; top: -9px; inset-inline-end: -6px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; font: 700 0.76rem var(--f-mono); color: #04101e; background: var(--signal); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 3px #0b1326; }
+.scc-guide .v-it.cur .v-n { background: #ffd36b; animation: v-pulse 1.3s ease-in-out infinite; }
+.scc-guide .v-msg { max-width: 88%; padding: 9px 13px 10px; border-radius: 18px; font-size: 0.93rem; line-height: 1.4; }
+.scc-guide .v-msg small { display: block; font-size: 0.68rem; opacity: 0.7; margin-bottom: 1px; }
+.scc-guide .v-msg.cust { align-self: flex-start; border-end-start-radius: 5px; background: #1a2746; border: 1px solid var(--line); }
+.scc-guide .v-msg.agent { align-self: flex-end; border-end-end-radius: 5px; color: #04101e; background: var(--signal); }
+.scc-guide .v-cap { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 16px; font-weight: 600; font-size: 0.97rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line-soft); }
+.scc-guide .v-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 0 rgba(0, 217, 197, 0.6); animation: v-dot 1.6s infinite; }
+.scc-guide .v-node { display: grid; justify-items: center; }
+.scc-guide .v-nd { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; font-weight: 600; font-size: 0.97rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line-soft); }
+.scc-guide .v-ic { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; font-size: 1.25rem; background: rgba(71, 123, 255, 0.18); }
+.scc-guide .v-arr { position: absolute; top: -17px; inset-inline: 0; margin-inline: auto; width: 18px; height: 18px; color: var(--teal); animation: v-bounce 1s ease-in-out infinite; }
+.scc-guide .v-voice { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line-soft); }
+.scc-guide .v-av { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; font-weight: 700; color: #04101e; background: var(--signal); }
+.scc-guide .v-voice b { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scc-guide .v-eq { display: flex; align-items: center; gap: 3px; height: 22px; opacity: 0; transition: opacity 0.3s; }
+.scc-guide .v-eq i { width: 3px; height: 6px; border-radius: 3px; background: var(--teal); animation: v-wave 0.8s ease-in-out infinite; }
+.scc-guide .v-eq i:nth-child(2) { animation-delay: 0.1s; } .scc-guide .v-eq i:nth-child(3) { animation-delay: 0.2s; } .scc-guide .v-eq i:nth-child(4) { animation-delay: 0.3s; } .scc-guide .v-eq i:nth-child(5) { animation-delay: 0.4s; }
+.scc-guide .v-voice.cur .v-eq { opacity: 1; }
+.scc-guide .v-play { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; font-size: 0.7rem; background: rgba(255, 255, 255, 0.08); }
+.scc-guide .v-voice.cur .v-play { background: var(--teal); color: #04101e; }
+.scc-guide .v-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 12px 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line-soft); }
+.scc-guide .v-row small { color: var(--gold); font-weight: 600; font-size: 0.8rem; }
+.scc-guide .v-row b { font-weight: 600; font-size: 0.98rem; }
+.scc-guide .v-ok { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; font-size: 0.78rem; font-weight: 700; color: #04101e; background: var(--teal); }
+.scc-guide .v-card .v-body { padding: 14px 12px 12px; margin-top: 2px; border-radius: 20px; background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--line); justify-content: flex-start; }
+.scc-guide .v-pack { display: flex; align-items: baseline; justify-content: center; gap: 8px; padding: 16px; border-radius: 18px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line-soft); }
+.scc-guide .v-pack b { font: 700 1.9rem var(--f-mono); background: var(--signal); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.scc-guide .v-pack small { color: var(--muted); }
+.scc-guide .v-it:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+/* a slide that is not on screen does not animate */
+.scc-guide .g-vslide:not(.active) *, .scc-guide .g-vslide:not(.active)::before { animation-play-state: paused !important; }
+
+@keyframes v-wave { 0%, 100% { height: 8px; } 50% { height: 34px; } }
+@keyframes v-ring { 0% { opacity: 0.7; transform: scale(1); } 100% { opacity: 0; transform: scale(1.7); } }
+@keyframes v-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+@keyframes v-nudge { 0%, 100% { transform: translateY(-50%) translateX(0); } 50% { transform: translateY(-50%) translateX(-6px); } }
+@keyframes v-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
+@keyframes v-dot { 0% { box-shadow: 0 0 0 0 rgba(0, 217, 197, 0.6); } 80%, 100% { box-shadow: 0 0 0 10px rgba(0, 217, 197, 0); } }
+@keyframes v-drift { from { transform: translate(0, 0); } to { transform: translate(60px, 50px); } }
+
+/* phones and narrow screens: the stage goes on top, the lines below it, the arrow points up, touch targets stay large */
+@media (max-width: 860px) {
+  .scc-guide .g-vslide { grid-template-columns: minmax(0, 1fr); }
+  .scc-guide .g-vslide .v-fig { order: -1; }
+  .scc-guide .g-vslide .g-list button::after { content: "↑"; }
+  .scc-guide .g-vslide .g-list button.on::after { animation: none; }
+  .scc-guide .v-phone { width: min(100%, 320px); }
+  .scc-guide .v-screen { min-height: 430px; }
+}
+@media (max-width: 420px) {
+  .scc-guide .g-vslide { padding: 14px 12px; border-radius: 22px; }
+  .scc-guide .v-phone { border-radius: 36px; padding: 8px; }
+  .scc-guide .v-screen { border-radius: 29px; padding-inline: 12px; }
+  .scc-guide .g-vslide .g-text h3 { font-size: 1.45rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scc-guide .g-vslide *, .scc-guide .g-vslide::before { animation: none !important; transition: none !important; }
+  .scc-guide .g-vslide .v-it { opacity: 1; transform: none; }
+}
