@@ -36,6 +36,22 @@ export async function publishDuePosts(budgetMs = 20_000): Promise<{ claimed: num
       await admin.from("social_posts").update({ status: "draft", results: { ...(p.results ?? {}), hygiene: "not_a_post" } }).eq("id", p.id);
       continue;
     }
+    // wave A1 (additive): an agent post that is not ready for customers (unfilled placeholder, raw JSON, leaked instructions…) is held as a
+    // draft with the reason — OUTBOUND_GUARD=off|clean disables the hold (default enforce)
+    if (p.source === "agent") {
+      try {
+        const { assessCustomerText, outboundGuardMode, heldRecord } = await import("@/lib/ai/outbound-guard-core");
+        if (outboundGuardMode(process.env.OUTBOUND_GUARD) === "enforce") {
+          const a = assessCustomerText(outgoingText(p.body, "agent"));
+          if (!a.ok) {
+            await admin.from("social_posts").update({ status: "draft", results: { ...(p.results ?? {}), hygiene: "not_ready", held: heldRecord(a, p.body) } }).eq("id", p.id);
+            continue;
+          }
+        }
+      } catch {
+        /* the post continues as before */
+      }
+    }
     const { data: accs } = await admin.from("channel_accounts").select("id, kind").eq("organization_id", p.organization_id).in("kind", ["messenger", "instagram"]);
     const byKind = new Map(((accs ?? []) as { id: string; kind: string }[]).map((a) => [a.kind, a.id]));
     const results: Record<string, unknown> = {};

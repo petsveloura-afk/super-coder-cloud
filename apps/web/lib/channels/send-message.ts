@@ -106,7 +106,17 @@ export async function sendToConversation(orgId: string, conversationId: string, 
   const admin = createAdminClient();
   const { data: conv } = await admin.from("conversations").select("id, channel, external_id").eq("id", conversationId).eq("organization_id", orgId).maybeSingle();
   if (!conv) return { ok: false, error: "not_found", permanent: true };
-  const body = text.slice(0, 4000);
+  // wave A1 — customer-ready guard, AI-authored messages only (people's own messages are never touched): the model's thinking and
+  // internal notes are removed; text that is not ready for a customer (placeholder, raw JSON, leaked instructions…) is HELD, not sent.
+  const guard = opts?.aiAgentId ? await guardAiMessage(text) : null;
+  if (guard?.held) {
+    await admin
+      .from("messages")
+      .insert({ organization_id: orgId, conversation_id: conv.id, direction: "out", body: text.slice(0, 4000), status: "failed", error: "held_by_outbound_guard", sent_by: sentBy ?? null, ai_agent_id: opts?.aiAgentId, meta: { ...(opts?.meta ?? {}), held: guard.held } })
+      .then(() => undefined, () => undefined);
+    return { ok: false, error: "held_by_outbound_guard", permanent: true };
+  }
+  const body = (guard?.text ?? text).slice(0, 4000);
   const { data: msg, error } = await admin
     .from("messages")
     .insert({
@@ -132,6 +142,26 @@ export async function sendToConversation(orgId: string, conversationId: string, 
     .update({ last_message_at: new Date().toISOString(), last_message_preview: body.slice(0, 200) })
     .eq("id", conv.id);
   return { ok: r.ok, messageId: msg.id as string, error: r.error, status: r.status, permanent: r.permanent };
+}
+
+/**
+ * wave A1 — the guard for AI-written text (OUTBOUND_GUARD: off | clean | enforce, default enforce). Never throws: on any failure
+ * the text goes out exactly as it was.
+ */
+async function guardAiMessage(text: string): Promise<{ text: string; held: { held: true; reasons: string[]; draft: string } | null }> {
+  try {
+    const { assessCustomerText, outboundGuardMode, heldRecord } = await import("@/lib/ai/outbound-guard-core");
+    const mode = outboundGuardMode(process.env.OUTBOUND_GUARD);
+    if (mode === "off") return { text, held: null };
+    const a = assessCustomerText(text);
+    if (a.ok) return { text: a.text, held: null };
+    if (mode === "clean") return { text: a.text || text, held: null };
+    const { log } = await import("@/lib/ops/log");
+    log.warn("outbound_guard.held", { reasons: a.blocking });
+    return { text, held: heldRecord(a, text) };
+  } catch {
+    return { text, held: null };
+  }
 }
 
 /** Automations: reach a contact on a channel, opening the conversation when needed. */

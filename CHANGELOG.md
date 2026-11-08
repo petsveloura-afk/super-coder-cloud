@@ -1,5 +1,14 @@
 # Changelog
 
+## Wave A1 — customer-ready guard for everything the AI sends or posts
+
+- **New pure module** `lib/ai/outbound-guard-core.ts` (unit-tested in Hebrew, English, Arabic): removes the model's own thinking (`<think>`, `<thinking>`, `<reasoning>`…, also an unclosed or lone closing tag) and labelled internal notes; holds text that is not ready for a customer (unfilled placeholder, raw JSON, draft introduction, leaked instructions). A discount line such as "הנחה: 10%" or a customer note such as "Note: …" is never touched.
+- **Wired in three places, AI-authored text only:** `sendToConversation` (every AI message on every channel), the autopilot (a held reply uses the existing "let me check with the team" hand-over, reason `guardrail_unready`, never silence), and social publishing (a not-ready agent post goes back to draft with the reason).
+- `cleanPostBody` now also removes the model's thinking from an agent post.
+- The inbox shows a translated explanation (he/en/ar) for a held message instead of a raw code.
+- **SSRF through redirects closed** (`lib/net/safe-fetch.ts → fetchPublicHttps`): reading a business website for the agent setup (`lib/ai/site-import.ts`) used to follow redirects after checking only the first URL, so a site could bounce the server to an internal address. Every hop now passes the same public-https check (max 4 hops, loop-safe). Outgoing webhooks already used `redirect: "error"` and are unchanged.
+- Optional `OUTBOUND_GUARD=off|clean|enforce` (default `enforce`). No migration.
+
 ## Clean team log in Hebrew, automatic senders out of the inbox, the reason behind "unexpected error"
 
 - **Team log** (display only, `activity-tidy-core.ts`):

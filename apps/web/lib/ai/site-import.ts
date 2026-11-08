@@ -11,7 +11,9 @@ async function getPage(url: string): Promise<string | null> {
   try {
     const { assertPublicHttpsUrl } = await import("@/lib/net/safe-url");
     const u = await assertPublicHttpsUrl(url);
-    const res = await fetch(u, { headers: { "User-Agent": "Mozilla/5.0 (compatible; SuperCoderCloudBot/1.0; +agent-setup)", Accept: "text/html,application/xhtml+xml" }, redirect: "follow", signal: AbortSignal.timeout(8000), cache: "no-store" });
+    // wave A1: every redirect hop passes the same public-https guard (a site must not be able to bounce this server to an internal host)
+    const { fetchPublicHttps } = await import("@/lib/net/safe-fetch");
+    const res = await fetchPublicHttps(u.toString(), { headers: { "User-Agent": "Mozilla/5.0 (compatible; SuperCoderCloudBot/1.0; +agent-setup)", Accept: "text/html,application/xhtml+xml" }, signal: AbortSignal.timeout(8000), cache: "no-store" });
     if (!res.ok || !/text\/html|xhtml/i.test(res.headers.get("content-type") ?? "text/html")) return null;
     const final = new URL(res.url || u.toString());
     if (final.protocol !== "https:") return null;

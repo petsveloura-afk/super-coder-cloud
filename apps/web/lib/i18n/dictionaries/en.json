@@ -2705,6 +2705,7 @@
     "leadNotification": "New lead from the agent: {name} ({score}) {need}",
     "ownerPhone": "Sent by you from the phone — the agent paused here",
     "aiLatency": "Agent response time",
+    "heldByGuard": "The message was held and not sent: it was not ready for a customer (for example an unfilled field). Review it and write the reply yourself.",
     "aiNote": {
       "owner_phone": "You wrote to the customer from your phone, so the agent paused in this conversation.",
       "resumeIn": "It comes back by itself in {n} minutes if you don't write again.",

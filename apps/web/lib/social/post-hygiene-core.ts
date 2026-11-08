@@ -9,6 +9,8 @@
  *  - a text that is a system report (ids, "draft saved", "scheduling confirmation") is refused — it is not a post.
  * The same module gives the board its "who wrote it" label and its date ordering.
  */
+import { stripReasoning } from "@/lib/ai/outbound-guard-core";
+
 
 export type PostClean = { ok: true; text: string } | { ok: false; reason: "too_short" | "not_a_post" };
 
@@ -65,7 +67,8 @@ export function plainForSocial(text: string): string {
 
 /** the post an agent hands over → the post a customer will read (or a refusal when it is not a post) */
 export function cleanPostBody(raw: string): PostClean {
-  const lines = String(raw ?? "").replace(/\r\n?/g, "\n").split("\n");
+  // wave A1: the model's own thinking (<think>…</think>) is never part of a post
+  const lines = stripReasoning(String(raw ?? "")).replace(/\r\n?/g, "\n").split("\n");
   const kept: string[] = [];
   for (const line of lines) {
     if (NOTES_HEADER.test(line)) break; // the notes section and everything after it are the employee's, not the customer's

@@ -229,3 +229,12 @@ When the Gemini image quota is exhausted (HTTP 429) the post studio falls back t
 | `STUDIO_IMAGE_FALLBACK` | no | server | `pollinations` (default) or `off` to disable the fallback |
 | `STUDIO_IMAGE_FALLBACK_URL` | no | server | alternative compatible prompt endpoint (default `https://image.pollinations.ai/prompt`) |
 | `POLLINATIONS_API_KEY` | no | server | sent as a bearer token when the provider asks for one |
+
+### Customer-ready guard for AI text (wave A1)
+Every AI-written customer message and every AI-written social post passes a pure check (`lib/ai/outbound-guard-core.ts`) before it leaves the business. The model's own thinking (`<think>…</think>`) and labelled internal notes ("Internal note:", "הערה פנימית:", "ملاحظة داخلية:") are removed; text that is not ready (an unfilled placeholder such as `[שם הלקוח]` or `{{name}}`, raw JSON, a draft introduction, leaked instructions) is held for a person.
+
+| Variable | Required | Scope | Purpose |
+|---|---|---|---|
+| `OUTBOUND_GUARD` | no | server | `enforce` (default) = clean and hold · `clean` = only remove thinking / internal notes · `off` = no check |
+
+In the autopilot a held reply takes the same "let me check with the team" path as a banned phrase (handoff reason `guardrail_unready`; the agent takes the conversation back by itself after the usual quiet period). For other AI sends the message is stored as failed with the reason `held_by_outbound_guard` and the draft in `messages.meta.held`; a held post goes back to draft with `results.hygiene = "not_ready"`. No migration.

@@ -381,7 +381,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                           📄 {(m.meta as { document_text: string }).document_text}
                         </p>
                       ) : null}
-                      {m.status === "failed" && m.error ? <p className="mt-1 text-[11px] text-danger">{m.error as string}</p> : null}
+                      {m.status === "failed" && m.error ? <p className="mt-1 text-[11px] text-danger">{m.error === "held_by_outbound_guard" ? t("inbox.heldByGuard") : (m.error as string)}</p> : null}
                     </div>
                   </li>
                 );

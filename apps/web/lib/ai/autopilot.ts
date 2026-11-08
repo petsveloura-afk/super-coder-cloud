@@ -790,6 +790,28 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
       return { replied: true, handoff: true, reason: hit ? "guardrail_banned" : "guardrail_price", text: safe };
     }
   }
+  // wave A1: customer-ready guard — the model's own thinking and internal notes never reach the customer; text that is not ready
+  // (unfilled placeholder, raw JSON, leaked instructions…) takes the same honest "let me check with the team" path as a banned phrase,
+  // so the customer is never left in silence and the team gets the draft
+  if (tools.text.trim()) {
+    try {
+      const { assessCustomerText, outboundGuardMode, heldRecord } = await import("./outbound-guard-core");
+      const guardMode = outboundGuardMode(process.env.OUTBOUND_GUARD);
+      if (guardMode !== "off") {
+        const a = assessCustomerText(tools.text);
+        if (a.ok) tools.text = a.text;
+        else if (guardMode === "clean") tools.text = a.text || tools.text;
+        else {
+          const safe = formatForChannel(guardrailHandoffText(locale, "check"), ch);
+          await sendToConversation(orgId, conv.id as string, safe, undefined, { aiAgentId: agent.id as string, meta: { system: "guardrail", blocked: "unready", held: heldRecord(a, tools.text) } });
+          await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "guardrail_unready" });
+          return { replied: true, handoff: true, reason: "guardrail_unready", text: safe };
+        }
+      }
+    } catch {
+      /* the reply goes out as it was */
+    }
+  }
   const text = formatForChannel(tools.text || handoffMessage(locale), ch);
   timing.mark("check");
   await sendToConversation(orgId, conv.id as string, text, undefined, {
