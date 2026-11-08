@@ -1,5 +1,14 @@
 # Changelog
 
+## Wave B2 — performance: indexes for foreign keys that had none
+
+- **Why it matters:** when a parent row is deleted (a campaign, a team task, a calendar connection, an AI agent, a contact, a deal …) the database checks every table that points to it. With no index on the pointing column that check reads the whole child table — once per deleted row. `messages`, `conversations` and `jobs` are among the biggest tables.
+- **Migration** `20261108000001_fk_index_coverage.sql` — only `create index if not exists`, 25 indexes, no table / column / policy / data touched (so no new RLS needed). Partial indexes (`where col is not null`) keep them small.
+  - The five candidates from the previous review, all confirmed: `jobs.campaign_recipient_id`, `team_tasks.parent_id`, `team_tasks.merged_into`, `team_approvals.task_id` (also serves the runner's "pending approvals of this task" count), `calendar_busy.connection_id` (its rows are deleted and re-inserted on every calendar sync).
+  - Found while verifying: the contact / deal / automation / webhook / AI-agent delete paths (`conversations`, `messages.ai_agent_id`, `jobs`, `automation_runs`, `activities`, `notes`, `tasks`, `deals`, `appointments`, `ai_usage`, `documents`, `tickets`, `files`).
+- **Checked and NOT changed (nothing to fix):** `appointments.host_id` (the booking-overlap index already serves the live queries; it is only a user-delete path), the 6 `select("*")` (all single-row lookups by id), N+1 in dashboard pages (none found; loops in background jobs are bounded by small limits and already reuse the organization), caching (`getOrgContext` is already request-cached, a TTL cache already exists).
+- Tests: `wave-b2-fk-index-migration.test.ts` (additive-only, newer than the last migration, unique names) and, on a real Postgres, `packages/database/tests/fk-index-coverage.test.ts` (indexes exist, migration re-runs cleanly, the foreign-key check really uses them).
+
 ## Wave A1 — customer-ready guard for everything the AI sends or posts
 
 - **New pure module** `lib/ai/outbound-guard-core.ts` (unit-tested in Hebrew, English, Arabic): removes the model's own thinking (`<think>`, `<thinking>`, `<reasoning>`…, also an unclosed or lone closing tag) and labelled internal notes; holds text that is not ready for a customer (unfilled placeholder, raw JSON, draft introduction, leaked instructions). A discount line such as "הנחה: 10%" or a customer note such as "Note: …" is never touched.
