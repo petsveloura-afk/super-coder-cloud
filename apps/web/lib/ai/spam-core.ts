@@ -6,6 +6,8 @@
  * Conservative on purpose: a real customer must never be ignored. A message needs SEVERAL strong signals to be filtered,
  * and a short personal question ("כמה עולה תספורת?") never is.
  */
+import { isServiceSender } from "@/lib/inbox/robots-core";
+
 export type NotCustomerKind = "bulk" | "spam" | null;
 
 const BULK = [
@@ -34,6 +36,9 @@ const PERSONAL = /\?|^(hi|hello|hey|היי|שלום|הי|مرحبا)\b|אפשר|
 export function notCustomerKind(input: { text: string; channel: string; automated?: boolean | null; subject?: string | null }): NotCustomerKind {
   const text = `${input.subject ?? ""}\n${input.text ?? ""}`.trim();
   if (input.automated) return "bulk";
+  // a well-known service sender by its NAME only (an exchange, a platform, "… Alerts") — the text is not used here, so a
+  // customer is never skipped because of what they wrote
+  if (isServiceSender(input.subject ?? null, null)) return "bulk";
   if (!text) return null;
   const bulk = BULK.filter((r) => r.test(text)).length;
   const spam = SPAM.filter((r) => r.test(text)).length;

@@ -181,3 +181,25 @@ describe("team AI gate — no self-made bursts", () => {
     expect(read("lib/team/runner.ts")).toContain("teamAiGate ??= new AiGate(4)");
   });
 });
+
+describe("display tidy-up — round 2 (cut ids, English tool wording, decimals)", () => {
+  it("the lines from the owner's screenshots read clean in Hebrew", () => {
+    const a = tidyActivityText("צפייה בטיוטות הפוסטים: [scheduled 2026-11-08T08:00 facebook+instagram] רוצים לבדוק … [draft 2026-11-08T17:14] | facebook id 92ed4233-cd66-4888-a183-18591da5a", "he");
+    expect(a).not.toMatch(/92ed4233/);
+    expect(a).toContain("מתוזמן 08/11");
+    const b = tidyActivityText(`לקוחות שמחכים: Neon Alerts on email (contact —, waiting since 2026-11-01T02:39). (9 automated sender(s) ignored — not customers)`, "he");
+    expect(b).toContain("ממתין מאז 01/11 02:39");
+    expect(b).toContain("9 שולחים אוטומטיים סוננו");
+    expect(b).not.toContain("contact —");
+    const c = tidyActivityText("נתוני אתמול: yesterday: 1 leads (avg 1.2857142857142858), 1 conversations (avg 1.4285714285714286), 2 AI replies, won 0 deals worth 0, revenue 0 (avg 0)", "he");
+    expect(c).toContain("1 לידים (ממוצע 1.2)");
+    expect(c).toContain("נסגרו 0 עסקאות בשווי 0");
+    expect(c).not.toMatch(/\d\.\d{3,}/);
+    const d = tidyActivityText("משימות פתוחות: חזרה ללקוח (due 2025-03-31, OVERDUE); מערכת (due 2026-10-17, OVERDUE) [stopped] [proposed]", "he");
+    expect(d).toContain("יעד 31/03/2025, באיחור");
+    expect(d).toContain("[נעצר]");
+    expect(d).toContain("[מוצע]");
+    expect(tidyActivityText("הנחות: ASSUMPTION: העסק מתמקד", "he")).toContain("הנחה: העסק מתמקד");
+    expect(tidyActivityText("waiting since 2026-11-01T02:39", "en")).toBe("waiting since 01/11 02:39");
+  });
+});

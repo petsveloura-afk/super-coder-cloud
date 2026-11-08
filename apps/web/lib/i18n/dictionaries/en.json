@@ -2614,6 +2614,14 @@
     }
   },
   "inbox": {
+    "robots": {
+      "badge": "Automatic message — not a customer",
+      "count": "{n} automatic messages (exchanges, alerts, login codes) — not customers",
+      "close": "Close them",
+      "confirm": "Close {n} conversations? (click to confirm)",
+      "closed": "{n} automatic conversations closed — reopen them from the \"Closed\" tab",
+      "none": "No automatic conversations to close"
+    },
     "ai": {
       "menu": "Improve the draft with AI",
       "empty": "Write a draft in the box and AI will improve it in one click",

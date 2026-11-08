@@ -195,7 +195,7 @@ export interface TeamPageData {
 
 export interface TeamPlus8Data {
   skipped: { key: string; reason: string; text: string; help: string | null }[];
-  attention: { id: string; title: string; status: string; label: string; action: string; reason: string; ageDays: number }[];
+  attention: { id: string; title: string; status: string; label: string; action: string; reason: string; ageDays: number; /** the technical reason of an unexpected error (short, no ids) */ detail?: string }[];
   staleBlocked: number;
   response?: { targetMin: number; line: string; alert: { level: "none" | "warn" | "alert"; text: string }; queue: { id: string; waitingMin: number; state: "ok" | "warning" | "breached" }[] };
 }

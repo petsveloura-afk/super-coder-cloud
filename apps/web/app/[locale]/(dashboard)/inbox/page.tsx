@@ -24,6 +24,7 @@ import { createClient } from "@/lib/supabase/server";
 import { memberOptions } from "@/lib/lookups";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { CloseRobotsButton } from "@/components/inbox/close-robots";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { t } = await getT(await resolveLocale(params));
@@ -115,6 +116,9 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
       const { robotConversationIds } = await import("@/lib/inbox/robots");
       for (const id of await robotConversationIds(supabase, ctx.org.id, emailRows)) robotIds.add(id);
     }
+    // service senders on every channel (Telegram login codes, exchanges, platform alerts) — not customers either
+    const { isServiceSender } = await import("@/lib/inbox/robots-core");
+    for (const c of allRows) if (isServiceSender(c.title, c.last_message_preview)) robotIds.add(c.id);
   } catch {
     /* the waiting counter works as before */
   }
@@ -227,6 +231,8 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
               </Link>
             ) : null}
           </div>
+          {/* automatic senders (exchanges, platform alerts, login codes) — not customers: one click closes them all */}
+          {filter !== "closed" && robotIds.size ? <CloseRobotsButton ids={allRows.filter((c) => robotIds.has(c.id)).map((c) => c.id)} /> : null}
           {list.length === 0 ? (
             <p className="p-6 text-center text-sm text-subtle">{t("inbox.empty")}</p>
           ) : (
@@ -245,7 +251,11 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
                           {c.unread_count > 0 ? <span className="grid h-5 min-w-5 place-items-center rounded-full bg-accent-solid px-1.5 text-[11px] font-bold text-accent-fg">{c.unread_count}</span> : null}
                         </div>
                         <p className="truncate text-[12.5px] text-muted">{c.last_message_preview ?? ""}</p>
-                        {c.ai_mode === "human" ? <p className="text-[11px] font-medium text-warning">{t("inbox.needsHuman")}</p> : null}
+                        {robotIds.has(c.id) ? (
+                          <p className="text-[11px] font-medium text-subtle" data-testid="robot-badge">🤖 {t("inbox.robots.badge")}</p>
+                        ) : c.ai_mode === "human" ? (
+                          <p className="text-[11px] font-medium text-warning">{t("inbox.needsHuman")}</p>
+                        ) : null}
                         {c.lead_score ? <p className={cn("text-[11px] font-medium", c.lead_score === "hot" ? "text-danger" : c.lead_score === "warm" ? "text-gold" : "text-subtle")}>{t(`inbox.lead.${c.lead_score}`)}</p> : null}
                         <p className="text-[11px] text-subtle">{c.last_message_at ? formatDateTime(locale, c.last_message_at) : ""}</p>
                         {wait !== null ? (

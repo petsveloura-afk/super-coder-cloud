@@ -1,5 +1,21 @@
 # Changelog
 
+## Clean team log in Hebrew, automatic senders out of the inbox, the reason behind "unexpected error"
+
+- **Team log** (display only, `activity-tidy-core.ts`):
+  - Ids cut in the middle by the log's length limit are removed.
+  - The tools' English wording is shown in the business language: waiting since, quiet since, automated senders, yesterday / leads / conversations / AI replies / deals / revenue / avg, due / OVERDUE, [proposed] / [stopped], scheduled / draft.
+  - Long decimals are rounded to one digit.
+  - "ASSUMPTION:" is shown as "הנחה:".
+- **Automatic senders are not customers** (`lib/inbox/robots-core.ts → isServiceSender`):
+  - Detected on every channel: exchanges and platforms by their whole name (OKX, Bybit, Telegram, "Neon Alerts" …), and machine texts (login / verification codes, IP + device reports, long opaque tokens). A customer or a business name that only contains such a word is never caught.
+  - In the inbox they get a "automatic message — not a customer" mark, do not count as waiting, and one click closes them all. The server checks every id again and closing is reversible.
+  - The agent does not answer them (by the sender's name only).
+  - The team's "unanswered" list skips them.
+- **"Unexpected error" shows its technical reason** in one short line (no ids), so the cause can be reported.
+- A post the employee wrote with notes or ids ("not_a_post") is now "invalid input" with its own guidance, not an "unexpected error".
+- No migration.
+
 ## Digital team: steps no longer fail on unknown ids or dates, no AI bursts, clean log
 
 - **Root cause:** an employee plans its steps BEFORE it reads anything. Steps like "add a note to each lead" or "create a follow-up task tomorrow 9:00" were planned with ids it did not have yet ("the lead from step 1") and dates in free form ("2026-11-10 09:00 (ASSUMPTION)", "מחר"). Strict validation refused them ("bad:contact_id", "bad:due_iso"), the same refusal repeated for every similar step, and the task ended "partially done".

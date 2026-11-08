@@ -121,6 +121,11 @@ export function StabilityPanel({ data, locale, onRefresh }: { data: TeamPageData
                   <Badge tone={x.status === "requires_connection" ? "warning" : "danger"}>{x.label || t(`aiTeam.health.reason.${x.reason}`)}</Badge>
                 </div>
                 {x.action ? <p className="mt-1 text-muted">{x.action}</p> : null}
+                {x.detail ? (
+                  <p className="mt-1 break-words rounded-lg bg-surface-hover/60 px-2 py-1 font-mono text-[11px] text-subtle" dir="ltr" data-testid="attention-detail">
+                    {x.detail}
+                  </p>
+                ) : null}
                 {can ? (
                   <div className="mt-1.5">
                     <Button size="sm" variant="ghost" loading={busy === `r${x.id}`} onClick={() => restart(x.id)}>

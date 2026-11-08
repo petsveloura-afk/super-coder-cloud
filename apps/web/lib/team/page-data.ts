@@ -198,7 +198,10 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
       attention: badRows.slice(0, 12).map((r) => {
         const e = explainToolFailure(r.error, lang8);
         const generic = r.status === "requires_connection" || reasonCode(r.error).startsWith("tool_");
-        return { id: r.id, title: localizeTitle(r.title, lang8), status: r.status, label: generic ? e.label : "", action: generic ? e.action : "", reason: reasonCode(r.error), ageDays: Math.floor((now - Date.parse(r.updated_at)) / 86_400_000) };
+        // "unexpected error" (additive): the technical reason in one short, clean line — so the owner can tell us what happened
+        const code = reasonCode(r.error);
+        const detail = code === "tool_bug" || code === "unknown" ? String(r.error ?? "").replace(/[0-9a-f]{8}-[0-9a-f-]{27}/gi, "").replace(/\s+/g, " ").trim().slice(0, 140) : "";
+        return { id: r.id, title: localizeTitle(r.title, lang8), status: r.status, label: generic ? e.label : "", action: generic ? e.action : "", reason: code, ageDays: Math.floor((now - Date.parse(r.updated_at)) / 86_400_000), ...(detail ? { detail } : {}) };
       }),
       staleBlocked: badRows.filter((r) => (r.status === "blocked" || r.status === "requires_connection") && now - Date.parse(r.updated_at) > 3 * 86_400_000).length,
       response: resp ? { targetMin: resp.targetMin, line: statsLine(resp.stats, resp.targetMin, lang8), alert: { level: resp.alert.level, text: slaAlertText(resp.alert, lang8) }, queue: resp.queue.slice(0, 8).map((q) => ({ id: q.id, waitingMin: q.waitingMin, state: q.state })) } : undefined,
