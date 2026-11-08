@@ -315,6 +315,10 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
       }
       case "social.schedule_post": {
         const when = s(args.when_iso) || new Date(Date.now() + 30 * 60_000).toISOString();
+        // hygiene: a draft that is only notes / a report is never scheduled
+        const { cleanPostBody } = await import("@/lib/social/post-hygiene-core");
+        const { data: cur } = await db.from("social_posts").select("body, source").eq("organization_id", orgId).eq("id", s(args.post_id)).eq("status", "draft").maybeSingle();
+        if (cur && (cur.source as string) === "agent" && !cleanPostBody(String(cur.body ?? "")).ok) return { ok: false, summary: "", error: "not_a_post: this draft is notes or a report, not a post — fix the text first" };
         const { data, error } = await db.from("social_posts").update({ status: "scheduled", scheduled_at: when }).eq("organization_id", orgId).eq("id", s(args.post_id)).eq("status", "draft").select("id");
         if (error) return { ok: false, summary: "", error: error.message };
         return data?.length ? { ok: true, summary: `post scheduled for ${when.slice(0, 16)}`, link: "/social" } : { ok: false, summary: "", error: "post_not_found_or_not_draft" };

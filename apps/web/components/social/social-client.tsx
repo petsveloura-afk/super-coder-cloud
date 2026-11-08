@@ -19,7 +19,7 @@ import type { AutopilotSettings, Learned } from "@/lib/social/brain-core";
 import { getPostAction, recyclePostAction } from "@/app/[locale]/(dashboard)/social/brain-actions";
 import { Dialog } from "@/components/ui/dialog";
 import { BrainCircuit, Flame, Heart, MessageCircle, Repeat2, Share2 } from "lucide-react";
-import { isFreshPost, outgoingText, postAuthor, sortPosts, type PostSort } from "@/lib/social/post-hygiene-core";
+import { isFreshPost, isNotAPost, outgoingText, postAuthor, sortPosts, suspectManualPost, type PostSort } from "@/lib/social/post-hygiene-core";
 import { filterComments, filterPosts, filterReviews, type CommentFilter, type PostFilter, type ReviewFilter } from "@/lib/social/insights";
 import { approveAllDraftsAction, commentStatusAction, duplicatePostAction, postStatusAction, replyCommentAction, replyReviewAction, reviewSettingsAction, savePostAction, saveSocialSettingsAction } from "@/app/[locale]/(dashboard)/social/actions";
 
@@ -279,7 +279,7 @@ function PostDrawer({ post, onClose, brand }: { post: PostRow; onClose: () => vo
           {post.pillar ? <Badge tone="neutral">{post.pillar}</Badge> : null}
           <span className="text-[12px] text-subtle">{when(locale, post.scheduled_at)}</span>
           <span className="ms-auto flex flex-wrap gap-1.5">
-            {editable ? (
+            {editable && !isNotAPost(post) ? (
               <Button size="sm" loading={pending} onClick={() => act(() => postStatusAction({ locale, id: post.id, action: "now" }))} data-testid="drawer-publish">
                 <Send className="h-3.5 w-3.5 rtl:-scale-x-100" /> {t("social.drawer.publishNow")}
               </Button>
@@ -328,6 +328,8 @@ function PostCard({ p, onEdit, isNew = false }: { p: PostRow; onEdit: () => void
   // who wrote it (the posts board is only loaded for people who manage it) + the text as it will go out
   const author = postAuthor(p);
   const shown = outgoingText(p.body, p.source);
+  const notAPost = isNotAPost(p); // only notes / a report — marked on the board, and never approved, scheduled or published
+  const suspect = !notAPost && suspectManualPost(p); // a person's own text that looks like notes — a warning only, nothing is blocked
   const duplicate = () =>
     start(async () => {
       const r = await duplicatePostAction({ locale, id: p.id });
@@ -402,16 +404,29 @@ function PostCard({ p, onEdit, isNew = false }: { p: PostRow; onEdit: () => void
             ))}
         </div>
       ) : null}
+      {suspect ? (
+        <p className="mt-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-[12px] font-semibold text-warning" data-testid="post-suspect">
+          {t("social.notAPost.suspect")}
+        </p>
+      ) : null}
+      {notAPost ? (
+        <p className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[12px] font-semibold text-danger" data-testid="post-not-a-post">
+          {t("social.notAPost.badge")}
+          <span className="block font-normal">{t("social.notAPost.hint")}</span>
+        </p>
+      ) : null}
       {editable ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          {p.status === "draft" ? (
+          {p.status === "draft" && !notAPost ? (
             <Button size="sm" loading={pending} onClick={() => act("approve")} data-testid="post-approve">
               <ThumbsUp className="h-3.5 w-3.5" /> {t("social.approve")}
             </Button>
           ) : null}
-          <Button size="sm" variant="secondary" disabled={pending} onClick={() => act("now")}>
-            <Send className="h-3.5 w-3.5 rtl:-scale-x-100" /> {t("social.publishNow")}
-          </Button>
+          {!notAPost ? (
+            <Button size="sm" variant="secondary" disabled={pending} onClick={() => act("now")}>
+              <Send className="h-3.5 w-3.5 rtl:-scale-x-100" /> {t("social.publishNow")}
+            </Button>
+          ) : null}
           <Button size="sm" variant="ghost" disabled={pending} onClick={onEdit}>
             {t("common.edit")}
           </Button>

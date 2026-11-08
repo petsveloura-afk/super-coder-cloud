@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanPostBody, isFreshPost, nextFreeSlot, outgoingText, plainForSocial, postAuthor, sortPosts } from "@/lib/social/post-hygiene-core";
+import { cleanPostBody, hasReportShape, isFreshPost, isNotAPost, markPostBody, nextFreeSlot, outgoingText, plainForSocial, postAuthor, sortPosts, suspectManualPost } from "@/lib/social/post-hygiene-core";
 import { extractPosts } from "@/lib/team/execution-plus-core";
 
 const root = join(__dirname, "..", "..");
@@ -166,5 +166,103 @@ describe("post hygiene — round 2 (publishing guard, edit pop-up, writing rules
     const sql = readFileSync(join(root, "..", "..", "supabase/migrations/20261107000001_social_post_hygiene.sql"), "utf8");
     expect(sql).toContain("status in ('draft', 'scheduled')");
     expect(sql).not.toMatch(/\bdelete\s+from\b/i);
+  });
+});
+
+describe("post hygiene — round 3 (report detector, marked extraction, board / approve / schedule guard)", () => {
+  it("a title line above the post goes, the post stays; a title alone is not a post", () => {
+    const r = cleanPostBody("**תוצאה סופית**\nבוקר טוב! השבוע אנחנו פותחים הרשמה לסדנה החדשה — מקומות מוגבלים 🙌");
+    expect(r.ok && r.text.startsWith("בוקר טוב")).toBe(true);
+    expect(cleanPostBody("**תוצאה סופית:**").ok).toBe(false);
+    // a sentence that merely starts with the word is a post line, not a heading
+    const s = cleanPostBody("סיכום השנה שלנו: הלקוחות שלנו חסכו אלפי שעות עבודה ידנית 🙌");
+    expect(s.ok).toBe(true);
+  });
+
+  it("a status report (two or more field lines) is refused, one field line inside a real post is not", () => {
+    const report = "סטטוס: תוזמן\nפלטפורמות: facebook, instagram\nמועד פרסום: מחר 10:00";
+    expect(hasReportShape(report)).toBe(true);
+    expect(cleanPostBody(report)).toEqual({ ok: false, reason: "not_a_post" });
+    expect(hasReportShape("Status: scheduled\nPlatforms: facebook")).toBe(true);
+    expect(cleanPostBody("מבצע סוף שבוע לכל הלקוחות שלנו!\nסטטוס: מלאי מוגבל, מזהים את זה בחנות 🙌").ok).toBe(true);
+  });
+
+  it("marked extraction keeps the text and marks it; a real post is not marked", () => {
+    const m = markPostBody("**הנחות:**\n- הפוסט מיועד לדף העסק");
+    expect(m.notAPost).toBe(true);
+    expect(m.reason).toBeTruthy();
+    expect(m.text).toContain("הנחות");
+    const ok = markPostBody("**מבצע** לסוף השבוע — 20% הנחה על כל הקולקציה");
+    expect(ok).toEqual({ text: "מבצע לסוף השבוע — 20% הנחה על כל הקולקציה", notAPost: false });
+  });
+
+  it("isNotAPost: only an agent's notes / report; a person's text and a real agent post are never marked", () => {
+    expect(isNotAPost({ body: "**הנחות:**\n- משהו", source: "agent" })).toBe(true);
+    expect(isNotAPost({ body: "**הנחות:**\n- משהו", source: "manual" })).toBe(false);
+    expect(isNotAPost({ body: "מבצע לסוף השבוע — 20% הנחה על כל הקולקציה", source: "agent" })).toBe(false);
+  });
+
+  it("such a 'post' is never approved, scheduled or published — the board marks it", () => {
+    const actions = read("app/[locale]/(dashboard)/social/actions.ts");
+    expect(actions).toContain('import { isNotAPost } from "@/lib/social/post-hygiene-core"');
+    // approve / publish-now (cancel stays possible)
+    expect(actions).toContain('if (input.action !== "cancel") {');
+    expect(actions.match(/social\.notAPost\.blocked/g)?.length).toBe(2);
+    // approve-all skips them
+    expect(actions).toContain("isNotAPost({ body: String(d.body ?? \"\"), source: d.source })");
+    expect(actions).toContain('.not("id", "in", skipList)');
+    // the team's schedule tool and the publishing guard
+    expect(read("lib/team/tools.ts")).toContain("not_a_post: this draft is notes or a report");
+    expect(read("lib/social/publish.ts")).toContain('p.source === "agent" && !cleanPostBody(p.body).ok');
+    // the board: red mark, no approve / publish-now buttons
+    const ui = read("components/social/social-client.tsx");
+    expect(ui).toContain('data-testid="post-not-a-post"');
+    expect(ui).toContain('p.status === "draft" && !notAPost');
+    expect(ui).toContain("editable && !isNotAPost(post)");
+    for (const l of ["he", "en", "ar"]) {
+      const d = JSON.parse(read(`lib/i18n/dictionaries/${l}.json`)) as { social: { notAPost: Record<string, string> } };
+      expect(Object.keys(d.social.notAPost)).toEqual(["badge", "hint", "suspect", "blocked"]);
+    }
+  });
+});
+
+describe("post hygiene — round 4 (all the wordings, AI chat lead-ins / tails, warning on a person's notes)", () => {
+  const POST = "מבצע סוף שבוע לכל הלקוחות שלנו — 20% הנחה על כל הקולקציה, רק עד יום שישי 🙌";
+  it("notes / instructions sections in he / en / ar are cut, the post stays", () => {
+    const heads = ["הנחיות לפרסום:", "**הערות מערכת:**", "הצעה לתמונה:", "המלצות לפרסום:", "שעת פרסום מומלצת:", "נימוק:", "Instructions:", "Image suggestion:", "Recommended posting time:", "Editor's note:", "Next steps:", "تعليمات:", "اقتراح صورة:", "أفضل وقت للنشر:", "ملاحظات النشر:"];
+    for (const h of heads) {
+      const r = cleanPostBody(`${POST}\n\n${h}\n- משהו פנימי`);
+      expect(r.ok, h).toBe(true);
+      if (r.ok) expect(r.text, h).toBe(POST);
+    }
+  });
+  it("a real post line that only looks similar is kept (a recipe 'הוראות:' / 'הוראות הגעה:')", () => {
+    const r = cleanPostBody("מתכון חדש אצלנו השבוע, בואו להכין יחד!\nהוראות:\n1. מערבבים\n2. אופים 20 דקות");
+    expect(r.ok && r.text.includes("אופים 20 דקות")).toBe(true);
+    const r2 = cleanPostBody("מחכים לכם בסניף החדש ברחוב הרצל 5!\nהוראות הגעה: חניה חינם ליד הכניסה");
+    expect(r2.ok && r2.text.includes("חניה חינם")).toBe(true);
+  });
+  it("an AI lead-in and closing offer around the post are cut", () => {
+    const a = cleanPostBody(`הנה הפוסט:\n${POST}\n\nרוצה שאשנה משהו בנוסח?`);
+    expect(a).toEqual({ ok: true, text: POST });
+    const b = cleanPostBody(`Sure! Here's the post:\n\n${POST}\n\nLet me know if you'd like changes.`);
+    expect(b).toEqual({ ok: true, text: POST });
+    const c = cleanPostBody("```\n" + POST + "\n```");
+    expect(c).toEqual({ ok: true, text: POST });
+    // a customer-facing CTA is part of the post
+    const d = cleanPostBody("רוצים לשמוע עוד? שלחו לנו הודעה פרטית ונשמח לעזור לכם בכל שאלה 🚀");
+    expect(d.ok).toBe(true);
+  });
+  it("more reports about a post are refused", () => {
+    expect(cleanPostBody("הפוסט תוזמן בהצלחה ליום ראשון ונוסף ללוח, ממתין לאישורך").ok).toBe(false);
+    expect(cleanPostBody("Post was created and added to the calendar, awaiting your approval").ok).toBe(false);
+    expect(cleanPostBody("تمت الجدولة بنجاح وفي انتظار الموافقة على المنشور").ok).toBe(false);
+  });
+  it("a person's own text that has notes inside gets a warning only — never blocked, never changed", () => {
+    expect(suspectManualPost({ body: `${POST}\n\nהנחיות לפרסום:\n- משהו`, source: "manual" })).toBe(true);
+    expect(suspectManualPost({ body: POST, source: "manual" })).toBe(false);
+    expect(suspectManualPost({ body: `${POST}\n\nהנחיות לפרסום:\n- משהו`, source: "agent" })).toBe(false);
+    expect(outgoingText(`${POST}\n\nהנחיות לפרסום:\n- משהו`, "manual")).toContain("הנחיות לפרסום");
+    expect(read("components/social/social-client.tsx")).toContain('data-testid="post-suspect"');
   });
 });

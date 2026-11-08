@@ -7,6 +7,7 @@ import { getOrgContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { dbErrorKey, type ActionState } from "@/lib/action-state";
 import { classifyPublishError, publishHintKey } from "@/lib/social/errors";
+import { isNotAPost } from "@/lib/social/post-hygiene-core";
 
 /** Wave 19 — comments board, scheduled posts, Google reviews, social settings. */
 const loc = (l: string) => (l === "ar" || l === "en" ? l : "he");
@@ -97,6 +98,11 @@ export async function savePostAction(input: { locale: string; id?: string | null
   }
   const when = new Date(p.data.scheduled_at);
   if (Number.isNaN(when.getTime())) return { error: "social.invalidPost" };
+  // hygiene: an employee's "post" that is still only notes / a report cannot be scheduled (a draft can be saved while it is fixed)
+  if (input.id && !input.draft && uuidSchema.safeParse(input.id).success) {
+    const { data: cur } = await (await createClient()).from("social_posts").select("source").eq("id", input.id).eq("organization_id", ctx.org.id).maybeSingle();
+    if (cur?.source === "agent" && isNotAPost({ body: p.data.body, source: "agent" })) return { error: "social.notAPost.blocked" };
+  }
   const row = {
     body: p.data.body,
     platforms: p.data.platforms,
@@ -126,6 +132,11 @@ export async function postStatusAction(input: { locale: string; id: string; acti
   if (!ctx.can("campaigns.manage")) return { error: "errors.forbidden" };
   if (!uuidSchema.safeParse(input.id).success) return { error: "validation.invalidId" };
   const supabase = await createClient();
+  // hygiene: a "post" that is only notes / a report is never approved, scheduled or published — cancel stays possible
+  if (input.action !== "cancel") {
+    const { data: cur } = await supabase.from("social_posts").select("body, source").eq("id", input.id).eq("organization_id", ctx.org.id).maybeSingle();
+    if (cur && isNotAPost({ body: String(cur.body ?? ""), source: cur.source })) return { error: "social.notAPost.blocked" };
+  }
   const patch = input.action === "cancel" ? { status: "canceled" } : input.action === "now" ? { status: "scheduled", scheduled_at: new Date().toISOString() } : { status: "scheduled" };
   const { error } = await supabase.from("social_posts").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", input.id).eq("organization_id", ctx.org.id).in("status", ["draft", "scheduled", "failed"]);
   if (error) return { error: dbErrorKey(error) };
@@ -246,8 +257,14 @@ export async function approveAllDraftsAction(input: { locale: string }): Promise
   if (!ctx.can("campaigns.manage")) return { error: "errors.forbidden" };
   const supabase = await createClient();
   const nowIso = new Date().toISOString();
-  const { data: late } = await supabase.from("social_posts").update({ status: "scheduled", scheduled_at: new Date(Date.now() + 10 * 60_000).toISOString(), updated_at: nowIso }).eq("organization_id", ctx.org.id).eq("status", "draft").lt("scheduled_at", nowIso).select("id");
-  const { data: future } = await supabase.from("social_posts").update({ status: "scheduled", updated_at: nowIso }).eq("organization_id", ctx.org.id).eq("status", "draft").gte("scheduled_at", nowIso).select("id");
+  // hygiene: drafts that are only notes / a report are skipped (they stay drafts for the owner to edit or cancel)
+  const { data: agentDrafts } = await supabase.from("social_posts").select("id, body, source").eq("organization_id", ctx.org.id).eq("status", "draft").eq("source", "agent");
+  const skip = ((agentDrafts ?? []) as { id: string; body: string; source: string }[]).filter((d) => isNotAPost({ body: String(d.body ?? ""), source: d.source })).map((d) => d.id);
+  const skipList = skip.length ? `(${skip.join(",")})` : null;
+  const lateQ = supabase.from("social_posts").update({ status: "scheduled", scheduled_at: new Date(Date.now() + 10 * 60_000).toISOString(), updated_at: nowIso }).eq("organization_id", ctx.org.id).eq("status", "draft").lt("scheduled_at", nowIso);
+  const futureQ = supabase.from("social_posts").update({ status: "scheduled", updated_at: nowIso }).eq("organization_id", ctx.org.id).eq("status", "draft").gte("scheduled_at", nowIso);
+  const { data: late } = await (skipList ? lateQ.not("id", "in", skipList) : lateQ).select("id");
+  const { data: future } = await (skipList ? futureQ.not("id", "in", skipList) : futureQ).select("id");
   const count = (late?.length ?? 0) + (future?.length ?? 0);
   revalidatePath(`/${locale}/social`);
   return { ok: true, message: count ? "social.pro.approvedAll" : "social.pro.noDrafts", messageParams: { count }, data: { count } };

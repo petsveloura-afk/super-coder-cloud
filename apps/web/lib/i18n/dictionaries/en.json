@@ -5733,6 +5733,12 @@
       "title": "Edit post",
       "subtitle": "Changes are saved to this post only"
     },
+    "notAPost": {
+      "badge": "Not a post — edit or cancel",
+      "hint": "This text is notes or a report, not a customer-facing post. It will not be approved, scheduled or published.",
+      "suspect": "This text has a part that looks like notes or instructions. Check it before scheduling — a post you wrote yourself goes out exactly as written.",
+      "blocked": "This is not a post (notes or a report), so it cannot be approved, scheduled or published. Edit the text or cancel it."
+    },
     "author": {
       "employee": "Written by {name} (AI team)",
       "team": "Written by the AI team",
