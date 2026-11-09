@@ -4,6 +4,9 @@ import { sendToConversation } from "@/lib/channels/send-message";
 import { advanceFlow, pickFlow, validFlowNodes, type Flow, type FlowState } from "./flows-core";
 import { formatForChannel, type AutopilotChannel } from "./autopilot-core";
 
+/** the customer kept talking about something else than the script's step → the AI runs the whole conversation from here */
+const RELEASED_HINT = "A scripted intake was dropped because the customer is talking about something else. Run the conversation yourself, naturally, by the business's instructions: answer what they write, and when it fits ask for the details you need (name, phone) in a friendly way — never as a questionnaire.";
+
 /**
  * Wave 16 — runs the business's conversation flows before the free AI.
  * handled=true → the flow answered (or handed off); false → the AI answers.
@@ -71,7 +74,7 @@ export async function runConversationFlow(input: { orgId: string; conversationId
     const aiHint = waiting?.text
       ? `A short scripted intake is paused on this step: "${waiting.text.slice(0, 200)}". The customer just wrote something else — answer THEIR message first, directly and concretely (never ignore it, never repeat the same scripted question word for word). Only after answering, if it fits naturally, return to that step in one short sentence.`
       : undefined;
-    return { handled: false, handoff: false, aiHint };
+    return { handled: false, handoff: false, aiHint: aiHint ?? (res.finished ? RELEASED_HINT : undefined) };
   }
   return { handled: res.messages.length > 0 || res.handoff, handoff: res.handoff, text: last };
 }

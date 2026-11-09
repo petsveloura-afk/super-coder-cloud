@@ -15,7 +15,6 @@ import {
   parseAgentTools,
   salesAgentInstructions,
   fallbackMessage,
-  wantsHuman,
   welcomeMessage,
   busyMessage,
   cleanCustomerName,
@@ -27,6 +26,7 @@ import {
   type LeadData,
   type StoredMessage,
 } from "./autopilot-core";
+import { angerNeedsPerson, humanMaybeHint, humanRequest } from "./handoff-intent-core";
 import {
   analyzeMessage,
   checkReply,
@@ -177,6 +177,8 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   const timing = new Timing();
   // true when the agent just took back a conversation it had handed over and nobody from the team answered
   let resumedUnattended = false;
+  // the flow engine paused a scripted step for the AI: what the AI should know about it (never shown to the customer)
+  let flowHint = "";
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { replied: false, handoff: false, reason: "no_service_key" };
   const admin = createAdminClient();
   const { data: conv } = await admin
@@ -201,7 +203,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     // wave 57: a conversation that was paused only because of a TECHNICAL hiccup (an empty / broken AI
     // answer, a busy engine) — not by a person and not by a real handoff — comes straight back to the agent
     const { data: noteRow } = await admin.from("conversations").select("ai_note, handoff_at, owner_takeover_at").eq("id", conv.id).maybeSingle();
-    const { technicalPauseExtended, unattendedResume } = await import("./autopilot-heal");
+    const { technicalPauseExtended, unattendedResume, waitingAssist } = await import("./autopilot-heal");
     const nr = (noteRow ?? {}) as { ai_note?: string | null; handoff_at?: string | null; owner_takeover_at?: string | null };
     // (also the watchdog's own hand-over after busy engines — "stuck_no_answer" is technical too)
     if (technicalPauseExtended(nr.ai_note ?? null)) {
@@ -221,7 +223,11 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
         .limit(1)
         .maybeSingle();
       const unattendedMinutes = (ra?.profile as { unattended_resume_minutes?: number } | null)?.unattended_resume_minutes;
-      if (unattendedResume({ note: nr.ai_note, handoffAt: nr.handoff_at, ownerTakeoverAt: nr.owner_takeover_at, teamAnsweredSince: Boolean(teamReply), minutes: unattendedMinutes, now: Date.now() })) {
+      if (
+        unattendedResume({ note: nr.ai_note, handoffAt: nr.handoff_at, ownerTakeoverAt: nr.owner_takeover_at, teamAnsweredSince: Boolean(teamReply), minutes: unattendedMinutes, now: Date.now() }) ||
+        // AI-first: nobody from the team wrote since the hand-over → the customer's new message is answered naturally, not ignored
+        waitingAssist({ note: nr.ai_note, handoffAt: nr.handoff_at, ownerTakeoverAt: nr.owner_takeover_at, teamAnsweredSince: Boolean(teamReply), minutes: unattendedMinutes, now: Date.now() })
+      ) {
         const { data: back } = await admin.from("conversations").update({ ai_mode: "auto", handoff_at: null, ai_note: "resumed_unattended", ai_note_at: new Date().toISOString() }).eq("id", conv.id).eq("ai_mode", "human").select("id");
         if (back?.length) {
           conv.ai_mode = "auto";
@@ -408,7 +414,9 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   }
 
   // the customer explicitly asks for a person → hand off right away (no AI call needed)
-  if (intent.kind === "human" || wantsHuman(lastLine)) {
+  const humanReq = humanRequest(lastLine);
+  if (humanReq === "maybe") flowHint = humanMaybeHint(locale); // the AI reads the context and decides (it ends with [[HANDOFF]] when a person is really needed)
+  if (intent.kind === "human" || humanReq === "yes") {
     const text = handoffMessage(locale);
     await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string });
     await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "customer_asked" });
@@ -447,11 +455,11 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   }
   // wave 16: guardrails (angry customer, budget per conversation), flows, knowledge base
   const { data: gRow } = await gRowP;
-  const { normalizeGuardrails, isAngry, guardrailHandoffText } = await import("./guardrails");
+  const { normalizeGuardrails, guardrailHandoffText } = await import("./guardrails");
   const rails = normalizeGuardrails((gRow as { guardrails?: unknown } | null)?.guardrails);
   // speed upgrade: the help-center search runs while the flows / customer details are checked
   const kbP = rails.kb ? admin.rpc("kb_search", { p_org: orgId, p_query: lastLine.slice(0, 300), p_limit: 3 }) : null;
-  if (rails.angry_handoff && isAngry(lastLine)) {
+  if (rails.angry_handoff && angerNeedsPerson(lastLine)) {
     const text = formatForChannel(guardrailHandoffText(locale, "angry"), ch);
     await sendToConversation(orgId, conv.id as string, text, undefined, { aiAgentId: agent.id as string, meta: { system: "guardrail" } });
     await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "angry_customer" });
@@ -470,6 +478,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     const { runConversationFlow } = await import("./flows");
     const flowRes = await runConversationFlow({ orgId, conversationId: conv.id as string, agentId: agent.id as string, contactId: (conv.contact_id as string | null) ?? null, channel: ch, text: lastLine, locale });
     if (flowRes.handled) return { replied: true, handoff: flowRes.handoff, reason: flowRes.handoff ? "flow_handoff" : undefined, text: flowRes.text };
+    flowHint = [flowHint, flowRes.aiHint ?? ""].filter(Boolean).join("\n\n");
   }
 
   // customer details — and fill in a phone / e-mail the customer just typed
@@ -568,7 +577,7 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     channel: ch,
     leadKnown: conv.lead_score ? { score: conv.lead_score as string } : null,
     locale,
-  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}${psychologySection}\n\n${actionsSection}\n\n${salesSection}${socialSection}${openerLine}${resumedUnattended ? `\n\n${(await import("./autopilot-heal")).resumedNote(replyLocale)}` : ""}`;
+  })}\n\n${situationBrief({ analysis, state, channel: ch, hours: hoursContext })}\n\n${proBrief({ text: lastIn, history })}${psychologySection}\n\n${actionsSection}\n\n${salesSection}${socialSection}${openerLine}${resumedUnattended ? `\n\n${(await import("./autopilot-heal")).resumedNote(replyLocale)}` : ""}${flowHint ? `\n\n${flowHint}` : ""}`;
   void typingIndicator(orgId, ch, conv.external_id as string); // speed upgrade: never waited for (the typing loop already runs)
   // wave 16: help-center answers (knowledge base) for this question
   let kb = "";

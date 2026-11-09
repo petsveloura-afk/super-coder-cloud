@@ -80,6 +80,24 @@ export function unattendedResume(i: UnattendedInput): boolean {
   return i.now - at >= waitMs;
 }
 
+/**
+ * AI-first while the team is away. When the AGENT handed a conversation over (the customer asked for a person, a flow or
+ * guardrail passed it on) and NOBODY from the team has written since, the customer's next message is still answered by the
+ * agent, naturally — never silence. It stops being the agent's the moment a person really writes (team reply or owner
+ * takeover), and it never applies to legal threats / threats of harm, forbidden phrases, an angry customer, a spent
+ * per-conversation budget or no AI credits. A business that set its own time (unattended_resume_minutes, including 0 = never)
+ * keeps exactly that choice — this only fills in for businesses that never chose one.
+ */
+export function waitingAssist(i: UnattendedInput): boolean {
+  if (i.minutes !== undefined && i.minutes !== null) return false;
+  if (i.teamAnsweredSince || i.ownerTakeoverAt) return false;
+  const note = (i.note ?? "").trim();
+  if (!note || !i.handoffAt) return false;
+  if (/^critical/i.test(note) || /banned/i.test(note) || /limit|demo|credit|quota/i.test(note)) return false;
+  if (note === "ai_budget" || note === "angry_customer") return false;
+  return true;
+}
+
 /** one line for the agent's instructions after it took a conversation back (the customer already heard "passing to the team") */
 export function resumedNote(lang: string): string {
   if (lang === "en") return "NOTE: earlier in this conversation it was passed to the team, and nobody from the team has answered yet. Do not leave the customer waiting: answer the new message yourself as well as you can. If something truly needs a person, say honestly that the team will also get back to them — never invent details.";

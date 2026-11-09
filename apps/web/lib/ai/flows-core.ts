@@ -104,10 +104,41 @@ export function pickFlow(flows: Flow[], text: string, isFirstMessage: boolean): 
     if (!f.enabled || !f.nodes.length) continue;
     if (f.trigger_keywords.some((k) => k.trim() && t.includes(norm(k)))) return f;
   }
-  // a customer whose very first message is a question gets an ANSWER first (the AI agent), not a questionnaire
-  if (isFirstMessage && !looksLikeQuestion(text)) return flows.find((f) => f.enabled && f.nodes.length && f.on_first_message) ?? null;
+  // AI first: a scripted intake starts by itself only on a bare greeting ("שלום", "hi"). Any first message that carries
+  // content — a question, a request, a statement — is answered by the AI agent, which runs the whole conversation by the
+  // business's own instructions. (A keyword the business chose still starts its flow, above.)
+  if (isFirstMessage && isGreetingOnly(text) && !looksLikeQuestion(text)) return flows.find((f) => f.enabled && f.nodes.length && f.on_first_message) ?? null;
   return null;
 }
+
+const GREETING_CORE = new Set([
+  "שלום", "שלומות", "היי", "הי", "הלו", "אהלן", "אהלא", "וסהלן", "בוקר", "ערב", "צהריים", "צהרים", "לילה", "נשמע", "קורה", "המצב", "שלומך", "שלומכם",
+  "hello", "hi", "hey", "hiya", "howdy", "yo", "morning", "afternoon", "evening", "sup", "greetings",
+  "مرحبا", "اهلا", "أهلا", "هلا", "سلام", "السلام", "صباح", "مساء", "كيفك", "حالك",
+]);
+const GREETING_FILLER = new Set([
+  "טוב", "טובים", "שבוע", "מה", "לכולם", "חברים", "יקר", "יקרים", "היקר", "אחי", "לכם", "לך", "אדוני", "גברתי",
+  "good", "there", "all", "everyone", "team", "sir", "madam", "how", "are", "you", "doing", "whats", "what", "s", "up",
+  "عليكم", "ورحمة", "الله", "وبركاته", "الخير", "النور", "كيف", "وعليكم",
+]);
+
+/**
+ * The message is ONLY a greeting (up to 5 words, e.g. "שלום", "היי מה נשמע", "good morning", "مرحبا", "👋") — nothing the AI
+ * would have to answer. Used to decide that a scripted first-message flow may start; every other message goes to the AI.
+ */
+export function isGreetingOnly(text: string): boolean {
+  const cleaned = (text ?? "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  if (!cleaned) return /[\u{1F300}-\u{1FAFF}☀-➿]/u.test(text ?? "") && !/[?？؟]/.test(text ?? "");
+  const words = cleaned.split(" ");
+  if (words.length > 5 || words.some((w) => /\d/.test(w))) return false;
+  if (!words.every((w) => GREETING_CORE.has(w) || GREETING_FILLER.has(w))) return false;
+  return words.some((w) => GREETING_CORE.has(w)) || /^(?:how are you|how you doing|what s up)$/.test(cleaned);
+}
+
+/** after this many consecutive off-step messages the customer is clearly talking about something else: the AI takes the whole conversation */
+export const MAX_AI_PAUSES = 3;
+const PAUSE_KEY = "_ai_turns";
+const withoutPause = (d: Record<string, string>): Record<string, string> => Object.fromEntries(Object.entries(d).filter(([k]) => k !== PAUSE_KEY));
 
 /** internal bookkeeping keys (retry counters) never leave the engine */
 const publicData = (d: Record<string, string>): Record<string, string> => Object.fromEntries(Object.entries(d).filter(([k]) => !k.startsWith("_")));
@@ -146,6 +177,20 @@ export function advanceFlow(flow: Flow, state: FlowState | null, customerText: s
   let data = { ...(state?.data ?? {}) };
   let cur: FlowNode | undefined;
 
+  /** the customer wrote something that is not an answer to this step: the AI answers them; a customer who keeps going off-script is released from the script */
+  const pauseForAI = (st: FlowState, d: Record<string, string>): FlowOutput => {
+    const n = Number(d[PAUSE_KEY] ?? 0) + 1;
+    out.toAI = true;
+    if (n >= MAX_AI_PAUSES) {
+      out.finished = true;
+      out.state = null;
+      out.collected = publicData(withoutPause(d));
+      return out;
+    }
+    out.state = { ...st, data: { ...d, [PAUSE_KEY]: String(n) } };
+    return out;
+  };
+
   if (state) {
     const waiting = byId.get(state.node_id);
     if (!waiting) {
@@ -157,16 +202,15 @@ export function advanceFlow(flow: Flow, state: FlowState | null, customerText: s
       const idx = /^\d{1,2}$/.test(t) ? Number(t) - 1 : -1;
       const choice = (waiting.buttons ?? []).find((b, i) => norm(b.label) === t || i === idx) ?? (waiting.buttons ?? []).find((b) => t.includes(norm(b.label)));
       if (!choice) {
-        // not one of the choices → the free AI handles it (the flow pauses on the same step)
-        out.toAI = true;
-        out.state = { ...state, data };
-        return out;
+        // not one of the choices → the free AI handles it (the flow pauses on the same step; after a few such turns it lets go)
+        return pauseForAI(state, data);
       }
-      data = { ...data, [`choice_${waiting.id}`]: choice.label };
+      data = { ...withoutPause(data), [`choice_${waiting.id}`]: choice.label };
       cur = choice.next ? byId.get(choice.next) : waiting.next ? byId.get(waiting.next) : undefined;
     } else if (waiting.type === "collect") {
-      const asked = looksLikeQuestion(customerText);
-      const v = asked && waiting.field !== "name" ? null : validateAnswer(waiting.field, customerText);
+      // a name step accepts short, name-like text; a question (a "?" or a longer question sentence) is never saved as a name
+      const asked = looksLikeQuestion(customerText) && (waiting.field !== "name" || /[?？؟]/.test(customerText) || customerText.trim().split(/\s+/).length >= 3);
+      const v = asked ? null : validateAnswer(waiting.field, customerText);
       if (!v) {
         // a question (or something that is clearly not an attempt at this field) is never "an invalid answer":
         // the flow pauses on the same step and the AI agent answers the customer like a person would
@@ -174,11 +218,7 @@ export function advanceFlow(flow: Flow, state: FlowState | null, customerText: s
         const attempt = waiting.field === "phone" ? digits >= 1 : waiting.field === "email" ? customerText.includes("@") : false;
         const retryKey = `_retry_${waiting.id}`;
         const tried = Number(data[retryKey] ?? 0);
-        if (asked || !attempt || tried >= 1) {
-          out.toAI = true;
-          out.state = { ...state, data };
-          return out;
-        }
+        if (asked || !attempt || tried >= 1) return pauseForAI(state, data);
         data = { ...data, [retryKey]: String(tried + 1) };
         out.invalid = true;
         out.messages.push({ text: retryText(waiting.field, locale) });
@@ -186,7 +226,7 @@ export function advanceFlow(flow: Flow, state: FlowState | null, customerText: s
         return out;
       }
       const key = waiting.field || "custom";
-      data = { ...data, [key === "custom" ? `answer_${waiting.id}` : key]: v };
+      data = { ...withoutPause(data), [key === "custom" ? `answer_${waiting.id}` : key]: v };
       out.collected[key === "custom" ? `answer_${waiting.id}` : key] = v;
       cur = waiting.next ? byId.get(waiting.next) : undefined;
     } else {
