@@ -36,7 +36,8 @@ export function stripStrayMarkers(text: string): string {
 /** pause reasons that technically failed — also the watchdog's own hand-over after busy engines */
 export function technicalPauseExtended(note: string | null | undefined): boolean {
   const n = (note ?? "").trim();
-  return technicalPause(n) || n === "stuck_no_answer" || n === "agent_timeout";
+  // wave A4: a reply the outbound guard held (a false alarm is possible) is a hiccup, not a decision of a person → the agent returns with the next message
+  return technicalPause(n) || n === "stuck_no_answer" || n === "agent_timeout" || n === "guardrail_unready";
 }
 
 /** default minutes of team silence after an AGENT hand-over before the agent answers again (agent profile can change it; 0 = never) */

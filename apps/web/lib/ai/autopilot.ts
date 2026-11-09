@@ -326,6 +326,18 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
   }
   timing.mark("debounce");
 
+  // wave A4 — one answer per customer message: the webhook run, the safety-net cron, the bridge tick and the watchdog can all pick
+  // up the same message at the same moment; only the first one to claim it answers (the others stop here, quietly).
+  // Fail-open: when the claim function is not installed yet (migration not run) or errors, the run continues exactly as before.
+  if (lastInRow?.id) {
+    try {
+      const { data: claimed, error: claimError } = await admin.rpc("ai_claim_reply", { p_conversation: conv.id, p_message: lastInRow.id, p_ttl_seconds: 90 });
+      if (!claimError && claimed === false) return { replied: false, handoff: false, reason: "already_answered" };
+    } catch {
+      /* no claim → the run goes on as before */
+    }
+  }
+
   // loop / abuse protection
   const [{ data: allowed }, { data: rows }] = await Promise.all([
     admin.rpc("public_rate_limit", { p_bucket: `autopilot:${conv.id}`, p_limit: 30, p_window_seconds: 3600 }),
@@ -813,6 +825,17 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     } catch {
       /* the reply goes out as it was */
     }
+  }
+  // wave A4 — last look before sending: when somebody (another run, or a person from the team) already answered this customer
+  // message while the answer was being written, this answer is dropped instead of sent as a second one
+  try {
+    const { data: recent } = await admin.from("messages").select("direction, status, meta").eq("conversation_id", conv.id).order("created_at", { ascending: false }).limit(8);
+    for (const m of (recent ?? []) as { direction: string; status: string | null; meta: { fallback?: boolean; escalation?: boolean } | null }[]) {
+      if (m.direction === "in") break;
+      if (m.direction === "out" && m.status !== "failed" && m.meta?.fallback !== true && m.meta?.escalation !== true) return { replied: false, handoff: false, reason: "already_answered" };
+    }
+  } catch {
+    /* the reply goes out as it was */
   }
   const text = formatForChannel(tools.text || handoffMessage(locale), ch);
   timing.mark("check");
