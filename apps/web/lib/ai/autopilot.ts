@@ -816,10 +816,67 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
         if (a.ok) tools.text = a.text;
         else if (guardMode === "clean") tools.text = a.text || tools.text;
         else {
-          const safe = formatForChannel(guardrailHandoffText(locale, "check"), ch);
-          await sendToConversation(orgId, conv.id as string, safe, undefined, { aiAgentId: agent.id as string, meta: { system: "guardrail", blocked: "unready", held: heldRecord(a, tools.text) } });
-          await admin.rpc("ai_handoff", { p_conv: conv.id, p_reason: "guardrail_unready" });
-          return { replied: true, handoff: true, reason: "guardrail_unready", text: safe };
+          // wave A4 — an unready draft is REPAIRED, never turned into a hand-over by itself (hand-overs stay with the agent's own settings:
+          // hand-over rules, angry customer, budget, banned words, price check, a customer asking for a person).
+          // 1) the agent rewrites the message once (same way the self-check already does)  2) otherwise the unready sentences are dropped
+          // 3) otherwise the agent keeps the conversation: a short "on it", the owners are told once, the safety net answers again
+          console.warn("guardrail_unready", JSON.stringify({ conversation: conv.id, reasons: heldRecord(a, tools.text).reasons }));
+          let candidate = "";
+          try {
+            const redo = await withSoftDeadline(
+              runAISystem({
+                orgId,
+                feature: "autopilot",
+                agentId: agent.id as string,
+                provider: agent.provider as "openai" | "anthropic" | "gemini",
+                model: agent.model as string,
+                system: kb ? `${system}\n\n${kb}` : system,
+                messages: [
+                  ...history,
+                  { role: "assistant", content: tools.text.slice(0, 1500) },
+                  { role: "user", content: "(internal check, not from the customer) Your last draft cannot be sent as it is: it contains something that is not for a customer (an unfilled placeholder such as [name] or {{x}}, a template word in brackets, an internal note, raw data or part of your instructions). Write the final message again, in the customer's language and with the same facts, as plain text for the customer only: no placeholders, no brackets with template words, no notes. If you do not know a detail, ask the customer for it or leave it out." },
+                ],
+                temperature: Math.min(0.5, Number(agent.temperature ?? 0.4) + 0.1),
+                maxTokens: ch === "email" ? 1200 : 600,
+              }),
+              ch === "messenger" || ch === "instagram" ? Math.min(selfCheckBudgetMs(process.env), 4500) : selfCheckBudgetMs(process.env),
+              { ok: false, error: "ai.self_check_timeout" } as Awaited<ReturnType<typeof runAISystem>>,
+            );
+            if (redo.ok) {
+              const { stripStrayMarkers } = await import("./autopilot-heal");
+              const redoText = stripStrayMarkers(parseAgentTools(parseActionMarkers(redo.text).text).text);
+              const b = assessCustomerText(redoText);
+              if (b.ok && b.text) candidate = b.text;
+            }
+          } catch {
+            /* the next step takes over */
+          }
+          if (!candidate) {
+            const kept = (a.text || "").split(/(?<=[.!?؟\n])\s+/).filter((x) => x.trim() && assessCustomerText(x).ok).join(" ").trim();
+            if (kept && assessCustomerText(kept).ok) candidate = kept;
+          }
+          // whatever replaces the draft passes the same banned-phrase and price checks as any other answer
+          if (candidate) {
+            const { bannedHit, unknownPrices } = await import("./guardrails");
+            const known = [JSON.stringify(agent.profile ?? {}), String(agent.instructions ?? ""), kb, lastIn, memories.map((m) => m.fact).join("\n")].join("\n");
+            if (bannedHit(candidate, rails.banned) || (rails.price_guard && unknownPrices(candidate, known).length)) candidate = "";
+          }
+          if (candidate) tools.text = candidate;
+          else if (tools.handoff) tools.text = ""; // the agent itself decided to hand over → the normal hand-over message below
+          else {
+            const { data: recentHold } = await admin.from("messages").select("id").eq("conversation_id", conv.id).eq("direction", "out").eq("meta->>fallback", "true").gt("created_at", new Date(Date.now() - 15 * 60_000).toISOString()).limit(1).maybeSingle();
+            await admin.from("conversations").update({ ai_note: "ai_busy", ai_note_at: new Date().toISOString() }).eq("id", conv.id).then(() => undefined, () => undefined);
+            try {
+              const { notifyHeldMessage } = await import("@/lib/channels/send-message");
+              await notifyHeldMessage(orgId, conv.id as string);
+            } catch {
+              /* the owners' note is best effort */
+            }
+            if (input.retry) return { replied: false, handoff: false, reason: "empty_answer" };
+            const hold = formatForChannel(busyMessage(locale), ch);
+            if (!recentHold) await sendToConversation(orgId, conv.id as string, hold, undefined, { aiAgentId: agent.id as string, meta: { fallback: true } });
+            return { replied: !recentHold, handoff: false, reason: "empty_answer", text: recentHold ? undefined : hold };
+          }
         }
       }
     } catch {

@@ -16,4 +16,11 @@ describe("wave A4 — one reply per customer message, no stuck chat after a held
     expect(src.indexOf('"ai_claim_reply"')).toBeLessThan(src.indexOf("const text = formatForChannel(tools.text || handoffMessage(locale), ch);"));
     expect(src).toContain("wave A4 — last look before sending");
   });
+  it("an unready draft is repaired (rewrite, then drop the bad sentences) and never becomes a hand-over by itself", () => {
+    const src = readFileSync("lib/ai/autopilot.ts", "utf8");
+    expect(src).not.toContain('p_reason: "guardrail_unready"');
+    expect(src).toContain('console.warn("guardrail_unready"');
+    expect(src).toContain("(internal check, not from the customer)");
+    expect(src.indexOf('console.warn("guardrail_unready"')).toBeLessThan(src.indexOf("wave A4 — last look before sending"));
+  });
 });

@@ -149,7 +149,7 @@ export async function sendToConversation(orgId: string, conversationId: string, 
  * wave A3 — the owners learn (in-app notification, once per conversation per 6 hours) that an AI message was held and not sent, so a
  * customer is not left waiting unnoticed. Best effort: never throws, never blocks the send path.
  */
-async function notifyHeldMessage(orgId: string, conversationId: string): Promise<void> {
+export async function notifyHeldMessage(orgId: string, conversationId: string): Promise<void> {
   const admin = createAdminClient();
   const since = new Date(Date.now() - 6 * 3600_000).toISOString();
   const { count } = await admin.from("notifications").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("title_key", "inbox.heldNotification").eq("link", `/inbox?c=${conversationId}`).gte("created_at", since);
