@@ -7,6 +7,19 @@ import { decodeVoice } from "./util.mjs"; // wave 22
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Remembers what was just sent (bounded) so a WhatsApp re-send request can be answered. Never throws. */
+function rememberSent(session, result) {
+  try {
+    const id = result?.key?.id;
+    if (!id || !result?.message) return;
+    const store = session.sentMsgs ?? (session.sentMsgs = new Map());
+    store.set(id, result.message);
+    if (store.size > 300) store.delete(store.keys().next().value);
+  } catch {
+    /* best effort */
+  }
+}
+
 export class SessionManager {
   /**
    * @param {object} o
@@ -74,6 +87,8 @@ export class SessionManager {
     session.status = "starting";
     session.callback = callback;
     session.sentIds = session.sentIds ?? new RecentIds(500);
+    // the last messages sent, kept so WhatsApp can ask for a re-send (see getMessage below)
+    session.sentMsgs = session.sentMsgs ?? new Map();
     session.stopped = false;
     this.sessions.set(id, session);
 
@@ -94,6 +109,9 @@ export class SessionManager {
       markOnlineOnConnect: false,
       syncFullHistory: false,
       logger: this.baileys.logger,
+      // When a phone could not decrypt a message it asks WhatsApp for a re-send. Without this callback the re-send
+      // cannot happen and the customer sees "Waiting for this message. This may take a while" (often on the 2nd / 3rd bubble).
+      getMessage: async (key) => session.sentMsgs?.get(key?.id) ?? undefined,
     });
     session.sock = sock;
     sock.ev.on("creds.update", saveCreds);
@@ -341,6 +359,7 @@ export class SessionManager {
       s.sentIds?.add(messageId);
       const r = await s.sock.sendMessage(jid, img ? { image: { url: img }, caption: body.slice(0, 1000) } : { text: parts[i] }, { messageId });
       s.sentIds?.add(r?.key?.id);
+      rememberSent(s, r);
       lastId = r?.key?.id ?? messageId;
     }
     if (parts.length > 1) {
@@ -374,6 +393,7 @@ export class SessionManager {
     s.sentIds?.add(messageId);
     const r = await s.sock.sendMessage(jid, { audio: v.buf, mimetype: v.mime, ptt: v.ogg }, { messageId });
     s.sentIds?.add(r?.key?.id);
+    rememberSent(s, r);
     try {
       await s.sock.sendPresenceUpdate?.("paused", jid);
     } catch {
