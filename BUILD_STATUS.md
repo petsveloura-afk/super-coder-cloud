@@ -840,3 +840,11 @@
 - **הבעיה בפרודקשן:** מכסת תמונות Gemini נגמרה (429 `RESOURCE_EXHAUSTED`), ולכן כל יצירה נכשלה (כ-6 קריאות בכל לחיצה).
 - **התיקון (תוספתי, `images.ts` לא שונה):** ב-`studio-image.ts`: Gemini קודם; ב-429 עוברים למחולל גיבוי ללא מפתח (Pollinations; ניתן לכיבוי או להחלפה במשתני `STUDIO_IMAGE_FALLBACK*`). התמונה מורדת ונשמרת באותו bucket ציבורי, ועולה קרדיט אחד. אחרי 429 מדלגים על Gemini ל-10 דקות. אם גם הגיבוי נכשל: הודעה ברורה על מכסה (`social.studio.quota`) ולא נגבה קרדיט.
 - **לא נבדק:** קריאה אמיתית לספק הגיבוי (אין רשת בסביבת הפיתוח). זמינות ומגבלות השירות החיצוני בצד הספק.
+
+## WhatsApp by QR / phone code — the agent answers (fix)
+- The agent used to stay silent on a WhatsApp linked by QR / phone code when it was ticked only for the official WhatsApp
+  (or created before the channel existed). Now: the moment the link is confirmed the business's agent is added to
+  `whatsapp_qr` (`lib/ai/agent-channel.ts`), and the autopilot falls back to the first working agent like Messenger / Instagram.
+- The bridge no longer drops customers that WhatsApp addresses by a private id (`@lid`): they are answered at that id,
+  the phone number is learned when WhatsApp reveals it, and wrapped messages (disappearing chats, documents with a caption,
+  edits) are read. Callback failures are logged (`WA_BRIDGE_SECRET` / `APP_URL` mismatches are now visible in the bridge logs).

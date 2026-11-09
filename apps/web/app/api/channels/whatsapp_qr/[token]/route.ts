@@ -20,6 +20,8 @@ interface BridgeEvent {
   name?: string | null;
   text?: string;
   isGroup?: boolean;
+  /** the customer is known only by WhatsApp's private id (LID) — `from` is that id, not a phone number */
+  lid?: boolean;
   media?: { type: string; name?: string; data?: string; mime?: string } | null;
   // status
   status?: "qr" | "connected" | "logged_out";
@@ -51,6 +53,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         updated_at: new Date().toISOString(),
       })
       .eq("id", acc.id);
+    // the owner just linked WhatsApp: the business's agent must answer here like on every other channel
+    // (an agent that was ticked only for the official WhatsApp used to stay silent on a QR / phone-code connection)
+    if (connected) {
+      const { ensureAgentOnChannel } = await import("@/lib/ai/agent-channel");
+      await ensureAgentOnChannel(acc.organization_id, "whatsapp_qr");
+    }
     return NextResponse.json({ ok: true });
   }
 
@@ -68,7 +76,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       token,
       chatId: ev.from,
       senderName: ev.name ?? null,
-      phone: `+${ev.from}`,
+      // a LID is not a phone number — never store it as one
+      phone: ev.lid ? null : `+${ev.from}`,
       text: (ev.text ?? "").slice(0, 8000),
       externalMessageId: ev.id ?? null,
       media: ev.media ?? null,

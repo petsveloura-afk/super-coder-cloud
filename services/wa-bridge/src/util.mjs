@@ -42,10 +42,55 @@ export function jidFromPhone(digits) {
   return /^\d{6,20}$/.test(d) ? `${d}@s.whatsapp.net` : null;
 }
 
+/**
+ * WhatsApp's newer "LID" addressing: "123456789012345@lid" (a private id that is NOT a phone number).
+ * Returns the digits (null for anything else).
+ */
+export function lidFromJid(jid) {
+  if (typeof jid !== "string") return null;
+  const m = jid.match(/^(\d{5,20})(?::\d+)?@lid$/);
+  return m ? m[1] : null;
+}
+
+/**
+ * The customer's phone number from every place WhatsApp may carry it (key fields differ between versions),
+ * or from the LID → phone map the bridge learned (`lidToPn`: Map|object). Null when it is really unknown.
+ */
+export function phoneFromKey(key, lidToPn = null) {
+  const k = key ?? {};
+  for (const c of [k.remoteJid, k.senderPn, k.remoteJidAlt, k.participantPn, k.participantAlt, k.participant]) {
+    const p = phoneFromJid(c ?? "");
+    if (p) return p;
+  }
+  const lid = lidFromJid(k.remoteJid ?? "") ?? lidFromJid(k.participant ?? "");
+  if (lid && lidToPn) {
+    const hit = typeof lidToPn.get === "function" ? lidToPn.get(lid) : lidToPn[lid];
+    if (hit && /^\d{6,20}$/.test(hit)) return hit;
+  }
+  return null;
+}
+
+/**
+ * WhatsApp wraps a message in several envelopes (disappearing chats, view-once, a document with a caption,
+ * an edited message …). The real content is inside — peeled here so nothing is silently dropped.
+ */
+export function unwrapMessage(message) {
+  let m = message;
+  for (let i = 0; i < 6 && m && typeof m === "object"; i++) {
+    const inner = m.ephemeralMessage?.message ?? m.viewOnceMessage?.message ?? m.viewOnceMessageV2?.message ?? m.viewOnceMessageV2Extension?.message ?? m.documentWithCaptionMessage?.message ?? m.editedMessage?.message ?? null;
+    if (!inner) break;
+    m = inner;
+  }
+  // an edit carries the new text inside protocolMessage.editedMessage
+  const edited = m?.protocolMessage?.editedMessage;
+  if (edited && typeof edited === "object") return unwrapMessage(edited);
+  return m;
+}
+
 /** Text of an incoming WhatsApp message (text, captions, buttons, lists, locations). */
 export function messageText(message) {
   if (!message || typeof message !== "object") return "";
-  const m = message.ephemeralMessage?.message ?? message.viewOnceMessage?.message ?? message.viewOnceMessageV2?.message ?? message;
+  const m = unwrapMessage(message) ?? message;
   return (
     m.conversation ??
     m.extendedTextMessage?.text ??
@@ -55,6 +100,8 @@ export function messageText(message) {
     m.buttonsResponseMessage?.selectedDisplayText ??
     m.listResponseMessage?.title ??
     m.templateButtonReplyMessage?.selectedDisplayText ??
+    m.buttonsResponseMessage?.selectedButtonId ??
+    m.listResponseMessage?.singleSelectReply?.selectedRowId ??
     (m.locationMessage ? `📍 ${m.locationMessage.degreesLatitude},${m.locationMessage.degreesLongitude}` : "") ??
     ""
   );
@@ -62,8 +109,9 @@ export function messageText(message) {
 
 export function messageMedia(message) {
   if (!message || typeof message !== "object") return null;
+  const m = unwrapMessage(message) ?? message;
   for (const t of ["imageMessage", "videoMessage", "audioMessage", "documentMessage", "stickerMessage"]) {
-    if (message[t]) return { type: t.replace("Message", ""), name: message[t].fileName ?? undefined };
+    if (m[t]) return { type: t.replace("Message", ""), name: m[t].fileName ?? undefined };
   }
   return null;
 }
@@ -72,18 +120,28 @@ export function messageMedia(message) {
  * Converts a Baileys WAMessage into the bridge callback payload,
  * or null when it must be ignored (own messages, groups, status, empty).
  */
-export function toInboundEvent(msg) {
+export function toInboundEvent(msg, lidToPn = null) {
   const key = msg?.key ?? {};
   if (key.fromMe) return null;
   const remote = key.remoteJid ?? "";
   if (!remote || remote.endsWith("@g.us") || remote === "status@broadcast" || remote.endsWith("@broadcast") || remote.endsWith("@newsletter")) return null;
-  // newer WhatsApp "LID" addressing: the phone number is carried separately
-  const from = phoneFromJid(remote) ?? phoneFromJid(key.senderPn ?? "") ?? null;
-  if (!from) return null;
+  // newer WhatsApp "LID" addressing: the phone number is carried separately (or learned earlier)
+  let from = phoneFromKey(key, lidToPn);
+  let lid = false;
+  if (!from) {
+    // a customer who only has a LID: WhatsApp still delivers the message AND accepts a reply to that LID,
+    // so the conversation is kept under the LID digits (before: the message was dropped and the agent never answered)
+    const l = lidFromJid(remote);
+    if (!l) return null;
+    from = l;
+    lid = true;
+  }
   const text = messageText(msg.message);
   const media = messageMedia(msg.message);
   if (!text && !media) return null;
-  return { type: "message", id: key.id ?? null, from, name: msg.pushName ?? null, text: String(text).slice(0, 8000), isGroup: false, media };
+  const ev = { type: "message", id: key.id ?? null, from, name: msg.pushName ?? null, text: String(text).slice(0, 8000), isGroup: false, media };
+  if (lid) ev.lid = true;
+  return ev;
 }
 
 /**
@@ -93,13 +151,14 @@ export function toInboundEvent(msg) {
  * Messages the bridge itself sent (`sentIds`) and the owner's own "message
  * yourself" chat are ignored. Returns null when it must be ignored.
  */
-export function toOwnerEvent(msg, sentIds = new Set(), ownPhone = null) {
+export function toOwnerEvent(msg, sentIds = new Set(), ownPhone = null, lidToPn = null) {
   const key = msg?.key ?? {};
   if (!key.fromMe) return null;
   if (key.id && sentIds.has(key.id)) return null;
   const remote = key.remoteJid ?? "";
   if (!remote || remote.endsWith("@g.us") || remote.endsWith("@broadcast") || remote.endsWith("@newsletter")) return null;
-  const to = phoneFromJid(remote) ?? phoneFromJid(key.senderPn ?? "") ?? phoneFromJid(key.participantPn ?? "") ?? null;
+  // same rule as inbound messages: a LID-only chat is kept under the LID digits so the agent steps back there too
+  const to = phoneFromKey({ ...key, participant: undefined }, lidToPn) ?? lidFromJid(remote) ?? null;
   if (!to || (ownPhone && to === ownPhone)) return null;
   // protocol messages (reactions, deletes, edits, receipts) carry no text for the customer
   const m = msg.message ?? {};
@@ -142,7 +201,7 @@ export function wantsMediaData(type, mime, name) {
 /** MIME type of a Baileys message's media part (null when unknown). */
 export function messageMime(message) {
   if (!message || typeof message !== "object") return null;
-  const m = message.ephemeralMessage?.message ?? message.viewOnceMessage?.message ?? message.viewOnceMessageV2?.message ?? message;
+  const m = unwrapMessage(message) ?? message;
   for (const t of ["audioMessage", "imageMessage", "documentMessage"]) if (m[t]) return m[t].mimetype ?? null;
   return null;
 }

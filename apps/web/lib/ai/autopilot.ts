@@ -262,9 +262,10 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
     if (nk) return { replied: false, handoff: false, reason: `filtered:${nk}` };
   }
   let agent = agentRow;
-  // Facebook Messenger / Instagram: an agent created before these channels existed (or by the quick-create
-  // button) does not list them — the business's first enabled agent answers there too, and the channel is added to it
-  if (!agent && (channel === "messenger" || channel === "instagram")) {
+  // Facebook Messenger / Instagram / WhatsApp by QR or phone code: an agent created before these channels existed
+  // (or by the quick-create button, or ticked only for the official WhatsApp) does not list them — the business's
+  // first enabled agent answers there too, and the channel is added to it
+  if (!agent && ((channel === "messenger" || channel === "instagram") || channel === "whatsapp_qr")) {
     const { data: fallback } = await admin
       .from("ai_agents")
       .select("id, name, instructions, provider, model, temperature, language, handoff_rules, greeting, profile, lead_goal, autopilot_channels")
@@ -272,7 +273,8 @@ async function handleInboundWithAICore(input: { conversationId: string; messageI
       .eq("enabled", true)
       .order("created_at")
       .limit(10);
-    const pick = ((fallback ?? []) as { id: string; autopilot_channels?: string[] | null }[]).find((a) => (a.autopilot_channels ?? []).length > 0) ?? null;
+    const { pickAgentForChannel } = await import("./agent-channel-core");
+    const pick = pickAgentForChannel((fallback ?? []) as { id: string; autopilot_channels?: string[] | null }[], channel);
     if (pick) {
       agent = pick as unknown as NonNullable<typeof agentRow>;
       await admin

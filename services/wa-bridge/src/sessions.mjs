@@ -2,7 +2,7 @@
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import QRCode from "qrcode";
-import { RecentIds, attachMediaData, formatPairCode, jidFromPhone, pairPhone, splitBubbles, typingPauseMs, messageMime, newMessageId, phoneFromJid, sign, toInboundEvent, toOwnerEvent, validSessionId, wantsMediaData } from "./util.mjs";
+import { RecentIds, attachMediaData, formatPairCode, jidFromPhone, lidFromJid, pairPhone, phoneFromJid, phoneFromKey, splitBubbles, typingPauseMs, messageMime, newMessageId, sign, toInboundEvent, toOwnerEvent, validSessionId, wantsMediaData } from "./util.mjs";
 import { decodeVoice } from "./util.mjs"; // wave 22
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -70,12 +70,15 @@ export class SessionManager {
     const { makeWASocket, useMultiFileAuthState, Browsers, fetchLatestBaileysVersion } = this.baileys;
     const prev = this.sessions.get(id);
     const session = prev ?? { sock: null, status: "starting", qr: null, phone: null, name: null, callback, stopped: false, retries: 0, error: null };
+    session.saveId = id;
     session.status = "starting";
     session.callback = callback;
     session.sentIds = session.sentIds ?? new RecentIds(500);
     session.stopped = false;
     this.sessions.set(id, session);
 
+    // LID chats: the customer's reply address + the LID → phone numbers learned so far (survive restarts)
+    await this.loadJids(id, session);
     const { state, saveCreds } = await useMultiFileAuthState(this.dir(id));
     let version;
     try {
@@ -99,7 +102,19 @@ export class SessionManager {
       if (this.sessions.get(id)?.sock !== sock) return;
       this.onConnectionUpdate(id, u).catch((e) => this.log.error?.("connection.update failed", e?.message));
     });
+    // WhatsApp tells the phone number behind a LID in contact / mapping updates — remembered for later messages
+    for (const evName of ["contacts.upsert", "contacts.update", "chats.phoneNumberShare", "lid-mapping.update"]) {
+      sock.ev.on(evName, (payload) => {
+        try {
+          this.learnLidMappings(session, payload);
+        } catch {
+          /* best effort */
+        }
+      });
+    }
     sock.ev.on("messages.upsert", ({ messages, type }) => {
+      // learn LID → phone from every message key before anything else reads it
+      for (const m of messages ?? []) this.learnFromKey(session, m?.key);
       // wave 12: what the owner types himself on the phone → recorded, the agent steps back
       if (type === "notify" || type === "append") {
         for (const m of messages ?? []) {
@@ -107,7 +122,8 @@ export class SessionManager {
           const ts = Number(m.messageTimestamp ?? 0);
           if (ts && Date.now() / 1000 - ts > 300) continue; // history sync, not a live message
           setTimeout(() => {
-            const ev = toOwnerEvent(m, session.sentIds, session.phone);
+            const ev = toOwnerEvent(m, session.sentIds, session.phone, session.lidToPn);
+            if (ev) this.rememberReplyJid(id, session, ev.to, m.key?.remoteJid);
             // wave 21: when it was written (the app tells an automatic greeting from a person by the timing)
             if (ev) this.post(id, { ...ev, ts: ts || null }).catch(() => {});
           }, this.ownerDelayMs).unref?.();
@@ -115,8 +131,13 @@ export class SessionManager {
       }
       if (type !== "notify") return;
       for (const m of messages ?? []) {
-        const ev = toInboundEvent(m);
-        if (!ev) continue;
+        const ev = toInboundEvent(m, session.lidToPn);
+        if (!ev) {
+          // not silent any more: a dropped customer message used to look like "the agent does not answer"
+          if (m?.key && !m.key.fromMe && m.message && !/@(g\.us|broadcast|newsletter)$/.test(m.key.remoteJid ?? "")) this.log.debug?.("wa-bridge: inbound message ignored", m.key.remoteJid, Object.keys(m.message ?? {}).join(","));
+          continue;
+        }
+        this.rememberReplyJid(id, session, ev.from, m.key?.remoteJid);
         // wave 21: remember the customer's latest message → blue ticks when the agent answers
         session.lastIn = session.lastIn ?? new Map();
         session.lastIn.set(ev.from, m.key);
@@ -129,6 +150,78 @@ export class SessionManager {
       }
     });
     return session;
+  }
+
+  /* ---- LID support: where to reply, and which phone number a LID belongs to ---- */
+
+  async loadJids(id, session) {
+    session.jids = session.jids ?? new Map();
+    session.lidToPn = session.lidToPn ?? new Map();
+    try {
+      const saved = JSON.parse(await readFile(path.join(this.dir(id), "jids.json"), "utf8"));
+      for (const [d, j] of Object.entries(saved?.jids ?? {})) if (/^\d{5,20}$/.test(d) && typeof j === "string") session.jids.set(d, j);
+      for (const [l, p] of Object.entries(saved?.lidToPn ?? {})) if (/^\d{5,20}$/.test(l) && /^\d{6,20}$/.test(String(p))) session.lidToPn.set(l, String(p));
+    } catch {
+      /* first start */
+    }
+  }
+
+  saveJids(id, session) {
+    if (session.jidsTimer) return;
+    session.jidsTimer = setTimeout(() => {
+      session.jidsTimer = null;
+      const cap = (m) => Object.fromEntries([...m.entries()].slice(-3000));
+      mkdir(this.dir(id), { recursive: true })
+        .then(() => writeFile(path.join(this.dir(id), "jids.json"), JSON.stringify({ jids: cap(session.jids), lidToPn: cap(session.lidToPn) }), "utf8"))
+        .catch(() => {});
+    }, 2000);
+    session.jidsTimer.unref?.();
+  }
+
+  /** The reply address of a chat that is kept under LID digits (a phone-number chat needs no entry). */
+  rememberReplyJid(id, session, digits, remoteJid) {
+    if (!digits || !remoteJid || !lidFromJid(remoteJid) || lidFromJid(remoteJid) !== digits) return;
+    session.jids = session.jids ?? new Map();
+    if (session.jids.get(digits) === remoteJid) return;
+    session.jids.set(digits, remoteJid);
+    this.saveJids(id, session);
+  }
+
+  learnPair(session, lid, pn) {
+    const l = lidFromJid(lid ?? "") ?? (/^\d{5,20}$/.test(String(lid ?? "")) ? String(lid) : null);
+    const p = phoneFromJid(pn ?? "") ?? (/^\d{6,20}$/.test(String(pn ?? "")) ? String(pn) : null);
+    if (!l || !p) return;
+    session.lidToPn = session.lidToPn ?? new Map();
+    if (session.lidToPn.get(l) === p) return;
+    session.lidToPn.set(l, p);
+    if (session.lidToPn.size > 5000) session.lidToPn.delete(session.lidToPn.keys().next().value);
+    if (session.saveId) this.saveJids(session.saveId, session);
+  }
+
+  learnFromKey(session, key) {
+    if (!key) return;
+    const lid = lidFromJid(key.remoteJid ?? "") ?? lidFromJid(key.participant ?? "");
+    if (!lid) return;
+    const pn = phoneFromKey({ ...key, remoteJid: undefined, participant: undefined });
+    if (pn) this.learnPair(session, lid, pn);
+  }
+
+  learnLidMappings(session, payload) {
+    const list = Array.isArray(payload) ? payload : payload ? [payload] : [];
+    for (const c of list) {
+      if (!c || typeof c !== "object") continue;
+      // contacts: { id: "…@s.whatsapp.net", lid: "…@lid" } or { id: "…@lid", phoneNumber: "…@s.whatsapp.net" };
+      // mapping updates: { lid, pn }
+      const lid = c.lid ?? (lidFromJid(c.id ?? "") ? c.id : null);
+      const pn = c.pn ?? c.phoneNumber ?? (phoneFromJid(c.id ?? "") ? c.id : null);
+      if (lid && pn) this.learnPair(session, lid, pn);
+    }
+  }
+
+  /** Where a reply to `to` (digits) goes: a LID chat is answered at its LID, everything else at the phone number. */
+  replyJid(session, to) {
+    const digits = String(to ?? "").replace(/[^\d]/g, "");
+    return session?.jids?.get(digits) ?? jidFromPhone(digits);
   }
 
   async onConnectionUpdate(id, u) {
@@ -217,7 +310,7 @@ export class SessionManager {
     const s = this.sessions.get(id);
     if (!s || s.stopped) throw Object.assign(new Error("not_found"), { code: 404 });
     if (s.status !== "connected") throw Object.assign(new Error("not_connected"), { code: 409 });
-    const jid = jidFromPhone(to);
+    const jid = this.replyJid(s, to);
     if (!jid) throw Object.assign(new Error("invalid_recipient"), { code: 400 });
     const body = String(text ?? "").slice(0, 4000);
     const img = typeof image === "string" && /^https:\/\/\S+$/.test(image) ? image : null;
@@ -268,7 +361,7 @@ export class SessionManager {
     const s = this.sessions.get(id);
     if (!s || s.stopped) throw Object.assign(new Error("not_found"), { code: 404 });
     if (s.status !== "connected") throw Object.assign(new Error("not_connected"), { code: 409 });
-    const jid = jidFromPhone(to);
+    const jid = this.replyJid(s, to);
     if (!jid) throw Object.assign(new Error("invalid_recipient"), { code: 400 });
     const v = decodeVoice(audioB64, mime);
     if (!v) throw Object.assign(new Error("invalid_audio"), { code: 400 });
@@ -293,7 +386,7 @@ export class SessionManager {
   async typing(id, to, on = true) {
     const s = this.sessions.get(id);
     if (!s || s.stopped || s.status !== "connected") return false;
-    const jid = jidFromPhone(to);
+    const jid = this.replyJid(s, to);
     if (!jid || typeof s.sock?.sendPresenceUpdate !== "function") return false;
     try {
       await s.sock.sendPresenceUpdate(on ? "composing" : "paused", jid);
@@ -340,12 +433,18 @@ export class SessionManager {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const res = await this.fetch(s.callback, { method: "POST", headers: { "Content-Type": "application/json", ...sign(this.secret, body) }, body, signal: AbortSignal.timeout(15_000) });
-        if (res.ok || (res.status >= 400 && res.status < 500)) return;
-      } catch {
-        /* retry */
+        if (res.ok) return;
+        if (res.status >= 400 && res.status < 500) {
+          // the app refused it (bad signature / unknown token / wrong APP_URL) — the agent can never answer until this is fixed
+          this.log.error?.(`wa-bridge: the web app answered ${res.status} to a "${payload?.type}" callback (check WA_BRIDGE_SECRET and APP_URL)`);
+          return;
+        }
+      } catch (e) {
+        this.log.warn?.(`wa-bridge: callback "${payload?.type}" failed (attempt ${attempt + 1}): ${e?.message ?? e}`);
       }
       await wait(1000 * (attempt + 1));
     }
+    this.log.error?.(`wa-bridge: callback "${payload?.type}" was not delivered after 3 attempts`);
   }
 
   /** Re-opens every saved session after a restart / deploy. */
