@@ -171,7 +171,7 @@ export function advanceFlow(flow: Flow, state: FlowState | null, customerText: s
         // a question (or something that is clearly not an attempt at this field) is never "an invalid answer":
         // the flow pauses on the same step and the AI agent answers the customer like a person would
         const digits = customerText.replace(/\D/g, "").length;
-        const attempt = waiting.field === "phone" ? digits >= 5 : waiting.field === "email" ? customerText.includes("@") : false;
+        const attempt = waiting.field === "phone" ? digits >= 1 : waiting.field === "email" ? customerText.includes("@") : false;
         const retryKey = `_retry_${waiting.id}`;
         const tried = Number(data[retryKey] ?? 0);
         if (asked || !attempt || tried >= 1) {
