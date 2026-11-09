@@ -8,7 +8,7 @@ import { formatForChannel, type AutopilotChannel } from "./autopilot-core";
  * Wave 16 — runs the business's conversation flows before the free AI.
  * handled=true → the flow answered (or handed off); false → the AI answers.
  */
-export async function runConversationFlow(input: { orgId: string; conversationId: string; agentId: string; contactId: string | null; channel: AutopilotChannel; text: string; locale: string }): Promise<{ handled: boolean; handoff: boolean; text?: string }> {
+export async function runConversationFlow(input: { orgId: string; conversationId: string; agentId: string; contactId: string | null; channel: AutopilotChannel; text: string; locale: string }): Promise<{ handled: boolean; handoff: boolean; text?: string; aiHint?: string }> {
   const admin = createAdminClient();
   const { data: flowRows, error } = await admin
     .from("agent_flows")
@@ -64,6 +64,14 @@ export async function runConversationFlow(input: { orgId: string; conversationId
     await admin.from("notes").insert({ organization_id: input.orgId, contact_id: input.contactId, body: `🧭 ${flow.name}\n${lines}`.slice(0, 10000) });
   }
   if (res.handoff) await admin.rpc("ai_handoff", { p_conv: input.conversationId, p_reason: "flow" });
-  if (res.toAI && !res.messages.length) return { handled: false, handoff: false };
+  if (res.toAI && !res.messages.length) {
+    // the flow paused on its current step because the customer asked something: the AI answers it like a person,
+    // and only then (if it fits) goes back to what the step wanted to know
+    const waiting = res.state ? flow.nodes.find((n) => n.id === res.state!.node_id) : undefined;
+    const aiHint = waiting?.text
+      ? `A short scripted intake is paused on this step: "${waiting.text.slice(0, 200)}". The customer just wrote something else — answer THEIR message first, directly and concretely (never ignore it, never repeat the same scripted question word for word). Only after answering, if it fits naturally, return to that step in one short sentence.`
+      : undefined;
+    return { handled: false, handoff: false, aiHint };
+  }
   return { handled: res.messages.length > 0 || res.handoff, handoff: res.handoff, text: last };
 }

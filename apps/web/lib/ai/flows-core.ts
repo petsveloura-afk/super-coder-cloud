@@ -81,6 +81,22 @@ export function validFlowNodes(raw: unknown): FlowNode[] {
   return out;
 }
 
+/**
+ * The customer is ASKING something (price, how it works, "did you read my question?") — not answering the
+ * flow's step. A scripted step must never swallow such a message: the AI agent answers it first.
+ */
+export function looksLikeQuestion(text: string): boolean {
+  const t = norm(text).replace(/[!.,]+$/g, "");
+  if (!t) return false;
+  if (/[?？؟]/.test(t)) return true;
+  if (/^(כמה|מה|מי|איך|למה|מדוע|איפה|היכן|האם|אפשר|אפשרי|יש לכם|יש לך|אתם|את |אתה |תענה|תעני|תסביר|תגיד|תספר|שאלתי|ענה|עני)(\s|$)/.test(t)) return true;
+  if (/(כמה (זה )?עולה|כמה עולה|מה המחיר|מחיר|עלות|תמחור|מה כולל|מה ההבדל)/.test(t)) return true;
+  if (/^(how|what|why|when|where|who|which|can|could|do|does|is|are|will|would|price|cost)\b/.test(t)) return true;
+  if (/(how much|what.?s the price|how long)/.test(t)) return true;
+  if (/^(كم|ما|ماذا|كيف|لماذا|متى|أين|هل)(\s|$)/.test(t)) return true;
+  return false;
+}
+
 /** Which flow (if any) starts on this customer message. */
 export function pickFlow(flows: Flow[], text: string, isFirstMessage: boolean): Flow | null {
   const t = norm(text);
@@ -88,9 +104,13 @@ export function pickFlow(flows: Flow[], text: string, isFirstMessage: boolean): 
     if (!f.enabled || !f.nodes.length) continue;
     if (f.trigger_keywords.some((k) => k.trim() && t.includes(norm(k)))) return f;
   }
-  if (isFirstMessage) return flows.find((f) => f.enabled && f.nodes.length && f.on_first_message) ?? null;
+  // a customer whose very first message is a question gets an ANSWER first (the AI agent), not a questionnaire
+  if (isFirstMessage && !looksLikeQuestion(text)) return flows.find((f) => f.enabled && f.nodes.length && f.on_first_message) ?? null;
   return null;
 }
+
+/** internal bookkeeping keys (retry counters) never leave the engine */
+const publicData = (d: Record<string, string>): Record<string, string> => Object.fromEntries(Object.entries(d).filter(([k]) => !k.startsWith("_")));
 
 export function validateAnswer(field: string | undefined, answer: string): string | null {
   const a = answer.trim();
@@ -145,8 +165,21 @@ export function advanceFlow(flow: Flow, state: FlowState | null, customerText: s
       data = { ...data, [`choice_${waiting.id}`]: choice.label };
       cur = choice.next ? byId.get(choice.next) : waiting.next ? byId.get(waiting.next) : undefined;
     } else if (waiting.type === "collect") {
-      const v = validateAnswer(waiting.field, customerText);
+      const asked = looksLikeQuestion(customerText);
+      const v = asked && waiting.field !== "name" ? null : validateAnswer(waiting.field, customerText);
       if (!v) {
+        // a question (or something that is clearly not an attempt at this field) is never "an invalid answer":
+        // the flow pauses on the same step and the AI agent answers the customer like a person would
+        const digits = customerText.replace(/\D/g, "").length;
+        const attempt = waiting.field === "phone" ? digits >= 5 : waiting.field === "email" ? customerText.includes("@") : false;
+        const retryKey = `_retry_${waiting.id}`;
+        const tried = Number(data[retryKey] ?? 0);
+        if (asked || !attempt || tried >= 1) {
+          out.toAI = true;
+          out.state = { ...state, data };
+          return out;
+        }
+        data = { ...data, [retryKey]: String(tried + 1) };
         out.invalid = true;
         out.messages.push({ text: retryText(waiting.field, locale) });
         out.state = { ...state, data };
@@ -185,23 +218,23 @@ export function advanceFlow(flow: Flow, state: FlowState | null, customerText: s
       if (text) out.messages.push({ text });
       out.handoff = true;
       out.finished = true;
-      out.collected = { ...data, ...out.collected };
+      out.collected = { ...publicData(data), ...out.collected };
       return out;
     }
     if (cur.type === "ai") {
       if (text) out.messages.push({ text });
       out.toAI = !text;
       out.finished = true;
-      out.collected = { ...data, ...out.collected };
+      out.collected = { ...publicData(data), ...out.collected };
       return out;
     }
     // end
     if (text) out.messages.push({ text });
     out.finished = true;
-    out.collected = { ...data, ...out.collected };
+    out.collected = { ...publicData(data), ...out.collected };
     return out;
   }
   out.finished = true;
-  out.collected = { ...data, ...out.collected };
+  out.collected = { ...publicData(data), ...out.collected };
   return out;
 }

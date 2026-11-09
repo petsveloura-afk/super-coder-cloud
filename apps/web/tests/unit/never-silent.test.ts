@@ -20,19 +20,19 @@ describe("the agent never goes silent on a customer", () => {
     expect(technicalPauseExtended("customer_asked")).toBe(false);
   });
 
-  it("an AGENT hand-over that nobody from the team answered comes back to the agent after the waiting time", () => {
+  it("an AGENT hand-over stays with the person by default; it comes back only when the business chose a time", () => {
     const base = { ownerTakeoverAt: null, teamAnsweredSince: false, now };
-    expect(unattendedResume({ ...base, note: "guardrail_price", handoffAt: ago(DEFAULT_UNATTENDED_RESUME_MINUTES + 1) })).toBe(true);
-    expect(unattendedResume({ ...base, note: "agent", handoffAt: ago(20) })).toBe(true);
-    expect(unattendedResume({ ...base, note: "customer_asked", handoffAt: ago(20) })).toBe(true);
-    expect(unattendedResume({ ...base, note: "angry_customer", handoffAt: ago(20) })).toBe(true);
-    // too early
-    expect(unattendedResume({ ...base, note: "guardrail_price", handoffAt: ago(5) })).toBe(false);
+    expect(DEFAULT_UNATTENDED_RESUME_MINUTES).toBe(0);
+    for (const note of ["guardrail_price", "agent", "customer_asked", "angry_customer", "flow"]) {
+      expect(unattendedResume({ ...base, note, handoffAt: ago(600) }), note).toBe(false);
+      expect(unattendedResume({ ...base, note, handoffAt: ago(20), minutes: 15 }), note).toBe(true);
+      expect(unattendedResume({ ...base, note, handoffAt: ago(5), minutes: 15 }), note).toBe(false); // too early
+    }
   });
 
   it("never when a person answered, the owner took over, a legal threat, a forbidden phrase or no AI credits", () => {
     const base = { now, handoffAt: ago(120) };
-    expect(unattendedResume({ ...base, note: "agent", ownerTakeoverAt: null, teamAnsweredSince: true })).toBe(false);
+    expect(unattendedResume({ ...base, minutes: 15, note: "agent", ownerTakeoverAt: null, teamAnsweredSince: true })).toBe(false);
     expect(unattendedResume({ ...base, note: "owner_typed", ownerTakeoverAt: ago(120), teamAnsweredSince: false })).toBe(false);
     expect(unattendedResume({ ...base, note: "critical:legal_or_threat", ownerTakeoverAt: null, teamAnsweredSince: false })).toBe(false);
     expect(unattendedResume({ ...base, note: "guardrail_banned", ownerTakeoverAt: null, teamAnsweredSince: false })).toBe(false);
@@ -45,8 +45,8 @@ describe("the agent never goes silent on a customer", () => {
     expect(unattendedResume({ ...base, note: "agent", handoffAt: ago(600), minutes: 0 })).toBe(false);
     expect(unattendedResume({ ...base, note: "agent", handoffAt: ago(45), minutes: 60 })).toBe(false);
     expect(unattendedResume({ ...base, note: "agent", handoffAt: ago(61), minutes: 60 })).toBe(true);
-    expect(unattendedResume({ ...base, note: "ai_budget", handoffAt: ago(60) })).toBe(false);
-    expect(unattendedResume({ ...base, note: "ai_budget", handoffAt: ago(13 * 60) })).toBe(true);
+    expect(unattendedResume({ ...base, note: "ai_budget", handoffAt: ago(60), minutes: 15 })).toBe(false);
+    expect(unattendedResume({ ...base, note: "ai_budget", handoffAt: ago(13 * 60), minutes: 15 })).toBe(true);
   });
 
   it("hold / hand-over messages are never a real answer; the agent is told it took the chat back", () => {

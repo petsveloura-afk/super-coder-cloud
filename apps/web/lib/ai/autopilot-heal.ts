@@ -40,8 +40,13 @@ export function technicalPauseExtended(note: string | null | undefined): boolean
   return technicalPause(n) || n === "stuck_no_answer" || n === "agent_timeout" || n === "guardrail_unready";
 }
 
-/** default minutes of team silence after an AGENT hand-over before the agent answers again (agent profile can change it; 0 = never) */
-export const DEFAULT_UNATTENDED_RESUME_MINUTES = 15;
+/**
+ * minutes of team silence after an AGENT hand-over before the agent answers again — 0 = never by default: a conversation
+ * that was passed to a person (the customer asked for one, a flow / guardrail handed it over) stays with the person until
+ * "return to agent" is pressed. The agent's profile (unattended_resume_minutes) can opt in to a time; technical hiccups
+ * still return by themselves (technicalPauseExtended).
+ */
+export const DEFAULT_UNATTENDED_RESUME_MINUTES = 0;
 
 export interface UnattendedInput {
   /** conversations.ai_note — the hand-over reason */
