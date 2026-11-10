@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { publicBase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
   const doc = sp.get("doc") ?? "";
   const orderId = sp.get("token") ?? "";
   const locale = ["he", "ar", "en"].includes(sp.get("locale") ?? "") ? (sp.get("locale") as string) : "he";
-  const back = (q: string) => NextResponse.redirect(new URL(`/${locale}/q/${doc}${q}`, request.url), 303);
+  const back = (q: string) => NextResponse.redirect(new URL(`/${locale}/q/${doc}${q}`, publicBase(request)), 303);
   if (!/^[a-f0-9]{32}$/.test(doc) || !/^[A-Z0-9]{8,40}$/.test(orderId)) return back("");
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return back("?paid=0");
   const { createAdminClient } = await import("@/lib/supabase/admin");

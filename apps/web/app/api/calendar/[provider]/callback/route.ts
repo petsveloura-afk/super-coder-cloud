@@ -4,6 +4,7 @@ import { getOrgContext } from "@/lib/auth";
 import { isLocale } from "@/lib/i18n/config";
 import { exchangeCalendarCode, type CalProvider } from "@/lib/calendar/sync";
 import { encryptionReady, sealSecrets } from "@/lib/channels/secrets";
+import { publicBase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const cookie = request.cookies.get("scc_oauth_cal")?.value ?? "";
   const [state = "", cp = "", cl = "", orgId = ""] = cookie.split(".");
   const locale = isLocale(cl) ? cl : "he";
-  const back = new URL(`/${locale}/settings`, request.url);
+  const back = new URL(`/${locale}/settings`, publicBase(request));
   const done = (status: string, detail?: string) => {
     back.searchParams.set("calendar", status);
     if (detail) back.searchParams.set("detail", detail.slice(0, 160));

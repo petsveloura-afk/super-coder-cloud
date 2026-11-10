@@ -7,6 +7,7 @@ import { detectMailServers, presetFor } from "@/lib/channels/email-core";
 import { verifyMailbox } from "@/lib/channels/email";
 import { saveMailbox } from "@/lib/channels/mailbox-save";
 import { encryptionReady } from "@/lib/channels/secrets";
+import { publicBase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const cookie = request.cookies.get("scc_oauth_mail")?.value ?? "";
   const [state = "", cp = "", cl = "", orgId = ""] = cookie.split(".");
   const locale = isLocale(cl) ? cl : "he";
-  const back = new URL(`/${locale}/integrations`, request.url);
+  const back = new URL(`/${locale}/integrations`, publicBase(request));
   const done = (status: string, detail?: string) => {
     back.searchParams.set("mail", status);
     if (detail) back.searchParams.set("detail", detail.slice(0, 160));

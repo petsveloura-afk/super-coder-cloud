@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isSupabaseConfigured, publicBase } from "@/lib/env";
 import { LOCALE_COOKIE, firstVisitLocale, isLocale } from "@/lib/i18n/config";
 import { updateSession } from "@/lib/supabase/proxy-session";
 import { isProbePath } from "@/lib/security/probe-core";
@@ -77,8 +77,7 @@ export async function proxy(request: NextRequest) {
   if (!isLocale(first)) {
     const cookieLocale = request.cookies.get(LOCALE_COOKIE)?.value;
     const locale = isLocale(cookieLocale) ? cookieLocale : firstVisitLocale(request.headers.get("accept-language"));
-    const url = request.nextUrl.clone();
-    url.pathname = `/${locale}${pathname === "/" ? "" : pathname}`;
+    const url = new URL(`/${locale}${pathname === "/" ? "" : pathname}`, publicBase(request));
     url.search = search;
     return NextResponse.redirect(url);
   }
@@ -91,7 +90,7 @@ export async function proxy(request: NextRequest) {
   // 2) Without Supabase configuration, route everything to the setup screen.
   if (!isSupabaseConfigured()) {
     if (subPath !== "/setup" && subPath !== "/offline") {
-      return NextResponse.redirect(new URL(`/${locale}/setup`, request.url));
+      return NextResponse.redirect(new URL(`/${locale}/setup`, publicBase(request)));
     }
     return response;
   }
@@ -103,18 +102,18 @@ export async function proxy(request: NextRequest) {
 
   const isPublic = PUBLIC_PATHS.some((p) => subPath === p || subPath.startsWith(`${p}/`));
   if (!session.user && !isPublic) {
-    const url = new URL(`/${locale}/login`, request.url);
+    const url = new URL(`/${locale}/login`, publicBase(request));
     if (subPath !== "/") url.searchParams.set("next", `/${locale}${subPath === "/" ? "" : subPath}${search}`);
     return NextResponse.redirect(url);
   }
   // spec I1: second sign-in step for accounts with an authenticator app
   if (session.user && session.needsMfa && !isPublic && subPath !== "/mfa") {
-    const url = new URL(`/${locale}/mfa`, request.url);
+    const url = new URL(`/${locale}/mfa`, publicBase(request));
     url.searchParams.set("next", `/${locale}${subPath === "/" ? "" : subPath}${search}`);
     return NextResponse.redirect(url);
   }
   if (session.user && (subPath === "/login" || subPath === "/signup")) {
-    return NextResponse.redirect(new URL(`/${locale}/overview`, request.url));
+    return NextResponse.redirect(new URL(`/${locale}/overview`, publicBase(request)));
   }
   return response;
 }

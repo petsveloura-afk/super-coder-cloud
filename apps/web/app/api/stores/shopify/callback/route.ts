@@ -5,6 +5,7 @@ import { isLocale } from "@/lib/i18n/config";
 import { validShopDomain, verifyShopifyQuery } from "@/lib/stores/core";
 import { missingScopes, shopifyBackfill, shopifyExchange, shopifyRegisterWebhooks } from "@/lib/stores/shopify";
 import { encryptionReady } from "@/lib/channels/secrets";
+import { publicBase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
   const cookie = request.cookies.get("scc_shopify")?.value ?? "";
   const [state = "", cl = "", orgId = "", cookieShop = ""] = cookie.split(".").length >= 4 ? [cookie.split(".")[0], cookie.split(".")[1], cookie.split(".")[2], cookie.split(".").slice(3).join(".")] : [];
   const locale = isLocale(cl) ? cl : "he";
-  const back = new URL(`/${locale}/integrations`, request.url);
+  const back = new URL(`/${locale}/integrations`, publicBase(request));
   back.hash = "stores";
   const done = (status: string, detail?: string) => {
     back.searchParams.set("store", status);

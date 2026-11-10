@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { getOrgContext } from "@/lib/auth";
 import { isLocale } from "@/lib/i18n/config";
-import { publicEnv } from "@/lib/env";
+import { publicEnv, publicBase } from "@/lib/env";
 import { graphVersion } from "@/lib/channels/meta";
 import { explainOwnAppError, ownOAuthUrl, ownRedirectUri } from "@/lib/channels/meta-own-core";
 
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   const [state = "", cl = "", orgId = ""] = cookie.split(".");
   const l = sp.get("locale") ?? cl;
   const locale = isLocale(l) ? l : "he";
-  const back = new URL(`/${locale}/integrations`, request.url);
+  const back = new URL(`/${locale}/integrations`, publicBase(request));
   back.hash = "meta-alt";
   const redirectUri = ownRedirectUri(publicEnv.appUrl);
   const finish = (status: string, detail?: string, extra?: (res: NextResponse) => void) => {

@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { getOrgContext } from "@/lib/auth";
 import { isLocale } from "@/lib/i18n/config";
 import { authorizeUrl, mailOAuthConfigured, type MailOAuthProvider } from "@/lib/channels/oauth-mail";
+import { publicBase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const locale = isLocale(l) ? l : "he";
   if (provider !== "google" && provider !== "microsoft") return NextResponse.json({ error: "not_found" }, { status: 404 });
   const p = provider as MailOAuthProvider;
-  const back = new URL(`/${locale}/integrations`, request.url);
+  const back = new URL(`/${locale}/integrations`, publicBase(request));
   if (!mailOAuthConfigured(p)) {
     back.searchParams.set("mail", "not_configured");
     return NextResponse.redirect(back);

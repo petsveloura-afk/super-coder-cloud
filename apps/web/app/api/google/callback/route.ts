@@ -4,6 +4,7 @@ import { getOrgContext } from "@/lib/auth";
 import { isLocale } from "@/lib/i18n/config";
 import { encryptionReady, sealSecrets } from "@/lib/channels/secrets";
 import { googleExchange, grantedAreas } from "@/lib/google/connect";
+import { publicBase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
   const cookie = request.cookies.get("scc_google")?.value ?? "";
   const [state = "", cl = "", orgId = ""] = cookie.split(".");
   const locale = isLocale(cl) ? cl : "he";
-  const back = new URL(`/${locale}/integrations`, request.url);
+  const back = new URL(`/${locale}/integrations`, publicBase(request));
   back.hash = "google";
   const done = (status: string, detail?: string) => {
     back.searchParams.set("google", status);

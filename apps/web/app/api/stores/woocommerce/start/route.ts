@@ -6,6 +6,7 @@ import { hookHash, storeOrigin } from "@/lib/stores/core";
 import { wooAuthorizeUrl } from "@/lib/stores/woocommerce";
 import { assertPublicHttpsUrl } from "@/lib/net/safe-url";
 import { encryptionReady } from "@/lib/channels/secrets";
+import { publicBase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const l = request.nextUrl.searchParams.get("locale");
   const locale = isLocale(l) ? l : "he";
-  const back = new URL(`/${locale}/integrations`, request.url);
+  const back = new URL(`/${locale}/integrations`, publicBase(request));
   back.hash = "stores";
   const fail = (status: string) => {
     back.searchParams.set("store", status);

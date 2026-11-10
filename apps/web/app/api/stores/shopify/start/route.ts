@@ -5,6 +5,7 @@ import { isLocale } from "@/lib/i18n/config";
 import { validShopDomain } from "@/lib/stores/core";
 import { resolveShop } from "@/lib/stores/resolve";
 import { shopifyAuthorizeUrl, shopifyConfigured } from "@/lib/stores/shopify";
+import { publicBase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const l = request.nextUrl.searchParams.get("locale");
   const locale = isLocale(l) ? l : "he";
-  const back = new URL(`/${locale}/integrations`, request.url);
+  const back = new URL(`/${locale}/integrations`, publicBase(request));
   back.hash = "stores";
   const typed = request.nextUrl.searchParams.get("shop");
   if (!shopifyConfigured()) {

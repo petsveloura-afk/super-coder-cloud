@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { safeRedirectPath } from "@/lib/env";
+import { safeRedirectPath, publicBase } from "@/lib/env";
 import { DEFAULT_LOCALE } from "@/lib/i18n/config";
 
 /**
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
   if (!ok) {
     const locale = next.split("/")[1] || DEFAULT_LOCALE;
-    return NextResponse.redirect(new URL(`/${locale}/login?error=link`, request.url));
+    return NextResponse.redirect(new URL(`/${locale}/login?error=link`, publicBase(request)));
   }
-  return NextResponse.redirect(new URL(next, request.url));
+  return NextResponse.redirect(new URL(next, publicBase(request)));
 }

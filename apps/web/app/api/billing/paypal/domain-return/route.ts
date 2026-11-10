@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isLocale } from "@/lib/i18n/config";
 import { paypalConfigured } from "@/lib/billing/paypal";
+import { publicBase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
   const l = request.nextUrl.searchParams.get("locale");
   const locale = isLocale(l) ? l : "he";
   const site = request.nextUrl.searchParams.get("site") ?? "";
-  const back = new URL(/^[0-9a-f-]{36}$/.test(site) ? `/${locale}/websites/${site}` : `/${locale}/websites`, request.url);
+  const back = new URL(/^[0-9a-f-]{36}$/.test(site) ? `/${locale}/websites/${site}` : `/${locale}/websites`, publicBase(request));
   const id = request.nextUrl.searchParams.get("token") ?? "";
   if (!paypalConfigured() || !/^[A-Z0-9]{8,40}$/.test(id)) {
     back.searchParams.set("domain", "error");

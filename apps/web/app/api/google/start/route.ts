@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { getOrgContext } from "@/lib/auth";
 import { isLocale } from "@/lib/i18n/config";
 import { googleAuthorizeUrl, googleConfigured, type GoogleArea } from "@/lib/google/connect";
+import { publicBase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const l = request.nextUrl.searchParams.get("locale");
   const locale = isLocale(l) ? l : "he";
-  const back = new URL(`/${locale}/integrations`, request.url);
+  const back = new URL(`/${locale}/integrations`, publicBase(request));
   back.hash = "google";
   if (!googleConfigured()) {
     back.searchParams.set("google", "not_configured");

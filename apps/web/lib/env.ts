@@ -27,3 +27,26 @@ export function safeRedirectPath(value: string | null | undefined, fallback: str
   if (!value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return fallback;
   return value;
 }
+
+const LOCAL_HOST = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/i;
+
+/**
+ * Base URL for building redirects. Behind Railway's proxy, `request.url` can be the
+ * container's internal address (http://localhost:8080), which sends users to a dead link.
+ * If the request looks internal, fall back to the public NEXT_PUBLIC_APP_URL; otherwise keep
+ * the request's own origin (so custom domains keep working).
+ */
+export function publicBase(request: { url: string }): string {
+  try {
+    if (!LOCAL_HOST.test(new URL(request.url).hostname)) return request.url;
+  } catch {
+    /* fall through */
+  }
+  const app = process.env.NEXT_PUBLIC_APP_URL;
+  try {
+    if (app && !LOCAL_HOST.test(new URL(app).hostname)) return app;
+  } catch {
+    /* fall through */
+  }
+  return request.url;
+}

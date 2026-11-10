@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { getOrgContext } from "@/lib/auth";
 import { isLocale } from "@/lib/i18n/config";
-import { publicEnv } from "@/lib/env";
+import { publicEnv, publicBase } from "@/lib/env";
 import { metaPagesPublicConfig } from "@/lib/channels/meta-pages";
 import { metaPublicConfig } from "@/lib/channels/meta";
 
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   const isWa = (sp.get("kind") ?? ck) === "wa";
   const l = sp.get("locale") ?? cl;
   const locale = isLocale(l) ? l : "he";
-  const back = new URL(`/${locale}/integrations`, request.url);
+  const back = new URL(`/${locale}/integrations`, publicBase(request));
   back.hash = "marketplace";
   const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
   const finish = async (status: string, detail?: string, extra?: (res: NextResponse) => void) => {

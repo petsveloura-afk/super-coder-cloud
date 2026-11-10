@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { getOrgContext } from "@/lib/auth";
 import { isLocale } from "@/lib/i18n/config";
 import { calendarAuthorizeUrl, calendarConfigured, type CalProvider } from "@/lib/calendar/sync";
+import { publicBase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const l = request.nextUrl.searchParams.get("locale");
   const locale = isLocale(l) ? l : "he";
   if (provider !== "google" && provider !== "microsoft") return NextResponse.json({ error: "not_found" }, { status: 404 });
-  const back = new URL(`/${locale}/settings#calendar`, request.url);
+  const back = new URL(`/${locale}/settings#calendar`, publicBase(request));
   if (!calendarConfigured(provider as CalProvider)) {
     back.searchParams.set("calendar", "not_configured");
     return NextResponse.redirect(back);

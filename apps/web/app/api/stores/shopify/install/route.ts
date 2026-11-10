@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { validShopDomain, verifyShopifyQuery } from "@/lib/stores/core";
 import { shopifyConfigured } from "@/lib/stores/shopify";
 import { createClient } from "@/lib/supabase/server";
+import { publicBase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
   const shop = validShopDomain(sp.get("shop"));
-  const home = new URL("/he/integrations", request.url);
+  const home = new URL("/he/integrations", publicBase(request));
   home.hash = "stores";
   if (!shop || !shopifyConfigured()) return NextResponse.redirect(home);
   const ts = Number(sp.get("timestamp") ?? 0);
@@ -24,6 +25,6 @@ export async function GET(request: NextRequest) {
   const connect = `/he/connect/shopify?shop=${encodeURIComponent(shop)}`;
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
-  if (!data.user) return NextResponse.redirect(new URL(`/he/login?next=${encodeURIComponent(connect)}`, request.url));
-  return NextResponse.redirect(new URL(connect, request.url));
+  if (!data.user) return NextResponse.redirect(new URL(`/he/login?next=${encodeURIComponent(connect)}`, publicBase(request)));
+  return NextResponse.redirect(new URL(connect, publicBase(request)));
 }
