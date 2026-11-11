@@ -12,6 +12,22 @@ import { decodeVoice } from "./util.mjs"; // wave 22
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Rejects with Error(label) when the promise takes longer than ms (timer is always cleaned up). */
+async function withTimeout(promise, ms, label) {
+  let t;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, rej) => {
+        t = setTimeout(() => rej(new Error(label)), ms);
+        t.unref?.();
+      }),
+    ]);
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 /** Converts a GramJS NewMessage event to the bridge callback payload (null = ignore). */
 export async function toTelegramUserEvent(event) {
   const m = event?.message;
@@ -104,10 +120,11 @@ export class TelegramUserManager {
    * @param {{apiId:number, apiHash:string}|null} o.api
    * @param {object} o.lib  { TelegramClient, StringSession, NewMessage, Api, bigInt }
    */
-  constructor({ dataDir, secret, api, lib, fetchImpl = fetch, logger = console, ownerDelayMs = 1500, authRetryMs = 2500, postRetryMs = 1000 }) {
+  constructor({ dataDir, secret, api, lib, fetchImpl = fetch, logger = console, ownerDelayMs = 1500, authRetryMs = 2500, postRetryMs = 1000, connectTimeoutMs = 20_000 }) {
     this.ownerDelayMs = ownerDelayMs;
     this.authRetryMs = authRetryMs; // wave 62: pause between authorization re-checks at start-up
     this.postRetryMs = postRetryMs; // wave 62: base back-off for delivering a message to the web app
+    this.connectTimeoutMs = connectTimeoutMs; // a first-time connect that hangs fails loudly instead of silently waiting
     this.watchdogTimer = null;
     this.dataDir = dataDir;
     this.secret = secret;
@@ -140,18 +157,22 @@ export class TelegramUserManager {
     }
   }
 
-  async start(id, callback, { waitMs = 8000 } = {}) {
+  async start(id, callback, { waitMs = 25_000 } = {}) {
     if (!validSessionId(id)) throw Object.assign(new Error("invalid_id"), { code: 400 });
     if (!this.configured()) throw Object.assign(new Error("tg_not_configured"), { code: 503 });
+    const begin = Date.now();
     await mkdir(this.dir(id), { recursive: true });
     await writeFile(path.join(this.dir(id), "meta.json"), JSON.stringify({ callback }), "utf8");
     const existing = this.sessions.get(id);
-    if (existing && !existing.stopped && ["connected", "qr", "password", "starting"].includes(existing.status)) {
+    // a session stuck in "starting" for too long is not reused: it is rebuilt from scratch
+    const stuck = existing?.status === "starting" && Date.now() - (existing.startedAt ?? 0) > 60_000;
+    if (existing && !existing.stopped && !stuck && ["connected", "qr", "password", "starting"].includes(existing.status)) {
       existing.callback = callback;
       return this.status(id);
     }
     await this.connect(id, callback);
-    const until = Date.now() + waitMs;
+    // waitMs counts from the beginning of start() (connect included), with at least 5 s left to wait for the QR
+    const until = Math.max(begin + waitMs, Date.now() + 5_000);
     while (Date.now() < until) {
       const st = this.sessions.get(id)?.status;
       if (st && st !== "starting") break;
@@ -165,6 +186,7 @@ export class TelegramUserManager {
     const saved = (await this.readFileSafe(path.join(this.dir(id), "session.txt"))) ?? "";
     const s = this.sessions.get(id) ?? { status: "starting", qr: null, phone: null, name: null, username: null, hint: null, error: null, callback, stopped: false, client: null, pw: null, peers: {} };
     s.status = "starting";
+    s.startedAt = Date.now();
     s.callback = callback;
     s.stopped = false;
     try {
@@ -183,10 +205,19 @@ export class TelegramUserManager {
     const client = new TelegramClient(new StringSession(saved), this.api.apiId, this.api.apiHash, { connectionRetries: 10, retryDelay: 2000, autoReconnect: true });
     s.client = client;
     try {
-      await client.connect();
+      await withTimeout(client.connect(), this.connectTimeoutMs, "connect_timeout");
     } catch (e) {
       // a saved session must survive a network hiccup: keep it and let the watchdog reconnect
-      if (!saved) throw e;
+      if (!saved) {
+        s.status = "error";
+        s.error = e?.message ?? "connect_failed";
+        this.log.error?.(`telegram user ${id}: first connect failed`, s.error);
+        // do not leave a half-open client retrying in the background; the next attempt builds a fresh one
+        s.client = null;
+        await client.disconnect?.().catch?.(() => {});
+        await client.destroy?.().catch?.(() => {});
+        throw e;
+      }
       s.status = "reconnecting";
       s.error = e?.message ?? "connect_failed";
       this.log.error?.(`telegram user ${id}: connect failed, will retry`, s.error);
@@ -224,8 +255,14 @@ export class TelegramUserManager {
           qrCode: async ({ token }) => {
             // wave 25: once the account asked for its 2FA password, a refreshed QR token must not overwrite that state
             if (s.status === "password") return;
-            s.status = "qr";
-            s.qr = await QRCode.toDataURL(`tg://login?token=${Buffer.from(token).toString("base64url")}`, { margin: 1, width: 320 });
+            try {
+              s.qr = await QRCode.toDataURL(`tg://login?token=${Buffer.from(token).toString("base64url")}`, { margin: 1, width: 320 });
+              s.status = "qr";
+              s.error = null;
+            } catch (e) {
+              s.error = e?.message ?? "qr_render_failed";
+              this.log.error?.(`telegram user ${id}: could not render the QR`, s.error);
+            }
           },
           password: async (hint) => {
             s.status = "password";
@@ -234,7 +271,9 @@ export class TelegramUserManager {
           },
           onError: async (err) => {
             s.error = err?.message ?? "login_error";
+            this.log.error?.(`telegram user ${id}: QR login error`, s.error);
             if (/PASSWORD_HASH_INVALID/.test(s.error)) s.status = "password";
+            await wait(1000); // no tight error loop while Telegram is unreachable
             return false; // keep trying (new QR tokens)
           },
         },
@@ -243,6 +282,7 @@ export class TelegramUserManager {
       .catch((e) => {
         s.status = "error";
         s.error = e?.message ?? "login_failed";
+        this.log.error?.(`telegram user ${id}: QR login failed`, s.error);
       });
     return s;
   }
