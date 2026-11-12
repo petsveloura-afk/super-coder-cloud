@@ -26,6 +26,18 @@ export interface AppWebhookIssue {
   fixable: boolean;
 }
 
+/** true when `current` is the same path as `expected` on another https host, and `expected` itself is a public https address */
+export function ownPathOnOldAddress(current: string, expected: string): boolean {
+  try {
+    const a = new URL(current);
+    const b = new URL(expected);
+    if (b.protocol !== "https:" || /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(b.hostname) || b.hostname.endsWith(".internal")) return false;
+    return a.host !== b.host && a.pathname.replace(/\/$/, "") === b.pathname.replace(/\/$/, "");
+  } catch {
+    return false;
+  }
+}
+
 export function evaluateAppSubscriptions(json: unknown, expectedCallback: string): AppWebhookIssue[] {
   const list = (json as RawSubs | null)?.data ?? [];
   const issues: AppWebhookIssue[] = [];
@@ -40,7 +52,9 @@ export function evaluateAppSubscriptions(json: unknown, expectedCallback: string
     const lacking = CRITICAL_FIELDS[object].filter((f) => !have.has(f));
     if (lacking.length) issues.push({ object, kind: "fields", detail: `the "${object}" webhook lacks: ${lacking.join(", ")}`, fixable: true });
     if (sub.callback_url && expectedCallback && sub.callback_url.replace(/\/$/, "") !== expectedCallback.replace(/\/$/, "")) {
-      issues.push({ object, kind: "callback", detail: `the "${object}" webhook points to ${sub.callback_url} (this site is ${expectedCallback})`, fixable: false });
+      // the app moved (Vercel → Railway, a new domain): a callback that is OUR OWN path on the old address is safe to re-point;
+      // any other address (staging, another system) is only reported, as before
+      issues.push({ object, kind: "callback", detail: `the "${object}" webhook points to ${sub.callback_url} (this site is ${expectedCallback})`, fixable: ownPathOnOldAddress(sub.callback_url, expectedCallback) });
     }
   }
   return issues;

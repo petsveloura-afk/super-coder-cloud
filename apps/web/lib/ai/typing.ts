@@ -38,8 +38,13 @@ export async function startTyping(input: { orgId: string; conversationId: string
     if (input.channel === "whatsapp_qr") void pulse(input, false).catch(() => undefined);
   });
   const every = input.channel === "telegram" ? 4500 : input.channel === "whatsapp" ? 20_000 : input.channel === "messenger" || input.channel === "instagram" ? 15_000 : 9000;
+  const mine = active.get(input.conversationId);
   const loop = async () => {
-    if (stopped || Date.now() > until) return;
+    if (stopped || Date.now() > until) {
+      // always-on server: an indicator that ran out by itself frees its slot, so the next answer in this chat shows "typing…" again
+      if (!stopped && active.get(input.conversationId) === mine) active.delete(input.conversationId);
+      return;
+    }
     await pulse(input, true).catch(() => undefined);
     if (!stopped) timer = setTimeout(() => void loop(), every);
   };

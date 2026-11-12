@@ -31,7 +31,9 @@ async function handle(request: NextRequest) {
   // wave 15: Telegram Business connections are checked against Telegram itself — never silent when one is lost
   const bizHealth = await import("@/lib/channels/telegram-business-health").then((m) => m.checkTelegramBusinessHealth(10)).catch(() => ({ checked: 0, changed: 0 }));
   const healed = await import("@/lib/channels/telegram-setup").then((m) => m.healTelegramWebhooks(5)).catch(() => 0);
-  return NextResponse.json({ ok: true, ...summary, pending, watchdog, bizHealth, healed, schedules }, { headers: { "Cache-Control": "no-store" } });
+  // the app moved (new host / domain): phone numbers the platform wired to its old address are re-pointed (≤ once per 6h)
+  const phones = await import("@/lib/voice/twilio-heal").then((m) => m.healTwilioNumbers(10)).catch(() => null);
+  return NextResponse.json({ ok: true, ...summary, pending, watchdog, bizHealth, healed, schedules, phones }, { headers: { "Cache-Control": "no-store" } });
 }
 
 // spec A4: every run is recorded in job_runs and never overlaps itself

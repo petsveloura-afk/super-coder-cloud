@@ -12,6 +12,15 @@ export async function register() {
   } catch (e) {
     console.warn("self-clock: not started", (e as Error).message);
   }
+  // always-on servers: unhandled promise failures are also recorded in Mission Control (Next.js keeps logging them as before)
+  if (process.env.NEXT_PHASE !== "phase-production-build") {
+    try {
+      const { installProcessGuard } = await import("@/lib/ops/process-guard");
+      installProcessGuard();
+    } catch {
+      /* never block the server start */
+    }
+  }
 }
 
 export async function onRequestError(err: unknown, request: { path: string; method: string }, context: { routePath?: string; routeType?: string }) {

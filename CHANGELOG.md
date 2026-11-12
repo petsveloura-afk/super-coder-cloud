@@ -1,5 +1,15 @@
 # Changelog
 
+## Railway hardening — an always-on server, after the move
+
+- **Checked first (what changed by moving from Vercel's short-lived functions to one long-running server):** unhandled promise failures (Next.js already logs them and never crashes — confirmed in its source), shutdown (Next.js handles SIGTERM; the clock's timers never hold the process), module-level caches (per-business with a time limit — bounded by the number of businesses), the client IP behind Railway's edge (Railway overwrites `X-Forwarded-For` / `X-Real-IP`, so the rate limits stay sound), every one of the 81 API routes for a login / cron secret / signature / rate limit (all have one; the OAuth starts use the session, the Twilio and voice webhooks verify Twilio's signature, the public chat and the error reporter are rate-limited).
+- **Phone numbers follow the new address** (`lib/voice/twilio-heal.ts`, `twilio-heal-core.ts`, new; run from the follow-ups clock at most once every 6 hours): platform numbers and the businesses' own auto-wired Twilio numbers whose Voice URL is OUR path on the old address are re-pointed with the same call used when a number is connected. A number pointed elsewhere on purpose is never touched.
+- **The Meta app webhook follows the new address:** a callback that is our own path (`/api/channels/meta/pages`) on another host is now repaired like a missing subscription (`ownPathOnOldAddress`); any other address is still only reported.
+- **A customer's attachment link can no longer reach the private network** (`lib/ai/inbound-media.ts` → `fetchPublicHttps`: public https hosts only, every redirect re-checked). On Railway the private network (`*.railway.internal`, the WhatsApp bridge) is reachable from the server — this closes the gap reported in Wave A3.
+- **"typing…" frees its slot when it runs out by itself** (`lib/ai/typing.ts`) — on a long-running server a stale entry would have kept that chat from showing "typing…" until the next restart.
+- **Unhandled promise failures are also recorded in Mission Control** (`lib/ops/process-guard.ts`, installed from `instrumentation.ts`; ≤ 20 per minute, Next.js' own prefetch noise skipped). Server behaviour unchanged.
+- No migration, no new environment variable. Tests: `railway-hardening.test.ts`.
+
 ## Railway round — the app moved from Vercel to Railway: everything that depended on Vercel now works there too
 
 - **A built-in clock replaces the Vercel cron** (`lib/ops/self-clock-core.ts`, `lib/ops/self-clock.ts`, started from `instrumentation.ts`): on Railway the app itself calls its 11 background routes (dispatch, team, meta-sync, social, email-poll, followups, growth, social-brain, agents, billing-sweep, keepalive) over loopback with `CRON_SECRET`. Every route keeps its own `job_runs` lock, so the GitHub "Automation jobs" and pg_cron stay as a harmless backup. Once per boot it re-points the database clock (pg_cron) to the current address. Off on Vercel, during build, or with `SELF_CLOCK=off`; `SELF_CLOCK_DB=off` skips the re-point. `/api/health` now shows `clock {on, reason, last}`.

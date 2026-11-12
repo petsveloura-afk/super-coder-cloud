@@ -96,7 +96,10 @@ export async function understandInboundMedia(input: { kind: Kind; token: string;
 /** wave 19: downloads an https attachment (≤ 6 MB). */
 async function fetchMediaUrl(url: string, mime?: string): Promise<{ buf: Buffer; mime: string } | null> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(20_000), cache: "no-store" });
+    // the URL comes from a customer's message: only public https hosts, every redirect re-checked (on an always-on server the
+    // private network — e.g. *.railway.internal, the WhatsApp bridge — must never be reachable through a customer's link)
+    const { fetchPublicHttps } = await import("@/lib/net/safe-fetch");
+    const res = await fetchPublicHttps(url, { signal: AbortSignal.timeout(20_000), cache: "no-store" });
     if (!res.ok) return null;
     const len = Number(res.headers.get("content-length") ?? 0);
     if (len > 6 * 1024 * 1024) return null;
