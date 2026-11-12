@@ -2,7 +2,7 @@ name: Keep alive
 
 # Daily heartbeat so the Supabase Free project is never paused for inactivity
 # (Vercel Cron in apps/web/vercel.json does the same — two independent sources).
-# Optional secrets: APP_URL (default https://super-coder-cloud.vercel.app), CRON_SECRET.
+# Optional secrets: APP_URL (default https://app.supercoder.agency — the app on Railway), CRON_SECRET.
 
 on:
   schedule:
@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Ping /api/keepalive (runs a real DB round-trip)
         run: |
-          URL="${APP_URL:-https://super-coder-cloud.vercel.app}"
+          URL="${APP_URL:-https://app.supercoder.agency}"
           AUTH=()
           if [ -n "$CRON_SECRET" ]; then AUTH=(-H "Authorization: Bearer $CRON_SECRET"); fi
           for i in 1 2 3; do

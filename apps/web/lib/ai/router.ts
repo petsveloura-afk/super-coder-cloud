@@ -116,7 +116,7 @@ async function callOneRaw(c: RouteCandidate, req: { system: string; messages: AI
     return { text: r.text, inputTokens: r.inputTokens, outputTokens: r.outputTokens, model: r.model };
   }
   const headers: Record<string, string> =
-    c.provider === "openrouter" ? { "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://super-coder-cloud.vercel.app", "X-Title": "Super Coder Cloud" } : {};
+    c.provider === "openrouter" ? { "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://app.supercoder.agency", "X-Title": "Super Coder Cloud" } : {};
   return openaiCompatibleCall(base, { name: c.provider, baseUrl: c.baseUrl!, key: c.key, timeoutMs, headers, noJsonMode: NO_JSON_MODE.includes(c.provider) });
 }
 

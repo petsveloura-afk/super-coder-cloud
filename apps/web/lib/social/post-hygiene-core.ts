@@ -50,6 +50,62 @@ export function hasReportShape(text: string): boolean {
   return false;
 }
 
+/**
+ * Round 3 (additive) — a PLAN / recommendations / findings about posts is not a post. An employee's deliverable such as a
+ * distribution plan, boost recommendations, a recommended schedule, key findings ("the post chosen (FACT) …") or a structured
+ * version ("2. Instagram version (Instagram Post) * opening: … * body: …") was split into parts, and each part was saved — and
+ * even scheduled — as if it were a post. These are recognised by their structure (several of the signs below together).
+ */
+const PLAN_TITLE = /^\s*(?:\d+[.)]\s*)?(?:המלצות|לוח\s+זמנים|ממצאים|תוצאה\s+סופית|תוכנית\s+(?:הפצה|תזמון|תוכן|עבודה)|התאמת\s+הקופי|גרסת\s+(?:פייסבוק|אינסטגרם|טיקטוק|לינקדאין)|הפוסט\s+שנבחר|קהל\s+יעד|תקציב\s+מומלץ|חלונות\s+זמן|recommendations?|recommended\s+schedule|key\s+findings|distribution\s+plan|posting\s+schedule|(?:facebook|instagram)\s+version|توصيات|جدول\s+النشر|ملخص)(?![\p{L}\p{N}])/iu;
+const PLAN_SIGNS: RegExp[] = [
+  /\((?:Facebook|Instagram|TikTok|LinkedIn)\s+Post\)|\((?:FACT|Boost|ASSUMPTION)\)/i,
+  /(?:^|\n)\s*[*•-]\s*(?:פתיחה|גוף\s+הפוסט|סיבה\s+לבחירה|טיוטה\s+נבחרת|יום\s+פרסום|חלונות\s+זמן|בוקר|ערב|קהל\s+יעד|תקציב|תחומי\s+עניין|opening|body|reason|budget|audience)[^\n:：]{0,20}[:：]/i,
+  /מומלץ[\s\S]*מומלץ|recommended[\s\S]*recommended/i,
+  /(?:^|\n)\s*\d+[.)]\s*(?:תקציב|קהל|תחומי|יום|חלון|budget|audience|interests)/i,
+  /תוכנית\s+הפצה|להפצה|לתזמון\s+ופרסום|לקידום\s+ממוקד|distribution\s+plan|boost/i,
+];
+
+/** a structured version with labels ("* פתיחה: …", "* גוף הפוסט: …") → the copy itself, without the headings and the labels */
+const COPY_LABEL = /^\s*[*•-]?\s*(?:פתיחה|גוף\s+הפוסט|גוף|הנעה\s+לפעולה|קריאה\s+לפעולה|סיום|האשטגים|תגיות|opening|hook|body|call\s+to\s+action|cta|closing|hashtags)\s*[:：]\s*(.*)$/i;
+const OTHER_LABEL = /^\s*[*•-]\s*[^:：\n]{2,30}[:：]\s*.*$/;
+
+export function salvageLabeledCopy(text: string): string | null {
+  const lines = String(text ?? "").replace(/\r\n?/g, "\n").split("\n");
+  if (lines.filter((l) => COPY_LABEL.test(l)).length < 2) return null;
+  const out: string[] = [];
+  let keep = false;
+  for (const l of lines) {
+    const m = l.match(COPY_LABEL);
+    if (m) {
+      keep = true;
+      if (m[1]!.trim()) out.push(m[1]!.trim());
+      continue;
+    }
+    if (OTHER_LABEL.test(l)) {
+      keep = false; // another labelled section (reason, audience …) is not copy
+      continue;
+    }
+    if (keep && l.trim()) out.push(l.trim());
+  }
+  const copy = out.join("\n").trim();
+  return copy.length >= 20 ? copy : null;
+}
+
+/** is this text a plan / recommendations / findings about posts rather than a post? */
+export function looksLikePostPlan(text: string): boolean {
+  const t = String(text ?? "").trim();
+  if (!t) return false;
+  const first = t.split("\n")[0] ?? "";
+  const signs = PLAN_SIGNS.filter((r) => r.test(t)).length;
+  if (PLAN_TITLE.test(first) && signs >= 1) return true;
+  if (signs >= 2) return true;
+  // a one-line "title" with nothing to post ("תוצאה סופית: תוכנית הפצה ותזמון לפוסט במדיה החברתית")
+  return PLAN_TITLE.test(first) && t.length < 140 && !/[!?]|\p{Extended_Pictographic}/u.test(t);
+}
+
+/** a label with extra words in front of the post ("נוסח הפוסט המלא (מוכן לפרסום):") — only the label goes */
+const LABEL_LINE_WIDE = /^\s*(?:[#>*_\s]*)\s*(?:נוסח\s+(?:ה)?פוסט|טקסט\s+(?:ה)?פוסט|הפוסט|final\s+post|post\s+text|نص\s+المنشور)(?:\s+(?:ה)?(?:מלא|סופי|full|final))?\s*(?:\([^)\n]{0,40}\))?\s*(?:[*_]{1,2})?\s*[:：]\s*(?:[*_]{1,2})?\s*$/i;
+
 /** markdown → plain text the networks print as intended */
 export function plainForSocial(text: string): string {
   return String(text ?? "")
@@ -73,16 +129,20 @@ export function cleanPostBody(raw: string): PostClean {
   for (const line of lines) {
     if (NOTES_HEADER.test(line)) break; // the notes section and everything after it are the employee's, not the customer's
     if (WRAP_LINE.test(line)) continue;
-    if (LABEL_LINE.test(line)) continue;
+    if (LABEL_LINE.test(line) || LABEL_LINE_WIDE.test(line)) continue;
     if (PREAMBLE.test(line) && !kept.some((k) => k.trim())) continue; // "הנה הפוסט:" in front of the post goes
     if (CHAT_TAIL.test(line) && kept.some((k) => k.trim())) break; // "רוצה שאשנה משהו?" after the post goes
     if (REPORT_HEADING.test(line) && !kept.some((k) => k.trim())) continue; // a title above the post ("תוצאה סופית") goes, the post stays
     kept.push(line);
   }
-  let text = plainForSocial(kept.join("\n"));
+  // round 3: a structured version ("* פתיחה: … * גוף הפוסט: …") keeps only its copy
+  const salvaged = salvageLabeledCopy(kept.join("\n"));
+  let text = plainForSocial(salvaged ?? kept.join("\n"));
   // a post wrapped in quotes as a whole ("…" / «…») loses the wrapping
   text = text.replace(/^["“”«](.*)["“”»]$/s, "$1").trim();
   if (UUID.test(text) || META.test(text) || hasReportShape(text)) return { ok: false, reason: "not_a_post" };
+  // round 3: a plan / recommendations / findings about posts is not a post
+  if (!salvaged && looksLikePostPlan(String(raw ?? ""))) return { ok: false, reason: "not_a_post" };
   if (text.length < 20) return { ok: false, reason: "too_short" };
   return { ok: true, text: text.slice(0, 5000) };
 }

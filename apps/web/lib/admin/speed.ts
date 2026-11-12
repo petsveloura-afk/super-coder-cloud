@@ -19,7 +19,7 @@ export async function measureSpeed(): Promise<{ db: number; totals: number; p50:
     totals: list.length,
     p50: pct(0.5),
     p90: pct(0.9),
-    region: process.env.VERCEL_REGION ?? "local",
+    region: process.env.VERCEL_REGION ?? process.env.RAILWAY_REPLICA_REGION ?? "local",
     supa: (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/^https?:\/\//, "").split("/")[0] ?? "",
   };
 }

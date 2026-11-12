@@ -76,7 +76,8 @@ export async function registerTelegramWebhook(acc: { id: string; webhook_token: 
     const admin = createAdminClient();
     await admin
       .from("channel_accounts")
-      .update({ config: { ...acc.config, updates_v: TELEGRAM_UPDATES_VERSION }, updated_at: new Date().toISOString() })
+      // + the address the webhook points to — after the app moves (Vercel → Railway, a new domain) the bot is re-pointed by itself
+      .update({ config: { ...acc.config, updates_v: TELEGRAM_UPDATES_VERSION, webhook_base: publicEnv.appUrl.replace(/\/$/, "") }, updated_at: new Date().toISOString() })
       .eq("id", acc.id);
   }
   return r.ok;
@@ -95,7 +96,14 @@ export async function healTelegramWebhooks(limit = 10): Promise<number> {
     .eq("kind", "telegram")
     .neq("status", "disabled")
     .limit(200);
-  const stale = ((data ?? []) as { organization_id: string; config: Record<string, string> | null }[]).filter((a) => (a.config ?? {}).updates_v !== TELEGRAM_UPDATES_VERSION).slice(0, limit);
+  // stale = an old update list, OR a webhook that still points to the app's previous address (moved to a new host / domain).
+  // Only when the current address is a real public https address — never re-point bots to localhost or an internal name.
+  const { publicEnv } = await import("@/lib/env");
+  const here = publicEnv.appUrl.replace(/\/$/, "");
+  const canRepoint = /^https:\/\/[^\s/]+/.test(here) && !/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(here);
+  const stale = ((data ?? []) as { organization_id: string; config: Record<string, string> | null }[])
+    .filter((a) => (a.config ?? {}).updates_v !== TELEGRAM_UPDATES_VERSION || (canRepoint && (a.config ?? {}).webhook_base !== here))
+    .slice(0, limit);
   let fixed = 0;
   for (const a of stale) {
     const acc = await loadAccount(a.organization_id, "telegram").catch(() => null);

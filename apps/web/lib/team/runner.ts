@@ -591,9 +591,12 @@ export async function runTask(orgId: string, taskId: string, opts: { interactive
  */
 export async function dispatchTaskRun(orgId: string, taskId: string): Promise<boolean> {
   const secret = process.env.CRON_SECRET;
-  const raw = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "") || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-  const base = raw.replace(/\/$/, "");
-  if (!secret || !/^https:\/\//.test(base)) return false;
+  const raw = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "") || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "");
+  // always-on server (Railway, Docker): the task's own run goes to this same server over loopback — no public round trip,
+  // no TLS, nothing to block (the work then runs in the background of that call, exactly as before)
+  const { clockEnabled, loopbackBase } = await import("@/lib/ops/self-clock-core");
+  const base = (clockEnabled(process.env).on ? loopbackBase(process.env) : raw).replace(/\/$/, "");
+  if (!secret || !/^https?:\/\//.test(base) || (base.startsWith("http://") && !base.startsWith("http://127.0.0.1"))) return false;
   try {
     const res = await fetch(`${base}/api/cron/team-task`, { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: JSON.stringify({ org: orgId, task: taskId }), signal: AbortSignal.timeout(8_000), cache: "no-store", redirect: "manual" });
     if (res.status !== 202) return false;

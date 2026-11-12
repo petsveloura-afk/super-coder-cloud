@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @scc/web dev",
+    "start": "pnpm --filter @scc/web start",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",

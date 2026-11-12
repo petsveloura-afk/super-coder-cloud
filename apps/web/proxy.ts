@@ -12,7 +12,7 @@ const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/offline", "/set
 const hostCache = new Map<string, { at: number; v: { slug: string; lang: string } | null }>();
 function ownHosts(): Set<string> {
   const out = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
-  for (const u of [process.env.NEXT_PUBLIC_APP_URL, process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "", process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : ""]) {
+  for (const u of [process.env.NEXT_PUBLIC_APP_URL, process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "", process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "", process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "", process.env.RAILWAY_PRIVATE_DOMAIN ? `http://${process.env.RAILWAY_PRIVATE_DOMAIN}` : ""]) {
     try {
       if (u) out.add(new URL(u).hostname.toLowerCase());
     } catch {
@@ -23,7 +23,7 @@ function ownHosts(): Set<string> {
 }
 const SITE_LEGAL = /^\/(privacy|terms|accessibility|cookies)\/?$/;
 async function siteForHost(host: string): Promise<{ slug: string; lang: string } | null> {
-  if (!host || ownHosts().has(host) || host.endsWith(".vercel.app") || /^\d+\.\d+\.\d+\.\d+$/.test(host)) return null;
+  if (!host || ownHosts().has(host) || host.endsWith(".vercel.app") || host.endsWith(".up.railway.app") || host.endsWith(".railway.internal") || /^\d+\.\d+\.\d+\.\d+$/.test(host)) return null;
   // https://{slug}.{SITES_ROOT_DOMAIN} (wildcard domain on the project)
   const root = (process.env.SITES_ROOT_DOMAIN ?? "").toLowerCase().replace(/^\.+/, "");
   if (root && host.endsWith(`.${root}`)) {

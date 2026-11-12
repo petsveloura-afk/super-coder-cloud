@@ -14,13 +14,20 @@ export async function GET() {
     {
       ...(live ? { checks: live } : {}),
       status: "ok",
-      version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "dev",
+      version: (process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.RAILWAY_GIT_COMMIT_SHA)?.slice(0, 7) ?? "dev",
       supabaseConfigured: isSupabaseConfigured(),
       serviceRoleConfigured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
       cronSecretConfigured: Boolean(process.env.CRON_SECRET),
       encryptionKeyConfigured: /^[A-Fa-f0-9]{64}$/.test(process.env.ENCRYPTION_KEY ?? ""),
-      region: process.env.VERCEL_REGION ?? null,
+      region: process.env.VERCEL_REGION ?? process.env.RAILWAY_REPLICA_REGION ?? null,
       integrations: integrationAvailability(process.env),
+      // always-on servers: is the built-in background clock running, and when did each job last answer (booleans / times only)
+      clock: await Promise.all([import("@/lib/ops/self-clock"), import("@/lib/ops/self-clock-core")])
+        .then(([m, core]) => {
+          const st = m.clockState();
+          return { on: st.started, reason: core.clockEnabled(process.env).reason, last: st.last };
+        })
+        .catch(() => null),
       time: new Date().toISOString(),
     },
     { headers: { "Cache-Control": "no-store" } },

@@ -3425,6 +3425,7 @@
         "canceled": "Canceled"
       },
       "err": {
+        "purchaseOff": "شراء نطاق جديد غير متاح حاليًا — يمكنكم ربط نطاق تملكونه بالفعل (\"لدي نطاق\")",
         "notConfigured": "Connecting and buying domains is not enabled on the platform yet. Meanwhile the site is available on its public link.",
         "auth": "No access to the platform's domain account. The platform owner needs to check VERCEL_API_TOKEN.",
         "inUse": "This domain is already connected to another site",

@@ -266,3 +266,37 @@ describe("post hygiene — round 4 (all the wordings, AI chat lead-ins / tails, 
     expect(read("components/social/social-client.tsx")).toContain('data-testid="post-suspect"');
   });
 });
+
+describe("post hygiene — round 3 (plans split into 'posts', structured versions) — the owner's screenshots", () => {
+  const notPost = [
+    "המלצות לקידום ממוקד (Boost)\n1. תקציב מומלץ לבוסט ראשוני: 100–150 ש\"ח לפוסט למשך 4 ימים.\n2. קהל יעד ממוקד: בעלי עסקים קטנים, עצמאיים, ומנהלי שיווק (גילאי 25–55) באזור ישראל.\n3. תחומי עניין לבחירה במודעה: בניה ועיצוב אתרים, אוטומציה",
+    "לוח זמנים מומלץ לתזמון ופרסום\n* יום פרסום מומלץ: יום שני (09/11/2026)\n* חלונות זמן מומלצים לפרסום:\n* בוקר: 09:00 – 10:00 (שעות הגעה למשרד / מעבר על רשתות).\n* ערב: 18:30 – 20:00 (זמן פנאי וצריכת תוכן)",
+    "ממצאים מרכזיים ונתונים\n1. הפוסט שנבחר להפצה (FACT):\n* טיוטה נבחרת: \"🚀 10% הנחה על דף נחיתה + אוטומציה ללא קוד! חסכו זמן: תהליכים מתוזמנים אוטומטית...\"\n* סיבה לבחירה: שילוב עקרון הערך של",
+    "תוצאה סופית: תוכנית הפצה ותזמון לפוסט במדיה החברתית",
+  ];
+  it("plans, recommendations, findings and report titles are not posts", () => {
+    for (const t of notPost) expect(cleanPostBody(t).ok, t.slice(0, 30)).toBe(false);
+  });
+  it("a structured version keeps only its copy (opening + body), without headings and labels", () => {
+    const v = "2. גרסת אינסטגרם (Instagram Post)\n* פתיחה: ✨ רוצים יותר לידים בפחות זמן עבודה?\n* גוף הפוסט:\nדף נחיתה ממיר + חיבור אוטומטי למערכות העסק שלכם.\n• עיצוב חדשני ומותאם למובייל\n* סיבה לבחירה: ערך גבוה";
+    const r = cleanPostBody(v);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.text.startsWith("✨ רוצים יותר לידים")).toBe(true);
+      expect(r.text).toContain("דף נחיתה ממיר");
+      expect(r.text).not.toMatch(/גרסת|Instagram Post|פתיחה:|גוף הפוסט|סיבה לבחירה/);
+    }
+  });
+  it("'נוסח הפוסט המלא (מוכן לפרסום):' — the label goes, the post stays", () => {
+    const r = cleanPostBody("נוסח הפוסט המלא (מוכן לפרסום):\n\nעסוקים בלרדוף אחרי לידים ולבצע פעולות ידניות חוזרות ונשנות? ⏱️\n\nבעלי עסקים רבים מאבדים לקוחות משלמים בגלל...");
+    expect(r.ok && r.text.startsWith("עסוקים בלרדוף")).toBe(true);
+  });
+  it("the real marketing posts from the board stay posts", () => {
+    for (const t of [
+      "🚀 קבלו דף נחיתה ב-10% הנחה + MVP מוכן תוך 2 שבועות!\nעיצוב מותאם למובייל שממיר כל ביקור ללקוח.\nפיתוח מהיר שמחסך לכם זמן וכסף.\nהודעה עכשיו לקבלת הצעת מחיר מותאמת.\n#דפנחיתה #SuperCoderIL MVP",
+      "📈 מחפשים דרך להגדיל את המכירות?\n\nדף נחיתה מקצועי יעשה את העבודה בשבילכם.\n\nעיצוב חדשני, מהירות טעינה גבוהה והתאמה מלאה למובייל.",
+      "למה עסקים נתקעים במקום במקום לגדול? 📉\nבעלי עסקים רבים מתמודדים עם אותן בעיות נפוצות: ❌ לידים שנופלים בין הכלסאות בגלל חוסר מעקב אוטומטי",
+      "💥 10% הנחה על דף נחיתה + קוד ריוויו לפני מיזוג!\nחוסך זמן יקר ומונע באגים לפני שהקוד מגיע ל-production.",
+    ]) expect(cleanPostBody(t).ok, t.slice(0, 30)).toBe(true);
+  });
+});

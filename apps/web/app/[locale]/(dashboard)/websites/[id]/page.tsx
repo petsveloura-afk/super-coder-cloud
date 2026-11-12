@@ -48,7 +48,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
   const Back = locale === "en" ? ArrowLeft : ArrowRight;
   const theme = (s.theme ?? {}) as { accent?: string; mode?: "dark" | "light"; template?: string; accent2?: string; font?: string; radius?: "sharp" | "soft" | "round"; animations?: boolean; effects?: "none" | "subtle" | "rich"; dividers?: "none" | "wave" | "curve" | "slant"; buttons?: string; hover?: string; entrance?: string; header?: string };
   // wave 13: domain panel data
-  const { domainsConfigured } = await import("@/lib/site/domains");
+  const { domainsConfigured, domainPurchaseConfigured } = await import("@/lib/site/domains");
   const { paypalSdkConfig } = await import("@/lib/billing/paypal");
   const { data: domainOrders } = await supabase.from("domain_orders").select("id, domain, status, price, currency, created_at, error").eq("organization_id", ctx.org.id).eq("site_id", id).order("created_at", { ascending: false }).limit(10);
   const platformUrl = `${sitePublicBase(locale)}/${s.slug as string}`;
@@ -99,6 +99,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             publicUrl={customActive ?? platformUrl}
             allowed={Boolean(caps.customDomain)}
             configured={domainsConfigured()}
+            canBuy={domainPurchaseConfigured()}
             domain={(s.custom_domain as string | null) ?? null}
             status={(s.domain_status as "pending" | "active" | "error" | null) ?? null}
             records={verification.records ?? []}

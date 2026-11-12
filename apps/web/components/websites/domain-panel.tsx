@@ -28,6 +28,8 @@ export interface DomainPanelProps {
   records: { type: string; name: string; value: string }[];
   orders: { id: string; domain: string; status: string; price: number; currency: string; created_at: string; error: string | null }[];
   sdk: { clientId: string; sdkUrl: string } | null;
+  /** (optional) buying NEW domains is available (the registrar is configured) — on Railway only "connect" is shown */
+  canBuy?: boolean;
 }
 
 interface Offer {
@@ -120,7 +122,7 @@ function DomainPay({ siteId, orderId, approveUrl, sdk, onDone }: { siteId: strin
 export function DomainPanel(p: DomainPanelProps) {
   const { t, locale } = useI18n();
   const router = useRouter();
-  const [mode, setMode] = useState<"buy" | "connect">("buy");
+  const [mode, setMode] = useState<"buy" | "connect">(p.canBuy === false ? "connect" : "buy");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Offer[] | null>(null);
   const [pick, setPick] = useState<Offer | null>(null);
@@ -256,8 +258,8 @@ export function DomainPanel(p: DomainPanelProps) {
         </Card>
       ) : (
         <Card className="p-4 sm:p-5">
-          <div role="tablist" className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-surface p-1 ring-1 ring-line">
-            {(["buy", "connect"] as const).map((k) => (
+          <div role="tablist" className={cn("mb-4 grid gap-1 rounded-xl bg-surface p-1 ring-1 ring-line", p.canBuy === false ? "grid-cols-1" : "grid-cols-2")}>
+            {(p.canBuy === false ? (["connect"] as const) : (["buy", "connect"] as const)).map((k) => (
               <button key={k} type="button" role="tab" aria-selected={mode === k} data-domain-tab={k} onClick={() => setMode(k)} className={cn("flex min-h-10 items-center justify-center gap-1.5 rounded-lg text-sm font-medium", mode === k ? "bg-elevated shadow-sm ring-1 ring-line" : "text-muted hover:text-fg")}>
                 {k === "buy" ? <ShoppingCart className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
                 {t(`websites.domain.tab.${k}`)}

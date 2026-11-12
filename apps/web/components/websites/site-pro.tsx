@@ -806,7 +806,7 @@ export function ProSite({
               {sstr(s.business_id) ? ` · ${sstr(s.business_id)}` : ""}. {t("websites.site.rights")}
             </span>
             {branding ? (
-              <a className="made" href="https://super-coder-cloud.vercel.app" target="_blank" rel="noopener">
+              <a className="made" href={(process.env.NEXT_PUBLIC_APP_URL || "https://app.supercoder.agency").replace(/\/$/, "")} target="_blank" rel="noopener">
                 <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> {t("websites.site.madeWith")}
               </a>
             ) : null}

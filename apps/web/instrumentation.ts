@@ -3,7 +3,15 @@
  * Errors are logged as redacted JSON and grouped in app_errors (Mission Control). Free, no external service.
  */
 export async function register() {
-  // nothing to initialise
+  // always-on servers (Railway, Docker): the built-in background clock — see lib/ops/self-clock-core.ts.
+  // Off on Vercel, during builds and with SELF_CLOCK=off; it never throws.
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  try {
+    const { startSelfClock } = await import("@/lib/ops/self-clock");
+    startSelfClock();
+  } catch (e) {
+    console.warn("self-clock: not started", (e as Error).message);
+  }
 }
 
 export async function onRequestError(err: unknown, request: { path: string; method: string }, context: { routePath?: string; routeType?: string }) {

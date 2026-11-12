@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { customerPrice, dnsRecords, domainCandidates, pricingFromEnv, registrarPhone, type DomainContact } from "./domain-core";
+import { RailwayDomainError, railwayAttach, railwayDetach, railwayDomainsConfigured, railwayState } from "./domains-railway";
 
 /**
  * Wave 13 — custom domains for published websites, through the platform's Vercel
@@ -17,7 +18,22 @@ import { customerPrice, dnsRecords, domainCandidates, pricingFromEnv, registrarP
  *      VERCEL_API_BASE (tests only).
  */
 export function domainsConfigured(): boolean {
+  return vercelDomains() || railwayDomainsConfigured();
+}
+
+/** the Vercel project (and its registrar) is configured */
+function vercelDomains(): boolean {
   return Boolean((process.env.VERCEL_API_TOKEN ?? "").trim() && (process.env.VERCEL_PROJECT_ID ?? "").trim());
+}
+
+/** buying NEW domains needs the Vercel registrar; connecting an owned domain also works on Railway (domains-railway.ts) */
+export function domainPurchaseConfigured(): boolean {
+  return vercelDomains();
+}
+
+/** where connected domains are served: the Vercel project (when configured) or the app's Railway service */
+function onRailway(): boolean {
+  return !vercelDomains() && railwayDomainsConfigured();
 }
 
 const vbase = () => (process.env.VERCEL_API_BASE || "https://api.vercel.com").replace(/\/$/, "");
@@ -60,6 +76,13 @@ async function vc<T = Record<string, unknown>>(path: string, init: { method?: "G
 }
 
 export function domainErrorKey(e: unknown): string {
+  if (e instanceof RailwayDomainError) {
+    if (e.status === 401 || e.status === 403) return "websites.domain.err.auth";
+    if (e.status === 409) return "websites.domain.err.inUse";
+    if (e.status === 400) return "websites.domain.err.invalid";
+    if (e.status === 429) return "websites.domain.err.busy";
+    return "websites.domain.err.generic";
+  }
   if (e instanceof VercelError) {
     if (e.status === 401 || e.status === 403) return "websites.domain.err.auth";
     if (/domain_already_in_use|already_exists|domain_taken|conflict/i.test(e.code) || e.status === 409) return "websites.domain.err.inUse";
@@ -119,6 +142,11 @@ const isApex = (d: string) => d.split(".").length === 2 || (d.split(".").length 
 
 /** Adds the domain (and www → domain redirect for apex domains) to the platform's project. */
 export async function attachDomain(domain: string): Promise<ProjectDomain> {
+  // Railway (the app's own service) when there is no Vercel project
+  if (onRailway()) {
+    const r = await railwayAttach(domain);
+    return { name: domain, verified: r.verified, verification: r.records.filter((x) => x.type === "TXT").map((x) => ({ type: x.type, domain: x.name, value: x.value })) };
+  }
   let main: ProjectDomain;
   try {
     main = await vc<ProjectDomain>(`/v10/projects/${project()}/domains`, { method: "POST", body: { name: domain } });
@@ -138,6 +166,7 @@ export async function attachDomain(domain: string): Promise<ProjectDomain> {
 }
 
 export async function detachDomain(domain: string): Promise<void> {
+  if (onRailway()) return railwayDetach(domain);
   for (const d of isApex(domain) ? [`www.${domain}`, domain] : [domain]) {
     try {
       await vc(`/v9/projects/${project()}/domains/${encodeURIComponent(d)}`, { method: "DELETE" });
@@ -149,6 +178,11 @@ export async function detachDomain(domain: string): Promise<void> {
 
 /** Ownership verified on the project + DNS pointing at Vercel → the site can switch to it. */
 export async function domainState(domain: string): Promise<{ verified: boolean; configured: boolean; verification: ProjectDomain["verification"] }> {
+  if (onRailway()) {
+    const r = await railwayState(domain);
+    // on Railway "verified" means the records are in place and the certificate can be issued
+    return { verified: r.verified, configured: r.verified, verification: r.records.map((x) => ({ type: x.type, domain: x.name, value: x.value })) };
+  }
   let pd: ProjectDomain;
   try {
     pd = await vc<ProjectDomain>(`/v9/projects/${project()}/domains/${encodeURIComponent(domain)}`);
@@ -165,7 +199,8 @@ export async function domainState(domain: string): Promise<{ verified: boolean; 
 export async function refreshSiteDomain(siteId: string, domain: string): Promise<{ status: "pending" | "active"; records: ReturnType<typeof dnsRecords> }> {
   const st = await domainState(domain);
   const status = st.verified && st.configured ? "active" : "pending";
-  const records = dnsRecords(domain, (st.verification ?? []).map((v) => ({ type: v.type, domain: v.domain, value: v.value })));
+  // Railway gives the exact records itself (CNAME to the service + the "_railway-verify" TXT); Vercel's are computed
+  const records = onRailway() ? (st.verification ?? []).map((v) => ({ type: v.type, name: v.domain, value: v.value })) : dnsRecords(domain, (st.verification ?? []).map((v) => ({ type: v.type, domain: v.domain, value: v.value })));
   await createAdminClient()
     .from("sites")
     .update({ domain_status: status, domain_verification: { records, verified: st.verified, configured: st.configured, checked_at: new Date().toISOString() } })

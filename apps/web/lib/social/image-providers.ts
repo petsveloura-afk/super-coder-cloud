@@ -18,7 +18,8 @@ export interface RawImage {
 }
 
 const cool = new Cooldowns();
-const UA = "SuperCoderCloud/1.0 (+https://super-coder-cloud.vercel.app)";
+// the app's own public address (moved off Vercel — Railway / a custom domain); the old address is only the last fallback
+const UA = `SuperCoderCloud/1.0 (+${(process.env.NEXT_PUBLIC_APP_URL || "https://app.supercoder.agency").replace(/\/$/, "")})`;
 
 function checkImage(buf: Buffer, mime: string): void {
   if (!mime.startsWith("image/")) throw new Error("not_image");

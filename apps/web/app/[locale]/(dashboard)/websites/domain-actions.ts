@@ -35,7 +35,9 @@ export async function searchDomainsAction(input: { locale: string; siteId: strin
   if ("error" in g) return { error: g.error };
   const q = String(input.query ?? "").trim().slice(0, 100);
   if (q.length < 2) return { error: "websites.domain.err.short" };
-  const { searchDomains, domainErrorKey } = await import("@/lib/site/domains");
+  const { searchDomains, domainErrorKey, domainPurchaseConfigured } = await import("@/lib/site/domains");
+  // buying new domains needs the registrar (Vercel); on Railway the business connects a domain it already owns
+  if (!domainPurchaseConfigured()) return { error: "websites.domain.err.purchaseOff" };
   try {
     return { ok: true, data: { results: await searchDomains(q) } };
   } catch (e) {
@@ -109,7 +111,8 @@ export async function createDomainOrderAction(input: { locale: string; siteId: s
   if (!contact.success) return { error: "websites.domain.err.contact" };
   const { paypalConfigured, paypalCreateOrder } = await import("@/lib/billing/paypal");
   if (!paypalConfigured()) return { error: "billing.notConfigured" };
-  const { checkDomain, domainErrorKey } = await import("@/lib/site/domains");
+  const { checkDomain, domainErrorKey, domainPurchaseConfigured } = await import("@/lib/site/domains");
+  if (!domainPurchaseConfigured()) return { error: "websites.domain.err.purchaseOff" };
   let offer;
   try {
     offer = await checkDomain(domain);
