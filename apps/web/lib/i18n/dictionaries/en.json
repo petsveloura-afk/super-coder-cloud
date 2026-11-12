@@ -8024,7 +8024,14 @@
       "budget": "The team reached its daily credit limit — raise it in the team settings.",
       "tooFast": "Too many starts in a minute — try again in a moment."
     },
-    "capReached": "The digital team reached its daily credit cap ({used}/{cap}) — {n} tasks are waiting. They resume by themselves, or raise the cap in the team settings."
+    "capReached": "The digital team reached its daily credit cap ({used}/{cap}) — {n} tasks are waiting. They resume by themselves, or raise the cap in the team settings.",
+    "cap": {
+      "resumeAt": "They resume by themselves around {when}, when credits from the last 24 hours free up.",
+      "resumeSoon": "They resume by themselves in the next few minutes.",
+      "resumeUnknown": "They resume by themselves when credits free up.",
+      "raise": "Raise the cap to {cap} and continue now",
+      "raised": "The daily cap is now {cap} — {n} task(s) are back to work."
+    }
   },
   "aiQuality": {
     "feedback": {

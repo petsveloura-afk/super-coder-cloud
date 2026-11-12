@@ -15,7 +15,8 @@ import { withRoleExtras9 } from "./tools-plus9-core";
 import { withRoleExtras10 } from "./tools-plus10-core";
 import { automatedContactIds, runTeamTool } from "./tools";
 import { playbookPrompt } from "./playbooks";
-import { REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt } from "./doctrine";
+import { WORKING_DOCTRINE, expertisePrompt } from "./doctrine";
+import { reportStandardFor } from "./report-lang-core";
 import { SAFETY_RULES, asData } from "./safety-core";
 import { healthyRoute, maintainTeam, noteModelResult } from "./runner-plus";
 import { pickResumable, resumeBudget } from "./resume-core";
@@ -681,9 +682,11 @@ async function synthesizeGoal(orgId: string, managerId: string | null, title: st
   if (!settings.enabled || settings.emergency_stop) return null;
   const { data: m } = managerId ? await db().from("team_members").select("name").eq("id", managerId).maybeSingle() : { data: null };
   const profile = await loadProfile(orgId);
+  // round 13: the summary's headings and tags in the business's language (they were copied in English)
+  const sumLang = await db().from("organizations").select("locale").eq("id", orgId).maybeSingle().then((r) => (r.data?.locale === "en" || r.data?.locale === "ar" ? r.data.locale : "he") as "he" | "en" | "ar", () => "he" as const);
   const system = [`You are ${(m?.name as string) ?? "the manager"}, the general manager of this business's AI team. Write for the business owner in the business's language.`, WORKING_DOCTRINE, expertisePrompt("manager"), SAFETY_RULES, `THE BUSINESS:\n${profilePrompt(profile)}`].join("\n\n");
   const material = done.map((r, i) => `${i + 1}. ${r.title}\n${asData("task result", String(r.result?.output ?? r.result?.report ?? "").slice(0, 2500), 2500)}`).join("\n\n");
-  const user = [`GOAL: ${title.slice(0, 300)}`, "Your team finished its tasks. Their results:", material, "Now synthesise ONE executive summary for the owner. Combine the findings, resolve contradictions, rank what matters by impact and effort, and say what is still unknown.", REPORT_STANDARD, "Answer with the final text only."].join("\n\n");
+  const user = [`GOAL: ${title.slice(0, 300)}`, "Your team finished its tasks. Their results:", material, "Now synthesise ONE executive summary for the owner. Combine the findings, resolve contradictions, rank what matters by impact and effort, and say what is still unknown.", reportStandardFor(sumLang), "Answer with the final text only."].join("\n\n");
   const ai = teamAi(orgId, settings.routing_pref, () => undefined, deadlineAt);
   const res = await ai("summarize", system, user, 2200);
   return res.ok && res.text.trim().length > 20 ? res.text.trim().slice(0, 8000) : null;

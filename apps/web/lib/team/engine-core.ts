@@ -24,7 +24,8 @@ import { SAME_FAILURE_LIMIT, failureKey, knownContactIds, repairArgs } from "./a
 import { budgetStop, decide, isLoop } from "./policy-core";
 import { memoryPrompt, recall, type MemoryItem } from "./memory-core";
 import { SAFETY_RULES, asData, escalationSignal, inventedPrices, leaks } from "./safety-core";
-import { DIAGNOSTIC_METHOD, GOAL_PLANNING_GUIDE, REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt, isDiagnosticTask } from "./doctrine";
+import { DIAGNOSTIC_METHOD, GOAL_PLANNING_GUIDE, WORKING_DOCTRINE, expertisePrompt, isDiagnosticTask } from "./doctrine";
+import { reportStandardFor } from "./report-lang-core";
 import type { TaskKind } from "./routing-core";
 import { checkRate, detectAnomalies, injectionNotice, injectionVerdict, needsDoubleApproval, rateLimitFor, recipientCapExceeded, redactSensitive, shouldFreeze, type ActionEvent } from "./safety-plus-core";
 import { interactionGuidance, interactionPrompt, ownerPrompt, ownerStyle } from "./interaction-core";
@@ -593,7 +594,7 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
         customer ? "It goes to a CUSTOMER: short, warm, accurate, only facts from the business profile, one clear next step." : "It goes to the OWNER: concise, factual, mark assumptions.",
         customer && plan!.deliverable.contact_id ? clientMemoryPrompt(clientMemories(ctx.memories, plan!.deliverable.contact_id)) : "",
         !customer && task.answer ? ownerPrompt(ownerStyle([task.answer, task.title])) : "",
-        !customer && (plan!.deliverable.type === "report" || isDiagnosticTask(taskText)) ? REPORT_STANDARD : "",
+        !customer && (plan!.deliverable.type === "report" || isDiagnosticTask(taskText)) ? reportStandardFor(deps.lang) : "",
         draft ? `Your previous draft:\n${asData("draft", draft, 3000)}\nFix exactly these points:\n${fixes.map((f, i) => `${i + 1}. ${f}`).join("\n")}` : "",
         "Answer with the final text only (no JSON, no preface).",
       ]

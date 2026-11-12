@@ -18,6 +18,8 @@ import { HealthPanel } from "./health-panel";
 import { DayHealthCard } from "./day-health-card";
 import { OwnerControlCard, OwnerLogCard } from "./owner-control-card";
 import { OpsPanel } from "./ops-panel";
+import { CapRelief } from "./cap-relief";
+import { shownUsed } from "@/lib/team/cap-relief-core";
 import type { ActivityView, ApprovalView, MemoryView, StatsView, TeamMemberView, TeamPageData, TeamTaskView } from "./types";
 import { PLAYBOOKS } from "@/lib/team/playbooks";
 import {
@@ -607,7 +609,11 @@ function BoardColumn({
                     <p className="text-muted">{t("aiTeam.board.waitingDep")}</p>
                   ) : x.status === "blocked" && x.error === "daily_credit_cap" ? (
                     // credit cap transparency: waiting for credits, resumes by itself — and how to raise the cap
-                    <p className="text-muted" data-testid="task-cap">{t("aiTeam.board.waitingCap", { used: data.dayCredits, cap: data.dayCap ?? data.settings.daily_credit_cap })}</p>
+                    <>
+                      <p className="text-muted" data-testid="task-cap">{t("aiTeam.board.waitingCap", { used: shownUsed(data.dayCredits, data.dayCap ?? data.settings.daily_credit_cap), cap: data.dayCap ?? data.settings.daily_credit_cap })}</p>
+                      {/* round 13: when it resumes by itself + one click to raise the cap and resume now */}
+                      <CapRelief data={data} showButton={list.find((y) => y.status === "blocked" && y.error === "daily_credit_cap")?.id === x.id} />
+                    </>
                   ) : (
                     (() => {
                       const f = ownerFailure(x.error, locale === "en" || locale === "ar" ? locale : "he");

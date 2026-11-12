@@ -17,6 +17,7 @@ import { SampleEntryCard, SkippedEnginesCard, StabilityPanel } from "./plus8-pan
 import Plus8bPanels from "./plus8b-panels";
 import { ActivityPanel, ApprovalsPanel, GoalsPanel, HireGallery, MeetingPanel, MemoryPanel, PlaybooksPanel, SettingsPanel } from "./panels";
 import type { TeamMemberView, TeamPageData } from "./types";
+import { shownUsed } from "@/lib/team/cap-relief-core";
 
 /**
  * "My team" — the digital team screen: the employees (3D presentation / grid / org chart), goals and the task
@@ -107,7 +108,7 @@ export function TeamScreen({ data }: { data: TeamPageData }) {
         {(data.dayCap ?? data.settings.daily_credit_cap) > 0 ? (
           // credit cap transparency (additive): today's use against the cap — warns at 80%, red when reached
           <Badge tone={data.dayCredits >= (data.dayCap ?? data.settings.daily_credit_cap) ? "danger" : data.dayCredits >= (data.dayCap ?? data.settings.daily_credit_cap) * 0.8 ? "warning" : "neutral"} data-testid="team-credit-meter">
-            {t("aiTeam.summary.credits", { used: data.dayCredits, cap: data.dayCap ?? data.settings.daily_credit_cap })}
+            {t("aiTeam.summary.credits", { used: shownUsed(data.dayCredits, data.dayCap ?? data.settings.daily_credit_cap), cap: data.dayCap ?? data.settings.daily_credit_cap })}
           </Badge>
         ) : null}
       </div>

@@ -177,6 +177,8 @@ export interface TeamPageData {
   dayCredits: number;
   /** today's cap including credits bought in the last 24h (the cap the team really works against) */
   dayCap?: number;
+  /** round 13: tasks held by the daily cap — when they resume by themselves (null = unknown) and the one-click raised cap */
+  capRelief?: { resumeAt: string | null; suggested: number; soon?: boolean };
   health?: TeamHealthData;
   /** wave 68: today's health card (absent when it could not be loaded) */
   dayHealth?: DayHealthView;

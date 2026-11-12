@@ -103,6 +103,30 @@ export function looksLikePostPlan(text: string): boolean {
   return PLAN_TITLE.test(first) && t.length < 140 && !/[!?]|\p{Extended_Pictographic}/u.test(t);
 }
 
+/**
+ * Round 13 (additive) — an employee's STATUS line saved as a post. The board showed drafts such as
+ * "שירה מתכננת לוחות זמנים לשעתיים המומלצות ומעדכנת את לוח הפרסום." and "דור יוצר את שלושת תבניות הפוסטים החדשות." — a
+ * sentence about the work (a name + a work verb in the present + posting-work words), not words a customer reads. A real post
+ * that happens to open with a name ("דנה מכינה עוגות טריות כל בוקר 🍰") is kept: it talks to the customer (emoji, !, ?, #,
+ * a link, "you" / an invitation) and has no posting-work vocabulary.
+ */
+const STATUS_VERB_HE = "(?:מתכננ(?:ת|ים|ות)?|מתכנן|יוצר(?:ת|ים|ות)?|מעדכנ(?:ת|ים|ות)|מעדכן|כותב(?:ת|ים|ות)?|מכינ(?:ה|ים|ות)|מכין|בודק(?:ת|ים|ות)?|מנתח(?:ת|ים|ות)?|אוספ(?:ת|ים|ות)|אוסף|בונ(?:ה|ים|ות)|שולח(?:ת|ים|ות)?|מתזמנ(?:ת|ים|ות)|מתזמן|מסכמ(?:ת|ים|ות)|מסכם|מגדיר(?:ה|ים|ות)?|מעצב(?:ת|ים|ות)?|מנסח(?:ת|ים|ות)?|עורכ(?:ת|ים|ות)|עורך|מארגנ(?:ת|ים|ות)|מארגן|ממשיכ(?:ה|ים|ות)|ממשיך|עובד(?:ת|ים|ות)?|מתחיל(?:ה|ים|ות)?|מסיימ(?:ת|ים|ות)|מסיים|מפיק(?:ה|ים|ות)?|מחלק(?:ת|ים|ות)?|מוסיפ(?:ה|ים|ות)|מוסיף|ממפה|ממפ(?:ים|ות)|מגבש(?:ת|ים|ות)?|מתאמ(?:ת|ים|ות)|מתאם)";
+const STATUS_VERB_AR = "(?:يخطط|تخطط|ينشئ|تنشئ|يحدّ?ث|تحدّ?ث|يكتب|تكتب|يجهز|تجهز|يحلل|تحلل|يجدول|تجدول|يعمل|تعمل|يصمم|تصمم)";
+const STATUS_START = new RegExp(`^[\\p{L}"'׳״-]{2,18}(?:\\s+[\\p{L}'׳-]{2,18})?\\s+(?:${STATUS_VERB_HE}|${STATUS_VERB_AR})(?![\\p{L}])`, "u");
+const STATUS_START_EN = /^[A-Z][a-z'-]{1,17}(?:\s+[A-Z][a-z'-]{1,17})?\s+(?:is|are|will be|has been|has started)\s+(?:now\s+)?(?:planning|creating|updating|writing|preparing|drafting|checking|analy[sz]ing|scheduling|building|designing|working\s+on|collecting|summari[sz]ing|mapping|editing)\b/;
+const POSTING_WORK = /(?:לוח(?:ות)?\s+(?:ה)?(?:זמנים|פרסום|תוכן)|לוח\s+הפרסום|תבני(?:ת|ות)\s+(?:ה)?(?:פוסט(?:ים)?|תוכן|עיצוב)|טיוט(?:ה|ות|ת)\s+(?:ה)?(?:פוסט(?:ים)?|תוכן)|(?:ה)?פוסטים\s+(?:ה)?(?:חדשים|הבאים|המתוכננים)|(?:ה)?שע(?:ות|תיים)\s+(?:ה)?(?:מומלצות|פרסום)|שעות\s+(?:ה)?פרסום|תזמון\s+(?:ה)?(?:פוסטים|פרסום)|(?:ה)?פוסטים|פוסט|תוכנית\s+(?:ה)?(?:תוכן|פרסום|הפצה)|קהל\s+(?:ה)?יעד|(?:ה)?נתונים|(?:ה)?ממצאים|דוח|ניתוח|משימ(?:ה|ות)|content\s+(?:calendar|plan)|posting\s+(?:schedule|calendar|times?)|post\s+templates?|(?:new\s+)?posts?|drafts?|schedule|calendar|templates?|report|analysis|جدول\s+النشر|قوالب\s+المنشورات|المنشورات|مسودات)/iu;
+const CUSTOMER_TALK = /[!?#@]|\p{Extended_Pictographic}|https?:\/\/|www\.|\b(?:you|your)\b|(?:אתכם|לכם|שלכם|אתם|אתה|את\s+מוזמנ|מוזמנ(?:ים|ות)|הזמינו|הירשמו|בואו|בוא|תתקשרו|התקשרו|שלחו|כתבו\s+לנו|לחצו|קנו|הצטרפו|מבצע|הנחה)/iu;
+
+/** an employee's status / progress sentence about the work rather than a post (pure) */
+export function isAgentStatusText(text: string): boolean {
+  const t = String(text ?? "").replace(/\s+/g, " ").trim();
+  if (!t || t.length > 320) return false;
+  if (CUSTOMER_TALK.test(t)) return false;
+  const sentences = t.split(/(?<=[.։。])\s+/).filter(Boolean).length;
+  if (sentences > 3) return false;
+  return (STATUS_START.test(t) || STATUS_START_EN.test(t)) && POSTING_WORK.test(t);
+}
+
 /** a label with extra words in front of the post ("נוסח הפוסט המלא (מוכן לפרסום):") — only the label goes */
 const LABEL_LINE_WIDE = /^\s*(?:[#>*_\s]*)\s*(?:נוסח\s+(?:ה)?פוסט|טקסט\s+(?:ה)?פוסט|הפוסט|final\s+post|post\s+text|نص\s+المنشور)(?:\s+(?:ה)?(?:מלא|סופי|full|final))?\s*(?:\([^)\n]{0,40}\))?\s*(?:[*_]{1,2})?\s*[:：]\s*(?:[*_]{1,2})?\s*$/i;
 
@@ -143,6 +167,8 @@ export function cleanPostBody(raw: string): PostClean {
   if (UUID.test(text) || META.test(text) || hasReportShape(text)) return { ok: false, reason: "not_a_post" };
   // round 3: a plan / recommendations / findings about posts is not a post
   if (!salvaged && looksLikePostPlan(String(raw ?? ""))) return { ok: false, reason: "not_a_post" };
+  // round 13: an employee's status line ("שירה מתכננת לוחות זמנים … ומעדכנת את לוח הפרסום.") is not a post
+  if (isAgentStatusText(text)) return { ok: false, reason: "not_a_post" };
   if (text.length < 20) return { ok: false, reason: "too_short" };
   return { ok: true, text: text.slice(0, 5000) };
 }

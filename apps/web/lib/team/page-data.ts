@@ -193,6 +193,19 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     } catch {
       /* display clean-up is optional */
     }
+    // round 13: saved reports / goal summaries with English section labels are shown with local labels (display only)
+    try {
+      const { localizeReportText } = await import("@/lib/team/report-lang-core");
+      data.tasks = data.tasks.map((x) => {
+        const r = (x.result ?? null) as Record<string, unknown> | null;
+        if (!r) return x;
+        const next: Record<string, unknown> = { ...r };
+        for (const k of ["summary", "report", "output"]) if (typeof r[k] === "string") next[k] = localizeReportText(r[k] as string, lang8);
+        return { ...x, result: next as typeof x.result };
+      });
+    } catch {
+      /* optional */
+    }
     const [skipped, { data: bad }, resp] = await Promise.all([
       // "add a key in Vercel" is platform work — business owners never see it
       opts.platformAdmin ? p8.loadSkippedProviders(lang8) : Promise.resolve([]),
@@ -237,6 +250,19 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     }
   } catch {
     /* the department split is optional — the screen works without it */
+  }
+
+  // round 13: tasks held by the daily credit cap — WHEN they resume by themselves, and the one-click raise
+  try {
+    if (data.tasks.some((x) => x.status === "blocked" && x.error === "daily_credit_cap")) {
+      const { capResumeAt, suggestedCap } = await import("@/lib/team/cap-relief-core");
+      const { data: rows } = await a.from("team_tasks").select("started_at, credits_used").eq("organization_id", org).gte("started_at", new Date(now - 86_400_000).toISOString()).limit(1000);
+      const cap = data.dayCap ?? settings.daily_credit_cap;
+      const at = capResumeAt((rows ?? []) as { started_at: string | null; credits_used: number | null }[], cap, now);
+      data.capRelief = { resumeAt: at ? new Date(at).toISOString() : null, suggested: suggestedCap(settings.daily_credit_cap, data.dayCredits), soon: at !== null && at - now < 60_000 };
+    }
+  } catch {
+    /* optional */
   }
 
   return data;
