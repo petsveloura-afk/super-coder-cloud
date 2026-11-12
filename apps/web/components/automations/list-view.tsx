@@ -31,9 +31,12 @@ export interface AutomationListItem {
   /** logic-analysis summary (errors/warnings found by the analyzer) */
   errors: number;
   warnings: number;
+  /** round 12: how many automations do exactly the same work (0 = unique) */
+  duplicates?: number;
 }
 
-type Filter = "all" | "active" | "paused" | "attention";
+type Filter = "all" | "active" | "paused" | "attention" | "duplicates";
+type Sort = "newest" | "name" | "runs" | "last" | "health";
 const HEALTH_TONE = { healthy: "success", attention: "warning", failing: "danger", idle: "neutral", disabled: "neutral" } as const;
 
 const needsAttention = (a: AutomationListItem) => a.health === "failing" || a.health === "attention" || a.errors > 0;
@@ -44,9 +47,10 @@ export function AutomationListView({ items }: { items: AutomationListItem[] }) {
   const it = useMemo(() => intelT(locale), [locale]);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [sort, setSort] = useState<Sort>("newest");
 
   const counts = useMemo(
-    () => ({ all: items.length, active: items.filter((a) => a.enabled).length, paused: items.filter((a) => !a.enabled).length, attention: items.filter(needsAttention).length }),
+    () => ({ all: items.length, active: items.filter((a) => a.enabled).length, paused: items.filter((a) => !a.enabled).length, attention: items.filter(needsAttention).length, duplicates: items.filter((a) => (a.duplicates ?? 0) > 1).length }),
     [items],
   );
   const shown = useMemo(
@@ -55,9 +59,24 @@ export function AutomationListView({ items }: { items: AutomationListItem[] }) {
         if (filter === "active" && !a.enabled) return false;
         if (filter === "paused" && a.enabled) return false;
         if (filter === "attention" && !needsAttention(a)) return false;
+        if (filter === "duplicates" && !((a.duplicates ?? 0) > 1)) return false;
         return matchesQuery([a.name, a.description, triggerLabel(t, a.trigger_type)], q);
-      }),
-    [items, filter, q, t],
+      })
+        // round 12: sorting (the default keeps the server's order — newest first)
+        .map((a, i) => ({ a, i }))
+        .sort((x, y) =>
+          sort === "name"
+            ? x.a.name.localeCompare(y.a.name)
+            : sort === "runs"
+              ? y.a.run_count - x.a.run_count
+              : sort === "last"
+                ? Date.parse(y.a.last_run_at ?? "1970-01-01") - Date.parse(x.a.last_run_at ?? "1970-01-01")
+                : sort === "health"
+                  ? Number(needsAttention(y.a)) - Number(needsAttention(x.a)) || x.i - y.i
+                  : x.i - y.i,
+        )
+        .map((x) => x.a),
+    [items, filter, q, t, sort],
   );
 
   const chips: { key: Filter; label: string }[] = [
@@ -65,6 +84,7 @@ export function AutomationListView({ items }: { items: AutomationListItem[] }) {
     { key: "active", label: it("o.fActive") },
     { key: "paused", label: it("o.fPaused") },
     { key: "attention", label: it("o.fAttention") },
+    ...(counts.duplicates ? [{ key: "duplicates" as Filter, label: t("automations.dup.filter") }] : []),
   ];
 
   return (
@@ -86,15 +106,27 @@ export function AutomationListView({ items }: { items: AutomationListItem[] }) {
               {c.label} <span className="tabular-nums opacity-70">{counts[c.key]}</span>
             </button>
           ))}
+          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label={t("automations.sort.label")} className="h-8 rounded-full border border-line bg-elevated px-3 text-[12.5px] text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {(["newest", "name", "runs", "last", "health"] as const).map((o) => (
+              <option key={o} value={o}>
+                {t(`automations.sort.${o}`)}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
+      {counts.duplicates ? (
+        <p className="flex items-center gap-2 border-b border-warning/30 bg-warning/5 px-5 py-2 text-[12.5px] text-warning" data-testid="automation-dup-note">
+          <ShieldAlert className="h-4 w-4 shrink-0" aria-hidden /> {t("automations.dup.note", { n: counts.duplicates })}
+        </p>
+      ) : null}
 
       {shown.length === 0 ? (
         <EmptyState icon={<Workflow className="h-6 w-6" />} title={it("o.noMatches")} />
       ) : (
         <ul className="divide-y divide-line">
           {shown.map((a) => (
-            <li key={a.id} className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center">
+            <li key={a.id} className="feed-in flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-surface-hover/50 lg:flex-row lg:items-center">
               <Link href={`/${locale}/automations/${a.id}`} className="min-w-0 flex-1">
                 <span className="block truncate font-semibold hover:text-accent">{a.name}</span>
                 <span className="mt-0.5 block text-[12.5px] text-muted">
@@ -105,6 +137,11 @@ export function AutomationListView({ items }: { items: AutomationListItem[] }) {
                   <Badge tone={HEALTH_TONE[a.health]}>{it(`h.${a.health}`)}</Badge>
                   {a.rate != null ? <Badge tone="neutral">{it("o.rate", { rate: a.rate })}</Badge> : null}
                   <Badge tone="neutral">{it("o.stepsCount", { count: a.steps })}</Badge>
+                  {(a.duplicates ?? 0) > 1 ? (
+                    <Badge tone="warning" title={t("automations.dup.hint")} data-testid="automation-dup">
+                      {t("automations.dup.badge", { n: a.duplicates ?? 0 })}
+                    </Badge>
+                  ) : null}
                   {a.errors + a.warnings > 0 ? (
                     <Badge tone={a.errors > 0 ? "danger" : "warning"}>
                       <ShieldAlert className="h-3 w-3" aria-hidden /> {a.errors + a.warnings}

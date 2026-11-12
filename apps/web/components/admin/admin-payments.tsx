@@ -1,12 +1,13 @@
 import { Banknote, Bitcoin, CreditCard, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getT } from "@/lib/i18n/server";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency } from "@/lib/format";
 import { paypalConfigured } from "@/lib/billing/paypal";
 import { lemonConfigured } from "@/lib/billing/lemonsqueezy";
 import { cryptoConfigured } from "@/lib/billing/nowpayments";
 import { stripeConfigured } from "@/lib/billing/stripe";
 import type { Locale } from "@/lib/i18n/config";
+import { AdminPaymentRows, type AdminPaymentRow } from "@/components/admin/admin-payment-rows";
 
 /** Platform admin: payment providers status, revenue (30 days, per currency) and the latest payments. */
 export async function AdminPayments({ locale }: { locale: Locale }) {
@@ -15,11 +16,17 @@ export async function AdminPayments({ locale }: { locale: Locale }) {
   const since = new Date(new Date().getTime() - 30 * 86_400_000).toISOString();
   const { data } = await supabase
     .from("billing_payments")
-    .select("id, organization_id, provider, plan_key, amount, currency, receipt_number, paid_at, status")
+    .select("id, organization_id, provider, plan_key, amount, currency, receipt_number, paid_at, status, payer_email, payer_name, meta")
     .gte("paid_at", since)
     .order("paid_at", { ascending: false })
     .limit(200);
-  const rows = (data ?? []) as { id: string; provider: string; plan_key: string | null; amount: number; currency: string; receipt_number: number; paid_at: string; status: string }[];
+  // round 12: voided payments (by the platform admin) are kept in the books but not shown here
+  const rows = ((data ?? []) as (AdminPaymentRow & { organization_id: string })[]).filter((r) => r.status !== "voided");
+  // the business name next to each payment
+  const orgIds = [...new Set(rows.map((r) => r.organization_id))].slice(0, 200);
+  const { data: orgs } = orgIds.length ? await supabase.from("organizations").select("id, name").in("id", orgIds) : { data: [] };
+  const orgName = new Map(((orgs ?? []) as { id: string; name: string }[]).map((o) => [o.id, o.name]));
+  for (const r of rows) r.org_name = orgName.get(r.organization_id) ?? null;
   const totals = new Map<string, number>();
   for (const r of rows) if (r.status === "paid") totals.set(r.currency.toUpperCase(), (totals.get(r.currency.toUpperCase()) ?? 0) + Number(r.amount));
   const providers = [
@@ -54,21 +61,7 @@ export async function AdminPayments({ locale }: { locale: Locale }) {
         ))}
         {totals.size === 0 ? <p className="text-[13px] text-subtle">{t("admin.payments.none")}</p> : null}
       </div>
-      {rows.length ? (
-        <ul className="max-h-80 divide-y divide-line overflow-y-auto border-t border-line">
-          {rows.slice(0, 30).map((r) => (
-            <li key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2.5 text-[13px]">
-              <span className="font-mono text-muted">#{r.receipt_number}</span>
-              <span className="text-muted">{formatDate(locale, r.paid_at)}</span>
-              <span>{r.plan_key ?? "—"}</span>
-              <span className="text-subtle">{t(`billing.pay.providers.${r.provider}`)}</span>
-              <span className="ms-auto font-semibold tabular-nums" dir="ltr">
-                {formatCurrency(locale, Number(r.amount), r.currency.toUpperCase())}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {rows.length ? <AdminPaymentRows rows={rows.slice(0, 100)} /> : null}
     </section>
   );
 }

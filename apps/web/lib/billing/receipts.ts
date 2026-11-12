@@ -58,7 +58,22 @@ export async function recordPayment(p0: PaymentInput): Promise<{ id: string; rec
   }
   const r = data as { id: string; receipt_number: number; new: boolean };
   if (r.new) await emailReceipt(p, r).catch(() => {});
+  // round 12: the platform owner hears about every new payment (to BILLING_BUSINESS_EMAIL, when e-mail is configured)
+  if (r.new) await emailPlatformSale(p, r).catch(() => {});
   return r;
+}
+
+async function emailPlatformSale(p: PaymentInput, r: { id: string; receipt_number: number }) {
+  const to = (process.env.BILLING_BUSINESS_EMAIL ?? "").trim();
+  if (!to || !emailConfigured()) return;
+  const admin = createAdminClient();
+  const { data: org } = await admin.from("organizations").select("name").eq("id", p.orgId).maybeSingle();
+  const item = typeof p.meta?.credit_pack === "string" ? `${Number(p.meta?.credits ?? 0)} credits` : p.plan ? `${p.plan}${p.interval ? ` / ${p.interval}` : ""}` : "payment";
+  const amount = `${p.amount.toFixed(2)} ${p.currency.toUpperCase()}`;
+  const link = `${publicEnv.appUrl.replace(/\/$/, "")}/he/receipt/${r.id}`;
+  const lines = [`💰 תשלום חדש · ${amount}`, `עסק: ${String(org?.name ?? p.orgId)}`, `פריט: ${item}`, `ספק: ${p.provider}`, `קבלה #${r.receipt_number}`];
+  const html = `<!doctype html><html dir="rtl"><body style="font-family:Arial,Helvetica,sans-serif;color:#1d2433">${lines.map((l) => `<p style="margin:4px 0">${escapeHtml(l)}</p>`).join("")}<p><a href="${link}">הקבלה</a></p></body></html>`;
+  await sendEmail({ to, subject: `💰 ${amount} · ${String(org?.name ?? "")}`.slice(0, 160), html, text: `${lines.join("\n")}\n${link}` });
 }
 
 /** the interval (and period end) of the business's subscription when the event did not carry it */
@@ -127,7 +142,7 @@ async function emailReceipt(p: PaymentInput, r: { id: string; receipt_number: nu
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e6e9f2">
 <tr><td style="background:#3366E6;color:#fff;padding:20px 24px;font-size:18px;font-weight:700;text-align:right">${escapeHtml(b.name)} · קבלה #${r.receipt_number}</td></tr>
 <tr><td style="padding:24px;color:#1d2433;font-size:15px;line-height:1.6;text-align:right">
-<p style="margin:0 0 16px">תודה! התשלום התקבל והמסלול שלכם פעיל. ✅</p>
+<p style="margin:0 0 16px">${typeof p.meta?.credit_pack === "string" ? `תודה! התשלום התקבל ו-${escapeHtml(String(p.meta?.credits ?? ""))} הקרדיטים נוספו לחשבון. ✅` : "תודה! התשלום התקבל והמסלול שלכם פעיל. ✅"}</p>
 <table role="presentation" width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;font-size:14px">
 ${rows.map(([k, v]) => `<tr><td style="border-bottom:1px solid #eef0f6;color:#667085">${escapeHtml(String(k))}</td><td style="border-bottom:1px solid #eef0f6;font-weight:600">${escapeHtml(String(v))}</td></tr>`).join("")}
 </table>

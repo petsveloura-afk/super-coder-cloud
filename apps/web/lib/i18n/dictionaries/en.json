@@ -667,7 +667,8 @@
       "byPaying": "Want another plan?",
       "changePlan": "Back to plans",
       "itemCredits": "AI credit pack · {n} credits",
-      "itemDomain": "Domain · {domain}"
+      "itemDomain": "Domain · {domain}",
+      "creditsItem": "{n} credits"
     },
     "customPrice": "Your special price",
     "advisor": {
@@ -689,7 +690,9 @@
         "receipts": "A receipt for every payment",
         "receiptsSub": "All payments and receipts are in the history below."
       }
-    }
+    },
+    "refundedNotification": "↩️ A plan payment was refunded ({amount})",
+    "paymentFailedNotification": "⚠️ The subscription payment failed — update the payment method in PayPal so the plan does not stop"
   },
   "ai": {
     "title": "AI Agents",
@@ -1203,7 +1206,36 @@
     "openDeals": "{count} open deals",
     "total": "{count} companies",
     "people": "People at this company",
-    "noPeople": "No linked contacts"
+    "noPeople": "No linked contacts",
+    "sync": {
+      "find": "Find companies in my contacts",
+      "found": "Found {n} new companies and {link} contacts for existing companies",
+      "run": "Create and link automatically",
+      "nothing": "All contacts are already linked — no new companies to find",
+      "done": "{created} companies created, {linked} contacts linked"
+    },
+    "kpi": {
+      "total": "Companies",
+      "withDeals": "With open deals",
+      "pipeline": "Open pipeline value",
+      "won": "Won"
+    },
+    "filter": {
+      "all": "All",
+      "open_deals": "With open deals",
+      "no_contacts": "No contacts",
+      "customers": "Customers (won)"
+    },
+    "sortBy": "Sort:",
+    "sort": {
+      "name": "Name",
+      "newest": "Newest",
+      "pipeline": "Pipeline value",
+      "contacts": "Contacts",
+      "won": "Revenue"
+    },
+    "pipelineValue": "In pipeline {v}",
+    "wonValue": "Won {v}"
   },
   "tasks": {
     "focus": {
@@ -1669,6 +1701,20 @@
       "contact_has_no_telegram_chat": "the contact hasn't messaged your Telegram bot yet",
       "contact_has_no_email": "the contact has no e-mail address",
       "delayed": "scheduled for later"
+    },
+    "dup": {
+      "filter": "Duplicates",
+      "badge": "Duplicate ×{n}",
+      "hint": "An identical automation exists (same trigger, settings, conditions and steps) — every event runs twice. Turn one off.",
+      "note": "{n} automations do exactly the same work — each event is handled more than once (e.g. a duplicate lead). Turn the duplicates off."
+    },
+    "sort": {
+      "label": "Sort",
+      "newest": "Newest first",
+      "name": "By name",
+      "runs": "Most runs",
+      "last": "Ran recently",
+      "health": "Needs attention first"
     }
   },
   "integrations": {
@@ -3772,7 +3818,24 @@
       "on": "Active",
       "off": "Not set",
       "revenue30": "Revenue · 30 days",
-      "none": "No payments in the last 30 days yet."
+      "none": "No payments in the last 30 days yet.",
+      "selected": "{n} selected",
+      "void": "Void (kept in the books)",
+      "delete": "Delete permanently",
+      "deleteForever": "Delete for good",
+      "typeDelete": "Type DELETE to delete permanently",
+      "deleteHint": "\"Void\" is recommended: the payment stays in the books (record-keeping) and stops counting as revenue. \"Delete\" is for test payments only; a copy is kept in the audit log. Refunds to the customer are done in PayPal.",
+      "voided": "{n} payments voided",
+      "deleted": "{n} payments deleted",
+      "auditFailed": "Not deleted — the audit copy could not be saved",
+      "selectOne": "Select receipt #{n}",
+      "credits": "{n} credits",
+      "status": {
+        "refunded": "Refunded",
+        "pending": "Pending",
+        "failed": "Failed",
+        "voided": "Voided"
+      }
     },
     "aiHealth": {
       "title": "AI engines check",
@@ -4921,7 +4984,8 @@
     "processing": "Payment is processing — credits are added once it is confirmed",
     "failed": "The payment was not completed — you were not charged",
     "unknownPack": "Unknown pack",
-    "addedNotification": "⚡ {credits} AI credits added"
+    "addedNotification": "⚡ {credits} AI credits added",
+    "refundedNotification": "↩️ A credit pack payment was refunded — {credits} credits were removed from the balance"
   },
   "followupMood": {
     "negativeNotification": "😟 {name} sounded unhappy. The automatic follow-up was paused, a person should reply"
@@ -7380,7 +7444,11 @@
         "s4": "Find what is stalling open deals and prepare a follow-up plan for every open deal",
         "s5": "Improve our reputation: answer every review and build a process for getting new reviews",
         "s6": "Audit the website and landing pages and propose changes that raise the conversion rate"
-      }
+      },
+      "delete": "Delete goal",
+      "deleteConfirm": "Delete the goal and its {n} tasks?",
+      "deleted": "The goal and its tasks were deleted",
+      "deleteRunning": "A task of this goal is running — stop it first, then delete"
     },
     "questions": {
       "title": "Your employees ask",

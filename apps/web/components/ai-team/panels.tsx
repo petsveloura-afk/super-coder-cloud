@@ -9,7 +9,7 @@ import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea } from 
 import { AgentAvatar } from "./avatar";
 import { ThinkingDots, TeamAgentLoader, type TeamPhase } from "./team-agent-loader";
 import { startTaskAction, taskProgressAction } from "@/app/[locale]/(dashboard)/ai-team/run-actions";
-import { clearTaskHistoryAction, deleteTeamTasksAction } from "@/app/[locale]/(dashboard)/ai-team/history-actions";
+import { clearTaskHistoryAction, deleteGoalAction, deleteTeamTasksAction } from "@/app/[locale]/(dashboard)/ai-team/history-actions";
 import { flowStep, FLOW_POLL_MS, FLOW_MAX_MS, FLOW_RETRY_WAIT_MS } from "@/lib/team/run-flow-core";
 import { ownerFailure } from "@/lib/team/failure-reason-core";
 import { ownerFacingText, selfServeAnswer } from "@/lib/team/ask-gate-core";
@@ -70,6 +70,8 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
   const { t, locale } = useI18n();
   const [goal, setGoal] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  // round 12: deleting a goal asks once more on the same button (two-step, no pop-up)
+  const [confirmGoal, setConfirmGoal] = useState<string | null>(null);
   const [taskFor, setTaskFor] = useState<{ memberId: string; title: string; brief?: string }>({ memberId: data.members[0]?.id ?? "", title: "" });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const goals = data.tasks.filter((x) => x.plan && (x.plan as { goal?: boolean }).goal);
@@ -343,7 +345,23 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
                     {m ? <AgentAvatar spec={m.avatar} state={g.status === "in_progress" ? "working" : g.status === "done" ? "success" : "idle"} size={30} /> : null}
                     <span className="min-w-0 flex-1 font-semibold">{g.title}</span>
                     <Badge tone={g.status === "in_progress" ? "accent" : "neutral"}>{g.status === "done" && kids.length > 0 && done < kids.length ? t("aiTeam.goal.partial") : t(`aiTeam.status.${g.status}`)}</Badge>
+                    {g.status !== "in_progress" && !kids.some((k) => k.status === "in_progress") && confirmGoal !== g.id ? (
+                      <button type="button" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted transition hover:bg-danger/10 hover:text-danger" aria-label={t("aiTeam.goal.delete")} title={t("aiTeam.goal.delete")} onClick={() => setConfirmGoal(g.id)} data-testid="goal-delete">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    ) : null}
                   </div>
+                  {confirmGoal === g.id ? (
+                    <div className="fade-slide mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2">
+                      <span className="flex-1 text-[12.5px] text-danger">{t("aiTeam.goal.deleteConfirm", { n: kids.length })}</span>
+                      <Button size="sm" variant="ghost" className="text-danger" loading={busy === `g${g.id}`} onClick={() => (setConfirmGoal(null), void run(`g${g.id}`, () => deleteGoalAction({ locale, goalId: g.id })))} data-testid="goal-delete-confirm">
+                        <Trash2 className="h-3.5 w-3.5" /> {t("aiTeam.goal.delete")}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setConfirmGoal(null)}>
+                        {t("common.cancel")}
+                      </Button>
+                    </div>
+                  ) : null}
                   {kids.length ? (
                     <div className="mt-2">
                       <div className="h-1.5 overflow-hidden rounded-full bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>

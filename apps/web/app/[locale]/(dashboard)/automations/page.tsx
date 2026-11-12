@@ -61,6 +61,9 @@ export default async function AutomationsPage({ params }: { params: Promise<{ lo
     else runsBy.set(k, [row]);
   }
   const nowMs = Date.parse(sinceIso(0));
+  // round 12: automations that do exactly the same work (same trigger, settings, conditions and steps)
+  const { duplicateGroups } = await import("@/lib/automations/dup-core");
+  const dups = duplicateGroups(list.map((a) => ({ id: a.id as string, trigger_type: a.trigger_type as string, trigger_config: a.trigger_config, conditions: a.conditions, actions: a.actions })));
   const items: AutomationListItem[] = list.map((a) => {
     const rs = runsBy.get(a.id as string) ?? [];
     const summary = summarizeRuns(rs);
@@ -88,6 +91,7 @@ export default async function AutomationsPage({ params }: { params: Promise<{ lo
       buckets: dailyBuckets(rs, STATS_DAYS, nowMs),
       errors: analysis.counts.error,
       warnings: analysis.counts.warning,
+      duplicates: dups.get(a.id as string) ?? 0,
     };
   });
   const attention = items.filter((a) => a.health === "failing" || a.health === "attention" || a.errors > 0).length;

@@ -86,7 +86,7 @@ export default async function BillingPage({
   ]);
   // wave 8 — more ways to pay + payment history with receipts
   const { data: payRows } = ctx.can("billing.manage")
-    ? await supabase.from("billing_payments").select("id, provider, plan_key, billing_interval, amount, currency, status, receipt_number, paid_at").eq("organization_id", ctx.org.id).order("paid_at", { ascending: false }).limit(50)
+    ? await supabase.from("billing_payments").select("id, provider, plan_key, billing_interval, amount, currency, status, receipt_number, paid_at, meta").eq("organization_id", ctx.org.id).neq("status", "voided").order("paid_at", { ascending: false }).limit(50)
     : { data: [] };
   const methodFor = (plan: string) => [
     // wave 12: card first; the PayPal recurring-subscription button only when PAYPAL_SHOW_SUBSCRIPTION=true

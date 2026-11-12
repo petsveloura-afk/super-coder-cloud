@@ -9,7 +9,8 @@ export const maxDuration = 60;
 /**
  * POST /api/webhooks/paypal — subscription lifecycle + payments.
  * Verified with PayPal's verify-webhook-signature (PAYPAL_WEBHOOK_ID); each event once (billing_events).
- * Events: BILLING.SUBSCRIPTION.* (ACTIVATED/UPDATED/CANCELLED/SUSPENDED/EXPIRED), PAYMENT.SALE.COMPLETED.
+ * Events: BILLING.SUBSCRIPTION.* (ACTIVATED/UPDATED/CANCELLED/SUSPENDED/EXPIRED/PAYMENT.FAILED), PAYMENT.SALE.COMPLETED,
+ * round 12: PAYMENT.CAPTURE.REFUNDED / REVERSED and PAYMENT.SALE.REFUNDED / REVERSED (refunds and chargebacks).
  */
 export async function POST(request: NextRequest) {
   if (!paypalConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ error: "not_configured" }, { status: 503 });
@@ -34,6 +35,13 @@ export async function POST(request: NextRequest) {
     const r = event.resource ?? {};
     if (type.startsWith("BILLING.SUBSCRIPTION.")) {
       const out = await syncPayPalSubscription(String(r.id ?? ""));
+      if (out.orgId) await admin.from("billing_events").update({ organization_id: out.orgId }).eq("provider", "paypal").eq("event_id", id);
+      // round 12: a failed renewal — the owners are told to update the payment method before the plan stops
+      if (type === "BILLING.SUBSCRIPTION.PAYMENT.FAILED" && out.orgId) await import("@/lib/billing/refunds").then((m) => m.notifyPaymentFailed(out.orgId!));
+    } else if (["PAYMENT.CAPTURE.REFUNDED", "PAYMENT.CAPTURE.REVERSED", "PAYMENT.SALE.REFUNDED", "PAYMENT.SALE.REVERSED"].includes(type)) {
+      // round 12: money went back (refund / chargeback) — payment marked refunded, a credit pack's credits taken back once
+      const { processRefundEvent } = await import("@/lib/billing/refunds");
+      const out = await processRefundEvent(type, r);
       if (out.orgId) await admin.from("billing_events").update({ organization_id: out.orgId }).eq("provider", "paypal").eq("event_id", id);
     } else if (type === "CHECKOUT.ORDER.APPROVED" || type === "PAYMENT.CAPTURE.COMPLETED") {
       // wave 11: card payments (one-time order) — captured even if the customer closed the page before returning

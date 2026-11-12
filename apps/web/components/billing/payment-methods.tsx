@@ -80,6 +80,8 @@ export interface PaymentRow {
   status: string;
   receipt_number: number;
   paid_at: string;
+  /** round 12: a credit pack payment carries { credit_pack, credits } */
+  meta?: Record<string, unknown> | null;
 }
 
 export async function PaymentHistory({ locale, rows }: { locale: Locale; rows: PaymentRow[] }) {
@@ -98,7 +100,8 @@ export async function PaymentHistory({ locale, rows }: { locale: Locale; rows: P
             <li key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-sm">
               <span className="font-mono text-[12.5px] text-muted">#{r.receipt_number}</span>
               <span className="text-muted">{formatDate(locale, r.paid_at)}</span>
-              <span className="font-medium">{r.plan_key ? t(`billing.plans.${r.plan_key}.name`) : "—"}</span>
+              <span className="font-medium">{r.plan_key ? t(`billing.plans.${r.plan_key}.name`) : typeof r.meta?.credits === "number" ? t("billing.pay.creditsItem", { n: r.meta.credits as number }) : "—"}</span>
+              {r.status === "refunded" ? <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[11.5px] text-warning">{t("billing.pay.refunded")}</span> : null}
               <span className="text-[12px] text-subtle">{t(`billing.pay.providers.${r.provider}`)}</span>
               <span className="ms-auto font-semibold tabular-nums" dir="ltr">
                 {formatCurrency(locale, Number(r.amount), r.currency.toUpperCase())}

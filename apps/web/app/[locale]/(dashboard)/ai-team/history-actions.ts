@@ -94,3 +94,33 @@ export async function clearTaskHistoryAction(input: { locale: string; olderThanD
   revalidatePath(`/${locale}/ai-team`);
   return { ok: true, message: "aiTeam.history.cleared", messageParams: { n: deleted }, data: { deleted } };
 }
+
+/**
+ * round 12: delete a whole GOAL (the owner's big request) with its tasks — from the "goals in progress and summaries" card.
+ * Only when none of its tasks is running right now (a running task is stopped first with "stop", then the goal can go).
+ * The goal and its tasks are removed together (the database cascades from the goal to its tasks, approvals and messages);
+ * the team's memory, facts and the activity log stay. Recorded in the activity log.
+ */
+export async function deleteGoalAction(input: { locale: string; goalId: string }): Promise<ActionState<{ deleted: number }>> {
+  const locale = loc(input.locale);
+  const id = z.string().uuid().safeParse(input.goalId);
+  if (!id.success) return { error: "validation.invalidId" };
+  const g = await gate(locale);
+  if ("error" in g) return { error: g.error };
+  const { ctx, a } = g;
+  const { data: goal } = await a.from("team_tasks").select("id, title, status, plan").eq("organization_id", ctx.org.id).eq("id", id.data).maybeSingle();
+  if (!goal || (goal.plan as { goal?: boolean } | null)?.goal !== true) return { error: "errors.notFound" };
+  const { data: kids } = await a.from("team_tasks").select("id, status").eq("organization_id", ctx.org.id).eq("goal_id", id.data).limit(500);
+  const rows = [{ id: goal.id as string, status: goal.status as string }, ...((kids ?? []) as { id: string; status: string }[])];
+  if (rows.some((r) => r.status === "in_progress")) return { error: "aiTeam.goal.deleteRunning" };
+  const kidIds = rows.slice(1).map((r) => r.id);
+  for (let i = 0; i < kidIds.length; i += 200) {
+    const { error } = await a.from("team_tasks").delete().eq("organization_id", ctx.org.id).in("id", kidIds.slice(i, i + 200)).neq("status", "in_progress");
+    if (error) return { error: "common.error" };
+  }
+  const { error } = await a.from("team_tasks").delete().eq("organization_id", ctx.org.id).eq("id", id.data).neq("status", "in_progress");
+  if (error) return { error: "common.error" };
+  await audit(a, ctx.org.id, ctx.userId, `Goal deleted by a manager: ${String(goal.title ?? "").slice(0, 200)}`, { goal: id.data, tasks: kidIds.length });
+  revalidatePath(`/${locale}/ai-team`);
+  return { ok: true, message: "aiTeam.goal.deleted", data: { deleted: kidIds.length + 1 } };
+}
