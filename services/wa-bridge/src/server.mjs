@@ -4,7 +4,7 @@
 //
 // Env:
 //   WA_BRIDGE_SECRET  shared secret (same value in Vercel), ≥ 24 chars — required
-//   APP_URL           https://super-coder-cloud.vercel.app — callbacks must point here
+//   APP_URL           https://app.supercoder.agency — callbacks must point here
 //   DATA_DIR          persistent directory for sessions (Railway volume) — default /data
 //   PORT              default 8080
 //   CRON_SECRET       optional: when set, the bridge also asks the web app every minute

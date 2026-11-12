@@ -1,5 +1,5 @@
 /*! SUPER CODER CLOUD — website chat widget.
- * <script src="https://super-coder-cloud.vercel.app/widget.js" data-org="your-workspace" data-lang="he" data-color="3366E6" async></script>
+ * <script src="https://app.supercoder.agency/widget.js" data-org="your-workspace" data-lang="he" data-color="3366E6" async></script>
  */
 (function () {
   var s = document.currentScript;

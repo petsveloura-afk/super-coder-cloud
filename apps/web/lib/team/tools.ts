@@ -121,7 +121,7 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
         const robots = await automatedContactIds(orgId, rows.map((c) => c.contact_id));
         // + service senders by name ("Neon Alerts", "OKX", "Telegram") — not customers (see inbox/robots-core)
         const { isServiceSender } = await import("@/lib/inbox/robots-core");
-        const people = rows.filter((c) => !(c.contact_id && robots.has(c.contact_id)) && !isServiceSender(c.title, null)).slice(0, 10);
+        const people = rows.filter((c) => !(c.contact_id && robots.has(c.contact_id)) && !isServiceSender(c.title, null, c.channel)).slice(0, 10);
         return { ok: true, data: people, summary: people.length ? people.map((c) => `${c.title ?? "customer"} on ${c.channel} (contact ${c.contact_id ?? "—"}, waiting since ${c.last_customer_at.slice(0, 16)})`).join("; ") + (robots.size ? `. (${robots.size} automated sender(s) ignored — not customers)` : "") : "no customer is waiting", link: "/inbox" };
       }
       case "reviews.recent": {

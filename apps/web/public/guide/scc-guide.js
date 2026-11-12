@@ -88,7 +88,7 @@
         ${!url ? "" : LINKS ? `<a class="g-open" href="${url}">פתיחת המסך הזה במערכת ${ICON.out}</a>` : `<a class="g-open" href="${url}" target="_blank" rel="noopener">לנסות עכשיו בפלטפורמה ${ICON.out}</a>`}
       </div>
       <figure class="g-fig">
-        <div class="frame"><div class="bar"><i></i><i></i><i></i><span>super-coder-cloud.vercel.app</span></div>
+        <div class="frame"><div class="bar"><i></i><i></i><i></i><span>app.supercoder.agency</span></div>
           <div class="g-pic"><img src="${s.img}" width="${s.w}" height="${s.h}" alt="${esc(s.title)}: צילום מסך מהמערכת עם סימון של המקומות ללחוץ" loading="${s.i < 2 ? "eager" : "lazy"}" decoding="async">${(s.marks || []).map(markHTML).join("")}</div>
         </div>
       </figure>

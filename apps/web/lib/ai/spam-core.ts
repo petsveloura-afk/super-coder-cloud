@@ -38,7 +38,7 @@ export function notCustomerKind(input: { text: string; channel: string; automate
   if (input.automated) return "bulk";
   // a well-known service sender by its NAME only (an exchange, a platform, "… Alerts") — the text is not used here, so a
   // customer is never skipped because of what they wrote
-  if (isServiceSender(input.subject ?? null, null)) return "bulk";
+  if (isServiceSender(input.subject ?? null, null, input.channel)) return "bulk";
   if (!text) return null;
   const bulk = BULK.filter((r) => r.test(text)).length;
   const spam = SPAM.filter((r) => r.test(text)).length;

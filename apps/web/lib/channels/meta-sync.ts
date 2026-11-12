@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadAccountById } from "@/lib/social/accounts";
 import { graphVersion } from "./meta";
+import { graphBaseFor } from "./ig-login-core";
 import {
   POLL_COMMENT_WINDOW_MS,
   POLL_MESSAGE_WINDOW_MS,
@@ -34,7 +35,7 @@ interface GraphResult {
 
 async function graphGet(path: string, token: string, params: Record<string, string> = {}): Promise<GraphResult> {
   try {
-    const base = (process.env.META_GRAPH_BASE || `https://graph.facebook.com/${graphVersion()}`).replace(/\/$/, "");
+    const base = graphBaseFor(token, graphVersion(), { META_GRAPH_BASE: process.env.META_GRAPH_BASE, META_IG_GRAPH_BASE: process.env.META_IG_GRAPH_BASE });
     const qs = new URLSearchParams(params).toString();
     const res = await fetch(`${base}${path}${qs ? `?${qs}` : ""}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000), cache: "no-store" });
     const j = (await res.json().catch(() => ({}))) as Record<string, unknown> & { error?: { message?: string; code?: number } };
@@ -112,6 +113,17 @@ export async function syncMetaInbound(budgetMs = 25_000, opts: { orgId?: string;
     const cfg = acc.config ?? {};
     const pageId = cfg.page_id ?? "";
     const igId = cfg.ig_id ?? "";
+    // Instagram connected directly (no Facebook Page): its own sweep — token refresh, comments, unanswered messages
+    if (acc.kind === "instagram" && cfg.mode === "instagram_login") {
+      if (token && /^\d{3,40}$/.test(igId)) {
+        result.accounts++;
+        await syncIgLoginAccount(acc, token, cfg, opts.fast === true, { handleComments, handleMessages, result }).catch((e) => {
+          result.errors++;
+          console.error("instagram direct sync failed", (e as Error).message);
+        });
+      }
+      continue;
+    }
     if (!token || !/^\d{3,40}$/.test(pageId)) continue;
     result.accounts++;
     const state: { problem: string | null } = { problem: null };
@@ -165,4 +177,56 @@ export async function syncMetaInbound(budgetMs = 25_000, opts: { orgId?: string;
     }
   }
   return result;
+}
+
+/**
+ * Instagram connected directly (Instagram Login): keeps the 60-day token alive, re-subscribes the webhooks, and picks up
+ * comments / direct messages Meta did not deliver — the same pipeline (and the same de-duplication) as the Page accounts.
+ */
+async function syncIgLoginAccount(
+  acc: AccRow,
+  token: string,
+  cfg: Record<string, string>,
+  fast: boolean,
+  io: { handleComments: (acc: AccRow, list: PageComment[]) => Promise<void>; handleMessages: (acc: AccRow, list: PolledMessage[]) => Promise<void>; result: MetaSyncResult },
+): Promise<void> {
+  const admin = createAdminClient();
+  const igId = cfg.ig_id ?? "";
+  let problem: string | null = null;
+  if (!fast) {
+    const { igTokenNeedsRefresh } = await import("./ig-login-core");
+    if (igTokenNeedsRefresh(cfg.token_expires, Date.now())) {
+      const { igRefreshToken } = await import("./ig-login");
+      const r = await igRefreshToken(token);
+      if (r.ok && r.token) {
+        const { sealSecrets } = await import("./secrets");
+        token = r.token;
+        await admin.from("channel_accounts").update({ secret_enc: sealSecrets({ page_token: r.token }), config: { ...cfg, token_expires: r.expiresAt ?? "" }, updated_at: new Date().toISOString() }).eq("id", acc.id);
+      } else if (Date.parse(cfg.token_expires ?? "") < Date.now()) problem = "sync: instagram token expired — connect Instagram again";
+    }
+    const subs = await graphGet(`/me/subscribed_apps`, token);
+    const fields = new Set((((subs.data.data as { subscribed_fields?: string[] }[] | undefined) ?? [])[0]?.subscribed_fields ?? []).map(String));
+    if (!subs.ok || !fields.has("messages") || !fields.has("comments")) {
+      const { igSubscribe } = await import("./ig-login");
+      const fix = await igSubscribe(token);
+      if (fix.ok) io.result.resubscribed++;
+      else problem ??= `subscribe: ${fix.error ?? ""}`.slice(0, 480);
+    }
+    const media = await graphGet(`/${encodeURIComponent(igId)}/media`, token, { fields: "id,timestamp,comments.limit(40){id,text,timestamp,username,parent_id,from}", limit: "10" });
+    if (!media.ok) {
+      io.result.errors++;
+      problem ??= `sync: instagram comments ${media.code ?? ""} ${media.error ?? ""}`.replace(/\s+/g, " ").trim().slice(0, 480);
+    } else await io.handleComments(acc, commentsFromIgMedia(igId, cfg.username, media.data, Date.now() - POLL_COMMENT_WINDOW_MS));
+  }
+  const convs = await graphGet(`/me/conversations`, token, { platform: "instagram", fields: "id,updated_time,messages.limit(8){id,message,created_time,from}", limit: "15" });
+  if (!convs.ok) {
+    io.result.errors++;
+    problem ??= `sync: instagram messages ${convs.code ?? ""} ${convs.error ?? ""}`.replace(/\s+/g, " ").trim().slice(0, 480);
+  } else await io.handleMessages(acc, messagesFromConversations("instagram", igId, [cfg.ig_app_id ?? ""].filter(Boolean), convs.data, Date.now() - POLL_MESSAGE_WINDOW_MS));
+  const prev = acc.last_error ?? "";
+  if (problem) {
+    if (prev !== problem) await admin.from("channel_accounts").update({ last_error: problem, updated_at: new Date().toISOString() }).eq("id", acc.id);
+  } else if (/^(sync|subscribe):/.test(prev)) {
+    await admin.from("channel_accounts").update({ last_error: null, updated_at: new Date().toISOString() }).eq("id", acc.id);
+  }
 }

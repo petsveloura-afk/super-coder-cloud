@@ -2,6 +2,7 @@ import "server-only";
 import { graphVersion } from "./meta";
 import type { ProviderResult } from "./providers";
 import { quickReplies, splitForMeta, type SocialPlatform } from "./meta-pages-core";
+import { graphBaseFor, grantedPermissions, igIssueFromPermissions, isIgLoginToken } from "./ig-login-core";
 
 /**
  * Wave 19 — Facebook Page (Messenger + comments + posts) and Instagram (Direct + comments + posts)
@@ -27,10 +28,12 @@ export function metaPagesPublicConfig() {
 }
 
 const graph = () => (process.env.META_GRAPH_BASE || `https://graph.facebook.com/${graphVersion()}`).replace(/\/$/, "");
+// Instagram connected directly: its token ("IG…") is served by graph.instagram.com — the same calls, another host
+const graphFor = (token?: string) => (isIgLoginToken(token) ? graphBaseFor(token, graphVersion(), { META_IG_GRAPH_BASE: process.env.META_IG_GRAPH_BASE }) : graph());
 
 async function g(path: string, init: { method?: "GET" | "POST" | "DELETE"; token?: string; body?: unknown } = {}) {
   try {
-    const res = await fetch(`${graph()}${path}`, {
+    const res = await fetch(`${graphFor(init.token)}${path}`, {
       method: init.method ?? "GET",
       headers: { ...(init.token ? { Authorization: `Bearer ${init.token}` } : {}), ...(init.body ? { "Content-Type": "application/json" } : {}) },
       body: init.body ? JSON.stringify(init.body) : undefined,
@@ -49,6 +52,8 @@ export interface MetaPage {
   name: string;
   token: string;
   instagram: { id: string; username: string | null } | null;
+  /** why the Page came without Instagram ("permission" / "not_linked") — shown with the exact fix */
+  igIssue?: string;
 }
 
 /** popup code → a user token → the Pages (with their own tokens) the business chose to share. */
@@ -63,11 +68,24 @@ export async function pagesFromLoginCode(code: string, redirectUri?: string): Pr
   // a long-lived user token → long-lived Page tokens (Business Login tokens usually already are)
   const ll = await g(`/oauth/access_token?${new URLSearchParams({ grant_type: "fb_exchange_token", client_id: process.env.META_APP_ID!, client_secret: process.env.META_APP_SECRET!, fb_exchange_token: userToken }).toString()}`);
   if (ll.ok && typeof ll.data.access_token === "string") userToken = ll.data.access_token;
-  const pages = await g(`/me/accounts?fields=id,name,access_token,instagram_business_account%7Bid,username%7D&limit=50`, { token: userToken });
+  // the Instagram account may come as instagram_business_account (linked in Business Settings) or as
+  // connected_instagram_account (linked from the Page's own settings) — either one is the business's Instagram
+  let pages = await g(`/me/accounts?fields=id,name,access_token,instagram_business_account%7Bid,username%7D,connected_instagram_account%7Bid,username%7D&limit=50`, { token: userToken });
+  if (!pages.ok) pages = await g(`/me/accounts?fields=id,name,access_token,instagram_business_account%7Bid,username%7D&limit=50`, { token: userToken });
   if (!pages.ok) return { ok: false, error: pages.error, pages: [] };
-  const list = ((pages.data.data as { id: string; name?: string; access_token?: string; instagram_business_account?: { id?: string; username?: string } }[] | undefined) ?? [])
+  type RawPage = { id: string; name?: string; access_token?: string; instagram_business_account?: { id?: string; username?: string }; connected_instagram_account?: { id?: string; username?: string } };
+  const list = ((pages.data.data as RawPage[] | undefined) ?? [])
     .filter((p) => /^\d{3,40}$/.test(p.id) && p.access_token)
-    .map((p) => ({ id: p.id, name: (p.name ?? "").slice(0, 160), token: p.access_token!, instagram: p.instagram_business_account?.id ? { id: p.instagram_business_account.id, username: p.instagram_business_account.username ?? null } : null }));
+    .map((p) => {
+      const ig = p.instagram_business_account?.id ? p.instagram_business_account : p.connected_instagram_account?.id ? p.connected_instagram_account : null;
+      return { id: p.id, name: (p.name ?? "").slice(0, 160), token: p.access_token!, instagram: ig?.id ? { id: ig.id, username: ig.username ?? null } : null } as MetaPage;
+    });
+  // a Page without Instagram: find out why (permission not granted vs. no Instagram linked) — one extra call, only then
+  if (list.some((p) => !p.instagram)) {
+    const perms = await g(`/me/permissions`, { token: userToken });
+    const issue = igIssueFromPermissions(perms.ok ? grantedPermissions(perms.data) : null);
+    for (const p of list) if (!p.instagram) p.igIssue = issue;
+  }
   return { ok: true, pages: list };
 }
 

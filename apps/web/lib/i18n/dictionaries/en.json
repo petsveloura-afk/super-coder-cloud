@@ -2048,6 +2048,11 @@
       "body": "{shop} will be connected to the workspace {org}. Taking you to Shopify to approve…",
       "noShop": "No store address was received. You can connect a store from Integrations.",
       "go": "Continue to Shopify"
+    },
+    "ig": {
+      "connected": "Instagram connected ✓ @{ig}",
+      "failed": "Connecting Instagram failed: {detail}",
+      "personal": "This is a personal Instagram account. A professional account (business or creator) is needed — in the app: Settings → Account type → switch to professional."
     }
   },
   "public": {
@@ -6026,10 +6031,34 @@
       "no_permissions": "No permission was ticked on the Google screen. Try again and tick the checkboxes (or \"Select all\").",
       "partial": "Partly connected ({detail}) — you can retry what failed",
       "shop_not_found": "We couldn't find a Shopify store with that name",
-      "not_shopify": "That domain isn't a Shopify store"
+      "not_shopify": "That domain isn't a Shopify store",
+      "personal": "This is a personal Instagram account — switch it to a professional account (business or creator) and connect again"
     },
     "adminSetup": "One-time setup in admin",
-    "adminOnly": "Only you see this"
+    "adminOnly": "Only you see this",
+    "ig": {
+      "title": "Instagram",
+      "body": "Direct messages reach the inbox and the agent answers; comments get replies; the marketing agent publishes. Connect through your Facebook Page or directly with your Instagram account.",
+      "steps": "One Instagram sign-in — no Facebook Page needed",
+      "connect": "Connect Instagram directly",
+      "connectOther": "Connect another Instagram account",
+      "switch": "Switch account",
+      "disconnect": "Disconnect Instagram",
+      "confirmDisconnect": "Disconnect only the Instagram account? Instagram messages and comments will stop arriving. The Facebook Page stays connected.",
+      "viaPage": "Connected through the Facebook Page",
+      "viaDirect": "Connected directly with the Instagram account",
+      "renews": "Access renews automatically every month",
+      "issuePermission": "Facebook connected, but the Instagram permissions were not approved",
+      "fixPermission": "Click \"Reconnect\" on the Facebook + Instagram card and, in Facebook's window, also select the Instagram account and all permissions.",
+      "issueNotLinked": "No Instagram business account is linked to the Facebook Page",
+      "fix1": "In the Instagram app: Settings → Account type → switch to a professional account (business or creator).",
+      "fix2": "In Meta Business Suite: Settings → Accounts → Instagram → link the account to the Facebook Page.",
+      "fix3": "In Instagram: Settings → Messages and story replies → Connected tools → allow access to messages.",
+      "fix4": "Come back here and click \"Reconnect\" on the Facebook + Instagram card.",
+      "orDirect": "Or the short way: connect Instagram directly with the button below.",
+      "howTo": "Connect through the Facebook + Instagram card, or directly here with a professional Instagram account (business or creator).",
+      "commentsLink": "Comments and automatic comment replies →"
+    }
   },
   "guide": {
     "newTitle": "What's new on the platform",

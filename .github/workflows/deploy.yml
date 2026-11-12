@@ -93,7 +93,7 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           if [ -z "$CRON_SECRET" ]; then echo "::warning::CRON_SECRET secret not set — the 30-second clock was not started."; exit 0; fi
-          URL="${APP_URL:-https://super-coder-cloud.vercel.app}"
+          URL="${APP_URL:-https://app.supercoder.agency}"
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -v url="$URL" -v secret="$CRON_SECRET" -q -t -f - <<'SQL'
           select public.schedule_meta_inbound_sync(:'url', :'secret');
           SQL
@@ -107,7 +107,7 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           if [ -z "$CRON_SECRET" ]; then echo "::warning::CRON_SECRET secret not set — the job clock was not started."; exit 0; fi
-          URL="${APP_URL:-https://super-coder-cloud.vercel.app}"
+          URL="${APP_URL:-https://app.supercoder.agency}"
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -v url="$URL" -v secret="$CRON_SECRET" -q -t -f - <<'SQL'
           select public.schedule_platform_jobs(:'url', :'secret');
           SQL
@@ -120,7 +120,7 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           if [ -z "$CRON_SECRET" ]; then echo "::warning::CRON_SECRET secret not set — the team clock was not started."; exit 0; fi
-          URL="${APP_URL:-https://super-coder-cloud.vercel.app}"
+          URL="${APP_URL:-https://app.supercoder.agency}"
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -v url="$URL" -v secret="$CRON_SECRET" -q -t -f - <<'SQL'
           select public.schedule_team_job(:'url', :'secret');
           SQL

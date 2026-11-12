@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getOrgContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { dbErrorKey, type ActionState } from "@/lib/action-state";
-import { isRobotName, isServiceSender } from "@/lib/inbox/robots-core";
+import { isChannelPlaceholderTitle, isRobotName, isServiceSender } from "@/lib/inbox/robots-core";
 
 /**
  * Close the automatic conversations (service senders: exchanges, platform alerts, login codes, no-reply mailboxes) in one
@@ -21,9 +21,9 @@ export async function closeServiceConversationsAction(input: { locale: string; i
   const parsed = ids.safeParse([...new Set(input.ids ?? [])]);
   if (!parsed.success) return { error: "validation.invalidId" };
   const supabase = await createClient();
-  const { data, error } = await supabase.from("conversations").select("id, title, last_message_preview").eq("organization_id", ctx.org.id).eq("status", "open").in("id", parsed.data);
+  const { data, error } = await supabase.from("conversations").select("id, title, last_message_preview, channel").eq("organization_id", ctx.org.id).eq("status", "open").in("id", parsed.data);
   if (error) return { error: dbErrorKey(error) };
-  const robots = ((data ?? []) as { id: string; title: string | null; last_message_preview: string | null }[]).filter((c) => isRobotName(c.title) || isServiceSender(c.title, c.last_message_preview)).map((c) => c.id);
+  const robots = ((data ?? []) as { id: string; title: string | null; last_message_preview: string | null; channel?: string | null }[]).filter((c) => (isChannelPlaceholderTitle(c.title, c.channel) ? isServiceSender(null, c.last_message_preview) : isRobotName(c.title) || isServiceSender(c.title, c.last_message_preview))).map((c) => c.id);
   if (!robots.length) return { ok: true, message: "inbox.robots.none", data: { closed: 0 } };
   const { data: done, error: upErr } = await supabase.from("conversations").update({ status: "closed" }).eq("organization_id", ctx.org.id).in("id", robots).select("id");
   if (upErr) return { error: dbErrorKey(upErr) };

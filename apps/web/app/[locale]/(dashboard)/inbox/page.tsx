@@ -117,8 +117,9 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
       for (const id of await robotConversationIds(supabase, ctx.org.id, emailRows)) robotIds.add(id);
     }
     // service senders on every channel (Telegram login codes, exchanges, platform alerts) — not customers either
-    const { isServiceSender } = await import("@/lib/inbox/robots-core");
-    for (const c of allRows) if (isServiceSender(c.title, c.last_message_preview)) robotIds.add(c.id);
+    const { isServiceSender, isChannelPlaceholderTitle } = await import("@/lib/inbox/robots-core");
+    // a Messenger / Instagram customer still titled "Instagram" / "Messenger" (name not read yet) is a person, not a service
+    for (const c of allRows) if (isChannelPlaceholderTitle(c.title, c.channel) ? isServiceSender(null, c.last_message_preview) : isServiceSender(c.title, c.last_message_preview)) robotIds.add(c.id);
   } catch {
     /* the waiting counter works as before */
   }

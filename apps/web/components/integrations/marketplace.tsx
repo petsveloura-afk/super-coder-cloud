@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { waitForSignup } from "@/lib/channels/wa-signup-wait";
 import { chooseMetaPageAction, connectMetaPagesAction, disconnectMetaPagesAction, type MetaPageChoice } from "@/app/[locale]/(dashboard)/integrations/connect-actions";
 import { connectWhatsAppEmbeddedAction } from "@/app/[locale]/(dashboard)/integrations/actions";
+import { disconnectInstagramAction } from "@/app/[locale]/(dashboard)/integrations/instagram-actions";
 
 /**
  * Wave 19 — the integrations marketplace: every connection by category, each in as few steps as
@@ -25,6 +26,8 @@ export interface MarketProps {
   metaWa: { appId: string; configId: string; version: string } | null;
   facebook: { connected: boolean; label: string | null; error: string | null };
   instagram: { connected: boolean; label: string | null };
+  /** Instagram connected directly (Instagram Login): configured on the platform, how the current one is connected, its problem */
+  igDirect?: { configured: boolean; mode: string | null; error: string | null; expires: string | null; issue: string | null };
   whatsappMode: string | null;
   google: { configured: boolean; calendar: boolean; gmail: boolean; business: boolean; email: string | null };
   shopify: { configured: boolean; connected: boolean; shop: string | null; error: string | null; orders30: number; revenue30: number };
@@ -268,6 +271,71 @@ function MetaTile({ p }: { p: MarketProps }) {
       {p.canManage && !p.facebook.connected ? (
         <a href="#meta-alt" className="block text-[12px] font-medium text-accent hover:underline" data-testid="meta-alt-link">
           {t("metaAlt.tileLink")}
+        </a>
+      ) : null}
+    </Tile>
+  );
+}
+
+/* ----------------------------------------------------------- Instagram (with the Facebook Page, or connected directly) */
+function InstagramTile({ p }: { p: MarketProps }) {
+  const { t, locale } = useI18n();
+  const d = p.igDirect;
+  const direct = d?.mode === "instagram_login";
+  const connected = p.instagram.connected;
+  const startUrl = `/api/channels/instagram/oauth?locale=${locale}`;
+  const issue = !connected && p.facebook.connected ? (d?.issue ?? "not_linked") : null;
+  const expires = direct && d?.expires ? new Date(d.expires) : null;
+  return (
+    <Tile
+      id="instagram"
+      icon={Camera}
+      title={t("market.ig.title")}
+      body={t("market.ig.body")}
+      gradient="from-fuchsia-500/15 via-orange-400/10 to-transparent"
+      state={<State on={connected} error={connected ? d?.error : null} />}
+      steps={t(d?.configured ? "market.ig.steps" : "market.oneClick")}
+    >
+      {connected ? (
+        <div className="space-y-1 text-[13px]" data-testid="ig-status">
+          <p className="font-medium">{p.instagram.label ?? "Instagram"}</p>
+          <p className="text-[12px] text-muted">{t(direct ? "market.ig.viaDirect" : "market.ig.viaPage")}</p>
+          {expires && Number.isFinite(expires.getTime()) ? <p className="text-[11.5px] text-subtle">{t("market.ig.renews")}</p> : null}
+          {d?.error ? <p className="rounded-lg bg-danger/10 px-2 py-1 text-[12px] text-danger" dir="auto">{d.error.slice(0, 200)}</p> : null}
+        </div>
+      ) : null}
+      {issue ? (
+        <div className="space-y-1.5 rounded-2xl border border-warning/40 bg-warning/10 p-3 text-[12.5px]" data-testid="ig-issue">
+          <p className="font-semibold">{t(issue === "permission" ? "market.ig.issuePermission" : "market.ig.issueNotLinked")}</p>
+          {issue === "permission" ? (
+            <p className="text-muted">{t("market.ig.fixPermission")}</p>
+          ) : (
+            <ol className="list-decimal space-y-0.5 ps-5 text-muted">
+              <li>{t("market.ig.fix1")}</li>
+              <li>{t("market.ig.fix2")}</li>
+              <li>{t("market.ig.fix3")}</li>
+              <li>{t("market.ig.fix4")}</li>
+            </ol>
+          )}
+          {d?.configured ? <p className="font-medium text-accent">{t("market.ig.orDirect")}</p> : null}
+        </div>
+      ) : null}
+      {!connected && !p.facebook.connected ? <p className="text-[12.5px] text-muted">{t("market.ig.howTo")}</p> : null}
+      {p.canManage ? (
+        <div className="flex flex-wrap gap-2">
+          {d?.configured ? (
+            <a href={startUrl} className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-600 via-pink-500 to-orange-400 px-3.5 text-[13px] font-semibold text-white shadow-sm transition hover:opacity-95" data-testid="ig-direct-connect">
+              <Camera className="h-4 w-4" /> {t(connected ? (direct ? "market.ig.switch" : "market.ig.connectOther") : "market.ig.connect")}
+            </a>
+          ) : p.platformAdmin ? (
+            <AdminSetup what="instagram" />
+          ) : null}
+          {connected ? <ConfirmActionButton action={disconnectInstagramAction} fields={{ locale }} size="sm" variant="ghost" label={t("market.ig.disconnect")} confirm={t("market.ig.confirmDisconnect")} /> : null}
+        </div>
+      ) : null}
+      {connected ? (
+        <a href={`/${locale}/social`} className="block text-[12px] font-medium text-accent hover:underline">
+          {t("market.ig.commentsLink")}
         </a>
       ) : null}
     </Tile>
@@ -586,12 +654,16 @@ export function IntegrationsMarketplace(p: MarketProps) {
     if (m) (m === "connected" ? toast.success : m === "choose" ? toast : toast.error)(t(m === "choose" ? "market.meta.choose" : `market.result.${m}`, { detail }));
     if (g) (g === "connected" ? toast.success : toast.error)(t(`market.result.${g}`, { detail }));
     if (s) (s === "connected" || s === "woocommerce" ? toast.success : toast.error)(t(`market.result.${s}`, { detail }));
-    if (g || s || m) router.replace(`/${locale}/integrations#marketplace`, { scroll: false });
+    // Instagram connected directly comes back with ?ig=
+    const ig = sp.get("ig");
+    if (ig) (ig === "connected" ? toast.success : toast.error)(ig === "connected" ? t("integrations.ig.connected", { ig: sp.get("username") ?? "" }) : t(`market.result.${ig}`, { detail }));
+    if (g || s || m || ig) router.replace(`/${locale}/integrations#marketplace`, { scroll: false });
   }, [sp, t, router, locale]);
   const tiles = useMemo(
     () =>
       [
         { cat: "social" as const, key: "meta", words: "facebook instagram messenger פייסבוק אינסטגרם מסנג'ר", el: <MetaTile key="meta" p={p} /> },
+        { cat: "social" as const, key: "instagram", words: "instagram direct dm אינסטגרם דיירקט", el: <InstagramTile key="instagram" p={p} /> },
         { cat: "social" as const, key: "wa-app", words: "whatsapp business app וואטסאפ", el: <WhatsAppAppTile key="wa" p={p} /> },
         { cat: "google" as const, key: "google", words: "google calendar gmail reviews גוגל יומן ביקורות", el: <GoogleTile key="google" p={p} /> },
         { cat: "stores" as const, key: "shopify", words: "shopify store חנות שופיפיי", el: <ShopifyTile key="shopify" p={p} /> },
@@ -599,7 +671,7 @@ export function IntegrationsMarketplace(p: MarketProps) {
         { cat: "automation" as const, key: "zapier", words: "zapier make n8n webhook זאפייר", el: <ZapierTile key="zapier" p={p} /> },
       ]
         // wave 20: a connection that still needs the platform's one-time setup is shown to platform admins only
-        .filter((x) => p.platformAdmin !== false || ({ meta: Boolean(p.metaPages), "wa-app": Boolean(p.metaWa), google: p.google.configured, shopify: p.shopify.configured } as Record<string, boolean>)[x.key] !== false)
+        .filter((x) => p.platformAdmin !== false || ({ meta: Boolean(p.metaPages), instagram: Boolean(p.igDirect?.configured) || p.instagram.connected || Boolean(p.metaPages), "wa-app": Boolean(p.metaWa), google: p.google.configured, shopify: p.shopify.configured } as Record<string, boolean>)[x.key] !== false)
         .filter((x) => (cat === "all" || x.cat === cat) && (!q.trim() || `${x.key} ${x.words}`.toLowerCase().includes(q.trim().toLowerCase()))),
     [cat, q, p],
   );

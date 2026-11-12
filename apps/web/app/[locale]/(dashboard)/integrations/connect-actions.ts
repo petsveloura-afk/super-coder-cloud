@@ -67,7 +67,7 @@ export async function chooseMetaPageAction(input: { locale: string; sealed: stri
   return savePage(locale, ctx.org.id, ctx.userId, page);
 }
 
-async function savePage<T = undefined>(locale: string, orgId: string, userId: string, page: { id: string; name: string; token: string; instagram: { id: string; username: string | null } | null }): Promise<ActionState<T>> {
+async function savePage<T = undefined>(locale: string, orgId: string, userId: string, page: { id: string; name: string; token: string; instagram: { id: string; username: string | null } | null; igIssue?: string }): Promise<ActionState<T>> {
   const { sealSecrets } = await import("@/lib/channels/secrets");
   const { subscribePage } = await import("@/lib/channels/meta-pages");
   const sub = await subscribePage(page.id, page.token);
@@ -79,9 +79,13 @@ async function savePage<T = undefined>(locale: string, orgId: string, userId: st
       ? supabase.from("channel_accounts").update(row).eq("id", existing.id).eq("organization_id", orgId)
       : supabase.from("channel_accounts").insert({ ...row, organization_id: orgId, kind, created_by: userId });
   };
-  const m = await upsert("messenger", { page_id: page.id, page_name: page.name, mode: "business_login" }, page.name || "Messenger");
+  // a Page without Instagram remembers why, so the integrations screen can show the exact fix (or the direct Instagram sign-in)
+  const m = await upsert("messenger", { page_id: page.id, page_name: page.name, mode: "business_login", ...(page.instagram ? {} : { ig_issue: page.igIssue ?? "not_linked" }) }, page.name || "Messenger");
   if (m.error) return { error: dbErrorKey(m.error) };
-  if (page.instagram) {
+  // an Instagram account the business connected DIRECTLY (Instagram Login) is its own choice — the Facebook flow never replaces it
+  const { data: direct } = await supabase.from("channel_accounts").select("id, config").eq("organization_id", orgId).eq("kind", "instagram").maybeSingle();
+  const keepDirect = (direct?.config as { mode?: string } | null)?.mode === "instagram_login";
+  if (page.instagram && !keepDirect) {
     const ig = await upsert("instagram", { ig_id: page.instagram.id, username: page.instagram.username ?? "", page_id: page.id, mode: "business_login" }, page.instagram.username ? `@${page.instagram.username}` : "Instagram");
     if (ig.error) return { error: dbErrorKey(ig.error) };
   }
@@ -104,8 +108,14 @@ export async function disconnectMetaPagesAction(fd: FormData): Promise<ActionSta
       await unsubscribePage(full.config.page_id, full.secrets.page_token).catch(() => undefined);
     }
   }
-  const { error } = await supabase.from("channel_accounts").delete().eq("organization_id", ctx.org.id).in("kind", ["messenger", "instagram"]);
+  // the Page and the Instagram that came with it go; an Instagram connected DIRECTLY stays (it has its own disconnect)
+  const { error } = await supabase.from("channel_accounts").delete().eq("organization_id", ctx.org.id).eq("kind", "messenger");
   if (error) return { error: dbErrorKey(error) };
+  const { data: ig } = await supabase.from("channel_accounts").select("id, config").eq("organization_id", ctx.org.id).eq("kind", "instagram").maybeSingle();
+  if (ig && (ig.config as { mode?: string } | null)?.mode !== "instagram_login") {
+    const { error: e2 } = await supabase.from("channel_accounts").delete().eq("id", ig.id as string).eq("organization_id", ctx.org.id);
+    if (e2) return { error: dbErrorKey(e2) };
+  }
   revalidatePath(`/${locale}/integrations`);
   return { ok: true, message: "integrations.channels.disconnected" };
 }

@@ -9,7 +9,7 @@ An always-on service that lets each business connect **its own WhatsApp by scann
 2. In the service's settings: **Root Directory** = `services/wa-bridge`.
 3. **Variables:**
    - `WA_BRIDGE_SECRET` = a long random password (at least 24 characters)
-   - `APP_URL` = `https://super-coder-cloud.vercel.app`
+   - `APP_URL` = `https://app.supercoder.agency`
    - `CRON_SECRET` = the same value as on Vercel (optional: e-mails and automations every minute)
 4. **Volumes** → Add Volume → Mount path `/data`.
 5. **Networking** → Generate Domain. Copy the address, e.g. `https://wa-bridge-production.up.railway.app`.

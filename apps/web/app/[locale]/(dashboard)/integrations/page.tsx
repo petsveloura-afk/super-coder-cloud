@@ -151,6 +151,8 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
       metaWa: metaPublicConfig(),
       facebook: { connected: Boolean(fb && fb.status !== "disabled"), label: fb?.config.page_name ?? fb?.name ?? null, error: fb?.status === "error" ? fb.last_error : fb?.last_error ?? null },
       instagram: { connected: Boolean(ig && ig.status !== "disabled"), label: ig?.config.username ? `@${ig.config.username}` : null },
+      // Instagram connected directly (no Facebook Page) — and why a Page came without Instagram
+      igDirect: { configured: await import("@/lib/channels/ig-login").then((m) => m.igLoginConfigured()).catch(() => false), mode: ig?.config.mode ?? null, error: ig?.last_error ?? null, expires: ig?.config.token_expires ?? null, issue: fb && !ig ? (fb.config.ig_issue ?? "not_linked") : null },
       whatsappMode: wa?.config.mode ?? null,
       google: { configured: googleConfigured(), calendar: Boolean(cal && cal.status === "active"), gmail: mail?.config.auth === "google", business: Boolean(ints.google_business && ints.google_business.status === "active"), email: (ints.google_business?.config as { email?: string } | undefined)?.email ?? mail?.config.address ?? null },
       shopify: { configured: shopifyConfigured(), connected: Boolean(shop && shop.status === "active"), shop: (shop?.config as { shop?: string } | undefined)?.shop ?? null, error: shop?.last_error ?? null, orders30: shopStats.orders, revenue30: shopStats.revenue },

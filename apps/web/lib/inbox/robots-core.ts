@@ -38,7 +38,17 @@ const MACHINE_TEXT = [
 ];
 
 /** is this conversation a service / platform sender and not a customer? (title + latest preview) */
-export function isServiceSender(title: string | null | undefined, preview?: string | null): boolean {
+/**
+ * A Messenger / Instagram conversation is titled "Messenger" / "Instagram" until the customer's real name is read from
+ * Meta (it can be slow or not allowed). That title is OUR placeholder for a real person — never a service sender.
+ * Before this, such customers were treated as a robot: the agent did not answer them and the inbox hid them.
+ */
+export function isChannelPlaceholderTitle(title: string | null | undefined, channel: string | null | undefined): boolean {
+  return (channel === "instagram" || channel === "messenger") && /^(instagram|messenger|facebook)$/i.test(String(title ?? "").trim());
+}
+
+export function isServiceSender(title: string | null | undefined, preview?: string | null, channel?: string | null): boolean {
+  if (channel && isChannelPlaceholderTitle(title, channel)) title = "";
   const n = (title ?? "").trim().replace(/\s+/g, " ");
   if (n && (SERVICE_TITLE.test(n) || SERVICE_ROLE_TITLE.test(n) || isRobotName(n))) return true;
   const p = (preview ?? "").trim();
