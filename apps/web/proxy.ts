@@ -77,6 +77,16 @@ export async function proxy(request: NextRequest) {
   if (!isLocale(first)) {
     const cookieLocale = request.cookies.get(LOCALE_COOKIE)?.value;
     const locale = isLocale(cookieLocale) ? cookieLocale : firstVisitLocale(request.headers.get("accept-language"));
+    // round 15: /privacy, /terms, /data-deletion … straight to the legal page (one redirect, not two)
+    {
+      const { legalAliasDoc } = await import("@/lib/legal/aliases-core");
+      const doc = legalAliasDoc(pathname);
+      if (doc) {
+        const to = new URL(`/${locale}/legal/${doc}`, publicBase(request));
+        to.search = search;
+        return NextResponse.redirect(to, 308);
+      }
+    }
     const url = new URL(`/${locale}${pathname === "/" ? "" : pathname}`, publicBase(request));
     url.search = search;
     return NextResponse.redirect(url);
@@ -84,6 +94,16 @@ export async function proxy(request: NextRequest) {
 
   const locale = first;
   const subPath = `/${rest.join("/")}`.replace(/\/$/, "") || "/";
+  // round 15: standard short addresses for the legal pages (/privacy, /terms, /data-deletion, /rules …) on the platform's own address
+  if (rest.length === 1 && rest[0]) {
+    const { legalAliasDoc } = await import("@/lib/legal/aliases-core");
+    const doc = legalAliasDoc(subPath);
+    if (doc) {
+      const url = new URL(`/${locale}/legal/${doc}`, publicBase(request));
+      url.search = search;
+      return NextResponse.redirect(url, 308);
+    }
+  }
   let response = NextResponse.next({ request });
   response.cookies.set(LOCALE_COOKIE, locale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
 

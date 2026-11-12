@@ -10,7 +10,7 @@ import { LEGAL_DOCS, LEGAL_UPDATED, legalContent, legalVars, type LegalDoc } fro
  *   /he/legal/privacy · /he/legal/terms · /he/legal/data-deletion  (English under /en/…)
  * Public (no login) — Meta, Google and Shopify app reviews link here.
  */
-type Params = { params: Promise<{ locale: string; doc: string }> };
+type Params = { params: Promise<{ locale: string; doc: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> };
 
 function pick(doc: string): LegalDoc | null {
   return (LEGAL_DOCS as string[]).includes(doc) ? (doc as LegalDoc) : null;
@@ -25,14 +25,17 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return { title: c.title, robots: { index: true } };
 }
 
-export default async function LegalPage({ params }: Params) {
+export default async function LegalPage({ params, searchParams }: Params) {
   const { doc } = await params;
   const locale = await resolveLocale(params);
   const d = pick(doc);
   if (!d) notFound();
   const lang = locale === "he" ? "he" : "en";
   const c = legalContent(d, lang, legalVars(process.env, publicEnv.appUrl));
-  const names: Record<LegalDoc, string> = lang === "he" ? { privacy: "מדיניות פרטיות", terms: "תנאי שימוש", "data-deletion": "מחיקת נתונים" } : { privacy: "Privacy", terms: "Terms", "data-deletion": "Data deletion" };
+  const names: Record<LegalDoc, string> = lang === "he" ? { privacy: "מדיניות פרטיות", terms: "תנאי שימוש", "data-deletion": "מחיקת נתונים", "acceptable-use": "כללי שימוש" } : { privacy: "Privacy", terms: "Terms", "data-deletion": "Data deletion", "acceptable-use": "Acceptable use" };
+  // round 15: the status link Meta gives a person after a data-deletion request (…/data-deletion?request=CODE)
+  const sp: Record<string, string | string[] | undefined> = (await searchParams?.catch(() => ({}))) ?? {};
+  const reqCode = d === "data-deletion" && typeof sp.request === "string" && /^[A-Z0-9-]{8,40}$/.test(sp.request) ? sp.request : null;
   return (
     <article dir={lang === "he" ? "rtl" : "ltr"} lang={lang} className="rounded-[var(--radius-card)] border border-line bg-surface p-5 sm:p-7" data-testid={`legal-${d}`}>
       <nav className="mb-5 flex flex-wrap gap-1.5" aria-label={lang === "he" ? "מסמכים" : "Documents"}>
@@ -47,6 +50,16 @@ export default async function LegalPage({ params }: Params) {
         {lang === "he" ? "עודכן לאחרונה: " : "Last updated: "}
         <time dateTime={LEGAL_UPDATED}>{LEGAL_UPDATED}</time>
       </p>
+      {reqCode ? (
+        <div className="mt-4 rounded-2xl border border-success/40 bg-success/10 p-4 text-[14px] leading-relaxed" role="status" data-testid="deletion-status">
+          <p className="font-semibold">{lang === "he" ? "בקשת המחיקה התקבלה ✓" : "Your deletion request was received ✓"}</p>
+          <p className="mt-1 text-muted">
+            {lang === "he" ? "מספר אישור: " : "Confirmation code: "}
+            <code dir="ltr" className="font-mono">{reqCode}</code>
+          </p>
+          <p className="mt-1 text-muted">{lang === "he" ? "החיבורים של החשבון הוסרו, והמידע שקשור אליו נמחק מהמערכות הפעילות תוך 30 יום לכל היותר." : "The account's connections were removed, and the related data is deleted from live systems within 30 days at most."}</p>
+        </div>
+      ) : null}
       <p className="mt-4 text-[14.5px] leading-relaxed">{c.intro}</p>
       {c.sections.map((s) => (
         <section key={s.h} className="mt-6">
