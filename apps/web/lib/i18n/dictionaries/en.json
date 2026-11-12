@@ -85,7 +85,8 @@
     "none": "None",
     "yes": "Yes",
     "no": "No",
-    "add": "Add"
+    "add": "Add",
+    "skipToContent": "Skip to content"
   },
   "auth": {
     "signIn": "Sign in",
@@ -5580,7 +5581,9 @@
       "v_linkedin": "LinkedIn",
       "aiVideo": "AI video",
       "quality": "Copy quality",
-      "ad": "Ad design"
+      "ad": "Ad design",
+      "editText": "Edit text",
+      "editImage": "Edit picture"
     },
     "drawer": {
       "title": "Your post is ready",
@@ -5759,6 +5762,97 @@
       "fresh": "New",
       "createdAt": "Created {when}",
       "plannedFor": "Planned publish time"
+    },
+    "edit": {
+      "nothing": "Nothing to change",
+      "done": "Text updated — earlier versions are kept in the history",
+      "left": "{n} characters left",
+      "over": "{n} characters too long",
+      "words": "Words",
+      "read": "Reading time",
+      "seconds": "{n}s",
+      "preview": "What shows before \"see more\"",
+      "seeMore": "…see more",
+      "ai": "Smart edits",
+      "translate": "Translate",
+      "clean": "One-click clean-up",
+      "noEmojis": "No emojis ({n})",
+      "noHashtags": "No hashtags ({n})",
+      "noLinks": "No links ({n})",
+      "history": "Earlier versions ({n})",
+      "restore": "Restore",
+      "e": {
+        "longer": "Longer",
+        "warmer": "Warmer",
+        "professional": "More professional",
+        "cta": "Call to action",
+        "grammar": "Fix spelling",
+        "emojis_more": "More emojis",
+        "emojis_less": "Fewer emojis",
+        "platform_fit": "Fit the network",
+        "translate_he": "עברית",
+        "translate_en": "English",
+        "translate_ar": "العربية"
+      },
+      "hint": {
+        "longer": "Adds one detail or benefit — only from existing facts",
+        "warmer": "Speaks to the reader directly, with warmth",
+        "professional": "Precise words, confident tone, max 2 emojis",
+        "cta": "Improves only the ending: what to do now and how",
+        "grammar": "Fixes spelling and punctuation only",
+        "emojis_more": "Adds 3–5 emojis at natural places",
+        "emojis_less": "Keeps at most one emoji",
+        "platform_fit": "A strong hook in the first 125 characters, short lines, hashtags per network"
+      }
+    },
+    "imageEdit": {
+      "noImage": "Choose or create a picture for the post first — then you can edit it here.",
+      "blocked": "This picture can't be edited (its site doesn't allow it). Upload it from your device or create one — then edit.",
+      "failed": "Saving the picture failed, please try again",
+      "saved": "The edited picture was saved and set on the post (the original is kept)",
+      "assetTitle": "Edited picture",
+      "preview": "Preview of the edited picture",
+      "loading": "Loading picture",
+      "frame": "Frame",
+      "zoom": "Zoom",
+      "focusX": "Horizontal focus",
+      "focusY": "Vertical focus",
+      "look": "Look",
+      "fine": "Fine-tune",
+      "headline": "Headline on the picture",
+      "headlinePh": "e.g. Weekend sale 🎉",
+      "color": "Color",
+      "save": "Save picture to post",
+      "reset": "Reset",
+      "note": "Saved at {w}×{h} — the recommended quality for the network.",
+      "frames": {
+        "square": "Square 1:1",
+        "portrait": "Instagram 4:5",
+        "landscape": "Facebook landscape",
+        "story": "Story 9:16"
+      },
+      "looks": {
+        "natural": "Natural",
+        "vivid": "Vivid",
+        "warm": "Warm",
+        "cool": "Cool",
+        "mono": "Black & white",
+        "cinematic": "Cinematic",
+        "soft": "Soft"
+      },
+      "adj": {
+        "brightness": "Brightness",
+        "contrast": "Contrast",
+        "saturation": "Saturation",
+        "warmth": "Warmth",
+        "blur": "Blur",
+        "vignette": "Vignette"
+      },
+      "band": {
+        "top": "Top",
+        "center": "Center",
+        "bottom": "Bottom"
+      }
     }
   },
   "market": {
@@ -7255,7 +7349,14 @@
       "sop_propose": "Propose a procedure change",
       "team_grant_tool": "Permission request",
       "social_drafts": "View post drafts",
-      "social_save_draft": "Save a post as a draft"
+      "social_save_draft": "Save a post as a draft",
+      "crm_recent_leads": "New leads and contacts",
+      "inbox_thread": "Read a customer conversation",
+      "deals_pipeline": "Pipeline overview",
+      "appointments_upcoming": "Upcoming meetings",
+      "tasks_complete": "Mark a task as done",
+      "crm_set_status": "Update a contact's status",
+      "social_update_draft": "Improve an existing post draft"
     },
     "goal": {
       "title": "A goal for the team",

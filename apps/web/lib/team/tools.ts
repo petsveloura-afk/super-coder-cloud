@@ -355,6 +355,17 @@ export async function runTeamTool(orgId: string, tool: string, args: Args, ctx: 
         const { runOrgTool } = await import("./org8-data");
         return runOrgTool(orgId, tool, args, { lang: ctx.locale === "en" || ctx.locale === "ar" ? ctx.locale : "he" });
       }
+      case "crm.recent_leads":
+      case "inbox.thread":
+      case "deals.pipeline":
+      case "appointments.upcoming":
+      case "tasks.complete":
+      case "crm.set_status":
+      case "social.update_draft": {
+        // upgrade 10: more real reads + internal writes (nothing reaches a customer, nothing costs money)
+        const { runPlus10Tool } = await import("./tools-plus10");
+        return runPlus10Tool(orgId, tool, args);
+      }
       default:
         return { ok: false, summary: "", error: "unknown_tool" };
     }

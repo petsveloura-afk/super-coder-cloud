@@ -1178,3 +1178,51 @@ main[data-shell] :is(a, button, [role="tab"], summary):focus-visible { outline: 
     .brand-loader-core { animation: d3-beat 1.2s ease-in-out infinite; }
   }
 }
+
+/* ------------------------------------------------------------------ round 10 — accessibility & form polish (additive)
+   • skip link: hidden until a keyboard user tabs to it, then it jumps to the screen's content
+   • range sliders and color pickers follow the brand accent everywhere (they were the browser's default blue/grey)
+   • the main region can receive focus from the skip link without showing an outline box */
+.skip-link {
+  position: fixed;
+  inset-inline-start: 1rem;
+  top: 0.75rem;
+  z-index: 100;
+  transform: translateY(-200%);
+  border-radius: 0.75rem;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.55rem 1rem;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.5);
+  transition: transform 0.15s ease;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+input[type="range"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+input[type="color"] {
+  cursor: pointer;
+}
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skip-link { transition: none; }
+}

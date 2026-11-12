@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { Bookmark, Camera, Clapperboard, Copy, Film, Gauge, Megaphone, Hash, Heart, MessageCircle, MessagesSquare, Send, Share2, Smartphone, Wand2 } from "lucide-react";
+import { Bookmark, Camera, Clapperboard, Copy, Film, Gauge, Megaphone, Hash, Heart, MessageCircle, MessagesSquare, Send, Share2, Smartphone, Wand2, PenLine, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n/client";
 import { Button } from "@/components/ui/primitives";
@@ -11,6 +11,8 @@ import { MotionStudio } from "@/components/social/motion-studio";
 import { AiVideoPanel } from "@/components/social/ai-video-panel";
 import { AdCreativeStudio } from "@/components/social/ad-creative-studio";
 import { PostQualityPanel } from "@/components/social/post-quality-panel";
+import { PostEditTools } from "@/components/social/post-edit-tools";
+import { ImageEditor } from "@/components/social/image-editor";
 import { hashtagsAction, repurposeAction } from "@/app/[locale]/(dashboard)/social/brain-actions";
 
 /**
@@ -85,12 +87,12 @@ const VERSION_KEYS = ["instagram", "facebook", "story", "reel", "telegram", "wha
 
 export function PostPower(props: { body: string; setBody: (v: string) => void; image: string; setImage: (v: string) => void; video: string; setVideo: (v: string) => void; fb: boolean; ig: boolean; brand?: string }) {
   const { t, locale } = useI18n();
-  const [open, setOpen] = useState<null | "preview" | "motion" | "versions" | "aivideo" | "quality" | "ad">(null);
+  const [open, setOpen] = useState<null | "preview" | "motion" | "versions" | "aivideo" | "quality" | "ad" | "edittext" | "editimage">(null);
   const [platform, setPlatform] = useState<"facebook" | "instagram">(props.ig && !props.fb ? "instagram" : props.ig ? "instagram" : "facebook");
   const [versions, setVersions] = useState<Record<string, string> | null>(null);
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
-  const toggle = (k: "preview" | "motion" | "versions" | "aivideo" | "quality" | "ad") => setOpen((x) => (x === k ? null : k));
+  const toggle = (k: "preview" | "motion" | "versions" | "aivideo" | "quality" | "ad" | "edittext" | "editimage") => setOpen((x) => (x === k ? null : k));
   const makeVersions = () =>
     start(async () => {
       setBusy("v");
@@ -117,6 +119,12 @@ export function PostPower(props: { body: string; setBody: (v: string) => void; i
     <div className="space-y-3 rounded-2xl border border-line bg-surface p-3" data-testid="post-power">
       <div className="flex flex-wrap items-center gap-2">
         <span className="me-1 text-[12.5px] font-semibold text-muted">{t("social.power.title")}</span>
+        <button type="button" onClick={() => toggle("edittext")} aria-expanded={open === "edittext"} className={cn(tool, open === "edittext" ? "border-accent bg-accent-soft text-accent" : "border-line hover:bg-surface-hover")} data-testid="open-edit-text">
+          <PenLine className="h-4 w-4" /> {t("social.power.editText")}
+        </button>
+        <button type="button" onClick={() => toggle("editimage")} aria-expanded={open === "editimage"} className={cn(tool, open === "editimage" ? "border-accent bg-accent-soft text-accent" : "border-line hover:bg-surface-hover")} data-testid="open-edit-image">
+          <ImagePlus className="h-4 w-4" /> {t("social.power.editImage")}
+        </button>
         <button type="button" onClick={() => toggle("preview")} aria-expanded={open === "preview"} className={cn(tool, open === "preview" ? "border-accent bg-accent-soft text-accent" : "border-line hover:bg-surface-hover")}>
           <Smartphone className="h-4 w-4" /> {t("social.power.preview")}
         </button>
@@ -155,6 +163,8 @@ export function PostPower(props: { body: string; setBody: (v: string) => void; i
       {open === "ad" ? <AdCreativeStudio body={props.body} image={props.image} ig={props.ig} onImage={props.setImage} /> : null}
       {open === "aivideo" ? <AiVideoPanel body={props.body} ig={props.ig} onVideo={props.setVideo} /> : null}
       {open === "quality" ? <PostQualityPanel body={props.body} setBody={props.setBody} ig={props.ig} /> : null}
+      {open === "edittext" ? <PostEditTools body={props.body} setBody={props.setBody} fb={props.fb} ig={props.ig} /> : null}
+      {open === "editimage" ? <ImageEditor image={props.image} setImage={props.setImage} ig={props.ig} /> : null}
       {open === "versions" && versions ? (
         <ul className="grid gap-2 md:grid-cols-2" data-testid="post-versions">
           {VERSION_KEYS.filter((k) => versions[k]).map((k) => (

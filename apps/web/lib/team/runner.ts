@@ -12,6 +12,7 @@ import { withRoleExtras7 } from "./tools-plus7-core";
 import { withRoleExtras7c } from "./tools-plus7c-core";
 import { withRoleExtrasOrg8 } from "./tools-org8-core";
 import { withRoleExtras9 } from "./tools-plus9-core";
+import { withRoleExtras10 } from "./tools-plus10-core";
 import { automatedContactIds, runTeamTool } from "./tools";
 import { playbookPrompt } from "./playbooks";
 import { REPORT_STANDARD, WORKING_DOCTRINE, expertisePrompt } from "./doctrine";
@@ -252,7 +253,7 @@ interface MemberRow {
 const MEMBER_COLS = "id, role_key, name, tone, instructions, tools, autonomy, auto_actions, status, limits, reports_to, linked";
 
 function toEngine(m: MemberRow): EngineMember {
-  return { id: m.id, role: isRoleKey(m.role_key) ? m.role_key : "custom", name: m.name, tone: m.tone, instructions: m.instructions, tools: withRoleExtras9(m.role_key, withRoleExtrasOrg8(m.role_key, withRoleExtras7c(m.role_key, withRoleExtras7(m.role_key, withRoleExtras(m.role_key, m.tools))))), autonomy: m.autonomy, auto_actions: m.auto_actions, status: m.status, limits: { max_steps: m.limits?.max_steps, max_credits: m.limits?.max_credits } };
+  return { id: m.id, role: isRoleKey(m.role_key) ? m.role_key : "custom", name: m.name, tone: m.tone, instructions: m.instructions, tools: withRoleExtras10(m.role_key, withRoleExtras9(m.role_key, withRoleExtrasOrg8(m.role_key, withRoleExtras7c(m.role_key, withRoleExtras7(m.role_key, withRoleExtras(m.role_key, m.tools)))))), autonomy: m.autonomy, auto_actions: m.auto_actions, status: m.status, limits: { max_steps: m.limits?.max_steps, max_credits: m.limits?.max_credits } };
 }
 
 async function members(orgId: string): Promise<MemberRow[]> {

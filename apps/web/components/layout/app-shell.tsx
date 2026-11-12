@@ -523,6 +523,10 @@ function AppShellInner(props: ShellProps) {
 
   return (
     <div className="flex min-h-dvh">
+      {/* accessibility: keyboard / screen-reader users jump straight to the screen's content (visible only on focus) */}
+      <a href="#main-content" className="skip-link">
+        {t("common.skipToContent")}
+      </a>
       {/* Desktop sidebar */}
       <aside
         className={cn(
@@ -580,7 +584,7 @@ function AppShellInner(props: ShellProps) {
           ) : null}
         </header>
 
-        <main className="mb-bottomnav flex-1 px-4 py-6 sm:px-6 lg:mb-0 lg:px-8 lg:py-8" data-shell>
+        <main id="main-content" tabIndex={-1} className="mb-bottomnav flex-1 px-4 py-6 outline-none sm:px-6 lg:mb-0 lg:px-8 lg:py-8" data-shell>
           {/* design upgrade: every screen change fades in softly (re-keyed by path; off for reduced motion) */}
           <div key={pathname} className="route-fade mx-auto w-full max-w-[1240px]">
             {props.children}
