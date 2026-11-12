@@ -14,7 +14,11 @@ export const maxDuration = 60;
  * One-time Meta setting: Instagram → API setup with Instagram business login → Business login settings →
  *   OAuth redirect URIs → https://<app>/api/channels/instagram/oauth
  */
-const redirectUri = () => `${publicEnv.appUrl.replace(/\/$/, "")}/api/channels/instagram/oauth`;
+// the same exact address for the sign-in and for the code exchange (Instagram compares them character for character)
+const redirectUriFor = async (request: NextRequest) => {
+  const { igRedirectUri } = await import("@/lib/channels/ig-login-core");
+  return igRedirectUri({ META_IG_REDIRECT_URI: process.env.META_IG_REDIRECT_URI, NEXT_PUBLIC_APP_URL: publicEnv.appUrl }, new URL(publicBase(request)).origin);
+};
 const COOKIE = "scc_ig_oauth";
 const COOKIE_PATH = "/api/channels/instagram";
 
@@ -39,14 +43,14 @@ export async function GET(request: NextRequest) {
 
   // step 2 — Instagram came back
   if (sp.get("code") || sp.get("error") || sp.get("error_reason")) {
-    if (sp.get("error") || sp.get("error_reason")) return finish("cancelled");
+    if (sp.get("error") || sp.get("error_reason")) return sp.get("error_reason") === "user_denied" || sp.get("error") === "access_denied" ? finish("cancelled") : finish("failed", String(sp.get("error_description") ?? sp.get("error_reason") ?? sp.get("error") ?? "").slice(0, 300));
     const given = sp.get("state") ?? "";
     if (!state || given.length !== state.length || !timingSafeEqual(Buffer.from(given), Buffer.from(state))) return finish("failed", "state");
     const ctx = await getOrgContext(locale);
     if (!ctx.can("integrations.manage") || ctx.org.id !== orgId) return finish("forbidden");
     const { cleanIgCode } = await import("@/lib/channels/ig-login-core");
     const { saveInstagramDirect } = await import("@/app/[locale]/(dashboard)/integrations/instagram-actions");
-    const r = await saveInstagramDirect({ locale, code: cleanIgCode(sp.get("code")), redirectUri: redirectUri() });
+    const r = await saveInstagramDirect({ locale, code: cleanIgCode(sp.get("code")), redirectUri: await redirectUriFor(request) });
     if (r.error) return finish(r.error === "integrations.ig.personal" ? "personal" : "failed", r.messageParams?.detail ? String(r.messageParams.detail) : r.error);
     back.searchParams.set("username", String(r.data?.username ?? ""));
     return finish("connected");
@@ -57,7 +61,7 @@ export async function GET(request: NextRequest) {
   if (!ctx.can("integrations.manage")) return finish("forbidden");
   const newState = randomBytes(24).toString("hex");
   const { igAuthorizeUrl } = await import("@/lib/channels/ig-login-core");
-  const res = NextResponse.redirect(igAuthorizeUrl({ appId: process.env.META_IG_APP_ID!, redirectUri: redirectUri(), state: newState }));
+  const res = NextResponse.redirect(igAuthorizeUrl({ appId: process.env.META_IG_APP_ID!, redirectUri: await redirectUriFor(request), state: newState }));
   res.cookies.set(COOKIE, `${newState}.${locale}.${ctx.org.id}`, { httpOnly: true, secure: true, sameSite: "lax", path: COOKIE_PATH, maxAge: 900 });
   return res;
 }

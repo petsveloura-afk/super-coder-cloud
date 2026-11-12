@@ -6057,7 +6057,14 @@
       "fix4": "Come back here and click \"Reconnect\" on the Facebook + Instagram card.",
       "orDirect": "Or the short way: connect Instagram directly with the button below.",
       "howTo": "Connect through the Facebook + Instagram card, or directly here with a professional Instagram account (business or creator).",
-      "commentsLink": "Comments and automatic comment replies →"
+      "commentsLink": "Comments and automatic comment replies →",
+      "setupTitle": "Meta setup (platform admin only)",
+      "setupRedirect": "Instagram → API setup with Instagram business login → Business login settings → OAuth redirect URIs — paste exactly this (no trailing /) and Save:",
+      "setupWebhook": "Instagram webhooks → Callback URL (with the same verify token), fields: messages, comments:",
+      "setupDeauth": "Deauthorize callback URL:",
+      "setupDeletion": "Data deletion request URL:",
+      "setupAppId": "The current META_IG_APP_ID ends with {tail} — it must be the Instagram app ID from that screen (not the Facebook App ID).",
+      "setupSameId": "META_IG_APP_ID equals the Facebook META_APP_ID. Use the Instagram app ID and Instagram app secret from \"API setup with Instagram business login\"."
     }
   },
   "guide": {

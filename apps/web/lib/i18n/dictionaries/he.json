@@ -6057,7 +6057,14 @@
       "fix4": "לחזור לכאן וללחוץ \"לחבר מחדש\" בכרטיס פייסבוק + אינסטגרם.",
       "orDirect": "או בדרך הקצרה: לחבר את האינסטגרם ישירות בכפתור למטה.",
       "howTo": "מחברים דרך כרטיס פייסבוק + אינסטגרם, או ישירות כאן עם חשבון אינסטגרם מקצועי (עסקי או יוצר).",
-      "commentsLink": "תגובות ומענה אוטומטי לתגובות ←"
+      "commentsLink": "תגובות ומענה אוטומטי לתגובות ←",
+      "setupTitle": "הגדרה ב-Meta (רואה רק מנהל הפלטפורמה)",
+      "setupRedirect": "Instagram ← API setup with Instagram business login ← Business login settings ← OAuth redirect URIs — להדביק בדיוק את זה (בלי / בסוף) וללחוץ Save:",
+      "setupWebhook": "Webhooks של Instagram ← Callback URL (עם אותו verify token), שדות: messages, comments:",
+      "setupDeauth": "Deauthorize callback URL:",
+      "setupDeletion": "Data deletion request URL:",
+      "setupAppId": "META_IG_APP_ID שמוגדר עכשיו מסתיים ב-{tail} — חייב להיות ה-Instagram app ID מאותו מסך (לא ה-App ID של פייסבוק).",
+      "setupSameId": "META_IG_APP_ID זהה ל-META_APP_ID של פייסבוק. צריך את ה-Instagram app ID ואת ה-Instagram app secret ממסך API setup with Instagram business login."
     }
   },
   "guide": {

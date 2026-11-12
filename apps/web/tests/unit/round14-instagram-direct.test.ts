@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { cleanIgCode, grantedPermissions, graphBaseFor, igAccountUsable, igAuthorizeUrl, igExpiry, igIssueFromPermissions, igTokenNeedsRefresh, isIgLoginToken, parseIgProfile, IG_LOGIN_SCOPES } from "@/lib/channels/ig-login-core";
+import { igRedirectUri, cleanIgCode, grantedPermissions, graphBaseFor, igAccountUsable, igAuthorizeUrl, igExpiry, igIssueFromPermissions, igTokenNeedsRefresh, isIgLoginToken, parseIgProfile, IG_LOGIN_SCOPES } from "@/lib/channels/ig-login-core";
 import { parsePagesWebhook } from "@/lib/channels/meta-pages-core";
 import { messagesFromConversations } from "@/lib/channels/meta-sync-core";
 import { isChannelPlaceholderTitle, isServiceSender } from "@/lib/inbox/robots-core";
@@ -119,5 +119,20 @@ describe("a Messenger / Instagram customer whose name was not read yet is a cust
     // unchanged elsewhere: an e-mail from "Instagram" is still a service sender
     expect(isServiceSender("Instagram", null, "email")).toBe(true);
     expect(isServiceSender("Instagram")).toBe(true);
+  });
+});
+
+describe("Instagram redirect address — exactly the one registered in Meta", () => {
+  it("META_IG_REDIRECT_URI wins; otherwise the app address; a local app address falls back to where the request came", () => {
+    expect(igRedirectUri({ META_IG_REDIRECT_URI: "https://x.example/cb", NEXT_PUBLIC_APP_URL: "https://app.supercoder.agency" })).toBe("https://x.example/cb");
+    expect(igRedirectUri({ NEXT_PUBLIC_APP_URL: "https://app.supercoder.agency/" })).toBe("https://app.supercoder.agency/api/channels/instagram/oauth");
+    expect(igRedirectUri({ NEXT_PUBLIC_APP_URL: "https://app.supercoder.agency/he" })).toBe("https://app.supercoder.agency/api/channels/instagram/oauth");
+    expect(igRedirectUri({ NEXT_PUBLIC_APP_URL: "http://localhost:3000" }, "https://app.supercoder.agency")).toBe("https://app.supercoder.agency/api/channels/instagram/oauth");
+    expect(igRedirectUri({ META_IG_REDIRECT_URI: "not a url", NEXT_PUBLIC_APP_URL: "https://a.b" })).toBe("https://a.b/api/channels/instagram/oauth");
+  });
+  it("the sign-in and the code exchange use the same address; the admin sees it to paste in Meta", () => {
+    const r = read("app/api/channels/instagram/oauth/route.ts");
+    expect((r.match(/await redirectUriFor\(request\)/g) ?? []).length).toBe(2);
+    expect(read("components/integrations/marketplace.tsx")).toContain('data-testid="ig-setup"');
   });
 });

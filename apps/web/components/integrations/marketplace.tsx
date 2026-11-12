@@ -27,7 +27,7 @@ export interface MarketProps {
   facebook: { connected: boolean; label: string | null; error: string | null };
   instagram: { connected: boolean; label: string | null };
   /** Instagram connected directly (Instagram Login): configured on the platform, how the current one is connected, its problem */
-  igDirect?: { configured: boolean; mode: string | null; error: string | null; expires: string | null; issue: string | null };
+  igDirect?: { configured: boolean; mode: string | null; error: string | null; expires: string | null; issue: string | null; setup?: { redirectUri: string; base: string; appIdTail: string; sameAsFacebook: boolean } };
   whatsappMode: string | null;
   google: { configured: boolean; calendar: boolean; gmail: boolean; business: boolean; email: string | null };
   shopify: { configured: boolean; connected: boolean; shop: string | null; error: string | null; orders30: number; revenue30: number };
@@ -337,6 +337,24 @@ function InstagramTile({ p }: { p: MarketProps }) {
         <a href={`/${locale}/social`} className="block text-[12px] font-medium text-accent hover:underline">
           {t("market.ig.commentsLink")}
         </a>
+      ) : null}
+      {d?.setup ? (
+        // platform admin only: the exact addresses to paste in Meta (Instagram refuses a redirect that differs by one character)
+        <details className="rounded-2xl border border-dashed border-line-strong p-3 text-[12px]" data-testid="ig-setup" open={!connected}>
+          <summary className="cursor-pointer font-semibold">{t("market.ig.setupTitle")}</summary>
+          <div className="mt-2 space-y-2">
+            {d.setup.sameAsFacebook ? <p className="rounded-lg bg-danger/10 px-2 py-1 text-danger">{t("market.ig.setupSameId")}</p> : null}
+            <p className="text-muted">{t("market.ig.setupRedirect")}</p>
+            <CopyLine value={d.setup.redirectUri} />
+            <p className="text-muted">{t("market.ig.setupWebhook")}</p>
+            <CopyLine value={`${d.setup.base}/api/channels/meta/pages`} />
+            <p className="text-muted">{t("market.ig.setupDeauth")}</p>
+            <CopyLine value={`${d.setup.base}/api/meta/deauthorize`} />
+            <p className="text-muted">{t("market.ig.setupDeletion")}</p>
+            <CopyLine value={`${d.setup.base}/api/meta/data-deletion`} />
+            {d.setup.appIdTail ? <p className="text-subtle">{t("market.ig.setupAppId", { tail: d.setup.appIdTail })}</p> : null}
+          </div>
+        </details>
       ) : null}
     </Tile>
   );

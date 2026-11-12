@@ -6,7 +6,8 @@
 - **Standard short addresses** (`lib/legal/aliases-core.ts`, `proxy.ts`): /privacy, /privacy-policy, /terms, /tos, /data-deletion, /rules, /acceptable-use, /legal (also with /he, /en, /ar in front) go straight to the right page — one redirect. A published website on its own domain keeps its own /privacy and /terms.
 - **Contact address on the legal pages:** without LEGAL_CONTACT_EMAIL the business e-mail (BILLING_BUSINESS_EMAIL) is shown — reviewers require a real address.
 - **Meta callbacks** (`app/api/meta/data-deletion`, `app/api/meta/deauthorize`, `lib/legal/meta-signed-core.ts`, `lib/legal/meta-callbacks.ts`, all new): Meta's signed_request is verified (HMAC-SHA256 with the Facebook and Instagram app secrets). Data deletion removes the matching Instagram connection and answers `{ url, confirmation_code }`; the status page (`/legal/data-deletion?request=CODE`) confirms the request. Deauthorize switches the connection off with a "connect again" note. Every request is written to the audit log.
-- No migration, no new environment variable. Tests: `round15-legal-rules.test.ts` (5).
+- **Instagram "Invalid redirect_uri" fix** (`ig-login-core.ts → igRedirectUri`, the Instagram OAuth route): one exact redirect address for the sign-in and the code exchange — META_IG_REDIRECT_URI when set, otherwise the app's public address, and the address the request came to when the configured one is local. Instagram's own error text is shown instead of "cancelled". The Instagram card shows the platform admin the exact addresses to paste in Meta (OAuth redirect, webhook, deauthorize, data deletion) and warns when META_IG_APP_ID is the Facebook App ID.
+- No migration. Optional env: META_IG_REDIRECT_URI. Tests: `round15-legal-rules.test.ts` (5) + 2 in `round14-instagram-direct.test.ts`.
 
 ## Round 14 — Instagram connected directly, customers named "Instagram" / "Messenger" answered again, Railway clean-up
 

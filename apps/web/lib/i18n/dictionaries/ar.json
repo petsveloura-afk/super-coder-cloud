@@ -6057,7 +6057,14 @@
       "fix4": "عودوا إلى هنا واضغطوا \"إعادة الربط\" في بطاقة فيسبوك + إنستغرام.",
       "orDirect": "أو الطريق الأقصر: اربطوا إنستغرام مباشرة بالزر أدناه.",
       "howTo": "اربطوا عبر بطاقة فيسبوك + إنستغرام، أو مباشرة هنا بحساب إنستغرام احترافي (تجاري أو صانع محتوى).",
-      "commentsLink": "التعليقات والرد التلقائي عليها ←"
+      "commentsLink": "التعليقات والرد التلقائي عليها ←",
+      "setupTitle": "إعداد Meta (لمدير المنصة فقط)",
+      "setupRedirect": "Instagram ← API setup with Instagram business login ← Business login settings ← OAuth redirect URIs — الصقوا هذا بالضبط (بدون / في النهاية) واضغطوا Save:",
+      "setupWebhook": "Webhooks لإنستغرام ← Callback URL (بنفس verify token)، الحقول: messages, comments:",
+      "setupDeauth": "Deauthorize callback URL:",
+      "setupDeletion": "Data deletion request URL:",
+      "setupAppId": "قيمة META_IG_APP_ID الحالية تنتهي بـ {tail} — يجب أن تكون Instagram app ID من نفس الشاشة (وليس App ID الخاص بفيسبوك).",
+      "setupSameId": "META_IG_APP_ID مطابق لـ META_APP_ID الخاص بفيسبوك. استخدموا Instagram app ID و Instagram app secret من شاشة API setup with Instagram business login."
     }
   },
   "guide": {

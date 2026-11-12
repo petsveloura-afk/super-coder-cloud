@@ -99,3 +99,27 @@ export function grantedPermissions(json: unknown): string[] | null {
   if (!Array.isArray(list)) return null;
   return list.filter((p) => p.status === "granted" && p.permission).map((p) => String(p.permission));
 }
+
+/**
+ * The exact redirect address Instagram must know (Business login settings → OAuth redirect URIs). Instagram refuses the
+ * sign-in with "Invalid redirect_uri" unless it matches character for character, so: META_IG_REDIRECT_URI when set,
+ * otherwise the app's public address (NEXT_PUBLIC_APP_URL) — and when that is missing or local, the address the request
+ * came to. The same value is used for the sign-in and for the code exchange.
+ */
+export function igRedirectUri(env: { META_IG_REDIRECT_URI?: string; NEXT_PUBLIC_APP_URL?: string }, requestOrigin?: string | null): string {
+  const explicit = String(env.META_IG_REDIRECT_URI ?? "").trim();
+  if (/^https:\/\/[^\s]+$/i.test(explicit)) return explicit;
+  const base = (raw: string | null | undefined): string | null => {
+    try {
+      const u = new URL(String(raw ?? "").trim());
+      if (!/^https?:$/.test(u.protocol)) return null;
+      return u.origin;
+    } catch {
+      return null;
+    }
+  };
+  const app = base(env.NEXT_PUBLIC_APP_URL);
+  const local = (o: string | null) => !o || /\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|$)/.test(o);
+  const origin = !local(app) ? app : (base(requestOrigin) ?? app ?? "");
+  return `${origin}/api/channels/instagram/oauth`;
+}
