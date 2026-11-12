@@ -784,9 +784,22 @@ export async function decideApproval(orgId: string, approvalId: string, decision
 /** the owner answered an employee's question → the task runs again with the answer */
 export async function answerQuestion(orgId: string, taskId: string, answer: string): Promise<boolean> {
   const a = db();
-  const { data: t } = await a.from("team_tasks").select("result, status").eq("organization_id", orgId).eq("id", taskId).maybeSingle();
+  const { data: t } = await a.from("team_tasks").select("result, status, question").eq("organization_id", orgId).eq("id", taskId).maybeSingle();
   if (!t || t.status !== "awaiting_input") return false;
   const { error } = await a.from("team_tasks").update({ status: "pending", result: { ...((t.result as Record<string, unknown>) ?? {}), answer: answer.slice(0, 2000) }, question: null, updated_at: new Date().toISOString() }).eq("id", taskId);
+  // round 11: the owner's answer becomes shared team knowledge — the same question is not asked again (best effort)
+  if (!error) {
+    try {
+      const { ownerAnswerMemory } = await import("./ask-gate-core");
+      const mem = ownerAnswerMemory(String((t as { question?: string | null }).question ?? ""), answer);
+      if (mem) {
+        const { writeShared } = await import("./runner-ops");
+        await writeShared(orgId, [{ layer: "semantic", kind: "fact", subject: mem.subject, content: mem.content, confidence: 0.9, status: "active", tags: ["owner_answer"] }]);
+      }
+    } catch {
+      /* memory is best effort — the answer itself is saved */
+    }
+  }
   return !error;
 }
 

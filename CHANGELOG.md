@@ -1,5 +1,16 @@
 # Changelog
 
+## Round 11 — a team that looks things up, remembers the owner's answers and works at expert level
+
+- **Questions to the owner — quality gate** (`lib/team/ask-gate-core.ts`, new; wired in `engine-core.ts` before a task waits): a question that asks for data the employee can read itself (customer ids / what a customer asked → `inbox.thread`; waiting chats → `inbox.unanswered`; number of leads → `crm.recent_leads`; reply time / conversion → `analytics.day_metrics`; engagement → `social.performance`; pipeline, calendar, drafts) is sent back to the employee once with the exact tool — the task continues instead of waiting. Owner decisions (prices, discounts, policy) still go to the owner. A second attempt always reaches the owner, so nothing loops.
+- **No database ids in front of the owner:** questions are cleaned before they are stored and when shown (also the ones asked before this update).
+- **One-tap answer "check it yourselves and continue"** on every question in "The employees ask" (he / en / ar).
+- **The owner's answers become team knowledge** (`runner.ts → answerQuestion`): each answer is saved as a shared team fact (subject `owner-answer:…`, a newer answer to the same question replaces the older one), so the same question is not asked again. The one-tap reply and escalations are not saved.
+- **Mastery layer for every employee** (`lib/team/mastery-core.ts`, new; added after the existing expertise in `employeeSystem`): owner mindset (impact vs. cost, cash flow, trust, reputation, decide within authority), self-sufficiency (read before asking; ask only decisions; never ids) and a master playbook per profession (OKRs / RACI for the manager, HEARD for service, SPIN / BANT / MEDDIC and follow-up cadence for sales, positioning and funnel benchmarks for marketing, AIDA / PAS / BAB for writing, landing-page anatomy and Core Web Vitals for web, the pyramid principle and cohorts for the analyst, critical path for coordination, severity-based review for QC, reminder ladders for collections, review-reply method for reputation).
+- **Activity feed** (display only, nothing stored changes): AI engine / model names are hidden ("a backup engine was used" stays); the same line repeated within 15 minutes is shown once with "×N".
+- Motion: the team's question cards and the new post editors open with the existing soft entrance animations (off for reduced motion).
+- No migration, no new environment variable. Tests: `round11-team-mastery.test.ts`.
+
 ## Round 10 — posts & pictures, a stronger digital team, accessibility
 
 - **Post editor → "Edit text"** (`components/social/post-edit-tools.tsx`, `lib/social/post-edits-core.ts`, action `social/edit-actions.ts`, all new): smart edits that keep every fact — longer, warmer, more professional, a stronger call to action, fix spelling only, more / fewer emojis, fit the network (Instagram / Facebook rules) and translate (Hebrew / English / Arabic). Same permissions, rate limit and credit metering as the existing rewrite (`copy-actions.ts`, unchanged). Free one-click clean-ups (no emojis / hashtags / links), live stats (characters left per network, what shows before "see more", words, reading time) and a version history of the session — any earlier text can be restored.

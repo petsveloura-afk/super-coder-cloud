@@ -64,6 +64,10 @@ export function tidyActivityText(text: string, lang: Lang = "he"): string {
   s = s.replace(/\s*\[\d{1,2}\]\s*/g, " ");
   s = s.replace(/\(\s*ASSUMPTION\s*\)/g, ASSUMPTION[lang]);
   s = s.replace(/\bASSUMPTION\s*:/g, ASSUMPTION_LABEL[lang]);
+  // round 11: AI engine internals ("(plan: github/openai/gpt-4.1-mini → nvidia/…)") are not for the owner — the sentence before
+  // them already says a backup engine was used
+  s = s.replace(/\s*\((?:[a-z_]+:\s*)?[\w.-]+\/[\w./:-]+\s*(?:→|->)\s*[\w.-]+\/[\w./:-]+\)/gi, "");
+  s = s.replace(/\s*\b(?:github|openai|anthropic|google|nvidia|groq|openrouter|together|mistral|deepseek|cerebras)\/[\w./:-]+/gi, "");
   // the tools' English wording → the business language
   if (lang !== "en") for (const [re, he, ar] of PHRASES) s = s.replace(re, lang === "he" ? he : ar);
   // left-over punctuation from removed parts: "( , )", ", ,", "( )"
@@ -71,4 +75,24 @@ export function tidyActivityText(text: string, lang: Lang = "he"): string {
   s = s.replace(/\s+,/g, ",").replace(/,\s*,/g, ",").replace(/·\s*·/g, "·");
   s = s.replace(/\s{2,}/g, " ").replace(/\s+([.;:)])/g, "$1").trim();
   return s;
+}
+
+/**
+ * round 11: the same line from the same employee repeated within a short time ("The owner answered…" twice) is shown once
+ * with "×N" — the list stays short and readable. Display only; nothing stored is changed. Input newest first.
+ */
+export function collapseRepeats<T extends { member_id: string | null; summary: string; created_at: string }>(list: T[], windowMs = 15 * 60_000): T[] {
+  const out: T[] = [];
+  let count = 1;
+  for (const item of list) {
+    const prev = out[out.length - 1];
+    if (prev && prev.member_id === item.member_id && prev.summary.replace(/ ×\d+$/, "") === item.summary && Math.abs(Date.parse(prev.created_at) - Date.parse(item.created_at)) <= windowMs) {
+      count++;
+      out[out.length - 1] = { ...prev, summary: `${item.summary} ×${count}` };
+      continue;
+    }
+    count = 1;
+    out.push(item);
+  }
+  return out;
 }

@@ -30,6 +30,8 @@ import { checkRate, detectAnomalies, injectionNotice, injectionVerdict, needsDou
 import { interactionGuidance, interactionPrompt, ownerPrompt, ownerStyle } from "./interaction-core";
 import { clientMemories, clientMemoryPrompt, isClientSubject, learnFromInteraction, lessonToMemory } from "./memory-plus-core";
 import { handoffPackage } from "./ops-core";
+import { ownerQuestionCheck } from "./ask-gate-core";
+import { masteryPrompt } from "./mastery-core";
 
 export interface EngineMember {
   id: string;
@@ -237,6 +239,8 @@ export function employeeSystem(m: EngineMember, ctx: TeamContext, lang: "he" | "
     playbookPrompt(m.role, ctx.playbookExtra),
     WORKING_DOCTRINE,
     expertisePrompt(m.role),
+    // round 11: owner mindset, self-sufficiency and the profession's master playbook
+    masteryPrompt(m.role),
     isDiagnosticTask(task) ? DIAGNOSTIC_METHOD : "",
     m.instructions ? `The owner's own instructions for you:\n${m.instructions.slice(0, 6000)}` : "",
     SAFETY_RULES,
@@ -369,6 +373,8 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
   let plan: PlanModel | null = null;
   /** permission requests already opened in this run (one per tool) */
   const askedGrant = new Set<string>();
+  // round 11: data questions are sent back to the employee once per tool (they read it instead of waiting for the owner)
+  const askRedirected = new Set<string>();
   for (let round = 0; round < 3; round++) {
     const b = stop();
     if (b) {
@@ -499,8 +505,15 @@ export async function runEmployeeTask(deps: EngineDeps, member: EngineMember, ta
         continue;
       }
       if (step.tool === "team.ask_user") {
+        const gate = ownerQuestionCheck(String(v.args.question ?? ""), member.tools ?? [], askRedirected);
+        if (!gate.ok) {
+          askRedirected.add(gate.tool);
+          results.push({ tool: step.tool, ok: false, summary: gate.hint });
+          await deps.log("understand", `Looked it up instead of asking the owner (${gate.tool}).`, { tool: gate.tool }, true);
+          continue;
+        }
         out.status = "awaiting_input";
-        out.question = String(v.args.question ?? "");
+        out.question = gate.question;
         await deps.message("clarify", null, { question: out.question });
         await deps.log("understand", `Asked the owner: ${out.question}`, {});
         return out;

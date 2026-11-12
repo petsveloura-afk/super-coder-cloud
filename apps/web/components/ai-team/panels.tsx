@@ -12,6 +12,7 @@ import { startTaskAction, taskProgressAction } from "@/app/[locale]/(dashboard)/
 import { clearTaskHistoryAction, deleteTeamTasksAction } from "@/app/[locale]/(dashboard)/ai-team/history-actions";
 import { flowStep, FLOW_POLL_MS, FLOW_MAX_MS, FLOW_RETRY_WAIT_MS } from "@/lib/team/run-flow-core";
 import { ownerFailure } from "@/lib/team/failure-reason-core";
+import { ownerFacingText, selfServeAnswer } from "@/lib/team/ask-gate-core";
 import { CleanupBar, SelectTick, useCleanup, useSelection } from "@/components/ui/cleanup";
 import { HealthPanel } from "./health-panel";
 import { DayHealthCard } from "./day-health-card";
@@ -265,13 +266,18 @@ export function GoalsPanel({ data, onRefresh }: { data: TeamPageData; onRefresh:
               const m = memberOf(data.members, q.assignee_id);
               const esc = (q.question ?? "").startsWith("escalate:");
               return (
-                <li key={q.id} className="rounded-2xl border border-line p-3">
+                <li key={q.id} className="feed-in rounded-2xl border border-line p-3 transition-shadow hover:shadow-card">
                   <div className="mb-1 flex items-center gap-2 text-[12.5px]">
                     {m ? <AgentAvatar spec={m.avatar} state="waiting" size={30} /> : null}
                     <span className="font-semibold">{m?.name}</span>
                     <span className="text-muted">· {q.title}</span>
                   </div>
-                  <p className="mb-2 text-[13px]">{esc ? t(`aiTeam.questions.escalate.${(q.question ?? "").slice(9)}`) : q.question}</p>
+                  <p className="mb-2 text-[13px]">{esc ? t(`aiTeam.questions.escalate.${(q.question ?? "").slice(9)}`) : ownerFacingText(q.question)}</p>
+                  {!esc ? (
+                    <button type="button" className="mb-2 inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12px] text-muted transition hover:bg-surface-hover hover:text-fg" onClick={() => run(`s${q.id}`, () => answerQuestionAction({ locale, taskId: q.id, answer: selfServeAnswer(locale === "en" || locale === "ar" ? locale : "he") }))} data-testid="question-self-serve">
+                      <Search className="h-3.5 w-3.5" /> {t("aiTeam.questions.selfServe")}
+                    </button>
+                  ) : null}
                   {!esc ? (
                     <div className="flex gap-2">
                       <Input value={answers[q.id] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} placeholder={t("aiTeam.questions.answer")} />

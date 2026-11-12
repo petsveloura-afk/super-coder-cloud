@@ -178,6 +178,13 @@ export async function loadTeamPageData(orgId: string, opts: { canManage: boolean
     try {
       const { tidyActivityText } = await import("@/lib/team/activity-tidy-core");
       data.activity = data.activity.map((x) => ({ ...x, summary: tidyActivityText(x.summary, lang8) }));
+      // round 11: repeated identical lines are shown once with ×N
+      try {
+        const { collapseRepeats } = await import("@/lib/team/activity-tidy-core");
+        data.activity = collapseRepeats(data.activity as { member_id: string | null; summary: string; created_at: string }[]) as typeof data.activity;
+      } catch {
+        /* optional */
+      }
       if (data.ownerLog) data.ownerLog = data.ownerLog.map((e) => (e.text ? { ...e, text: tidyActivityText(e.text, lang8) } : e));
       data.tasks = data.tasks.map((x) => {
         const r = (x.result ?? null) as { report?: unknown } | null;

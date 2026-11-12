@@ -38,7 +38,7 @@ export function PostEditTools({ body, setBody, fb, ig }: { body: string; setBody
   const chip = "inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12px] transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-50";
   const disabled = Boolean(busy) || body.trim().length < 5;
   return (
-    <div className="space-y-3 rounded-xl border border-line bg-elevated p-3" data-testid="post-edit-tools">
+    <div className="fade-slide space-y-3 rounded-xl border border-line bg-elevated p-3" data-testid="post-edit-tools">
       {/* live stats */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-live="polite">
         {stats.left.map((l) => (

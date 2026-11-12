@@ -157,7 +157,7 @@ export function ImageEditor({ image, setImage, ig, brandColor }: { image: string
   const pill = (on: boolean) => cn("rounded-full border px-2.5 py-1 text-[12px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50", on ? "border-accent bg-accent-soft text-accent" : "border-line hover:bg-surface-hover");
 
   return (
-    <div className="grid gap-4 rounded-xl border border-line bg-elevated p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" data-testid="image-editor">
+    <div className="fade-slide grid gap-4 rounded-xl border border-line bg-elevated p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" data-testid="image-editor">
       <div className="flex items-center justify-center rounded-lg bg-[repeating-conic-gradient(#0000000d_0_25%,transparent_0_50%)] bg-[length:16px_16px] p-2">
         {img ? <canvas ref={canvasRef} className="max-h-[420px] w-auto max-w-full rounded-md shadow-lg" role="img" aria-label={t("social.imageEdit.preview")} /> : <Loader2 className="h-6 w-6 animate-spin text-muted" aria-label={t("social.imageEdit.loading")} />}
       </div>

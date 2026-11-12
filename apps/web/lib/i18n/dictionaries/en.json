@@ -7395,7 +7395,8 @@
         "repeat_complaint": "A repeat complaint from a customer — please handle it personally.",
         "sensitive_situation": "A sensitive situation for a customer — please handle it yourself.",
         "long_wait": "A customer has been waiting a long time for an answer."
-      }
+      },
+      "selfServe": "Look it up yourselves and continue"
     },
     "proposals": {
       "title": "The team's initiatives",
