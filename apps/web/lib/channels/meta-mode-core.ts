@@ -12,11 +12,14 @@
 export const META_MODE_FLAG = "meta_connect_own_app";
 export type MetaConnectMode = "platform" | "own_app";
 
-/** the switch (true / false / never set) → the mode. Never set: the platform app when it is configured, otherwise own apps */
+/**
+ * the switch (true / false / never set) → the mode. Never set = "platform": nothing changes for anyone until the platform
+ * admin turns own apps on (the screens stay exactly as they were). `platformReady` is kept for the admin card's hint.
+ */
 export function resolveMetaMode(flag: boolean | null | undefined, platformReady: boolean): MetaConnectMode {
+  void platformReady;
   if (flag === true) return "own_app";
-  if (flag === false) return "platform";
-  return platformReady ? "platform" : "own_app";
+  return "platform";
 }
 
 /** every address the business's own app needs, from the platform's public address */

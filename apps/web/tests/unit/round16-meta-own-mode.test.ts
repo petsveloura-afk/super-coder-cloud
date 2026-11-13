@@ -7,12 +7,13 @@ const root = join(__dirname, "../..");
 const read = (p: string) => readFileSync(join(root, p), "utf8");
 
 describe("round 16 — Facebook + Instagram: each business's own app, with a platform-admin switch", () => {
-  it("the switch decides; when never set, the platform app only when it is configured", () => {
+  it("the switch decides; never set → the regular platform mode (nothing changes until the admin turns it on)", () => {
     expect(META_MODE_FLAG).toBe("meta_connect_own_app");
     expect(resolveMetaMode(true, true)).toBe("own_app");
+    expect(resolveMetaMode(true, false)).toBe("own_app");
     expect(resolveMetaMode(false, false)).toBe("platform");
     expect(resolveMetaMode(null, true)).toBe("platform");
-    expect(resolveMetaMode(undefined, false)).toBe("own_app");
+    expect(resolveMetaMode(undefined, false)).toBe("platform");
   });
 
   it("every address the business's app needs comes from the platform address", () => {

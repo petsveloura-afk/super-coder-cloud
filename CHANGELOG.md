@@ -8,6 +8,7 @@
 - **More done for the business:** saving the App ID + App Secret now also fills the privacy, terms, data-deletion and deauthorize addresses and the app domain in the business's app (best effort; `lib/channels/meta-mode.ts → configureOwnAppSettings`), next to the real-time notifications that were already set up automatically.
 - **"Check and fix everything"** (`integrations/meta-easy-actions.ts → checkOwnSetupAction`, `meta-mode.ts → ownSetupStatus`): one button checks the keys, the notifications (re-set when wrong), the required addresses (re-filled), the connected Page, the Page's subscription (re-subscribed when missing) and Live (a real-time message from this Page in the last 3 days), and shows the one next step.
 - Texts in Hebrew, English and Arabic (`metaMode.*`, `metaEasy.*`, keys added only). No migration, no new env. Tests: `round16-meta-own-mode.test.ts` (10).
+- **Fix (16b):** the switch is off until the platform admin turns it on — a platform where it was never set keeps the regular screens exactly as before (customers do not see a Meta tile that still needs the platform's setup; admins keep the "setup" link). Fixes the E2E runs wave 19 / wave 20.
 
 ## Round 15 — usage rules, standard legal addresses, Meta data-deletion and deauthorize callbacks
 
