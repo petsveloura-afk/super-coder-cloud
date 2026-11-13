@@ -8106,5 +8106,77 @@
     "cleanBody": "New updates will appear here. Cleared items come back with \"Show all again\".",
     "deleted": "Deleted",
     "markAllRead": "Mark all read"
+  },
+  "metaMode": {
+    "title": "How businesses connect Facebook + Instagram",
+    "subtitle": "Choose how businesses connect. Switching never disconnects anyone — existing connections of both kinds keep working side by side.",
+    "active": "Active",
+    "own_app": {
+      "title": "Each business's own app (guided wizard)",
+      "body": "Every business connects through its own free Meta app with a short wizard. Works at once, no Meta approval of the platform needed. The system sets up everything it can for them."
+    },
+    "platform": {
+      "title": "The platform's app (one click)",
+      "body": "Every business clicks \"Connect\" and approves. For when the platform app passed App Review and is Live."
+    },
+    "connected": "{n} businesses connected this way",
+    "platformNotReady": "The platform app is not fully configured (META_APP_ID / META_PAGES_CONFIG_ID) — \"each business's own app\" is recommended for now.",
+    "keep": "A business that is already connected stays connected in either mode, and can reconnect the active way.",
+    "savedOwn": "Businesses now connect through their own app (guided wizard)",
+    "savedPlatform": "Businesses now connect in one click through the platform's app"
+  },
+  "metaEasy": {
+    "title": "Connect Facebook + Instagram — simple wizard",
+    "subtitle": "A few short steps, once. The system does everything it can for you: real-time notifications, the privacy and deletion addresses, the domain, connecting the Page and Instagram — and checks that it all works.",
+    "start": "Connect Facebook + Instagram",
+    "startIg": "Connect Instagram (with Facebook)",
+    "manage": "Manage and check the connection",
+    "igWithPage": "In the simple wizard Instagram connects together with the Facebook Page — make sure it is linked to the Page and select it in the Facebook window.",
+    "live": "Last: in your Meta app, at the top of the page, switch App Mode to Live. The addresses Meta requires were already filled in for you. Without Live, Meta does not send customers' messages in real time (the 1-minute sync still works).",
+    "openApp": "Open my app in Meta",
+    "checkTitle": "Check and auto-fix",
+    "checkRun": "Check and fix everything",
+    "checkHint": "One click checks the app, the notifications and the Page — and fixes whatever it can by itself.",
+    "allGood": "Everything is connected and working ✓",
+    "fixed": "fixed automatically",
+    "next": {
+      "keys": "The app's keys are not valid — paste App ID and App Secret again",
+      "connected": "Connect the Page: click \"Connect through my app\"",
+      "webhooks": "Real-time notifications are not set — click \"Manual setup\" and follow the steps",
+      "page": "The Page is not subscribed to messages — click \"Reconnect through my app\"",
+      "live": "Switch the app to Live"
+    },
+    "c": {
+      "keys": {
+        "ok": "The app's keys are valid",
+        "bad": "The keys are not valid — paste App ID and App Secret again",
+        "unknown": "Checking the keys…"
+      },
+      "webhooks": {
+        "ok": "Real-time notifications are set",
+        "bad": "Real-time notifications are not set — \"Manual setup\"",
+        "unknown": "Not known yet"
+      },
+      "settings": {
+        "ok": "Privacy, terms and data-deletion addresses are filled in",
+        "bad": "The privacy addresses are not filled in — paste them in App Settings → Basic",
+        "unknown": "Privacy addresses: if Meta asks when switching to Live — they are under \"Manual setup\""
+      },
+      "connected": {
+        "ok": "A Facebook Page is connected through your app",
+        "bad": "No Page connected yet — click \"Connect through my app\"",
+        "unknown": "Not known yet"
+      },
+      "page": {
+        "ok": "The Page is subscribed to messages and comments",
+        "bad": "The Page is not subscribed to messages — reconnect",
+        "unknown": "Not known yet"
+      },
+      "live": {
+        "ok": "Customer messages arrive in real time (Live) ✓",
+        "bad": "The app is not Live",
+        "unknown": "No real-time message yet — if the app is Live, send a test message to the Page and check again"
+      }
+    }
   }
 }

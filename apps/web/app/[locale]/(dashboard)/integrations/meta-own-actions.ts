@@ -56,6 +56,9 @@ export async function saveOwnAppAction(input: { locale: string; appId: string; a
   // the hash is stored first: Meta checks the callback (GET with the verify token) while we configure it
   const hooks = await configureOwnWebhooks(appId, secret, webhookCallbackUrl(await appUrl()), verifyToken);
   await admin.from("meta_own_apps").update({ webhooks_ok: hooks.ok, last_error: hooks.ok ? null : `webhooks: ${hooks.error ?? ""}`.slice(0, 900) }).eq("organization_id", ctx.org.id);
+  const publicEnvUrl = await appUrl();
+  // round 16: the addresses Meta requires before the app can go Live (privacy, terms, data deletion, domain) — filled for the business
+  await import("@/lib/channels/meta-mode").then((m) => m.configureOwnAppSettings(appId, secret, publicEnvUrl)).catch(() => undefined);
   await admin.from("audit_logs").insert({ organization_id: ctx.org.id, actor_id: ctx.userId, action: "integrations.meta_own_app", entity_type: "organization", entity_id: ctx.org.id, metadata: { app_id: appId, webhooks: hooks.ok } }).then(() => undefined, () => undefined);
   revalidatePath(`/${locale}/integrations`);
   return { ok: true, message: hooks.ok ? "metaAlt.savedWithHooks" : "metaAlt.savedNoHooks", messageParams: { name: check.name ?? appId }, data: { webhooks: hooks.ok, name: check.name ?? null } };

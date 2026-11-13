@@ -27,6 +27,8 @@ export interface MarketProps {
   facebook: { connected: boolean; label: string | null; error: string | null };
   instagram: { connected: boolean; label: string | null };
   /** Instagram connected directly (Instagram Login): configured on the platform, how the current one is connected, its problem */
+  /** round 16: how businesses connect Facebook + Instagram — the platform's one-click app, or their own app (guided) */
+  metaMode?: "platform" | "own_app";
   igDirect?: { configured: boolean; mode: string | null; error: string | null; expires: string | null; issue: string | null; setup?: { redirectUri: string; base: string; appIdTail: string; sameAsFacebook: boolean } };
   whatsappMode: string | null;
   google: { configured: boolean; calendar: boolean; gmail: boolean; business: boolean; email: string | null };
@@ -256,7 +258,15 @@ function MetaTile({ p }: { p: MarketProps }) {
           ))}
         </div>
       ) : null}
-      {p.canManage ? (
+      {p.canManage && p.metaMode === "own_app" ? (
+        // round 16: every business connects through its own Meta app — the guided wizard below does everything it can for them
+        <div className="flex flex-wrap gap-2">
+          <a href="#meta-alt" className="inline-flex h-9 items-center gap-2 rounded-xl bg-accent-solid px-3.5 text-[13px] font-semibold text-accent-fg shadow-sm hover:opacity-95" data-testid="meta-own-start">
+            <MessagesSquare className="h-4 w-4" /> {t(p.facebook.connected ? "metaEasy.manage" : "metaEasy.start")}
+          </a>
+          {p.facebook.connected ? <ConfirmActionButton action={disconnectMetaPagesAction} fields={{ locale }} size="sm" variant="ghost" label={t("integrations.channels.disconnect")} confirm={t("integrations.channels.confirmDisconnect")} /> : null}
+        </div>
+      ) : p.canManage ? (
         p.metaPages ? (
           <div className="flex flex-wrap gap-2">
             <Button onClick={connect} loading={busy} data-testid="meta-connect">
@@ -268,7 +278,7 @@ function MetaTile({ p }: { p: MarketProps }) {
           <AdminSetup what="meta" />
         )
       ) : null}
-      {p.canManage && !p.facebook.connected ? (
+      {p.canManage && !p.facebook.connected && p.metaMode !== "own_app" ? (
         <a href="#meta-alt" className="block text-[12px] font-medium text-accent hover:underline" data-testid="meta-alt-link">
           {t("metaAlt.tileLink")}
         </a>
@@ -317,13 +327,18 @@ function InstagramTile({ p }: { p: MarketProps }) {
               <li>{t("market.ig.fix4")}</li>
             </ol>
           )}
-          {d?.configured ? <p className="font-medium text-accent">{t("market.ig.orDirect")}</p> : null}
+          {p.metaMode === "own_app" ? <p className="font-medium text-accent">{t("metaEasy.igWithPage")}</p> : d?.configured ? <p className="font-medium text-accent">{t("market.ig.orDirect")}</p> : null}
         </div>
       ) : null}
       {!connected && !p.facebook.connected ? <p className="text-[12.5px] text-muted">{t("market.ig.howTo")}</p> : null}
       {p.canManage ? (
         <div className="flex flex-wrap gap-2">
-          {d?.configured ? (
+          {p.metaMode === "own_app" ? (
+            // round 16: Instagram comes with the Facebook Page in the guided wizard (the business's own app)
+            <a href="#meta-alt" className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-600 via-pink-500 to-orange-400 px-3.5 text-[13px] font-semibold text-white shadow-sm transition hover:opacity-95" data-testid="ig-own-start">
+              <Camera className="h-4 w-4" /> {t(connected ? "metaEasy.manage" : "metaEasy.startIg")}
+            </a>
+          ) : d?.configured ? (
             <a href={startUrl} className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-600 via-pink-500 to-orange-400 px-3.5 text-[13px] font-semibold text-white shadow-sm transition hover:opacity-95" data-testid="ig-direct-connect">
               <Camera className="h-4 w-4" /> {t(connected ? (direct ? "market.ig.switch" : "market.ig.connectOther") : "market.ig.connect")}
             </a>
@@ -689,7 +704,7 @@ export function IntegrationsMarketplace(p: MarketProps) {
         { cat: "automation" as const, key: "zapier", words: "zapier make n8n webhook זאפייר", el: <ZapierTile key="zapier" p={p} /> },
       ]
         // wave 20: a connection that still needs the platform's one-time setup is shown to platform admins only
-        .filter((x) => p.platformAdmin !== false || ({ meta: Boolean(p.metaPages), instagram: Boolean(p.igDirect?.configured) || p.instagram.connected || Boolean(p.metaPages), "wa-app": Boolean(p.metaWa), google: p.google.configured, shopify: p.shopify.configured } as Record<string, boolean>)[x.key] !== false)
+        .filter((x) => p.platformAdmin !== false || ({ meta: Boolean(p.metaPages) || p.metaMode === "own_app", instagram: Boolean(p.igDirect?.configured) || p.instagram.connected || Boolean(p.metaPages) || p.metaMode === "own_app", "wa-app": Boolean(p.metaWa), google: p.google.configured, shopify: p.shopify.configured } as Record<string, boolean>)[x.key] !== false)
         .filter((x) => (cat === "all" || x.cat === cat) && (!q.trim() || `${x.key} ${x.words}`.toLowerCase().includes(q.trim().toLowerCase()))),
     [cat, q, p],
   );

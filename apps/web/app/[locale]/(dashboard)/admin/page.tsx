@@ -15,6 +15,7 @@ import { AdminDomains } from "@/components/admin/admin-domains";
 import { AdminOverrides } from "@/components/admin/admin-growth";
 import { SpeedCard } from "@/components/admin/speed-card";
 import { PlatformSetup } from "@/components/admin/platform-setup";
+import { MetaModeCard } from "@/components/admin/meta-mode-card";
 import { moreSetupSteps, setupSteps, voiceSetupSteps } from "@/lib/admin/setup-core";
 import { AdminPhones } from "@/components/admin/admin-phones";
 import { publicEnv } from "@/lib/env";
@@ -75,6 +76,19 @@ export default async function AdminPage({ params, searchParams }: { params: Prom
       {/* wave 20: the platform's one-time setup — after it, every business connects in one click */}
       {/* wave 57: + the agents' voice and phone numbers for every business (set once by the platform owner) */}
       <PlatformSetup steps={setupSteps(process.env, publicEnv.appUrl)} extra={voiceSetupSteps(process.env, publicEnv.appUrl)} more={moreSetupSteps(process.env)} />
+      {/* round 16: how businesses connect Facebook + Instagram — one switch, nothing already connected is touched */}
+      {await (async () => {
+        try {
+          const [{ loadMetaMode }, { platformAppReady }, { createAdminClient }] = await Promise.all([import("@/lib/channels/meta-mode"), import("@/lib/channels/meta-own"), import("@/lib/supabase/admin")]);
+          const mode = await loadMetaMode();
+          const { data: fbRows } = process.env.SUPABASE_SERVICE_ROLE_KEY ? await createAdminClient().from("channel_accounts").select("config").eq("kind", "messenger").neq("status", "disabled").limit(2000) : { data: [] };
+          const rows = (fbRows ?? []) as { config: Record<string, string> | null }[];
+          const own = rows.filter((r) => r.config?.mode === "own_app").length;
+          return <MetaModeCard mode={mode} counts={{ own, platform: rows.length - own }} platformReady={platformAppReady() && /^\d{5,30}$/.test(process.env.META_PAGES_CONFIG_ID ?? "")} />;
+        } catch {
+          return null;
+        }
+      })()}
       <AdminPhones orgs={orgRows.map((o) => ({ id: o.id, name: o.name, plan: o.plan }))} />
       <AiHealth configured={Object.fromEntries(ROUTE_PROVIDERS.map((p) => [p, providerKeys(p, process.env).length]))} />
       <SpeedCard locale={locale} />

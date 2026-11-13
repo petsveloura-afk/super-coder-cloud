@@ -148,6 +148,8 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
       canManage: canChannels,
       platformAdmin: ctx.isPlatformAdmin,
       metaPages: metaPagesPublicConfig(),
+      // round 16: how businesses connect Facebook + Instagram (platform admin's switch)
+      metaMode: await import("@/lib/channels/meta-mode").then((m) => m.loadMetaMode()).catch(() => "platform" as const),
       metaWa: metaPublicConfig(),
       facebook: { connected: Boolean(fb && fb.status !== "disabled"), label: fb?.config.page_name ?? fb?.name ?? null, error: fb?.status === "error" ? fb.last_error : fb?.last_error ?? null },
       instagram: { connected: Boolean(ig && ig.status !== "disabled"), label: ig?.config.username ? `@${ig.config.username}` : null },
@@ -188,6 +190,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ l
       canManage: canChannels,
       platformAdmin: ctx.isPlatformAdmin,
       testerReady: platformAppReady(),
+      metaMode: await import("@/lib/channels/meta-mode").then((m) => m.loadMetaMode()).catch(() => "platform" as const),
       facebookConnected: Boolean(fbRow && fbRow.status !== "disabled"),
       connectedMode: fbRow?.config.mode ?? null,
       ownApp: own ? { appId: own.appId, appName: own.appName, configId: own.configId, status: own.status, webhooksOk: own.webhooksOk, lastError: own.lastError } : null,

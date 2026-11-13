@@ -9,6 +9,8 @@ import { Badge, Button, Input } from "@/components/ui/primitives";
 import { ConfirmActionButton } from "@/components/ui/form-dialog";
 import { cn } from "@/lib/utils";
 import { needsAlternative, ownAppSteps } from "@/lib/channels/meta-own-core";
+import { appDashboardLinks, nextOwnStep, type SetupCheck } from "@/lib/channels/meta-mode-core";
+import { checkOwnSetupAction } from "@/app/[locale]/(dashboard)/integrations/meta-easy-actions";
 import { markTesterRequestAction, removeOwnAppAction, requestTesterAction, retryOwnWebhooksAction, revealOwnVerifyTokenAction, saveOwnAppAction } from "@/app/[locale]/(dashboard)/integrations/meta-own-actions";
 
 /**
@@ -26,6 +28,8 @@ export interface MetaAltProps {
   ownApp: { appId: string; appName: string | null; configId: string | null; status: "saved" | "connected" | "error"; webhooksOk: boolean; lastError: string | null } | null;
   requests: { id: string; profile_ref: string; status: string; created_at: string }[];
   adminQueue: { id: string; org_name: string; profile_ref: string; fb_user: string | null; last_error: string | null; created_at: string }[];
+  /** round 16: "own_app" — every business connects through its own Meta app; this section becomes THE way to connect */
+  metaMode?: "platform" | "own_app";
 }
 
 function Copyable({ value, label }: { value: string; label?: string }) {
@@ -77,7 +81,9 @@ export function MetaAlternatives(p: MetaAltProps) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const sp = useSearchParams();
-  const [open, setOpen] = useState<0 | 1 | 2>(p.ownApp ? 2 : 0);
+  const [open, setOpen] = useState<0 | 1 | 2>(p.ownApp || p.metaMode === "own_app" ? 2 : 0);
+  const ownMode = p.metaMode === "own_app";
+  const [checks, setChecks] = useState<SetupCheck[] | null>(null);
   const [highlight, setHighlight] = useState(false);
   const [profile, setProfile] = useState("");
   const [appId, setAppId] = useState(p.ownApp?.appId ?? "");
@@ -149,8 +155,8 @@ export function MetaAlternatives(p: MetaAltProps) {
           <Sparkles className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold">{t("metaAlt.title")}</h2>
-          <p className="text-[13px] leading-relaxed text-muted">{t("metaAlt.subtitle")}</p>
+          <h2 className="text-lg font-bold">{t(ownMode ? "metaEasy.title" : "metaAlt.title")}</h2>
+          <p className="text-[13px] leading-relaxed text-muted">{t(ownMode ? "metaEasy.subtitle" : "metaAlt.subtitle")}</p>
         </div>
         {p.facebookConnected ? (
           <Badge tone="success">
@@ -159,8 +165,9 @@ export function MetaAlternatives(p: MetaAltProps) {
         ) : null}
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        {/* 1 — tester of the platform app */}
+      <div className={cn("grid gap-3", !ownMode && "lg:grid-cols-2")}>
+        {/* 1 — tester of the platform app (not offered when every business connects through its own app) */}
+        {!ownMode ? (
         <Option n={1} icon={UserPlus} tone="bg-gradient-to-br from-emerald-500 to-teal-500" title={t("metaAlt.tester.title")} badge={t("metaAlt.tester.badge")} body={t("metaAlt.tester.body")} open={open === 1} onToggle={() => setOpen(open === 1 ? 0 : 1)}>
           {p.testerReady ? (
             <>
@@ -197,6 +204,7 @@ export function MetaAlternatives(p: MetaAltProps) {
             <p className="rounded-2xl bg-elevated p-3 text-[12.5px] text-muted">{t("metaAlt.tester.unavailable")}</p>
           )}
         </Option>
+        ) : null}
 
         {/* 2 — the business's own Meta app */}
         <Option n={2} icon={KeyRound} tone="bg-gradient-to-br from-blue-600 to-indigo-500" title={t("metaAlt.own.title")} badge={t("metaAlt.own.badge")} body={t("metaAlt.own.body")} open={open === 2} onToggle={() => setOpen(open === 2 ? 0 : 2)}>
@@ -293,6 +301,59 @@ export function MetaAlternatives(p: MetaAltProps) {
               </li>
             ))}
           </ol>
+          {/* round 16: the last step (Live) and one button that checks and repairs everything the app's keys can repair */}
+          <div className="flex gap-3">
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent-soft text-[12px] font-bold text-accent">{steps.length + 1}</span>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <p className="text-[12.5px] leading-relaxed">{t("metaEasy.live")}</p>
+              {p.ownApp ? (
+                <a href={appDashboardLinks(p.ownApp.appId).dashboard} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] font-medium text-accent hover:underline">
+                  {t("metaEasy.openApp")} <ExternalLink className="h-3 w-3" />
+                </a>
+              ) : null}
+            </div>
+          </div>
+          {p.ownApp ? (
+            <div className="space-y-2 rounded-2xl border border-line p-3" data-testid="own-check">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="min-w-0 flex-1 text-[13px] font-semibold">{t("metaEasy.checkTitle")}</p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  loading={busy === "check"}
+                  data-testid="own-check-run"
+                  onClick={async () => {
+                    setBusy("check");
+                    const r = await checkOwnSetupAction({ locale });
+                    setBusy(null);
+                    if (r.error || !r.data) return toast.error(t(r.error ?? "common.error"));
+                    setChecks(r.data.checks);
+                    const next = nextOwnStep(r.data.checks);
+                    if (next === "done") toast.success(t("metaEasy.allGood"));
+                    else toast(t(`metaEasy.next.${next}`));
+                    router.refresh();
+                  }}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" /> {t("metaEasy.checkRun")}
+                </Button>
+              </div>
+              {checks ? (
+                <ul className="space-y-1" data-testid="own-check-list">
+                  {checks.map((c) => (
+                    <li key={c.key} className="flex items-start gap-2 text-[12.5px]">
+                      <span aria-hidden className={cn("mt-0.5", c.ok === true ? "text-success" : c.ok === false ? "text-danger" : "text-warning")}>{c.ok === true ? "✓" : c.ok === false ? "✕" : "…"}</span>
+                      <span className="min-w-0 flex-1">
+                        {t(`metaEasy.c.${c.key}.${c.ok === true ? "ok" : c.ok === false ? "bad" : "unknown"}`)}
+                        {c.fixed ? <span className="ms-1 text-success">· {t("metaEasy.fixed")}</span> : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[12px] text-muted">{t("metaEasy.checkHint")}</p>
+              )}
+            </div>
+          ) : null}
           <p className="rounded-2xl bg-elevated p-3 text-[11.5px] leading-relaxed text-subtle">🔒 {t("metaAlt.own.privacy")}</p>
         </Option>
       </div>
